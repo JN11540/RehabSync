@@ -11,7 +11,7 @@ import SwiftUI
 struct RehabSyncApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            Home()
         }
     }
 }
