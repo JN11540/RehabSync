@@ -182,17 +182,6 @@ struct HealthTipCard: View {
                         .foregroundStyle(.white.opacity(0.25))
                 }
 
-                // 底部分隔線 + footer
-                Divider().background(.white.opacity(0.25))
-                HStack(spacing: 6) {
-                    Image(systemName: "diamond")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.white.opacity(0.75))
-                    Text("查看全部提示")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.75))
-                }
-                .padding(.top, 10)
             }
             .padding(20)
         }
