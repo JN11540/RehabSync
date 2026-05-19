@@ -45,13 +45,16 @@ struct HomeContent: View {
                         .frame(maxHeight: .infinity, alignment: .top)
 
                         // 右欄 40%
-                        VStack(spacing: 16) {
-                            HealthTipCard()
-                            AssessmentEntryCard()
-                                .frame(maxHeight: .infinity)
+                        GeometryReader { rightGeo in
+                            VStack(spacing: 16) {
+                                HealthTipCard()
+                                    .frame(height: (rightGeo.size.height - 16) * 0.6)
+                                AssessmentEntryCard()
+                                    .frame(height: (rightGeo.size.height - 16) * 0.4)
+                            }
                         }
                         .frame(width: usable * 0.4)
-                        .frame(maxHeight: .infinity, alignment: .top)
+                        .frame(maxHeight: .infinity)
                     }
                     .padding(.horizontal, hPad)
                 }
@@ -121,27 +124,80 @@ struct TreatmentPlanCard: View {
 
 struct HealthTipCard: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 6) {
-                Text("99")
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(Color(red: 0.15, green: 0.6, blue: 0.55))
-                Text("今日健康提示")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.75))
+        ZStack(alignment: .topLeading) {
+            // 漸層背景
+            LinearGradient(
+                colors: [
+                    Color(red: 0.38, green: 0.38, blue: 0.88),
+                    Color(red: 0.22, green: 0.30, blue: 0.82)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            // 粉色光暈
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            Color(red: 0.88, green: 0.45, blue: 0.55).opacity(0.65),
+                            Color.clear
+                        ],
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: 100
+                    )
+                )
+                .frame(width: 200, height: 200)
+                .offset(x: 80, y: 40)
+
+            // 內容
+            VStack(alignment: .leading, spacing: 0) {
+                // 標題列
+                HStack(spacing: 8) {
+                    Text("\u{201C}")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundStyle(.white)
+                    Text("今日健康提示")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.8))
+                }
+
+                Spacer()
+
+                // 提示文字
+                Text("定期伸展胸肌有助於預防圓肩姿勢，減輕頸部長期負擔。")
+                    .font(.system(size: 18, weight: .bold))
+                    .italic()
+                    .foregroundStyle(.white)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Spacer()
+
+                // 右下引號
+                HStack {
+                    Spacer()
+                    Text("\u{201D}")
+                        .font(.system(size: 48, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.25))
+                }
+
+                // 底部分隔線 + footer
+                Divider().background(.white.opacity(0.25))
+                HStack(spacing: 6) {
+                    Image(systemName: "diamond")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.white.opacity(0.75))
+                    Text("查看全部提示")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.75))
+                }
+                .padding(.top, 10)
             }
-            Text("\"")
-                .font(.system(size: 26, weight: .bold))
-                .foregroundStyle(Color(red: 0.15, green: 0.6, blue: 0.55))
-            Text("定期伸展胸肌有助於預防圓肩姿勢，減輕頸部長期負擔。")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(.white)
-                .fixedSize(horizontal: false, vertical: true)
+            .padding(20)
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(red: 0.1, green: 0.23, blue: 0.38))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .frame(maxWidth: .infinity)
     }
 }
 
