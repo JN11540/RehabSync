@@ -41,7 +41,8 @@ struct HomeContent: View {
                             TreatmentPlanCard()
                                 .frame(maxHeight: .infinity)
                         }
-                        .frame(width: usable * 0.6, maxHeight: .infinity, alignment: .top)
+                        .frame(width: usable * 0.6)
+                        .frame(maxHeight: .infinity, alignment: .top)
 
                         // 右欄 40%
                         VStack(spacing: 16) {
@@ -49,7 +50,8 @@ struct HomeContent: View {
                             AssessmentEntryCard()
                                 .frame(maxHeight: .infinity)
                         }
-                        .frame(width: usable * 0.4, maxHeight: .infinity, alignment: .top)
+                        .frame(width: usable * 0.4)
+                        .frame(maxHeight: .infinity, alignment: .top)
                     }
                     .padding(.horizontal, hPad)
                 }
