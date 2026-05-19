@@ -1,5 +1,7 @@
 import Foundation
+import Observation
 
-class VasHistoryViewModel: ObservableObject {
+@Observable
+class VasHistoryViewModel {
 
 }

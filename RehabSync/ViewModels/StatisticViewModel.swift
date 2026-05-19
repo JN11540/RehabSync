@@ -1,5 +1,7 @@
 import Foundation
+import Observation
 
-class StatisticViewModel: ObservableObject {
+@Observable
+class StatisticViewModel {
 
 }

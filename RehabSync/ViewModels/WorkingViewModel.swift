@@ -1,5 +1,7 @@
 import Foundation
+import Observation
 
-class WorkingViewModel: ObservableObject {
+@Observable
+class WorkingViewModel {
 
 }

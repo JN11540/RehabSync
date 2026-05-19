@@ -1,5 +1,7 @@
 import Foundation
+import Observation
 
-class TreatmentViewModel: ObservableObject {
+@Observable
+class TreatmentViewModel {
 
 }
