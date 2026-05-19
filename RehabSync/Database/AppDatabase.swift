@@ -19,33 +19,33 @@ func createAppDatabase() throws -> DatabaseQueue {
         try db.create(table: "treatment") { t in
             t.autoIncrementedPrimaryKey("id")
             t.column("name", .text).notNull()
-            t.column("patientId", .integer).notNull()
-            t.column("startTime", .integer).notNull()
-            t.column("endTime", .integer).notNull()
+            t.column("patient_id", .integer).notNull()
+            t.column("start_time", .integer).notNull()
+            t.column("end_time", .integer).notNull()
         }
 
         try db.create(table: "treatment_content") { t in
             t.autoIncrementedPrimaryKey("id")
-            t.column("treatmentId", .integer).notNull()
+            t.column("treatment_id", .integer).notNull()
                 .references("treatment", onDelete: .cascade)
-            t.column("exerciseId", .integer).notNull()
+            t.column("exercise_id", .integer).notNull()
                 .references("exercise", onDelete: .restrict)
             t.column("sets", .integer).notNull()
-            t.column("setRestTime", .integer).notNull()
+            t.column("set_rest_time", .integer).notNull()
             t.column("reps", .integer).notNull()
-            t.column("repTrainingTime", .integer).notNull()
-            t.column("repRestTime", .integer).notNull()
+            t.column("rep_training_time", .integer).notNull()
+            t.column("rep_rest_time", .integer).notNull()
             t.column("date", .integer).notNull()
         }
 
         try db.create(table: "treatment_result") { t in
             t.autoIncrementedPrimaryKey("id")
-            t.column("treatmentId", .integer).notNull()
+            t.column("treatment_id", .integer).notNull()
                 .references("treatment", onDelete: .cascade)
-            t.column("treatmentContentId", .integer).notNull()
+            t.column("treatment_content_id", .integer).notNull()
                 .references("treatment_content", onDelete: .cascade)
             t.column("reps", .integer).notNull()
-            t.column("totalTime", .integer).notNull()
+            t.column("total_time", .integer).notNull()
             t.column("date", .integer).notNull()
         }
     }

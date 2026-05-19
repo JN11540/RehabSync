@@ -9,7 +9,7 @@ class TreatmentResultViewModel {
     func fetchAll(for treatmentId: Int) {
         results = (try? db.read { db in
             try TreatmentResult
-                .filter(Column("treatmentId") == treatmentId)
+                .filter(Column("treatment_id") == treatmentId)
                 .fetchAll(db)
         }) ?? []
     }

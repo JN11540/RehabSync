@@ -2,6 +2,7 @@ import GRDB
 
 struct Treatment: Codable, FetchableRecord, MutablePersistableRecord {
     static let databaseTableName = "treatment"
+    static let databaseColumnDecodingStrategy = DatabaseColumnDecodingStrategy.convertFromSnakeCase
 
     var id: Int64?
     var name: String
