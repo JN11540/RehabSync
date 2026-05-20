@@ -19,6 +19,7 @@ struct HomeContent: View {
     @State private var vm = TreatmentViewModel()
 
     var body: some View {
+        NavigationStack {
         ZStack {
             Color(red: 0.96, green: 0.94, blue: 0.91).ignoresSafeArea()
             VStack(alignment: .leading, spacing: 20) {
@@ -53,6 +54,7 @@ struct HomeContent: View {
             .padding(.bottom, 20)
         }
         .onAppear { vm.fetchAll() }
+        } // NavigationStack
     }
 }
 
@@ -163,7 +165,18 @@ struct TreatmentPlanCard: View {
 
             HStack(spacing: 12) {
                 OutlineButton(title: "Start") {}
-                OutlineButton(title: "動作列表") {}
+                NavigationLink {
+                    TreatmentView(treatment: treatment)
+                } label: {
+                    Text("動作列表")
+                        .font(.system(size: 16, weight: .medium))
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 10)
+                        .background(.white)
+                        .foregroundStyle(.primary)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.3)))
+                }
                 Spacer()
                 ProgressView(value: 0.28)
                     .tint(Color(red: 0.15, green: 0.6, blue: 0.55))

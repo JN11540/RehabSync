@@ -1,11 +1,151 @@
 import SwiftUI
 
 struct TreatmentView: View {
+    let treatment: Treatment
+    @State private var contentVM = TreatmentContentViewModel()
+    @State private var exerciseVM = ExerciseViewModel()
+
+    private var startDate: String {
+        Date(timeIntervalSince1970: TimeInterval(treatment.start_time))
+            .formatted(.dateTime.year().month().day())
+    }
+    private var endDate: String {
+        Date(timeIntervalSince1970: TimeInterval(treatment.end_time))
+            .formatted(.dateTime.year().month().day())
+    }
+
     var body: some View {
-        Text("Treatment")
+        ZStack {
+            Color(red: 0.96, green: 0.94, blue: 0.91).ignoresSafeArea()
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(treatment.name)
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
+                    Text("\(startDate) ～ \(endDate)")
+                        .font(.system(size: 15))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 24)
+
+                Label("左右滑動查看全部訓練日", systemImage: "arrow.left.and.right")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 24)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 16) {
+                        ForEach(contentVM.contents, id: \.id) { content in
+                            DayCard(
+                                content: content,
+                                exerciseName: exerciseName(for: content.exercise_id)
+                            )
+                        }
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 8)
+                }
+
+                Spacer()
+            }
+            .padding(.top, 24)
+        }
+        .navigationTitle("動作列表")
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            contentVM.fetchAll(for: Int(treatment.id ?? 0))
+            exerciseVM.fetchAll()
+        }
+    }
+
+    private func exerciseName(for id: Int) -> String {
+        exerciseVM.exercises.first { Int($0.id ?? 0) == id }?.name ?? "未知動作"
     }
 }
 
-#Preview {
-    TreatmentView()
+// MARK: - Day Card
+
+struct DayCard: View {
+    let content: TreatmentContent
+    let exerciseName: String
+
+    private var date: Date {
+        Date(timeIntervalSince1970: TimeInterval(content.date))
+    }
+    private var dateLabel: String {
+        date.formatted(.dateTime.month().day())
+    }
+    private var totalSeconds: Int {
+        content.sets * (content.reps * content.rep_training_time + content.set_rest_time)
+    }
+    private var timeLabel: String {
+        let m = totalSeconds / 60
+        let s = totalSeconds % 60
+        return String(format: "%02d:%02d", m, s)
+    }
+    private var status: DayStatus {
+        let today = Calendar.current.startOfDay(for: Date())
+        let cardDay = Calendar.current.startOfDay(for: date)
+        if cardDay < today { return .done }
+        if cardDay == today { return .active }
+        return .upcoming
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Image(systemName: status.icon)
+                .font(.system(size: 24))
+                .foregroundStyle(status == .active ? .white : Color(red: 0.15, green: 0.6, blue: 0.55))
+
+            Text(dateLabel)
+                .font(.system(size: 14))
+                .foregroundStyle(status == .active ? .white.opacity(0.8) : .secondary)
+
+            Text(exerciseName)
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(status == .active ? .white : Color(red: 0.1, green: 0.25, blue: 0.4))
+                .lineLimit(2)
+
+            Text(status.label)
+                .font(.system(size: 13))
+                .foregroundStyle(status == .active ? .white.opacity(0.8) : .secondary)
+
+            Spacer()
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(timeLabel)
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundStyle(status == .active ? .white : Color(red: 0.1, green: 0.25, blue: 0.4))
+                Text("分鐘")
+                    .font(.system(size: 13))
+                    .foregroundStyle(status == .active ? .white.opacity(0.7) : .secondary)
+            }
+        }
+        .padding(20)
+        .frame(width: 180, height: 260)
+        .background(status == .active ? Color(red: 0.1, green: 0.25, blue: 0.4) : .white)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
+    }
+}
+
+// MARK: - Day Status
+
+enum DayStatus {
+    case done, active, upcoming
+
+    var icon: String {
+        switch self {
+        case .done:     return "checkmark.circle"
+        case .active:   return "play.circle.fill"
+        case .upcoming: return "clock"
+        }
+    }
+    var label: String {
+        switch self {
+        case .done:     return "已完成"
+        case .active:   return "進行中"
+        case .upcoming: return "即將開始"
+        }
+    }
 }
