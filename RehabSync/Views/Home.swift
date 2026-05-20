@@ -139,9 +139,14 @@ struct TreatmentPlanCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("治療計畫")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(Color(red: 0.15, green: 0.6, blue: 0.55))
+            HStack(spacing: 8) {
+                Image(systemName: "list.clipboard")
+                    .font(.system(size: 25, weight: .semibold))
+                    .foregroundStyle(Color(red: 0.15, green: 0.6, blue: 0.55))
+                Text("治療計畫")
+                    .font(.system(size: 25, weight: .semibold))
+                    .foregroundStyle(Color(red: 0.15, green: 0.6, blue: 0.55))
+            }
 
             RoundedRectangle(cornerRadius: 10)
                 .fill(Color(red: 0.78, green: 0.88, blue: 0.95))
@@ -180,37 +185,11 @@ struct TreatmentPlanCard: View {
 struct HealthTipCard: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.38, green: 0.38, blue: 0.88),
-                    Color(red: 0.22, green: 0.30, blue: 0.82)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [
-                            Color(red: 0.88, green: 0.45, blue: 0.55).opacity(0.65),
-                            Color.clear
-                        ],
-                        center: .center,
-                        startRadius: 0,
-                        endRadius: 100
-                    )
-                )
-                .frame(width: 200, height: 200)
-                .offset(x: 80, y: 40)
+            Color(red: 0.1, green: 0.25, blue: 0.4)
             VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 8) {
-                    Text("\u{201C}")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundStyle(.white)
-                    Text("今日健康提示")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.8))
-                }
+                Text("今日健康提示")
+                    .font(.system(size: 25, weight: .semibold))
+                    .foregroundStyle(.white)
                 Spacer()
                 Text("定期伸展胸肌有助於預防圓肩姿勢，減輕頸部長期負擔。")
                     .font(.system(size: 18, weight: .bold))
@@ -218,12 +197,6 @@ struct HealthTipCard: View {
                     .foregroundStyle(.white)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer()
-                HStack {
-                    Spacer()
-                    Text("\u{201D}")
-                        .font(.system(size: 48, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.25))
-                }
             }
             .padding(20)
         }
@@ -239,10 +212,10 @@ struct AssessmentEntryCard: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Image(systemName: "doc.text")
-                    .font(.system(size: 18))
+                    .font(.system(size: 25))
                     .foregroundStyle(Color(red: 0.15, green: 0.6, blue: 0.55))
                 Text("主觀量表")
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.system(size: 25, weight: .semibold))
                     .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
             }
             Text("記錄今日訓練前的主觀感受")
