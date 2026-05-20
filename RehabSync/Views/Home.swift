@@ -98,7 +98,7 @@ struct TreatmentPlanSection: View {
             .background(.white)
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
-        } else if plans.count <= 3 {
+        } else if plans.count <= 2 {
             VStack(spacing: 12) {
                 ForEach(plans, id: \.id) { plan in
                     TreatmentPlanCard(treatment: plan)

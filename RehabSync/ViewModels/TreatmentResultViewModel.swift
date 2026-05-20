@@ -34,4 +34,11 @@ class TreatmentResultViewModel {
         }
         fetchAll(for: result.treatment_id)
     }
+
+    func deleteAll() {
+        try? db.write { db in
+            try TreatmentResult.deleteAll(db)
+        }
+        results = []
+    }
 }

@@ -34,4 +34,11 @@ class TreatmentContentViewModel {
         }
         fetchAll(for: content.treatment_id)
     }
+
+    func deleteAll() {
+        try? db.write { db in
+            try TreatmentContent.deleteAll(db)
+        }
+        contents = []
+    }
 }

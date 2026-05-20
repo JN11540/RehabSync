@@ -74,6 +74,15 @@ class TreatmentViewModel {
         fetchAll()
     }
 
+    func deleteAll() {
+        TreatmentResultViewModel().deleteAll()
+        TreatmentContentViewModel().deleteAll()
+        try? db.write { db in
+            try Treatment.deleteAll(db)
+        }
+        fetchAll()
+    }
+
     private func checkDuplicate(id: Int) throws {
         let exists = (try? db.read { db in
             try Treatment.filter(Column("id") == Int64(id)).fetchCount(db) > 0

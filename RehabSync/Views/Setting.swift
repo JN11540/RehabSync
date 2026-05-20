@@ -6,6 +6,7 @@ struct Setting: View {
     @State private var showFileImporter = false
     @State private var importError: String?
     @State private var importSuccess = false
+    @State private var showDeleteConfirm = false
 
     var body: some View {
         VStack(spacing: 20) {
@@ -29,6 +30,17 @@ struct Setting: View {
                 case .failure(let error):
                     importError = error.localizedDescription
                 }
+            }
+
+            Button("移除所有資料") {
+                showDeleteConfirm = true
+            }
+            .foregroundStyle(.red)
+            .confirmationDialog("確定要移除所有資料？", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+                Button("移除所有資料", role: .destructive) {
+                    vm.deleteAll()
+                }
+                Button("取消", role: .cancel) {}
             }
 
             if importSuccess {
