@@ -105,7 +105,7 @@ struct TreatmentPlanSection: View {
                 .frame(maxHeight: .infinity)
         } else {
             GeometryReader { geo in
-                let cardHeight = (geo.size.height - 12) / 2
+                let cardHeight = geo.size.height
                 ScrollView {
                     VStack(spacing: 12) {
                         ForEach(plans, id: \.id) { plan in
