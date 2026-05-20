@@ -45,7 +45,7 @@ class ExerciseViewModel {
             return
         }
 
-        guard let url = Bundle.main.url(forResource: "exercise", withExtension: "json", subdirectory: "Util") else {
+        guard let url = Bundle.main.url(forResource: "exercise", withExtension: "json") else {
             print("[seed] ❌ 找不到 exercise.json，請確認 Target Membership 有勾選")
             return
         }
