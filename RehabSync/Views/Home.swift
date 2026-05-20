@@ -100,14 +100,9 @@ struct TreatmentPlanSection: View {
             .background(.white)
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
-        } else if plans.count <= 2 {
-            VStack(spacing: 12) {
-                ForEach(plans, id: \.id) { plan in
-                    TreatmentPlanCard(treatment: plan)
-                        .frame(maxHeight: .infinity)
-                }
-            }
-            .frame(maxHeight: .infinity)
+        } else if plans.count == 1 {
+            TreatmentPlanCard(treatment: plans[0])
+                .frame(maxHeight: .infinity)
         } else {
             GeometryReader { geo in
                 let cardHeight = (geo.size.height - 12) / 2
@@ -128,6 +123,9 @@ struct TreatmentPlanSection: View {
 
 struct TreatmentPlanCard: View {
     let treatment: Treatment
+    @State private var contentVM = TreatmentContentViewModel()
+    @State private var resultVM = TreatmentResultViewModel()
+    @State private var progress: Double = 0
 
     private var startDate: String {
         Date(timeIntervalSince1970: TimeInterval(treatment.start_time))
@@ -178,10 +176,10 @@ struct TreatmentPlanCard: View {
                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.3)))
                 }
                 Spacer()
-                ProgressView(value: 0.28)
+                ProgressView(value: progress)
                     .tint(Color(red: 0.15, green: 0.6, blue: 0.55))
                     .frame(width: 100)
-                Text("28%")
+                Text("\(Int(progress * 100))%")
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(Color(red: 0.15, green: 0.6, blue: 0.55))
             }
@@ -190,6 +188,13 @@ struct TreatmentPlanCard: View {
         .background(.white)
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
+        .onAppear {
+            let tid = Int(treatment.id ?? 0)
+            contentVM.fetchAll(for: tid)
+            let completed = resultVM.fetchCompletedContentIds(for: tid)
+            let total = contentVM.contents.count
+            progress = total > 0 ? Double(completed.count) / Double(total) : 0
+        }
     }
 }
 
@@ -200,9 +205,14 @@ struct HealthTipCard: View {
         ZStack(alignment: .topLeading) {
             Color(red: 0.1, green: 0.25, blue: 0.4)
             VStack(alignment: .leading, spacing: 0) {
-                Text("今日健康提示")
-                    .font(.system(size: 25, weight: .semibold))
-                    .foregroundStyle(.white)
+                HStack(spacing: 8) {
+                    Image(systemName: "lightbulb.fill")
+                        .font(.system(size: 25))
+                        .foregroundStyle(.yellow)
+                    Text("今日健康提示")
+                        .font(.system(size: 25, weight: .semibold))
+                        .foregroundStyle(.white)
+                }
                 Spacer()
                 Text("定期伸展胸肌有助於預防圓肩姿勢，減輕頸部長期負擔。")
                     .font(.system(size: 18, weight: .bold))

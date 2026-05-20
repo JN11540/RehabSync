@@ -50,28 +50,34 @@ struct TreatmentView: View {
                     let cardHeight = geo.size.height - 320
                     let cardWidth = cardHeight * (9.0 / 13.0)
 
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 16) {
-                            ForEach(Array(contentVM.contents.enumerated()), id: \.element.id) { index, content in
-                                let cardStatus: DayStatus =
-                                    index == activeIndex ? .active :
-                                    completedContentIds.contains(Int(content.id ?? -1)) ? .done :
-                                    .upcoming
-                                DayCard(
-                                    content: content,
-                                    exerciseName: exerciseName(for: content.exercise_id),
-                                    width: cardWidth,
-                                    height: cardHeight,
-                                    status: cardStatus,
-                                    onTap: {
-                                    activeIndex = index
-                                    UserDefaults.standard.set(index, forKey: activeIndexKey)
+                    ScrollViewReader { proxy in
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 16) {
+                                ForEach(Array(contentVM.contents.enumerated()), id: \.element.id) { index, content in
+                                    let cardStatus: DayStatus =
+                                        index == activeIndex ? .active :
+                                        completedContentIds.contains(Int(content.id ?? -1)) ? .done :
+                                        .upcoming
+                                    DayCard(
+                                        content: content,
+                                        exerciseName: exerciseName(for: content.exercise_id),
+                                        width: cardWidth,
+                                        height: cardHeight,
+                                        status: cardStatus,
+                                        onTap: {
+                                        activeIndex = index
+                                        UserDefaults.standard.set(index, forKey: activeIndexKey)
+                                    }
+                                    )
+                                    .id(index)
                                 }
-                                )
                             }
+                            .padding(.horizontal, 24)
+                            .padding(.bottom, 8)
                         }
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 8)
+                        .onChange(of: contentVM.contents.count) { _, _ in
+                            proxy.scrollTo(activeIndex, anchor: .leading)
+                        }
                     }
                 }
                 .padding(.top, 24)
