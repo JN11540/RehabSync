@@ -43,6 +43,8 @@ class TreatmentViewModel {
         let data = try Data(contentsOf: url)
         let dto = try JSONDecoder().decode(TreatmentImportDTO.self, from: data)
 
+        try checkDuplicate(id: dto.id)
+
         try db.write { db in
             var treatment = Treatment(
                 id: Int64(dto.id),
@@ -70,5 +72,25 @@ class TreatmentViewModel {
         }
 
         fetchAll()
+    }
+
+    private func checkDuplicate(id: Int) throws {
+        let exists = (try? db.read { db in
+            try Treatment.filter(Column("id") == Int64(id)).fetchCount(db) > 0
+        }) ?? false
+        if exists {
+            throw ImportError.duplicateId(id)
+        }
+    }
+
+    enum ImportError: LocalizedError {
+        case duplicateId(Int)
+
+        var errorDescription: String? {
+            switch self {
+            case .duplicateId(let id):
+                return "治療計畫 ID \(id) 已存在，無法重複匯入"
+            }
+        }
     }
 }

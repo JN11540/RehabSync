@@ -140,7 +140,7 @@ struct TreatmentPlanCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("治療計畫")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(Color(red: 0.15, green: 0.6, blue: 0.55))
 
             RoundedRectangle(cornerRadius: 10)
