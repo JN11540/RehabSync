@@ -24,19 +24,21 @@ struct TreatmentView: View {
                             .font(.system(size: 36, weight: .bold))
                             .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
                         Text("\(startDate) ～ \(endDate)")
-                            .font(.system(size: 22))
+                            .font(.system(size: 18))
                             .foregroundStyle(.secondary)
                         Text("A simple, beginner-friendly program designed to release tension, improve posture, and build the essential strength of your neck muscles.")
-                            .font(.system(size: 22))
+                            .font(.system(size: 18))
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .padding(.horizontal, 24)
 
                     Label("左右滑動查看全部訓練日", systemImage: "arrow.left.and.right")
-                        .font(.system(size: 22))
+                        .font(.system(size: 18))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 24)
+                        .padding(.top, 12)
+                        .padding(.bottom, 12)
 
                     let cardHeight = geo.size.height - 320
                     let cardWidth = cardHeight * (9.0 / 13.0)
