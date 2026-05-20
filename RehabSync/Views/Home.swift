@@ -83,36 +83,42 @@ struct TreatmentPlanSection: View {
     let vm: TreatmentViewModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("治療計畫")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
-                Spacer()
-                Button("查看全部 ›") {}
-                    .font(.system(size: 17))
-                    .foregroundStyle(Color(red: 0.15, green: 0.6, blue: 0.55))
-            }
+        let plans = vm.treatments
 
-            if let plan = vm.treatments.first {
-                TreatmentPlanCard(treatment: plan)
-                    .frame(maxHeight: .infinity)
-            } else {
-                VStack(spacing: 12) {
-                    Image(systemName: "tray")
-                        .font(.system(size: 40))
-                        .foregroundStyle(Color.gray.opacity(0.4))
-                    Text("目前沒有治療計畫")
-                        .font(.system(size: 17, weight: .medium))
-                        .foregroundStyle(Color.gray.opacity(0.6))
+        if plans.isEmpty {
+            VStack(spacing: 12) {
+                Image(systemName: "tray")
+                    .font(.system(size: 40))
+                    .foregroundStyle(Color.gray.opacity(0.4))
+                Text("目前沒有治療計畫")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(Color.gray.opacity(0.6))
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
+        } else if plans.count <= 3 {
+            VStack(spacing: 12) {
+                ForEach(plans, id: \.id) { plan in
+                    TreatmentPlanCard(treatment: plan)
+                        .frame(maxHeight: .infinity)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-                .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
+            }
+            .frame(maxHeight: .infinity)
+        } else {
+            GeometryReader { geo in
+                let cardHeight = (geo.size.height - 12 * 2) / 3
+                ScrollView {
+                    VStack(spacing: 12) {
+                        ForEach(plans, id: \.id) { plan in
+                            TreatmentPlanCard(treatment: plan)
+                                .frame(height: cardHeight)
+                        }
+                    }
+                }
             }
         }
-        .frame(maxHeight: .infinity, alignment: .top)
     }
 }
 
@@ -133,6 +139,10 @@ struct TreatmentPlanCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            Text("治療計畫")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color(red: 0.15, green: 0.6, blue: 0.55))
+
             RoundedRectangle(cornerRadius: 10)
                 .fill(Color(red: 0.78, green: 0.88, blue: 0.95))
                 .frame(maxHeight: .infinity)
@@ -141,9 +151,6 @@ struct TreatmentPlanCard: View {
                 Text(treatment.name)
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
-                Text("病患 ID：\(treatment.patient_id)")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
                 Text("\(startDate) ～ \(endDate)")
                     .font(.system(size: 14))
                     .foregroundStyle(.secondary)
