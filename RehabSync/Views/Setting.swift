@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct Setting: View {
     @State private var showFileImporter = false
