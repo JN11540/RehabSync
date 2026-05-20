@@ -6,6 +6,10 @@ struct TreatmentView: View {
     @State private var exerciseVM = ExerciseViewModel()
     @State private var activeIndex: Int = 0
 
+    private var activeIndexKey: String {
+        "activeIndex_\(treatment.id ?? 0)"
+    }
+
     private var startDate: String {
         Date(timeIntervalSince1970: TimeInterval(treatment.start_time))
             .formatted(.dateTime.year().month().day())
@@ -54,7 +58,10 @@ struct TreatmentView: View {
                                     width: cardWidth,
                                     height: cardHeight,
                                     status: cardStatus,
-                                    onTap: { activeIndex = index }
+                                    onTap: {
+                                    activeIndex = index
+                                    UserDefaults.standard.set(index, forKey: activeIndexKey)
+                                }
                                 )
                             }
                         }
@@ -69,6 +76,9 @@ struct TreatmentView: View {
         .onAppear {
             contentVM.fetchAll(for: Int(treatment.id ?? 0))
             exerciseVM.fetchAll()
+            if let saved = UserDefaults.standard.object(forKey: activeIndexKey) as? Int {
+                activeIndex = saved
+            }
         }
     }
 
@@ -146,7 +156,8 @@ struct DayCard: View {
                     .foregroundStyle(status == .done ? Color.gray : (status == .active ? .white.opacity(0.7) : .secondary))
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.leading, 10)
+        .padding(.trailing, 16)
         .padding(.vertical, 24)
         .frame(width: width, height: height)
         .background(status == .active ? Color(red: 0.1, green: 0.25, blue: 0.4) : .white)
