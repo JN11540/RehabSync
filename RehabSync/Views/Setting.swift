@@ -2,6 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct Setting: View {
+    @State private var vm = TreatmentViewModel()
     @State private var showFileImporter = false
     @State private var importError: String?
     @State private var importSuccess = false
@@ -20,7 +21,7 @@ struct Setting: View {
                 switch result {
                 case .success(let url):
                     do {
-                        try ImportJSON.shared.importTreatment(from: url)
+                        try vm.importTreatment(from: url)
                         importSuccess = true
                     } catch {
                         importError = error.localizedDescription
