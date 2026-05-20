@@ -4,6 +4,7 @@ struct TreatmentView: View {
     let treatment: Treatment
     @State private var contentVM = TreatmentContentViewModel()
     @State private var exerciseVM = ExerciseViewModel()
+    @State private var activeIndex: Int = 0
 
     private var startDate: String {
         Date(timeIntervalSince1970: TimeInterval(treatment.start_time))
@@ -45,12 +46,15 @@ struct TreatmentView: View {
 
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 16) {
-                            ForEach(contentVM.contents, id: \.id) { content in
+                            ForEach(Array(contentVM.contents.enumerated()), id: \.element.id) { index, content in
+                                let cardStatus: DayStatus = index < activeIndex ? .done : (index == activeIndex ? .active : .upcoming)
                                 DayCard(
                                     content: content,
                                     exerciseName: exerciseName(for: content.exercise_id),
                                     width: cardWidth,
-                                    height: cardHeight
+                                    height: cardHeight,
+                                    status: cardStatus,
+                                    onTap: { activeIndex = index }
                                 )
                             }
                         }
@@ -80,6 +84,8 @@ struct DayCard: View {
     let exerciseName: String
     let width: CGFloat
     let height: CGFloat
+    let status: DayStatus
+    let onTap: () -> Void
 
     private var date: Date {
         Date(timeIntervalSince1970: TimeInterval(content.date))
@@ -95,20 +101,13 @@ struct DayCard: View {
         let s = totalSeconds % 60
         return String(format: "%02d:%02d", m, s)
     }
-    private var status: DayStatus {
-        let today = Calendar.current.startOfDay(for: Date())
-        let cardDay = Calendar.current.startOfDay(for: date)
-        if cardDay < today { return .done }
-        if cardDay == today { return .active }
-        return .upcoming
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Image(systemName: status.icon)
                 .font(.system(size: 36))
                 .foregroundStyle(
-                    status == .done   ? Color.gray :
+                    status == .done   ? Color.green :
                     status == .active ? Color.white :
                     Color(red: 0.15, green: 0.6, blue: 0.55)
                 )
@@ -128,7 +127,7 @@ struct DayCard: View {
                 .strikethrough(status == .done, color: .gray)
                 .lineLimit(2)
 
-            Text(status == .done ? "完成：\(dateLabel)" : status.label)
+            Text(status.label)
                 .font(.system(size: 17))
                 .foregroundStyle(status == .done ? Color.gray : (status == .active ? .white.opacity(0.8) : .secondary))
 
@@ -147,11 +146,13 @@ struct DayCard: View {
                     .foregroundStyle(status == .done ? Color.gray : (status == .active ? .white.opacity(0.7) : .secondary))
             }
         }
-        .padding(24)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 24)
         .frame(width: width, height: height)
         .background(status == .active ? Color(red: 0.1, green: 0.25, blue: 0.4) : .white)
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
+        .onTapGesture { onTap() }
     }
 }
 
