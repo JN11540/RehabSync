@@ -76,7 +76,9 @@ struct TreatmentView: View {
                             .padding(.bottom, 8)
                         }
                         .onChange(of: contentVM.contents.count) { _, _ in
-                            proxy.scrollTo(activeIndex, anchor: .leading)
+                            DispatchQueue.main.async {
+                                proxy.scrollTo(activeIndex, anchor: .leading)
+                            }
                         }
                     }
                 }
@@ -85,12 +87,12 @@ struct TreatmentView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            contentVM.fetchAll(for: Int(treatment.id ?? 0))
-            exerciseVM.fetchAll()
-            completedContentIds = resultVM.fetchCompletedContentIds(for: Int(treatment.id ?? 0))
             if let saved = UserDefaults.standard.object(forKey: activeIndexKey) as? Int {
                 activeIndex = saved
             }
+            contentVM.fetchAll(for: Int(treatment.id ?? 0))
+            exerciseVM.fetchAll()
+            completedContentIds = resultVM.fetchCompletedContentIds(for: Int(treatment.id ?? 0))
         }
     }
 

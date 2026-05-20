@@ -208,7 +208,7 @@ struct HealthTipCard: View {
                 HStack(spacing: 8) {
                     Image(systemName: "lightbulb.fill")
                         .font(.system(size: 25))
-                        .foregroundStyle(.yellow)
+                        .foregroundStyle(.green)
                     Text("今日健康提示")
                         .font(.system(size: 25, weight: .semibold))
                         .foregroundStyle(.white)
