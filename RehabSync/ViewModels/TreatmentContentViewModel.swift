@@ -18,20 +18,20 @@ class TreatmentContentViewModel {
         try? db.write { db in
             try content.insert(db)
         }
-        fetchAll(for: content.treatmentId)
+        fetchAll(for: content.treatment_id)
     }
 
     func update(_ content: TreatmentContent) {
         try? db.write { db in
             try content.update(db)
         }
-        fetchAll(for: content.treatmentId)
+        fetchAll(for: content.treatment_id)
     }
 
     func delete(_ content: TreatmentContent) {
         try? db.write { db in
             try content.delete(db)
         }
-        fetchAll(for: content.treatmentId)
+        fetchAll(for: content.treatment_id)
     }
 }

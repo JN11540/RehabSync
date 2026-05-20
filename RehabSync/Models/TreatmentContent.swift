@@ -1,26 +1,28 @@
 import GRDB
 
+struct TreatmentContentImportDTO: Codable {
+    let id: Int
+    let exercise_id: Int
+    let sets: Int
+    let reps: Int
+    let set_rest_time: Int
+    let rep_training_time: Int
+    let rep_rest_time: Int
+    let date: Int
+}
+
 struct TreatmentContent: Codable, FetchableRecord, MutablePersistableRecord {
     static let databaseTableName = "treatment_content"
 
     var id: Int64?
-    var treatmentId: Int
-    var exerciseId: Int
+    var treatment_id: Int
+    var exercise_id: Int
     var sets: Int
-    var setRestTime: Int
+    var set_rest_time: Int
     var reps: Int
-    var repTrainingTime: Int
-    var repRestTime: Int
+    var rep_training_time: Int
+    var rep_rest_time: Int
     var date: Int
-
-    enum CodingKeys: String, CodingKey {
-        case id, sets, reps, date
-        case treatmentId     = "treatment_id"
-        case exerciseId      = "exercise_id"
-        case setRestTime     = "set_rest_time"
-        case repTrainingTime = "rep_training_time"
-        case repRestTime     = "rep_rest_time"
-    }
 
     mutating func didInsert(_ inserted: InsertionSuccess) {
         id = inserted.rowID

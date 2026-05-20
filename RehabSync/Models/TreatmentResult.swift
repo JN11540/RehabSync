@@ -4,18 +4,11 @@ struct TreatmentResult: Codable, FetchableRecord, MutablePersistableRecord {
     static let databaseTableName = "treatment_result"
 
     var id: Int64?
-    var treatmentId: Int
-    var treatmentContentId: Int
+    var treatment_id: Int
+    var treatment_content_id: Int
     var reps: Int
-    var totalTime: Int
+    var total_time: Int
     var date: Int
-
-    enum CodingKeys: String, CodingKey {
-        case id, reps, date
-        case treatmentId        = "treatment_id"
-        case treatmentContentId = "treatment_content_id"
-        case totalTime          = "total_time"
-    }
 
     mutating func didInsert(_ inserted: InsertionSuccess) {
         id = inserted.rowID

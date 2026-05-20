@@ -122,12 +122,12 @@ struct TreatmentPlanCard: View {
     let treatment: Treatment
 
     private var startDate: String {
-        Date(timeIntervalSince1970: TimeInterval(treatment.startTime))
+        Date(timeIntervalSince1970: TimeInterval(treatment.start_time))
             .formatted(.dateTime.year().month().day())
     }
 
     private var endDate: String {
-        Date(timeIntervalSince1970: TimeInterval(treatment.endTime))
+        Date(timeIntervalSince1970: TimeInterval(treatment.end_time))
             .formatted(.dateTime.year().month().day())
     }
 
@@ -141,7 +141,7 @@ struct TreatmentPlanCard: View {
                 Text(treatment.name)
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
-                Text("病患 ID：\(treatment.patientId)")
+                Text("病患 ID：\(treatment.patient_id)")
                     .font(.system(size: 14))
                     .foregroundStyle(.secondary)
                 Text("\(startDate) ～ \(endDate)")
