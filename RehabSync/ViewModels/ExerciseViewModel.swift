@@ -1,5 +1,6 @@
 import GRDB
 import Observation
+import Foundation
 
 @Observable
 class ExerciseViewModel {
