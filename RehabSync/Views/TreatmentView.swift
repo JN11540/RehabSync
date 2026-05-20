@@ -5,6 +5,8 @@ struct TreatmentView: View {
     @State private var contentVM = TreatmentContentViewModel()
     @State private var exerciseVM = ExerciseViewModel()
     @State private var activeIndex: Int = 0
+    @State private var resultVM = TreatmentResultViewModel()
+    @State private var completedContentIds: Set<Int> = []
 
     private var activeIndexKey: String {
         "activeIndex_\(treatment.id ?? 0)"
@@ -51,7 +53,10 @@ struct TreatmentView: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 16) {
                             ForEach(Array(contentVM.contents.enumerated()), id: \.element.id) { index, content in
-                                let cardStatus: DayStatus = index < activeIndex ? .done : (index == activeIndex ? .active : .upcoming)
+                                let cardStatus: DayStatus =
+                                    index == activeIndex ? .active :
+                                    completedContentIds.contains(Int(content.id ?? -1)) ? .done :
+                                    .upcoming
                                 DayCard(
                                     content: content,
                                     exerciseName: exerciseName(for: content.exercise_id),
@@ -76,6 +81,7 @@ struct TreatmentView: View {
         .onAppear {
             contentVM.fetchAll(for: Int(treatment.id ?? 0))
             exerciseVM.fetchAll()
+            completedContentIds = resultVM.fetchCompletedContentIds(for: Int(treatment.id ?? 0))
             if let saved = UserDefaults.standard.object(forKey: activeIndexKey) as? Int {
                 activeIndex = saved
             }
@@ -104,7 +110,8 @@ struct DayCard: View {
         date.formatted(.dateTime.month().day())
     }
     private var totalSeconds: Int {
-        content.sets * (content.reps * content.rep_training_time + content.set_rest_time)
+        (content.rep_training_time + content.rep_rest_time) * content.reps * content.sets
+            + content.set_rest_time * (content.sets - 1)
     }
     private var timeLabel: String {
         let m = totalSeconds / 60

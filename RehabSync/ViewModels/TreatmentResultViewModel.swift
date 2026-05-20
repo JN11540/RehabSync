@@ -35,6 +35,15 @@ class TreatmentResultViewModel {
         fetchAll(for: result.treatment_id)
     }
 
+    func fetchCompletedContentIds(for treatmentId: Int) -> Set<Int> {
+        let fetched = (try? db.read { db in
+            try TreatmentResult
+                .filter(Column("treatment_id") == treatmentId)
+                .fetchAll(db)
+        }) ?? []
+        return Set(fetched.map { $0.treatment_content_id })
+    }
+
     func deleteAll() {
         try? db.write { db in
             try TreatmentResult.deleteAll(db)
