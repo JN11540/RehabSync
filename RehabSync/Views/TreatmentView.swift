@@ -21,25 +21,25 @@ struct TreatmentView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(treatment.name)
-                            .font(.system(size: 28, weight: .bold))
+                            .font(.system(size: 36, weight: .bold))
                             .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
                         Text("\(startDate) ～ \(endDate)")
-                            .font(.system(size: 15))
+                            .font(.system(size: 22))
                             .foregroundStyle(.secondary)
                         Text("A simple, beginner-friendly program designed to release tension, improve posture, and build the essential strength of your neck muscles.")
-                            .font(.system(size: 13))
+                            .font(.system(size: 22))
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .padding(.horizontal, 24)
 
                     Label("左右滑動查看全部訓練日", systemImage: "arrow.left.and.right")
-                        .font(.system(size: 13))
+                        .font(.system(size: 22))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 24)
 
-                    let cardHeight = geo.size.height - 180
-                    let cardWidth: CGFloat = 220
+                    let cardHeight = geo.size.height - 320
+                    let cardWidth = cardHeight * (9.0 / 13.0)
 
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 16) {
@@ -102,22 +102,22 @@ struct DayCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 16) {
             Image(systemName: status.icon)
-                .font(.system(size: 24))
+                .font(.system(size: 32))
                 .foregroundStyle(status == .active ? .white : Color(red: 0.15, green: 0.6, blue: 0.55))
 
             Text(dateLabel)
-                .font(.system(size: 14))
+                .font(.system(size: 18))
                 .foregroundStyle(status == .active ? .white.opacity(0.8) : .secondary)
 
             Text(exerciseName)
-                .font(.system(size: 17, weight: .bold))
+                .font(.system(size: 22, weight: .bold))
                 .foregroundStyle(status == .active ? .white : Color(red: 0.1, green: 0.25, blue: 0.4))
                 .lineLimit(2)
 
             Text(status.label)
-                .font(.system(size: 13))
+                .font(.system(size: 17))
                 .foregroundStyle(status == .active ? .white.opacity(0.8) : .secondary)
 
             Spacer()
@@ -127,7 +127,7 @@ struct DayCard: View {
                     .font(.system(size: 28, weight: .bold))
                     .foregroundStyle(status == .active ? .white : Color(red: 0.1, green: 0.25, blue: 0.4))
                 Text("分鐘")
-                    .font(.system(size: 13))
+                    .font(.system(size: 17))
                     .foregroundStyle(status == .active ? .white.opacity(0.7) : .secondary)
             }
         }
