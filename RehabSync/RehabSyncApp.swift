@@ -1,14 +1,11 @@
-//
-//  RehabSyncApp.swift
-//  RehabSync
-//
-//  Created by 1617-82n2 on 2026/5/19.
-//
-
 import SwiftUI
 
 @main
 struct RehabSyncApp: App {
+    init() {
+        ExerciseViewModel().seedIfNeeded()
+    }
+
     var body: some Scene {
         WindowGroup {
             Home()
