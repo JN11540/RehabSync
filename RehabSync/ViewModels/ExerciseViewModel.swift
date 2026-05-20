@@ -56,8 +56,11 @@ class ExerciseViewModel {
             return
         }
 
-        guard let dtos = try? JSONDecoder().decode([ExerciseDTO].self, from: data) else {
-            print("[seed] ❌ JSON 解析失敗")
+        let dtos: [ExerciseDTO]
+        do {
+            dtos = try JSONDecoder().decode([ExerciseDTO].self, from: data)
+        } catch {
+            print("[seed] ❌ JSON 解析失敗：\(error)")
             return
         }
         print("[seed] 解析到 \(dtos.count) 筆資料")
