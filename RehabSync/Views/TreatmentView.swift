@@ -4,12 +4,18 @@ struct TreatmentView: View {
     let treatment: Treatment
     @State private var contentVM = TreatmentContentViewModel()
     @State private var exerciseVM = ExerciseViewModel()
-    @State private var activeIndex: Int = 0
+    @State private var activeIndex: Int
     @State private var resultVM = TreatmentResultViewModel()
     @State private var completedContentIds: Set<Int> = []
 
     private var activeIndexKey: String {
         "activeIndex_\(treatment.id ?? 0)"
+    }
+
+    init(treatment: Treatment) {
+        self.treatment = treatment
+        let key = "activeIndex_\(treatment.id ?? 0)"
+        self._activeIndex = State(initialValue: UserDefaults.standard.integer(forKey: key))
     }
 
     private var startDate: String {
@@ -87,9 +93,6 @@ struct TreatmentView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            if let saved = UserDefaults.standard.object(forKey: activeIndexKey) as? Int {
-                activeIndex = saved
-            }
             contentVM.fetchAll(for: Int(treatment.id ?? 0))
             exerciseVM.fetchAll()
             completedContentIds = resultVM.fetchCompletedContentIds(for: Int(treatment.id ?? 0))
