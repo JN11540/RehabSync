@@ -17,40 +17,48 @@ struct TreatmentView: View {
     var body: some View {
         ZStack {
             Color(red: 0.96, green: 0.94, blue: 0.91).ignoresSafeArea()
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(treatment.name)
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
-                    Text("\(startDate) ～ \(endDate)")
-                        .font(.system(size: 15))
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, 24)
-
-                Label("左右滑動查看全部訓練日", systemImage: "arrow.left.and.right")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 24)
-
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 16) {
-                        ForEach(contentVM.contents, id: \.id) { content in
-                            DayCard(
-                                content: content,
-                                exerciseName: exerciseName(for: content.exercise_id)
-                            )
-                        }
+            GeometryReader { geo in
+                VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(treatment.name)
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
+                        Text("\(startDate) ～ \(endDate)")
+                            .font(.system(size: 15))
+                            .foregroundStyle(.secondary)
+                        Text("A simple, beginner-friendly program designed to release tension, improve posture, and build the essential strength of your neck muscles.")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     .padding(.horizontal, 24)
-                    .padding(.vertical, 8)
-                }
 
-                Spacer()
+                    Label("左右滑動查看全部訓練日", systemImage: "arrow.left.and.right")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 24)
+
+                    let cardHeight = geo.size.height - 200
+                    let cardWidth = cardHeight * (9.0 / 13.0)
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 16) {
+                            ForEach(contentVM.contents, id: \.id) { content in
+                                DayCard(
+                                    content: content,
+                                    exerciseName: exerciseName(for: content.exercise_id),
+                                    width: cardWidth,
+                                    height: cardHeight
+                                )
+                            }
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 8)
+                    }
+                }
+                .padding(.top, 24)
             }
-            .padding(.top, 24)
         }
-        .navigationTitle("動作列表")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             contentVM.fetchAll(for: Int(treatment.id ?? 0))
@@ -68,6 +76,8 @@ struct TreatmentView: View {
 struct DayCard: View {
     let content: TreatmentContent
     let exerciseName: String
+    let width: CGFloat
+    let height: CGFloat
 
     private var date: Date {
         Date(timeIntervalSince1970: TimeInterval(content.date))
@@ -92,39 +102,39 @@ struct DayCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 16) {
             Image(systemName: status.icon)
-                .font(.system(size: 24))
+                .font(.system(size: 32))
                 .foregroundStyle(status == .active ? .white : Color(red: 0.15, green: 0.6, blue: 0.55))
 
             Text(dateLabel)
-                .font(.system(size: 14))
+                .font(.system(size: 18))
                 .foregroundStyle(status == .active ? .white.opacity(0.8) : .secondary)
 
             Text(exerciseName)
-                .font(.system(size: 17, weight: .bold))
+                .font(.system(size: 22, weight: .bold))
                 .foregroundStyle(status == .active ? .white : Color(red: 0.1, green: 0.25, blue: 0.4))
                 .lineLimit(2)
 
             Text(status.label)
-                .font(.system(size: 13))
+                .font(.system(size: 17))
                 .foregroundStyle(status == .active ? .white.opacity(0.8) : .secondary)
 
             Spacer()
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(timeLabel)
-                    .font(.system(size: 28, weight: .bold))
+                    .font(.system(size: 36, weight: .bold))
                     .foregroundStyle(status == .active ? .white : Color(red: 0.1, green: 0.25, blue: 0.4))
                 Text("分鐘")
-                    .font(.system(size: 13))
+                    .font(.system(size: 17))
                     .foregroundStyle(status == .active ? .white.opacity(0.7) : .secondary)
             }
         }
-        .padding(20)
-        .frame(width: 180, height: 260)
+        .padding(24)
+        .frame(width: width, height: height)
         .background(status == .active ? Color(red: 0.1, green: 0.25, blue: 0.4) : .white)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
         .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
     }
 }
