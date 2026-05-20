@@ -1,5 +1,10 @@
 import GRDB
 
+struct ExerciseDTO: Decodable {
+    let id: Int
+    let name: String
+}
+
 struct Exercise: Codable, FetchableRecord, MutablePersistableRecord {
     static let databaseTableName = "exercise"
 

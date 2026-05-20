@@ -56,17 +56,18 @@ class ExerciseViewModel {
             return
         }
 
-        guard let exercises = try? JSONDecoder().decode([Exercise].self, from: data) else {
+        guard let dtos = try? JSONDecoder().decode([ExerciseDTO].self, from: data) else {
             print("[seed] ❌ JSON 解析失敗")
             return
         }
-        print("[seed] 解析到 \(exercises.count) 筆資料")
+        print("[seed] 解析到 \(dtos.count) 筆資料")
 
-        let sorted = exercises.sorted { ($0.id ?? 0) < ($1.id ?? 0) }
+        let sorted = dtos.sorted { $0.id < $1.id }
 
         do {
             try db.write { db in
-                for var exercise in sorted {
+                for dto in sorted {
+                    var exercise = Exercise(id: Int64(dto.id), name: dto.name)
                     try exercise.insert(db, onConflict: .ignore)
                 }
             }

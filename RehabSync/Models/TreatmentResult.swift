@@ -1,5 +1,14 @@
 import GRDB
 
+struct TreatmentResultDTO: Decodable {
+    let id: Int
+    let treatment_id: Int
+    let treatment_content_id: Int
+    let reps: Int
+    let total_time: Int
+    let date: Int
+}
+
 struct TreatmentResult: Codable, FetchableRecord, MutablePersistableRecord {
     static let databaseTableName = "treatment_result"
 
