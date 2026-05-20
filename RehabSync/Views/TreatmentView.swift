@@ -38,8 +38,8 @@ struct TreatmentView: View {
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 24)
 
-                    let cardHeight = geo.size.height - 200
-                    let cardWidth = cardHeight * (9.0 / 13.0)
+                    let cardHeight = geo.size.height - 180
+                    let cardWidth: CGFloat = 220
 
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 16) {
@@ -102,32 +102,32 @@ struct DayCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             Image(systemName: status.icon)
-                .font(.system(size: 32))
+                .font(.system(size: 24))
                 .foregroundStyle(status == .active ? .white : Color(red: 0.15, green: 0.6, blue: 0.55))
 
             Text(dateLabel)
-                .font(.system(size: 18))
+                .font(.system(size: 14))
                 .foregroundStyle(status == .active ? .white.opacity(0.8) : .secondary)
 
             Text(exerciseName)
-                .font(.system(size: 22, weight: .bold))
+                .font(.system(size: 17, weight: .bold))
                 .foregroundStyle(status == .active ? .white : Color(red: 0.1, green: 0.25, blue: 0.4))
                 .lineLimit(2)
 
             Text(status.label)
-                .font(.system(size: 17))
+                .font(.system(size: 13))
                 .foregroundStyle(status == .active ? .white.opacity(0.8) : .secondary)
 
             Spacer()
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(timeLabel)
-                    .font(.system(size: 36, weight: .bold))
+                    .font(.system(size: 28, weight: .bold))
                     .foregroundStyle(status == .active ? .white : Color(red: 0.1, green: 0.25, blue: 0.4))
                 Text("分鐘")
-                    .font(.system(size: 17))
+                    .font(.system(size: 13))
                     .foregroundStyle(status == .active ? .white.opacity(0.7) : .secondary)
             }
         }
