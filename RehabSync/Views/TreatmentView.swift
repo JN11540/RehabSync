@@ -106,31 +106,45 @@ struct DayCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Image(systemName: status.icon)
-                .font(.system(size: 32))
-                .foregroundStyle(status == .active ? .white : Color(red: 0.15, green: 0.6, blue: 0.55))
+                .font(.system(size: 36))
+                .foregroundStyle(
+                    status == .done   ? Color.gray :
+                    status == .active ? Color.white :
+                    Color(red: 0.15, green: 0.6, blue: 0.55)
+                )
 
             Text(dateLabel)
                 .font(.system(size: 18))
-                .foregroundStyle(status == .active ? .white.opacity(0.8) : .secondary)
+                .foregroundStyle(status == .done ? Color.gray : (status == .active ? .white.opacity(0.8) : .secondary))
+                .strikethrough(status == .done, color: .gray)
 
             Text(exerciseName)
                 .font(.system(size: 22, weight: .bold))
-                .foregroundStyle(status == .active ? .white : Color(red: 0.1, green: 0.25, blue: 0.4))
+                .foregroundStyle(
+                    status == .done   ? Color.gray :
+                    status == .active ? Color.white :
+                    Color(red: 0.1, green: 0.25, blue: 0.4)
+                )
+                .strikethrough(status == .done, color: .gray)
                 .lineLimit(2)
 
-            Text(status.label)
+            Text(status == .done ? "完成：\(dateLabel)" : status.label)
                 .font(.system(size: 17))
-                .foregroundStyle(status == .active ? .white.opacity(0.8) : .secondary)
+                .foregroundStyle(status == .done ? Color.gray : (status == .active ? .white.opacity(0.8) : .secondary))
 
             Spacer()
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(timeLabel)
                     .font(.system(size: 28, weight: .bold))
-                    .foregroundStyle(status == .active ? .white : Color(red: 0.1, green: 0.25, blue: 0.4))
+                    .foregroundStyle(
+                        status == .done   ? Color.gray :
+                        status == .active ? Color.white :
+                        Color(red: 0.1, green: 0.25, blue: 0.4)
+                    )
                 Text("分鐘")
                     .font(.system(size: 17))
-                    .foregroundStyle(status == .active ? .white.opacity(0.7) : .secondary)
+                    .foregroundStyle(status == .done ? Color.gray : (status == .active ? .white.opacity(0.7) : .secondary))
             }
         }
         .padding(24)
