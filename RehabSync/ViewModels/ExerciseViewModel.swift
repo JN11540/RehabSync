@@ -38,19 +38,41 @@ class ExerciseViewModel {
         let count = (try? db.read { db in
             try Exercise.fetchCount(db)
         }) ?? 0
+        print("[seed] exercise 表目前筆數：\(count)")
 
-        guard count == 0 else { return }
+        guard count == 0 else {
+            print("[seed] 已有資料，跳過 seed")
+            return
+        }
 
-        guard let url = Bundle.main.url(forResource: "exercise", withExtension: "json", subdirectory: "Util"),
-              let data = try? Data(contentsOf: url),
-              let exercises = try? JSONDecoder().decode([Exercise].self, from: data) else { return }
+        guard let url = Bundle.main.url(forResource: "exercise", withExtension: "json", subdirectory: "Util") else {
+            print("[seed] ❌ 找不到 exercise.json，請確認 Target Membership 有勾選")
+            return
+        }
+        print("[seed] ✅ 找到 exercise.json：\(url)")
+
+        guard let data = try? Data(contentsOf: url) else {
+            print("[seed] ❌ 無法讀取檔案內容")
+            return
+        }
+
+        guard let exercises = try? JSONDecoder().decode([Exercise].self, from: data) else {
+            print("[seed] ❌ JSON 解析失敗")
+            return
+        }
+        print("[seed] 解析到 \(exercises.count) 筆資料")
 
         let sorted = exercises.sorted { ($0.id ?? 0) < ($1.id ?? 0) }
 
-        try? db.write { db in
-            for var exercise in sorted {
-                try exercise.insert(db, onConflict: .ignore)
+        do {
+            try db.write { db in
+                for var exercise in sorted {
+                    try exercise.insert(db, onConflict: .ignore)
+                }
             }
+            print("[seed] ✅ 成功寫入 \(sorted.count) 筆 exercise")
+        } catch {
+            print("[seed] ❌ 寫入失敗：\(error)")
         }
     }
 }
