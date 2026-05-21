@@ -9,13 +9,13 @@ struct PreWorking: View {
             GeometryReader { geo in
                 HStack(alignment: .top, spacing: 0) {
                     PreWorkingLeftPanel()
-                        .frame(width: geo.size.width * 0.4)
+                        .frame(width: geo.size.width * 0.5)
 
                     ScrollView {
                         PreWorkingRightPanel()
                             .padding(24)
                     }
-                    .frame(width: geo.size.width * 0.6)
+                    .frame(width: geo.size.width * 0.5)
                 }
             }
         }
@@ -42,7 +42,7 @@ private struct PreWorkingLeftPanel: View {
                 .foregroundStyle(.white.opacity(0.55))
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 80)
+            .frame(maxHeight: .infinity)
             .clipShape(RoundedRectangle(cornerRadius: 8))
 
             VStack(alignment: .leading, spacing: 8) {
@@ -59,7 +59,18 @@ private struct PreWorkingLeftPanel: View {
             .background(Color(red: 0.92, green: 0.91, blue: 0.89))
             .clipShape(RoundedRectangle(cornerRadius: 10))
 
-            Spacer()
+            VStack(alignment: .leading, spacing: 8) {
+                Text("輔具")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Text("瑜珈墊")
+                    .font(.system(size: 15))
+                    .foregroundStyle(.primary)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .background(Color(red: 0.92, green: 0.91, blue: 0.89))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
 
             Button {} label: {
                 HStack(spacing: 8) {
