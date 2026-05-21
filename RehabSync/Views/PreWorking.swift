@@ -1,0 +1,232 @@
+import SwiftUI
+
+// MARK: - PreWorking
+
+struct PreWorking: View {
+    var body: some View {
+        ZStack {
+            Color(red: 0.96, green: 0.94, blue: 0.91).ignoresSafeArea()
+            GeometryReader { geo in
+                HStack(alignment: .top, spacing: 0) {
+                    PreWorkingLeftPanel()
+                        .frame(width: geo.size.width * 0.4)
+
+                    ScrollView {
+                        PreWorkingRightPanel()
+                            .padding(24)
+                    }
+                    .frame(width: geo.size.width * 0.6)
+                }
+            }
+        }
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+// MARK: - Left Panel
+
+private struct PreWorkingLeftPanel: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("躺姿抬腿")
+                .font(.system(size: 28, weight: .bold))
+                .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
+
+            ZStack {
+                Color.black
+                HStack(spacing: 6) {
+                    Image(systemName: "photo")
+                    Text("躺姿抬腿示範圖")
+                        .font(.system(size: 14))
+                }
+                .foregroundStyle(.white.opacity(0.55))
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 80)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("訓練姿勢")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Text("仰臥於瑜珈墊，患腿完全伸直平放床面，健腿屈膝腳踩地，雙手自然置於身側，腰部貼平墊面。")
+                    .font(.system(size: 15))
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .background(Color(red: 0.92, green: 0.91, blue: 0.89))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+
+            Spacer()
+
+            Button {} label: {
+                HStack(spacing: 8) {
+                    Text("Start")
+                    Image(systemName: "arrow.up.right")
+                }
+                .font(.system(size: 18, weight: .medium))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(.white)
+                .foregroundStyle(.primary)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.gray.opacity(0.3)))
+            }
+        }
+        .padding(24)
+    }
+}
+
+// MARK: - Right Panel
+
+private struct PreWorkingRightPanel: View {
+    private let procedureSteps: [(duration: String, name: String)] = [
+        ("5 sec.", "預備"),
+        ("5 sec.", "起始坐姿"),
+        ("1 sec.", "延展"),
+        ("5 sec.", "緩慢放下"),
+    ]
+
+    private let observations: [(label: String, value: String)] = [
+        ("面向", "等長維持"),
+        ("目標肌群", "股四頭肌"),
+        ("關節", "膝關節"),
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            // Exercises
+            Text("Exercises")
+                .font(.system(size: 22, weight: .bold))
+                .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
+
+            HStack(spacing: 12) {
+                ExerciseStatCard(icon: "clock", iconColor: Color(red: 0.94, green: 0.33, blue: 0.33), value: "05:30", label: "Time")
+                ExerciseStatCard(icon: "repeat", iconColor: Color(red: 0.5, green: 0.44, blue: 0.86), value: "3", label: "Sets")
+                ExerciseStatCard(icon: "waveform.path.ecg", iconColor: Color(red: 0.95, green: 0.62, blue: 0.18), value: "10", label: "Reps")
+            }
+
+            // Procedure
+            Text("Procedure")
+                .font(.system(size: 22, weight: .bold))
+                .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
+
+            ScrollView(.horizontal, showsIndicators: true) {
+                HStack(spacing: 12) {
+                    ForEach(procedureSteps, id: \.name) { step in
+                        ProcedureStepCard(duration: step.duration, stepName: step.name)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+
+            // 觀察重點
+            Text("觀察重點")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
+
+            VStack(spacing: 0) {
+                ForEach(Array(observations.enumerated()), id: \.offset) { index, row in
+                    ObservationRow(label: row.label, value: row.value)
+                    if index < observations.count - 1 {
+                        Divider().padding(.horizontal, 16)
+                    }
+                }
+            }
+            .background(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
+        }
+    }
+}
+
+// MARK: - Exercise Stat Card
+
+private struct ExerciseStatCard: View {
+    let icon: String
+    let iconColor: Color
+    let value: String
+    let label: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 20))
+                .foregroundStyle(iconColor)
+            Text(value)
+                .font(.system(size: 28, weight: .bold))
+                .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
+            Text(label)
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
+    }
+}
+
+// MARK: - Procedure Step Card
+
+private struct ProcedureStepCard: View {
+    let duration: String
+    let stepName: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(duration)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.secondary)
+
+            ZStack {
+                Color(red: 1.0, green: 0.9, blue: 0.9)
+                Image(systemName: "person")
+                    .font(.system(size: 32))
+                    .foregroundStyle(Color(red: 0.84, green: 0.28, blue: 0.28))
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 100)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+
+            Text(stepName)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
+        }
+        .padding(12)
+        .frame(width: 130)
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
+    }
+}
+
+// MARK: - Observation Row
+
+private struct ObservationRow: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        HStack {
+            Text(label)
+                .font(.system(size: 15))
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(value)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+    }
+}
+
+#Preview {
+    NavigationStack {
+        PreWorking()
+    }
+}

@@ -162,7 +162,21 @@ struct TreatmentPlanCard: View {
             }
 
             HStack(spacing: 12) {
-                OutlineButton(title: "Start") {}
+                NavigationLink {
+                    PreWorking()
+                } label: {
+                    HStack(spacing: 6) {
+                        Text("Start")
+                        Image(systemName: "arrow.up.right")
+                    }
+                    .font(.system(size: 16, weight: .medium))
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 10)
+                    .background(.white)
+                    .foregroundStyle(.primary)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.3)))
+                }
                 NavigationLink {
                     TreatmentView(treatment: treatment)
                 } label: {
