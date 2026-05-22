@@ -94,12 +94,10 @@ private struct PreWorkingLeftPanel: View {
 
 private struct PreWorkingRightPanel: View {
     private let procedureSteps: [(duration: String, name: String, icon: String)] = [
-        ("5 sec.", "預備",     "person"),
         ("5 sec.", "起始坐姿", "person"),
         ("1 sec.", "延展",     "person"),
         ("5 sec.", "緩慢放下", "person"),
         ("1 sec.", "收回",     "person"),
-        ("",       "下一次",   "repeat"),
     ]
 
     private let observations: [(label: String, value: String)] = [
