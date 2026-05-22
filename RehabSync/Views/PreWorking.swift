@@ -93,11 +93,13 @@ private struct PreWorkingLeftPanel: View {
 // MARK: - Right Panel
 
 private struct PreWorkingRightPanel: View {
-    private let procedureSteps: [(duration: String, name: String)] = [
-        ("5 sec.", "預備"),
-        ("5 sec.", "起始坐姿"),
-        ("1 sec.", "延展"),
-        ("5 sec.", "緩慢放下"),
+    private let procedureSteps: [(duration: String, name: String, icon: String)] = [
+        ("5 sec.", "預備",     "person"),
+        ("5 sec.", "起始坐姿", "person"),
+        ("1 sec.", "延展",     "person"),
+        ("5 sec.", "緩慢放下", "person"),
+        ("1 sec.", "收回",     "person"),
+        ("",       "下一次",   "repeat"),
     ]
 
     private let observations: [(label: String, value: String)] = [
@@ -127,7 +129,7 @@ private struct PreWorkingRightPanel: View {
             ScrollView(.horizontal, showsIndicators: true) {
                 HStack(spacing: 12) {
                     ForEach(procedureSteps, id: \.name) { step in
-                        ProcedureStepCard(duration: step.duration, stepName: step.name)
+                        ProcedureStepCard(duration: step.duration, stepName: step.name, icon: step.icon)
                     }
                 }
                 .padding(.vertical, 4)
@@ -186,6 +188,7 @@ private struct ExerciseStatCard: View {
 private struct ProcedureStepCard: View {
     let duration: String
     let stepName: String
+    var icon: String = "person"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -195,7 +198,7 @@ private struct ProcedureStepCard: View {
 
             ZStack {
                 Color(red: 1.0, green: 0.9, blue: 0.9)
-                Image(systemName: "person")
+                Image(systemName: icon)
                     .font(.system(size: 32))
                     .foregroundStyle(Color(red: 0.84, green: 0.28, blue: 0.28))
             }
