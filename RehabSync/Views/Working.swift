@@ -1,37 +1,206 @@
 import SwiftUI
+import Combine
+
+// MARK: - Phase
+
+private enum WorkingPhase: Equatable {
+    case preparation
+    case exercise(set: Int, rep: Int, stage: Int)
+    case setRest(afterSet: Int)
+    case finished
+}
+
+// MARK: - State
+
+@Observable
+private class WorkingState {
+    let exerciseName: String
+    let sets: Int
+    let reps: Int
+    let setRestTime: Int
+    let prepTime = 10
+    let stages: [(name: String, duration: Int)]
+
+    var phase: WorkingPhase = .preparation
+    var elapsed: Int = 0
+    var totalElapsed: Int = 0
+    var isPaused: Bool = false
+
+    private var cancellable: AnyCancellable?
+
+    init(content: TreatmentContent, exercise: Exercise) {
+        exerciseName = exercise.name
+        sets         = content.sets
+        reps         = content.reps
+        setRestTime  = content.set_rest_time
+
+        var s: [(String, Int)] = []
+        if let n = exercise.act_stage1, let d = exercise.rep_stage1 { s.append((n, d)) }
+        if let n = exercise.act_stage2, let d = exercise.rep_stage2 { s.append((n, d)) }
+        if let n = exercise.act_stage3, let d = exercise.rep_stage3 { s.append((n, d)) }
+        if let n = exercise.act_stage4, let d = exercise.rep_stage4 { s.append((n, d)) }
+        stages = s
+    }
+
+    func start() {
+        cancellable = Timer.publish(every: 1, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                guard let self, !self.isPaused else { return }
+                self.tick()
+            }
+    }
+
+    func cancel() { cancellable?.cancel() }
+
+    func togglePause() { isPaused.toggle() }
+
+    // MARK: Computed display
+
+    var stageName: String {
+        switch phase {
+        case .preparation:             return "預備"
+        case .exercise(_, _, let s):   return stages[safe: s]?.name ?? ""
+        case .setRest:                 return "組間休息"
+        case .finished:                return "完成"
+        }
+    }
+
+    var currentDuration: Int {
+        switch phase {
+        case .preparation:             return prepTime
+        case .exercise(_, _, let s):   return stages[safe: s]?.duration ?? 5
+        case .setRest:                 return setRestTime
+        case .finished:                return 0
+        }
+    }
+
+    // Ring: which stage segment is currently active (0–3); 4 = all complete
+    var ringCurrentStage: Int {
+        switch phase {
+        case .exercise(_, _, let s): return s
+        case .finished:              return 4
+        default:                     return 0
+        }
+    }
+
+    // Ring: fill fraction within the active segment
+    var ringStageProgress: CGFloat {
+        guard case .exercise = phase, currentDuration > 0 else { return 0 }
+        return min(CGFloat(elapsed) / CGFloat(currentDuration), 1.0)
+    }
+
+    var setDisplay: String {
+        switch phase {
+        case .exercise(let set, _, _): return "\(set + 1) / \(sets)"
+        case .setRest(let s):          return "\(s + 1) / \(sets)"
+        case .finished:                return "\(sets) / \(sets)"
+        default:                       return "- / \(sets)"
+        }
+    }
+
+    var repDisplay: String {
+        switch phase {
+        case .exercise(let set, let rep, _):
+            return "\(set * reps + rep + 1) / \(sets * reps)"
+        case .setRest(let s):
+            return "\(( s + 1) * reps) / \(sets * reps)"
+        case .finished:
+            return "\(sets * reps) / \(sets * reps)"
+        default:
+            return "- / \(sets * reps)"
+        }
+    }
+
+    var totalTimeDisplay: String {
+        String(format: "%02d:%02d", totalElapsed / 60, totalElapsed % 60)
+    }
+
+    // MARK: Timer
+
+    private func tick() {
+        elapsed       += 1
+        totalElapsed  += 1
+        if elapsed >= currentDuration { advance() }
+    }
+
+    private func advance() {
+        elapsed = 0
+        switch phase {
+        case .preparation:
+            phase = .exercise(set: 0, rep: 0, stage: 0)
+
+        case .exercise(let set, let rep, let stage):
+            if stage + 1 < stages.count {
+                phase = .exercise(set: set, rep: rep, stage: stage + 1)
+            } else if rep + 1 < reps {
+                phase = .exercise(set: set, rep: rep + 1, stage: 0)
+            } else if set + 1 < sets {
+                phase = .setRest(afterSet: set)
+            } else {
+                phase = .finished
+                cancel()
+            }
+
+        case .setRest(let afterSet):
+            phase = .exercise(set: afterSet + 1, rep: 0, stage: 0)
+
+        case .finished:
+            cancel()
+        }
+    }
+}
+
+private extension Array {
+    subscript(safe index: Index) -> Element? {
+        indices.contains(index) ? self[index] : nil
+    }
+}
 
 // MARK: - Working
 
 struct Working: View {
     let content: TreatmentContent
     let exercise: Exercise
+    @State private var state: WorkingState
+
+    init(content: TreatmentContent, exercise: Exercise) {
+        self.content  = content
+        self.exercise = exercise
+        _state = State(wrappedValue: WorkingState(content: content, exercise: exercise))
+    }
 
     var body: some View {
         ZStack {
             Color(red: 0.96, green: 0.94, blue: 0.91).ignoresSafeArea()
             GeometryReader { geo in
                 HStack(alignment: .top, spacing: 0) {
-                    WorkingLeftPanel(exercise: exercise, content: content)
+                    WorkingLeftPanel(state: state)
                         .frame(width: geo.size.width * 0.5)
                     Spacer()
                 }
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+        .onAppear  { state.start() }
+        .onDisappear { state.cancel() }
     }
 }
 
 // MARK: - Left Panel
 
 private struct WorkingLeftPanel: View {
-    let exercise: Exercise
-    let content: TreatmentContent
+    let state: WorkingState
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         VStack(spacing: 0) {
-            WorkingTopBar(title: exercise.name, onDismiss: { dismiss() })
+            WorkingTopBar(title: state.exerciseName, onDismiss: {
+                state.cancel()
+                dismiss()
+            })
 
+            // Animation guide
             ZStack {
                 RoundedRectangle(cornerRadius: 16)
                     .fill(Color(red: 0.93, green: 0.91, blue: 0.88))
@@ -47,23 +216,29 @@ private struct WorkingLeftPanel: View {
             .padding(.vertical, 8)
             .frame(maxHeight: .infinity)
 
+            // Ring + labels
             ZStack {
-                WorkingRingTimer(stageName: "前傾伸展", currentSec: 6, totalSec: 5, currentStage: 2, stageProgress: 1.0)
-                    .frame(width: 160, height: 160)
+                WorkingRingTimer(
+                    currentSec:    state.elapsed,
+                    totalSec:      state.currentDuration,
+                    currentStage:  state.ringCurrentStage,
+                    stageProgress: state.ringStageProgress
+                )
+                .frame(width: 160, height: 160)
 
                 // Stage name — outside right
-                Text("前傾伸展")
+                Text(state.stageName)
                     .font(.system(size: 24, weight: .medium))
                     .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
                     .offset(x: 200)
 
-                // Pause button — outside left
-                Button(action: {}) {
+                // Pause / resume — outside left
+                Button(action: { state.togglePause() }) {
                     ZStack {
                         Circle()
                             .stroke(Color.gray.opacity(0.35), lineWidth: 1.5)
                             .frame(width: 50, height: 50)
-                        Image(systemName: "pause.fill")
+                        Image(systemName: state.isPaused ? "play.fill" : "pause.fill")
                             .font(.system(size: 18))
                             .foregroundStyle(.primary)
                     }
@@ -73,10 +248,11 @@ private struct WorkingLeftPanel: View {
             .frame(maxWidth: .infinity, minHeight: 160)
             .padding(.vertical, 20)
 
+            // Stats
             HStack(spacing: 8) {
-                WorkingStatCard(label: "總時間",     value: "07:08")
-                WorkingStatCard(label: "目前組數",   value: "2 / 3")
-                WorkingStatCard(label: "目前動作數", value: "6 / 10")
+                WorkingStatCard(label: "總時間",     value: state.totalTimeDisplay)
+                WorkingStatCard(label: "目前組數",   value: state.setDisplay)
+                WorkingStatCard(label: "目前動作數", value: state.repDisplay)
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 20)
@@ -112,7 +288,6 @@ private struct WorkingTopBar: View {
 
             outlineIconButton(systemName: "info")
             outlineIconButton(systemName: "speaker.wave.1")
-
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -136,13 +311,11 @@ private struct WorkingTopBar: View {
 // MARK: - Ring Timer
 
 private struct WorkingRingTimer: View {
-    let stageName: String
     let currentSec: Int
     let totalSec: Int
-    let currentStage: Int      // 0–3
+    let currentStage: Int      // 0–3 active; 4 = all complete
     let stageProgress: CGFloat // 0.0–1.0
 
-    // Each segment: 82° arc + 8° gap (4° each side) = 90° per quarter
     private let halfGap: CGFloat = 0
     private let arcLen:  CGFloat = 0.25
     private let lineWidth: CGFloat = 14
@@ -163,15 +336,15 @@ private struct WorkingRingTimer: View {
                     .rotationEffect(.degrees(-90))
             }
 
-            // Completed stages — full arc
-            ForEach(0..<currentStage, id: \.self) { i in
+            // Completed stages
+            ForEach(0..<min(currentStage, 4), id: \.self) { i in
                 Circle()
                     .trim(from: segStart(i), to: segEnd(i))
                     .stroke(tealDark, style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt))
                     .rotationEffect(.degrees(-90))
             }
 
-            // Current stage — partial arc
+            // Current stage partial
             if currentStage < 4 && stageProgress > 0 {
                 let s = segStart(currentStage)
                 let e = s + arcLen * min(stageProgress, 1.0)
@@ -227,39 +400,31 @@ private struct WorkingStickFigure: View {
             let cx  = size.width / 2
             let r: CGFloat = size.width * 0.11
 
-            // Head
-            let head = Path(ellipseIn: CGRect(
-                x: cx - r, y: 0, width: r * 2, height: r * 2
-            ))
+            let head = Path(ellipseIn: CGRect(x: cx - r, y: 0, width: r * 2, height: r * 2))
             ctx.stroke(head, with: .color(bodyColor), lineWidth: 1.8)
 
-            // Body
             var body = Path()
             body.move(to: CGPoint(x: cx, y: r * 2))
             body.addLine(to: CGPoint(x: cx, y: size.height * 0.57))
             ctx.stroke(body, with: .color(bodyColor), lineWidth: 1.8)
 
-            // Left arm
             let shoulderY = size.height * 0.30
             var lArm = Path()
             lArm.move(to: CGPoint(x: cx, y: shoulderY))
             lArm.addLine(to: CGPoint(x: cx - size.width * 0.38, y: shoulderY + size.height * 0.13))
             ctx.stroke(lArm, with: .color(bodyColor), lineWidth: 1.8)
 
-            // Right arm
             var rArm = Path()
             rArm.move(to: CGPoint(x: cx, y: shoulderY))
             rArm.addLine(to: CGPoint(x: cx + size.width * 0.38, y: shoulderY + size.height * 0.13))
             ctx.stroke(rArm, with: .color(bodyColor), lineWidth: 1.8)
 
-            // Left leg (teal)
             let hipY = size.height * 0.57
             var lLeg = Path()
             lLeg.move(to: CGPoint(x: cx, y: hipY))
             lLeg.addLine(to: CGPoint(x: cx - size.width * 0.30, y: size.height * 0.97))
             ctx.stroke(lLeg, with: .color(legColor), lineWidth: 2.2)
 
-            // Right leg (teal)
             var rLeg = Path()
             rLeg.move(to: CGPoint(x: cx, y: hipY))
             rLeg.addLine(to: CGPoint(x: cx + size.width * 0.30, y: size.height * 0.97))
@@ -275,21 +440,21 @@ private struct WorkingStickFigure: View {
         Working(
             content: TreatmentContent(
                 treatment_id: 1, exercise_id: 1,
-                sets: 3, set_rest_time: 30,
-                reps: 10, rep_training_time: 5, rep_rest_time: 5,
+                sets: 2, set_rest_time: 10,
+                reps: 2, rep_training_time: 5, rep_rest_time: 5,
                 date: Int(Date().timeIntervalSince1970)
             ),
             exercise: Exercise(
                 id: nil,
-                name: "股四頭肌等長收縮",
+                name: "前後滑行運動",
                 info: "保持站姿，緩慢向前傾",
                 device: nil,
                 target: "股四頭肌",
                 joint: "膝關節",
                 rep_stage1: 5, act_stage1: "起始站立",
-                rep_stage2: 5, act_stage2: "前傾伸展",
-                rep_stage3: 5, act_stage3: "回復站立",
-                rep_stage4: nil, act_stage4: nil
+                rep_stage2: 1, act_stage2: "前傾伸展",
+                rep_stage3: 5, act_stage3: "靜態維持",
+                rep_stage4: 1, act_stage4: "緩慢回正"
             )
         )
     }
