@@ -14,6 +14,23 @@ struct TreatmentView: View {
             .map { $0.offset } ?? max(0, contentVM.contents.count - 1)
     }
 
+    private var groupedByDate: [(day: Date, items: [(idx: Int, content: TreatmentContent)])] {
+        var dict: [Date: [(Int, TreatmentContent)]] = [:]
+        for (i, c) in contentVM.contents.enumerated() {
+            let day = Calendar.current.startOfDay(for: Date(timeIntervalSince1970: TimeInterval(c.date)))
+            dict[day, default: []].append((i, c))
+        }
+        return dict.keys.sorted().map { day in
+            (day, dict[day]!.sorted { $0.0 < $1.0 })
+        }
+    }
+
+    private var activeGroupFirstIdx: Int {
+        groupedByDate
+            .first { $0.items.contains { $0.idx == activeIndex } }?
+            .items.first?.idx ?? 0
+    }
+
     private var startDate: String {
         Date(timeIntervalSince1970: TimeInterval(treatment.start_time))
             .formatted(.dateTime.year().month().day())
@@ -54,20 +71,27 @@ struct TreatmentView: View {
 
                     ScrollViewReader { proxy in
                         ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 16) {
-                                ForEach(Array(contentVM.contents.enumerated()), id: \.element.id) { index, content in
-                                    let cardStatus: DayStatus =
-                                        index == activeIndex ? .active :
-                                        completedContentIds.contains(Int(content.id ?? -1)) ? .done :
-                                        .upcoming
-                                    DayCard(
-                                        content: content,
-                                        exerciseName: exerciseName(for: content.exercise_id),
-                                        width: cardWidth,
-                                        height: cardHeight,
-                                        status: cardStatus
-                                    )
-                                    .id(index)
+                            HStack(alignment: .top, spacing: 16) {
+                                ForEach(groupedByDate, id: \.day) { group in
+                                    VStack(spacing: 10) {
+                                        ForEach(group.items, id: \.idx) { item in
+                                            let cardStatus: DayStatus =
+                                                item.idx == activeIndex ? .active :
+                                                completedContentIds.contains(Int(item.content.id ?? -1)) ? .done :
+                                                .upcoming
+                                            DayCard(
+                                                content: item.content,
+                                                exerciseName: exerciseName(for: item.content.exercise_id),
+                                                width: cardWidth,
+                                                height: cardHeight,
+                                                status: cardStatus
+                                            )
+                                        }
+                                    }
+                                    .padding(8)
+                                    .background(Color(red: 0.93, green: 0.91, blue: 0.88))
+                                    .clipShape(RoundedRectangle(cornerRadius: 26))
+                                    .id(group.items.first?.idx ?? 0)
                                 }
                             }
                             .padding(.horizontal, 24)
@@ -75,7 +99,7 @@ struct TreatmentView: View {
                         }
                         .onChange(of: contentVM.contents.count) { _, _ in
                             DispatchQueue.main.async {
-                                proxy.scrollTo(activeIndex, anchor: .leading)
+                                proxy.scrollTo(activeGroupFirstIdx, anchor: .leading)
                             }
                         }
                     }
