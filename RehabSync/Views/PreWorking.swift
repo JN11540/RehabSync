@@ -59,19 +59,6 @@ private struct PreWorkingLeftPanel: View {
             .background(Color(red: 0.92, green: 0.91, blue: 0.89))
             .clipShape(RoundedRectangle(cornerRadius: 10))
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("輔具")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.secondary)
-                Text("瑜珈墊")
-                    .font(.system(size: 15))
-                    .foregroundStyle(.primary)
-            }
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-            .background(Color(red: 0.92, green: 0.91, blue: 0.89))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-
             Button {} label: {
                 HStack(spacing: 8) {
                     Text("Start")
@@ -101,7 +88,7 @@ private struct PreWorkingRightPanel: View {
     ]
 
     private let observations: [(label: String, value: String)] = [
-        ("面向", "等長維持"),
+        ("輔具", "瑜珈墊"),
         ("目標肌群", "股四頭肌"),
         ("關節", "膝關節"),
     ]
