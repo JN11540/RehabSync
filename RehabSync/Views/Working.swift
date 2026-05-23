@@ -62,9 +62,9 @@ private struct WorkingLeftPanel: View {
                     ZStack {
                         Circle()
                             .stroke(Color.gray.opacity(0.35), lineWidth: 1.5)
-                            .frame(width: 63, height: 63)
+                            .frame(width: 50, height: 50)
                         Image(systemName: "pause.fill")
-                            .font(.system(size: 24))
+                            .font(.system(size: 18))
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -96,15 +96,15 @@ private struct WorkingTopBar: View {
                 ZStack {
                     Circle()
                         .fill(Color(red: 0.90, green: 0.88, blue: 0.85))
-                        .frame(width: 63, height: 63)
+                        .frame(width: 50, height: 50)
                     Image(systemName: "xmark")
-                        .font(.system(size: 24, weight: .semibold))
+                        .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(.primary)
                 }
             }
 
             Text(title)
-                .font(.system(size: 32, weight: .semibold))
+                .font(.system(size: 28, weight: .semibold))
                 .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
                 .lineLimit(1)
 
@@ -129,9 +129,9 @@ private struct WorkingTopBar: View {
             ZStack {
                 Circle()
                     .stroke(Color.gray.opacity(0.35), lineWidth: 1.5)
-                    .frame(width: 63, height: 63)
+                    .frame(width: 50, height: 50)
                 Image(systemName: systemName)
-                    .font(.system(size: 24))
+                    .font(.system(size: 18))
                     .foregroundStyle(.secondary)
             }
         }
