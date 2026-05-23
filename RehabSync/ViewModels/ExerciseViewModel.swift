@@ -45,20 +45,9 @@ class ExerciseViewModel {
             try Exercise.fetchCount(db)
         }) ?? 0
 
-        let staleCount = (try? db.read { db in
-            try Exercise.filter(Column("info") == "").fetchCount(db)
-        }) ?? 0
-
-        let needsSeed = count == 0
-        let needsReseed = count > 0 && staleCount > 0
-
-        guard needsSeed || needsReseed else {
-            print("[seed] 已有完整資料，跳過 seed")
+        guard count == 0 else {
+            print("[seed] 已有資料，跳過 seed")
             return
-        }
-
-        if needsReseed {
-            print("[seed] 偵測到 v2 migration 後欄位為空，執行 reseed（\(staleCount) 筆）")
         }
 
         guard let url = Bundle.main.url(forResource: "exercise", withExtension: "json") else {
