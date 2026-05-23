@@ -186,6 +186,8 @@ struct Working: View {
 private struct WorkingLeftPanel: View {
     let state: WorkingState
     @Environment(\.dismiss) private var dismiss
+    @State private var arcProgress: CGFloat = 0
+    @State private var arcEraseFrom: CGFloat = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -213,6 +215,8 @@ private struct WorkingLeftPanel: View {
             // Ring + labels
             ZStack {
                 WorkingRingTimer(
+                    arcFrom:        arcEraseFrom,
+                    arcTo:          arcProgress,
                     currentSec:     state.repElapsed,
                     totalSec:       state.repTotal,
                     stageDurations: state.stageDurations
@@ -249,6 +253,25 @@ private struct WorkingLeftPanel: View {
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 20)
+        }
+        .onChange(of: state.repElapsed) { oldValue, newValue in
+            guard state.repTotal > 0 else { return }
+            if newValue == 0 && oldValue > 0 {
+                // Rep ended: erase the arc clockwise (arcFrom sweeps toward arcTo)
+                let end = arcProgress
+                withAnimation(.linear(duration: 0.4)) {
+                    arcEraseFrom = end
+                } completion: {
+                    arcEraseFrom = 0
+                    arcProgress = 0
+                }
+            } else if newValue > 0 {
+                // Normal forward tick
+                arcEraseFrom = 0
+                withAnimation(.linear(duration: 1)) {
+                    arcProgress = CGFloat(newValue) / CGFloat(state.repTotal)
+                }
+            }
         }
     }
 }
@@ -304,6 +327,8 @@ private struct WorkingTopBar: View {
 // MARK: - Ring Timer
 
 private struct WorkingRingTimer: View {
+    let arcFrom: CGFloat        // leading edge (advances during clockwise erase)
+    let arcTo: CGFloat          // trailing edge (normal fill progress)
     let currentSec: Int
     let totalSec: Int
     let stageDurations: [Int]
@@ -324,23 +349,23 @@ private struct WorkingRingTimer: View {
         return CGFloat(stageDurations.prefix(i + 1).reduce(0, +)) / total
     }
 
+    // Map a 0-1 fraction to the top-semicircle window [0.5, 1.0]
+    // 0 → left (9 o'clock), 0.5 → top (12 o'clock), 1 → right (3 o'clock)
+    private func semi(_ x: CGFloat) -> CGFloat { 0.5 + x * 0.5 }
+
     var body: some View {
         ZStack {
-            // Background tracks — proportional per stage
+            // Background tracks — proportional per stage, top semicircle
             ForEach(0..<stageDurations.count, id: \.self) { i in
                 Circle()
-                    .trim(from: segStart(i), to: segEnd(i))
+                    .trim(from: semi(segStart(i)), to: semi(segEnd(i)))
                     .stroke(trackColor, style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt))
-                    .rotationEffect(.degrees(-90))
             }
 
-            // Single continuous progress arc advancing one second at a time
-            let progress = totalSec > 0 ? CGFloat(currentSec) / CGFloat(totalSec) : 0
+            // Progress arc — animated externally via arcFrom / arcTo
             Circle()
-                .trim(from: 0, to: progress)
+                .trim(from: semi(arcFrom), to: semi(arcTo))
                 .stroke(tealDark, style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt))
-                .rotationEffect(.degrees(-90))
-                .animation(.linear(duration: 1), value: progress)
 
             VStack(spacing: 2) {
                 Text("\(currentSec)\"")
