@@ -75,21 +75,6 @@ private class WorkingState {
         }
     }
 
-    // Ring: which stage segment is currently active; stages.count = all complete
-    var ringCurrentStage: Int {
-        switch phase {
-        case .exercise(_, _, let s): return s
-        case .finished:              return stages.count
-        default:                     return 0
-        }
-    }
-
-    // Ring: fill fraction within the active segment
-    var ringStageProgress: CGFloat {
-        guard case .exercise = phase, currentDuration > 0 else { return 0 }
-        return min(CGFloat(elapsed) / CGFloat(currentDuration), 1.0)
-    }
-
     // Elapsed seconds within the current rep (accumulates across stages)
     var repElapsed: Int {
         guard case .exercise(_, _, let stage) = phase else { return 0 }
@@ -230,8 +215,6 @@ private struct WorkingLeftPanel: View {
                 WorkingRingTimer(
                     currentSec:     state.repElapsed,
                     totalSec:       state.repTotal,
-                    currentStage:   state.ringCurrentStage,
-                    stageProgress:  state.ringStageProgress,
                     stageDurations: state.stageDurations
                 )
                 .frame(width: 160, height: 160)
@@ -323,9 +306,7 @@ private struct WorkingTopBar: View {
 private struct WorkingRingTimer: View {
     let currentSec: Int
     let totalSec: Int
-    let currentStage: Int      // active stage index; stages.count = all complete
-    let stageProgress: CGFloat // 0.0–1.0 within active stage
-    let stageDurations: [Int]  // duration of each stage in seconds
+    let stageDurations: [Int]
 
     private let lineWidth: CGFloat = 14
     private let tealDark   = Color(red: 0.12, green: 0.42, blue: 0.38)
@@ -333,29 +314,19 @@ private struct WorkingRingTimer: View {
 
     private var total: CGFloat { CGFloat(stageDurations.reduce(0, +)) }
 
-    // Cumulative fraction at the START of segment i
     private func segStart(_ i: Int) -> CGFloat {
         guard total > 0 else { return CGFloat(i) / CGFloat(max(stageDurations.count, 1)) }
-        let prior = CGFloat(stageDurations.prefix(i).reduce(0, +))
-        return prior / total
+        return CGFloat(stageDurations.prefix(i).reduce(0, +)) / total
     }
 
-    // Cumulative fraction at the END of segment i
     private func segEnd(_ i: Int) -> CGFloat {
         guard total > 0 else { return CGFloat(i + 1) / CGFloat(max(stageDurations.count, 1)) }
-        let upTo = CGFloat(stageDurations.prefix(i + 1).reduce(0, +))
-        return upTo / total
-    }
-
-    // Arc length (fraction) of segment i
-    private func arcLen(_ i: Int) -> CGFloat {
-        guard total > 0, i < stageDurations.count else { return 0 }
-        return CGFloat(stageDurations[i]) / total
+        return CGFloat(stageDurations.prefix(i + 1).reduce(0, +)) / total
     }
 
     var body: some View {
         ZStack {
-            // Background tracks — one per stage, proportional width
+            // Background tracks — proportional per stage
             ForEach(0..<stageDurations.count, id: \.self) { i in
                 Circle()
                     .trim(from: segStart(i), to: segEnd(i))
@@ -363,22 +334,14 @@ private struct WorkingRingTimer: View {
                     .rotationEffect(.degrees(-90))
             }
 
-            // Completed stages
-            ForEach(0..<min(currentStage, stageDurations.count), id: \.self) { i in
+            // Single continuous progress arc advancing one second at a time
+            let progress = totalSec > 0 ? CGFloat(currentSec) / CGFloat(totalSec) : 0
+            if progress > 0 {
                 Circle()
-                    .trim(from: segStart(i), to: segEnd(i))
+                    .trim(from: 0, to: progress)
                     .stroke(tealDark, style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt))
                     .rotationEffect(.degrees(-90))
-            }
-
-            // Current stage — partial fill
-            if currentStage < stageDurations.count && stageProgress > 0 {
-                let s = segStart(currentStage)
-                let e = s + arcLen(currentStage) * min(stageProgress, 1.0)
-                Circle()
-                    .trim(from: s, to: max(s, e))
-                    .stroke(tealDark, style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt))
-                    .rotationEffect(.degrees(-90))
+                    .animation(.linear(duration: 1), value: progress)
             }
 
             VStack(spacing: 2) {
