@@ -66,24 +66,32 @@ struct Working: View {
         GeometryReader { geo in
             ZStack {
                 Color(red: 0.96, green: 0.94, blue: 0.91).ignoresSafeArea()
-                VStack(spacing: 0) {
-                    topBar
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 14)
+                HStack(spacing: 0) {
+                    // Left panel — all content
+                    VStack(spacing: 0) {
+                        topBar
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 14)
 
-                    animationArea
-                        .frame(height: geo.size.height * 0.44)
-                        .padding(.horizontal, 20)
-                        .padding(.top, 4)
+                        animationArea
+                            .frame(height: geo.size.height * 0.44)
+                            .padding(.horizontal, 20)
+                            .padding(.top, 4)
 
+                        Spacer()
+
+                        timerControls
+                            .padding(.vertical, 20)
+
+                        Spacer()
+
+                        bottomStats
+                    }
+                    .frame(width: geo.size.width * 0.5)
+
+                    // Right panel — empty for now
                     Spacer()
-
-                    timerControls
-                        .padding(.vertical, 20)
-
-                    Spacer()
-
-                    bottomStats
+                        .frame(width: geo.size.width * 0.5)
                 }
             }
         }
@@ -184,15 +192,13 @@ struct Working: View {
     }
 
     private var bottomStats: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 10) {
             WorkingStatCell(label: "總時間",    value: totalTimeLabel)
-            Rectangle().fill(Color.gray.opacity(0.2)).frame(width: 1, height: 28)
             WorkingStatCell(label: "目前組數",   value: "\(currentSet) / \(content.sets)")
-            Rectangle().fill(Color.gray.opacity(0.2)).frame(width: 1, height: 28)
             WorkingStatCell(label: "目前動作數", value: "\(currentRep) / \(content.reps)")
         }
-        .padding(.vertical, 14)
-        .background(Color.white.opacity(0.8))
+        .padding(.horizontal, 16)
+        .padding(.bottom, 16)
     }
 
     // MARK: - Timer Logic
@@ -269,11 +275,15 @@ struct WorkingStatCell: View {
                 .foregroundStyle(.secondary)
             Text(value)
                 .font(.system(size: 22, weight: .bold))
-                .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
+                .foregroundStyle(Color(red: 0.15, green: 0.6, blue: 0.55))
                 .monospacedDigit()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
     }
 }
 
