@@ -73,7 +73,7 @@ struct TreatmentView: View {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(alignment: .top, spacing: 16) {
                                 ForEach(groupedByDate, id: \.day) { group in
-                                    VStack(spacing: 10) {
+                                    HStack(spacing: 10) {
                                         ForEach(group.items, id: \.idx) { item in
                                             let cardStatus: DayStatus =
                                                 item.idx == activeIndex ? .active :
