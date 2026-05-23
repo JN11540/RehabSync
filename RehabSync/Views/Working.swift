@@ -65,7 +65,7 @@ private struct WorkingLeftPanel: View {
                             .frame(width: 50, height: 50)
                         Image(systemName: "pause.fill")
                             .font(.system(size: 18))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.primary)
                     }
                 }
                 .offset(x: -200)
@@ -113,11 +113,6 @@ private struct WorkingTopBar: View {
             outlineIconButton(systemName: "info")
             outlineIconButton(systemName: "speaker.wave.1")
 
-            Button(action: {}) {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 18))
-                    .foregroundStyle(.secondary)
-            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -132,7 +127,7 @@ private struct WorkingTopBar: View {
                     .frame(width: 50, height: 50)
                 Image(systemName: systemName)
                     .font(.system(size: 18))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
             }
         }
     }
