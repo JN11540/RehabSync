@@ -244,7 +244,7 @@ private struct ObservationRow: View {
     let value: String
 
     var body: some View {
-        HStack {
+        HStack(alignment: .top) {
             Text(label)
                 .font(.system(size: 15))
                 .foregroundStyle(.secondary)
@@ -252,6 +252,8 @@ private struct ObservationRow: View {
             Text(value)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
+                .multilineTextAlignment(.trailing)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
