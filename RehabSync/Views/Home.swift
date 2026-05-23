@@ -125,7 +125,14 @@ struct TreatmentPlanCard: View {
     let treatment: Treatment
     @State private var contentVM = TreatmentContentViewModel()
     @State private var resultVM = TreatmentResultViewModel()
+    @State private var completedContentIds: Set<Int> = []
     @State private var progress: Double = 0
+
+    private var activeContent: TreatmentContent? {
+        contentVM.contents
+            .first { !completedContentIds.contains(Int($0.id ?? -1)) }
+            ?? contentVM.contents.last
+    }
 
     private var startDate: String {
         Date(timeIntervalSince1970: TimeInterval(treatment.start_time))
@@ -163,7 +170,9 @@ struct TreatmentPlanCard: View {
 
             HStack(spacing: 12) {
                 NavigationLink {
-                    PreWorking()
+                    if let content = activeContent {
+                        PreWorking(content: content)
+                    }
                 } label: {
                     HStack(spacing: 6) {
                         Text("Start")
@@ -205,9 +214,9 @@ struct TreatmentPlanCard: View {
         .onAppear {
             let tid = Int(treatment.id ?? 0)
             contentVM.fetchAll(for: tid)
-            let completed = resultVM.fetchCompletedContentIds(for: tid)
+            completedContentIds = resultVM.fetchCompletedContentIds(for: tid)
             let total = contentVM.contents.count
-            progress = total > 0 ? Double(completed.count) / Double(total) : 0
+            progress = total > 0 ? Double(completedContentIds.count) / Double(total) : 0
         }
     }
 }

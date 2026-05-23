@@ -3,16 +3,23 @@ import SwiftUI
 // MARK: - PreWorking
 
 struct PreWorking: View {
+    let content: TreatmentContent
+    @State private var exerciseVM = ExerciseViewModel()
+    @State private var exercise: Exercise? = nil
+
     var body: some View {
         ZStack {
             Color(red: 0.96, green: 0.94, blue: 0.91).ignoresSafeArea()
             GeometryReader { geo in
                 HStack(alignment: .top, spacing: 0) {
-                    PreWorkingLeftPanel()
-                        .frame(width: geo.size.width * 0.5)
+                    PreWorkingLeftPanel(
+                        exerciseName: exercise?.name ?? "",
+                        info: exercise?.info ?? ""
+                    )
+                    .frame(width: geo.size.width * 0.5)
 
                     ScrollView {
-                        PreWorkingRightPanel()
+                        PreWorkingRightPanel(content: content, exercise: exercise)
                             .padding(24)
                     }
                     .frame(width: geo.size.width * 0.5)
@@ -20,15 +27,21 @@ struct PreWorking: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            exercise = exerciseVM.fetch(by: content.exercise_id)
+        }
     }
 }
 
 // MARK: - Left Panel
 
 private struct PreWorkingLeftPanel: View {
+    let exerciseName: String
+    let info: String
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("躺姿抬腿")
+            Text(exerciseName)
                 .font(.system(size: 28, weight: .bold))
                 .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
 
@@ -36,7 +49,7 @@ private struct PreWorkingLeftPanel: View {
                 Color.black
                 HStack(spacing: 6) {
                     Image(systemName: "photo")
-                    Text("躺姿抬腿示範圖")
+                    Text("\(exerciseName)示範圖")
                         .font(.system(size: 14))
                 }
                 .foregroundStyle(.white.opacity(0.55))
@@ -45,19 +58,21 @@ private struct PreWorkingLeftPanel: View {
             .frame(maxHeight: .infinity)
             .clipShape(RoundedRectangle(cornerRadius: 8))
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("訓練姿勢")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.secondary)
-                Text("仰臥於瑜珈墊，患腿完全伸直平放床面，健腿屈膝腳踩地，雙手自然置於身側，腰部貼平墊面。")
-                    .font(.system(size: 15))
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
+            if !info.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("訓練姿勢")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Text(info)
+                        .font(.system(size: 15))
+                        .foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .background(Color(red: 0.92, green: 0.91, blue: 0.89))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
             }
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-            .background(Color(red: 0.92, green: 0.91, blue: 0.89))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
 
             Button {} label: {
                 HStack(spacing: 8) {
@@ -80,18 +95,34 @@ private struct PreWorkingLeftPanel: View {
 // MARK: - Right Panel
 
 private struct PreWorkingRightPanel: View {
-    private let procedureSteps: [(duration: String, name: String, icon: String)] = [
-        ("5 sec.", "起始坐姿", "person"),
-        ("1 sec.", "延展",     "person"),
-        ("5 sec.", "緩慢放下", "person"),
-        ("1 sec.", "收回",     "person"),
-    ]
+    let content: TreatmentContent
+    let exercise: Exercise?
 
-    private let observations: [(label: String, value: String)] = [
-        ("輔具", "瑜珈墊"),
-        ("目標肌群", "股四頭肌"),
-        ("關節", "膝關節"),
-    ]
+    private var timeLabel: String {
+        let s = (content.rep_training_time + content.rep_rest_time) * content.reps * content.sets
+            + content.set_rest_time * (content.sets - 1)
+        return String(format: "%02d:%02d", s / 60, s % 60)
+    }
+
+    private var procedureSteps: [(duration: String, name: String)] {
+        guard let e = exercise else { return [] }
+        return [(e.rep_stage1, e.act_stage1),
+                (e.rep_stage2, e.act_stage2),
+                (e.rep_stage3, e.act_stage3),
+                (e.rep_stage4, e.act_stage4)]
+            .compactMap { rep, act in
+                guard let rep, let act else { return nil }
+                return ("\(rep) sec.", act)
+            }
+    }
+
+    private var observations: [(String, String)] {
+        var rows: [(String, String)] = []
+        if let device = exercise?.device { rows.append(("輔具", device)) }
+        if let target = exercise?.target { rows.append(("目標肌群", target)) }
+        if let joint  = exercise?.joint  { rows.append(("關節", joint)) }
+        return rows
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -101,41 +132,45 @@ private struct PreWorkingRightPanel: View {
                 .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
 
             HStack(spacing: 12) {
-                ExerciseStatCard(icon: "clock", iconColor: Color(red: 0.94, green: 0.33, blue: 0.33), value: "05:30", label: "Time")
-                ExerciseStatCard(icon: "repeat", iconColor: Color(red: 0.5, green: 0.44, blue: 0.86), value: "3", label: "Sets")
-                ExerciseStatCard(icon: "waveform.path.ecg", iconColor: Color(red: 0.95, green: 0.62, blue: 0.18), value: "10", label: "Reps")
+                ExerciseStatCard(icon: "clock",           iconColor: Color(red: 0.94, green: 0.33, blue: 0.33), value: timeLabel,                   label: "Time")
+                ExerciseStatCard(icon: "repeat",          iconColor: Color(red: 0.5,  green: 0.44, blue: 0.86), value: "\(content.sets)",            label: "Sets")
+                ExerciseStatCard(icon: "waveform.path.ecg", iconColor: Color(red: 0.95, green: 0.62, blue: 0.18), value: "\(content.reps)",          label: "Reps")
             }
 
             // Procedure
-            Text("Procedure")
-                .font(.system(size: 22, weight: .bold))
-                .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
+            if !procedureSteps.isEmpty {
+                Text("Procedure")
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
 
-            ScrollView(.horizontal, showsIndicators: true) {
-                HStack(spacing: 12) {
-                    ForEach(procedureSteps, id: \.name) { step in
-                        ProcedureStepCard(duration: step.duration, stepName: step.name, icon: step.icon)
+                ScrollView(.horizontal, showsIndicators: true) {
+                    HStack(spacing: 12) {
+                        ForEach(procedureSteps, id: \.name) { step in
+                            ProcedureStepCard(duration: step.duration, stepName: step.name)
+                        }
                     }
+                    .padding(.vertical, 4)
                 }
-                .padding(.vertical, 4)
             }
 
             // 觀察重點
-            Text("觀察重點")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
+            if !observations.isEmpty {
+                Text("觀察重點")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
 
-            VStack(spacing: 0) {
-                ForEach(Array(observations.enumerated()), id: \.offset) { index, row in
-                    ObservationRow(label: row.label, value: row.value)
-                    if index < observations.count - 1 {
-                        Divider().padding(.horizontal, 16)
+                VStack(spacing: 0) {
+                    ForEach(Array(observations.enumerated()), id: \.offset) { index, row in
+                        ObservationRow(label: row.0, value: row.1)
+                        if index < observations.count - 1 {
+                            Divider().padding(.horizontal, 16)
+                        }
                     }
                 }
+                .background(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
             }
-            .background(.white)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
         }
     }
 }
@@ -173,7 +208,6 @@ private struct ExerciseStatCard: View {
 private struct ProcedureStepCard: View {
     let duration: String
     let stepName: String
-    var icon: String = "person"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -183,7 +217,7 @@ private struct ProcedureStepCard: View {
 
             ZStack {
                 Color(red: 1.0, green: 0.9, blue: 0.9)
-                Image(systemName: icon)
+                Image(systemName: "person")
                     .font(.system(size: 32))
                     .foregroundStyle(Color(red: 0.84, green: 0.28, blue: 0.28))
             }
@@ -226,6 +260,11 @@ private struct ObservationRow: View {
 
 #Preview {
     NavigationStack {
-        PreWorking()
+        PreWorking(content: TreatmentContent(
+            treatment_id: 1, exercise_id: 1,
+            sets: 3, set_rest_time: 30,
+            reps: 10, rep_training_time: 5, rep_rest_time: 5,
+            date: Int(Date().timeIntervalSince1970)
+        ))
     }
 }
