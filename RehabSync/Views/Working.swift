@@ -159,10 +159,49 @@ struct Working: View {
 
             ZStack {
                 ForEach(Array(stages.enumerated()), id: \.offset) { i, stage in
-                    ringSegment(index: i, stage: stage)
-                    ringLabel(index: i, stage: stage)
+                    let count    = stages.count
+                    let segFrac  = 1.0 / Double(count)
+                    let segStart = Double(i) * segFrac + ringGap
+                    let segEnd   = Double(i + 1) * segFrac - ringGap
+                    let teal     = Color(red: 0.1, green: 0.55, blue: 0.5)
+                    let style    = StrokeStyle(lineWidth: ringLineW, lineCap: .butt)
+
+                    Circle()
+                        .trim(from: segStart, to: segEnd)
+                        .stroke(Color.gray.opacity(0.15), style: style)
+                        .rotationEffect(.degrees(-90))
+
+                    if isResting || i < currentStageIndex {
+                        Circle()
+                            .trim(from: segStart, to: segEnd)
+                            .stroke(teal.opacity(0.5), style: style)
+                            .rotationEffect(.degrees(-90))
+                    } else if i == currentStageIndex {
+                        let dur     = Double(max(stage.duration, 1))
+                        let stageP  = min(Double(stageElapsed) / dur, 1.0)
+                        let fillEnd = segStart + (segEnd - segStart) * stageP
+                        Circle()
+                            .trim(from: segStart, to: max(segStart + 0.0001, fillEnd))
+                            .stroke(teal, style: style)
+                            .rotationEffect(.degrees(-90))
+                            .animation(.linear(duration: 0.4), value: stageElapsed)
+                    }
+
+                    let midDeg   = (Double(i) * segFrac + segFrac / 2) * 360 - 90
+                    let midRad   = Angle(degrees: midDeg).radians
+                    let isActive = !isResting && i == currentStageIndex
+                    let isDone   = isResting || i < currentStageIndex
+
+                    Text(stage.name)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(
+                            isActive ? Color.white :
+                            isDone   ? Color.white.opacity(0.75) :
+                                       Color.gray.opacity(0.5)
+                        )
+                        .offset(x: cos(midRad) * ringTextR,
+                                y: sin(midRad) * ringTextR)
                 }
-                // Center content
                 VStack(spacing: 2) {
                     Text(phaseLabel)
                         .font(.system(size: 13))
@@ -195,63 +234,6 @@ struct Working: View {
     private let ringLineW: CGFloat = 40
     private let ringTextR: CGFloat = 66
     private let ringGap: Double    = 0.012
-
-    @ViewBuilder
-    private func ringSegment(index i: Int, stage: (name: String, duration: Int)) -> some View {
-        let count    = stages.count
-        let segFrac  = 1.0 / Double(count)
-        let segStart = Double(i) * segFrac + ringGap
-        let segEnd   = Double(i + 1) * segFrac - ringGap
-        let teal     = Color(red: 0.1, green: 0.55, blue: 0.5)
-        let style    = StrokeStyle(lineWidth: ringLineW, lineCap: .butt)
-
-        // Background
-        Circle()
-            .trim(from: segStart, to: segEnd)
-            .stroke(Color.gray.opacity(0.15), style: style)
-            .rotationEffect(.degrees(-90))
-
-        if isResting {
-            Circle()
-                .trim(from: segStart, to: segEnd)
-                .stroke(teal.opacity(0.5), style: style)
-                .rotationEffect(.degrees(-90))
-        } else if i < currentStageIndex {
-            Circle()
-                .trim(from: segStart, to: segEnd)
-                .stroke(teal.opacity(0.5), style: style)
-                .rotationEffect(.degrees(-90))
-        } else if i == currentStageIndex {
-            let dur     = Double(max(stage.duration, 1))
-            let stageP  = min(Double(stageElapsed) / dur, 1.0)
-            let fillEnd = segStart + (segEnd - segStart) * stageP
-            Circle()
-                .trim(from: segStart, to: max(segStart + 0.0001, fillEnd))
-                .stroke(teal, style: style)
-                .rotationEffect(.degrees(-90))
-                .animation(.linear(duration: 0.4), value: stageElapsed)
-        }
-    }
-
-    @ViewBuilder
-    private func ringLabel(index i: Int, stage: (name: String, duration: Int)) -> some View {
-        let count    = stages.count
-        let segFrac  = 1.0 / Double(count)
-        let midDeg   = (Double(i) * segFrac + segFrac / 2) * 360 - 90
-        let midRad   = Angle(degrees: midDeg).radians
-        let isActive = !isResting && i == currentStageIndex
-        let isDone   = isResting || i < currentStageIndex
-
-        Text(stage.name)
-            .font(.system(size: 10, weight: .medium))
-            .foregroundStyle(
-                isActive ? Color.white :
-                isDone   ? Color.white.opacity(0.75) :
-                           Color.gray.opacity(0.5)
-            )
-            .offset(x: cos(midRad) * ringTextR,
-                    y: sin(midRad) * ringTextR)
-    }
 
     // MARK: - Timer Logic
 
