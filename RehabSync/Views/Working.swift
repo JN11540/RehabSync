@@ -47,9 +47,17 @@ private struct WorkingLeftPanel: View {
             .padding(.vertical, 8)
             .frame(maxHeight: .infinity)
 
-            WorkingRingTimer(stageName: "前傾伸展", currentSec: 6, totalSec: 5, currentStage: 2, stageProgress: 1.0)
-                .frame(width: 160, height: 160)
-                .padding(.vertical, 20)
+            ZStack {
+                WorkingRingTimer(stageName: "前傾伸展", currentSec: 6, totalSec: 5, currentStage: 2, stageProgress: 1.0)
+                    .frame(width: 160, height: 160)
+
+                Text("前傾伸展")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
+                    .offset(x: 108)
+            }
+            .frame(maxWidth: .infinity, minHeight: 160)
+            .padding(.vertical, 20)
 
             VStack(spacing: 0) {
                 HStack {
@@ -144,8 +152,8 @@ private struct WorkingRingTimer: View {
     let stageProgress: CGFloat // 0.0–1.0
 
     // Each segment: 82° arc + 8° gap (4° each side) = 90° per quarter
-    private let halfGap: CGFloat = 4.0 / 360.0
-    private let arcLen:  CGFloat = 82.0 / 360.0
+    private let halfGap: CGFloat = 1.5 / 360.0
+    private let arcLen:  CGFloat = 87.0 / 360.0
     private let lineWidth: CGFloat = 14
 
     private let tealDark   = Color(red: 0.12, green: 0.42, blue: 0.38)
@@ -183,9 +191,6 @@ private struct WorkingRingTimer: View {
             }
 
             VStack(spacing: 2) {
-                Text(stageName)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
                 Text("\(currentSec)\"")
                     .font(.system(size: 36, weight: .bold))
                     .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
