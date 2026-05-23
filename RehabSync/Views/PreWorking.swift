@@ -244,15 +244,15 @@ private struct ObservationRow: View {
     let value: String
 
     var body: some View {
-        HStack(alignment: .top) {
+        HStack(alignment: .top, spacing: 12) {
             Text(label)
                 .font(.system(size: 15))
                 .foregroundStyle(.secondary)
-            Spacer()
+                .frame(width: 72, alignment: .leading)
             Text(value)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
-                .multilineTextAlignment(.trailing)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 16)
