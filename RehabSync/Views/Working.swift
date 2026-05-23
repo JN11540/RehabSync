@@ -143,59 +143,56 @@ private struct WorkingRingTimer: View {
     let currentStage: Int      // 0–3
     let stageProgress: CGFloat // 0.0–1.0
 
+    // Each segment: 82° arc + 8° gap (4° each side) = 90° per quarter
+    private let halfGap: CGFloat = 4.0 / 360.0
+    private let arcLen:  CGFloat = 82.0 / 360.0
+    private let lineWidth: CGFloat = 14
+
     private let tealLight  = Color(red: 0.53, green: 0.80, blue: 0.76)
     private let tealDark   = Color(red: 0.12, green: 0.42, blue: 0.38)
-    private let trackColor = Color.gray.opacity(0.22)
+    private let trackColor = Color(white: 0.88, opacity: 1)
 
-    // 4 stages × 80° arc + 4 × 10° gap = 360°
-    private let ticksPerStage = 8
-    private let stageDeg: CGFloat = 80
-    private let gapDeg:   CGFloat = 10
+    private func segStart(_ i: Int) -> CGFloat { CGFloat(i) * 0.25 + halfGap }
+    private func segEnd(_ i: Int)   -> CGFloat { CGFloat(i) * 0.25 + 0.25 - halfGap }
+
+    // AngularGradient angles are in local (pre-rotation) space.
+    // trim fraction f → local angle f×360°; after rotationEffect(-90°) it lands at f×360°−90° on screen.
+    // So gradient start for segment i = i×90° + halfGap×360° ≈ i×90°+4°
+    private func segGradient(_ i: Int) -> AngularGradient {
+        AngularGradient(
+            colors: [tealLight, tealDark],
+            center: .center,
+            startAngle: .degrees(Double(i) * 90 + 4),
+            endAngle:   .degrees(Double(i) * 90 + 86)
+        )
+    }
 
     var body: some View {
         ZStack {
-            Canvas { ctx, size in
-                let cx = size.width / 2
-                let cy = size.height / 2
-                let radius: CGFloat = size.width * 0.41
-                let tickW: CGFloat  = 5.5
-                let tickH: CGFloat  = 13
-                let cr: CGFloat     = 2.5
+            // Background tracks
+            ForEach(0..<4, id: \.self) { i in
+                Circle()
+                    .trim(from: segStart(i), to: segEnd(i))
+                    .stroke(trackColor, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+            }
 
-                for stageIdx in 0..<4 {
-                    let stageStartDeg = CGFloat(stageIdx) * (stageDeg + gapDeg) - 90
+            // Completed stages — full gradient arc
+            ForEach(0..<currentStage, id: \.self) { i in
+                Circle()
+                    .trim(from: segStart(i), to: segEnd(i))
+                    .stroke(segGradient(i), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+            }
 
-                    let litCount: Int
-                    if stageIdx < currentStage {
-                        litCount = ticksPerStage
-                    } else if stageIdx == currentStage {
-                        litCount = min(Int(ceil(stageProgress * CGFloat(ticksPerStage))), ticksPerStage)
-                    } else {
-                        litCount = 0
-                    }
-
-                    for tickIdx in 0..<ticksPerStage {
-                        let angleDeg = stageStartDeg + CGFloat(tickIdx) * stageDeg / CGFloat(ticksPerStage - 1)
-                        let angle    = angleDeg * .pi / 180
-                        let phi      = angle + .pi / 2
-
-                        let tx = cx + radius * cos(angle)
-                        let ty = cy + radius * sin(angle)
-
-                        let color: Color = tickIdx < litCount
-                            ? (stageIdx < currentStage ? tealDark : tealLight)
-                            : trackColor
-
-                        let baseRect = CGRect(x: -tickW / 2, y: -tickH / 2, width: tickW, height: tickH)
-                        let basePath = Path(roundedRect: baseRect, cornerRadius: cr)
-                        let transform = CGAffineTransform(
-                            a: cos(phi), b: sin(phi),
-                            c: -sin(phi), d: cos(phi),
-                            tx: tx, ty: ty
-                        )
-                        ctx.fill(basePath.applying(transform), with: .color(color))
-                    }
-                }
+            // Current stage — partial gradient arc
+            if currentStage < 4 && stageProgress > 0 {
+                let s = segStart(currentStage)
+                let e = s + arcLen * min(stageProgress, 1.0)
+                Circle()
+                    .trim(from: s, to: max(s, e))
+                    .stroke(segGradient(currentStage), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
             }
 
             VStack(spacing: 2) {
