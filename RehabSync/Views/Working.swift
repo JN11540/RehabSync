@@ -47,7 +47,7 @@ private struct WorkingLeftPanel: View {
             .padding(.vertical, 8)
             .frame(maxHeight: .infinity)
 
-            WorkingRingTimer(stageName: "前傾伸展", currentSec: 6, totalSec: 5, progress: 0.75)
+            WorkingRingTimer(stageName: "前傾伸展", currentSec: 6, totalSec: 5, currentStage: 2, stageProgress: 1.0)
                 .frame(width: 160, height: 160)
                 .padding(.vertical, 20)
 
@@ -140,29 +140,58 @@ private struct WorkingRingTimer: View {
     let stageName: String
     let currentSec: Int
     let totalSec: Int
-    let progress: CGFloat
+    let currentStage: Int    // 0–3: which segment is active
+    let stageProgress: CGFloat  // 0.0–1.0 within the active segment
+
+    // Each segment: 82° arc + 8° gap (4° each side) = 90° per quarter
+    private let halfGap: CGFloat = 4.0 / 360.0
+    private let arcLen:  CGFloat = 82.0 / 360.0
+    private let lineWidth: CGFloat = 12
+
+    private let tealLight = Color(red: 0.53, green: 0.80, blue: 0.76)
+    private let tealDark  = Color(red: 0.12, green: 0.42, blue: 0.38)
+    private let trackColor = Color.gray.opacity(0.18)
+
+    private func segStart(_ i: Int) -> CGFloat { CGFloat(i) * 0.25 + halfGap }
+    private func segEnd(_ i: Int)   -> CGFloat { CGFloat(i) * 0.25 + 0.25 - halfGap }
 
     var body: some View {
         ZStack {
-            Circle()
-                .stroke(Color.gray.opacity(0.18), lineWidth: 12)
+            // Background tracks (4 gray segments)
+            ForEach(0..<4, id: \.self) { i in
+                Circle()
+                    .trim(from: segStart(i), to: segEnd(i))
+                    .stroke(trackColor, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+            }
 
-            Circle()
-                .trim(from: 0, to: progress)
-                .stroke(
-                    AngularGradient(
-                        colors: [
-                            Color(red: 0.53, green: 0.80, blue: 0.76),
-                            Color(red: 0.12, green: 0.42, blue: 0.38)
-                        ],
-                        center: .center,
-                        startAngle: .degrees(-90),
-                        endAngle: .degrees(270)
-                    ),
-                    style: StrokeStyle(lineWidth: 12, lineCap: .round)
-                )
-                .rotationEffect(.degrees(-90))
+            // Completed stages (full teal)
+            ForEach(0..<currentStage, id: \.self) { i in
+                Circle()
+                    .trim(from: segStart(i), to: segEnd(i))
+                    .stroke(tealDark, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+            }
 
+            // Current stage (partial, gradient)
+            if currentStage < 4 && stageProgress > 0 {
+                let s = segStart(currentStage)
+                let e = s + arcLen * min(stageProgress, 1.0)
+                Circle()
+                    .trim(from: s, to: e)
+                    .stroke(
+                        AngularGradient(
+                            colors: [tealLight, tealDark],
+                            center: .center,
+                            startAngle: .degrees(Double(currentStage) * 90 + 4),
+                            endAngle:   .degrees(Double(currentStage) * 90 + 86)
+                        ),
+                        style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
+                    )
+                    .rotationEffect(.degrees(-90))
+            }
+
+            // Center text
             VStack(spacing: 2) {
                 Text(stageName)
                     .font(.system(size: 12))
