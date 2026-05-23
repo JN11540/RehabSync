@@ -53,7 +53,7 @@ private struct WorkingLeftPanel: View {
 
                 // Stage name — outside right
                 Text("前傾伸展")
-                    .font(.system(size: 16, weight: .medium))
+                    .font(.system(size: 24, weight: .medium))
                     .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
                     .offset(x: 200)
 
@@ -62,9 +62,9 @@ private struct WorkingLeftPanel: View {
                     ZStack {
                         Circle()
                             .stroke(Color.gray.opacity(0.35), lineWidth: 1.5)
-                            .frame(width: 34, height: 34)
+                            .frame(width: 63, height: 63)
                         Image(systemName: "pause.fill")
-                            .font(.system(size: 13))
+                            .font(.system(size: 24))
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -73,31 +73,13 @@ private struct WorkingLeftPanel: View {
             .frame(maxWidth: .infinity, minHeight: 160)
             .padding(.vertical, 20)
 
-            VStack(spacing: 0) {
-                HStack {
-                    Spacer()
-                    Button(action: {}) {
-                        ZStack {
-                            Circle()
-                                .fill(Color(red: 0.90, green: 0.88, blue: 0.85))
-                                .frame(width: 34, height: 34)
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(.trailing, 16)
-                    .padding(.bottom, 6)
-                }
-
-                HStack(spacing: 8) {
-                    WorkingStatCard(label: "總時間",     value: "07:08")
-                    WorkingStatCard(label: "目前組數",   value: "2 / 3")
-                    WorkingStatCard(label: "目前動作數", value: "6 / 10")
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 20)
+            HStack(spacing: 8) {
+                WorkingStatCard(label: "總時間",     value: "07:08")
+                WorkingStatCard(label: "目前組數",   value: "2 / 3")
+                WorkingStatCard(label: "目前動作數", value: "6 / 10")
             }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 20)
         }
     }
 }
@@ -114,15 +96,15 @@ private struct WorkingTopBar: View {
                 ZStack {
                     Circle()
                         .fill(Color(red: 0.90, green: 0.88, blue: 0.85))
-                        .frame(width: 36, height: 36)
+                        .frame(width: 63, height: 63)
                     Image(systemName: "xmark")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 24, weight: .semibold))
                         .foregroundStyle(.primary)
                 }
             }
 
             Text(title)
-                .font(.system(size: 22, weight: .semibold))
+                .font(.system(size: 32, weight: .semibold))
                 .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
                 .lineLimit(1)
 
@@ -147,9 +129,9 @@ private struct WorkingTopBar: View {
             ZStack {
                 Circle()
                     .stroke(Color.gray.opacity(0.35), lineWidth: 1.5)
-                    .frame(width: 34, height: 34)
+                    .frame(width: 63, height: 63)
                 Image(systemName: systemName)
-                    .font(.system(size: 13))
+                    .font(.system(size: 24))
                     .foregroundStyle(.secondary)
             }
         }
@@ -225,10 +207,10 @@ private struct WorkingStatCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label)
-                .font(.system(size: 11))
+                .font(.system(size: 14))
                 .foregroundStyle(.secondary)
             Text(value)
-                .font(.system(size: 20, weight: .bold))
+                .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
         }
         .padding(.horizontal, 12)
