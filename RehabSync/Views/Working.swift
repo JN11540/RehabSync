@@ -148,24 +148,11 @@ private struct WorkingRingTimer: View {
     private let arcLen:  CGFloat = 82.0 / 360.0
     private let lineWidth: CGFloat = 14
 
-    private let tealLight  = Color(red: 0.53, green: 0.80, blue: 0.76)
     private let tealDark   = Color(red: 0.12, green: 0.42, blue: 0.38)
     private let trackColor = Color(white: 0.88, opacity: 1)
 
     private func segStart(_ i: Int) -> CGFloat { CGFloat(i) * 0.25 + halfGap }
     private func segEnd(_ i: Int)   -> CGFloat { CGFloat(i) * 0.25 + 0.25 - halfGap }
-
-    // AngularGradient angles are in local (pre-rotation) space.
-    // trim fraction f → local angle f×360°; after rotationEffect(-90°) it lands at f×360°−90° on screen.
-    // So gradient start for segment i = i×90° + halfGap×360° ≈ i×90°+4°
-    private func segGradient(_ i: Int) -> AngularGradient {
-        AngularGradient(
-            colors: [tealLight, tealDark],
-            center: .center,
-            startAngle: .degrees(Double(i) * 90 + 4),
-            endAngle:   .degrees(Double(i) * 90 + 86)
-        )
-    }
 
     var body: some View {
         ZStack {
@@ -173,25 +160,25 @@ private struct WorkingRingTimer: View {
             ForEach(0..<4, id: \.self) { i in
                 Circle()
                     .trim(from: segStart(i), to: segEnd(i))
-                    .stroke(trackColor, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                    .stroke(trackColor, style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt))
                     .rotationEffect(.degrees(-90))
             }
 
-            // Completed stages — full gradient arc
+            // Completed stages — full arc
             ForEach(0..<currentStage, id: \.self) { i in
                 Circle()
                     .trim(from: segStart(i), to: segEnd(i))
-                    .stroke(segGradient(i), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                    .stroke(tealDark, style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt))
                     .rotationEffect(.degrees(-90))
             }
 
-            // Current stage — partial gradient arc
+            // Current stage — partial arc
             if currentStage < 4 && stageProgress > 0 {
                 let s = segStart(currentStage)
                 let e = s + arcLen * min(stageProgress, 1.0)
                 Circle()
                     .trim(from: s, to: max(s, e))
-                    .stroke(segGradient(currentStage), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                    .stroke(tealDark, style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt))
                     .rotationEffect(.degrees(-90))
             }
 
