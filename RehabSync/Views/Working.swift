@@ -90,6 +90,7 @@ private class WorkingState {
         switch phase {
         case .preparation:           return elapsed
         case .exercise:              return repElapsed
+        case .setRest:               return elapsed
         default:                     return 0
         }
     }
@@ -98,6 +99,7 @@ private class WorkingState {
         switch phase {
         case .preparation:           return prepTime
         case .exercise:              return repTotal
+        case .setRest:               return setRestTime
         default:                     return 0
         }
     }
