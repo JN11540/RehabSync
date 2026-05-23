@@ -75,11 +75,11 @@ private class WorkingState {
         }
     }
 
-    // Ring: which stage segment is currently active (0–3); 4 = all complete
+    // Ring: which stage segment is currently active; stages.count = all complete
     var ringCurrentStage: Int {
         switch phase {
         case .exercise(_, _, let s): return s
-        case .finished:              return 4
+        case .finished:              return stages.count
         default:                     return 0
         }
     }
@@ -99,6 +99,9 @@ private class WorkingState {
 
     // Total seconds for one rep
     var repTotal: Int { stages.reduce(0) { $0 + $1.duration } }
+
+    // Duration of each stage (for proportional ring segments)
+    var stageDurations: [Int] { stages.map { $0.duration } }
 
     var setDisplay: String {
         switch phase {
@@ -225,10 +228,11 @@ private struct WorkingLeftPanel: View {
             // Ring + labels
             ZStack {
                 WorkingRingTimer(
-                    currentSec:    state.repElapsed,
-                    totalSec:      state.repTotal,
-                    currentStage:  state.ringCurrentStage,
-                    stageProgress: state.ringStageProgress
+                    currentSec:     state.repElapsed,
+                    totalSec:       state.repTotal,
+                    currentStage:   state.ringCurrentStage,
+                    stageProgress:  state.ringStageProgress,
+                    stageDurations: state.stageDurations
                 )
                 .frame(width: 160, height: 160)
 
@@ -319,23 +323,40 @@ private struct WorkingTopBar: View {
 private struct WorkingRingTimer: View {
     let currentSec: Int
     let totalSec: Int
-    let currentStage: Int      // 0–3 active; 4 = all complete
-    let stageProgress: CGFloat // 0.0–1.0
+    let currentStage: Int      // active stage index; stages.count = all complete
+    let stageProgress: CGFloat // 0.0–1.0 within active stage
+    let stageDurations: [Int]  // duration of each stage in seconds
 
-    private let halfGap: CGFloat = 0
-    private let arcLen:  CGFloat = 0.25
     private let lineWidth: CGFloat = 14
-
     private let tealDark   = Color(red: 0.12, green: 0.42, blue: 0.38)
     private let trackColor = Color(white: 0.88, opacity: 1)
 
-    private func segStart(_ i: Int) -> CGFloat { CGFloat(i) * 0.25 + halfGap }
-    private func segEnd(_ i: Int)   -> CGFloat { CGFloat(i) * 0.25 + 0.25 - halfGap }
+    private var total: CGFloat { CGFloat(stageDurations.reduce(0, +)) }
+
+    // Cumulative fraction at the START of segment i
+    private func segStart(_ i: Int) -> CGFloat {
+        guard total > 0 else { return CGFloat(i) / CGFloat(max(stageDurations.count, 1)) }
+        let prior = CGFloat(stageDurations.prefix(i).reduce(0, +))
+        return prior / total
+    }
+
+    // Cumulative fraction at the END of segment i
+    private func segEnd(_ i: Int) -> CGFloat {
+        guard total > 0 else { return CGFloat(i + 1) / CGFloat(max(stageDurations.count, 1)) }
+        let upTo = CGFloat(stageDurations.prefix(i + 1).reduce(0, +))
+        return upTo / total
+    }
+
+    // Arc length (fraction) of segment i
+    private func arcLen(_ i: Int) -> CGFloat {
+        guard total > 0, i < stageDurations.count else { return 0 }
+        return CGFloat(stageDurations[i]) / total
+    }
 
     var body: some View {
         ZStack {
-            // Background tracks
-            ForEach(0..<4, id: \.self) { i in
+            // Background tracks — one per stage, proportional width
+            ForEach(0..<stageDurations.count, id: \.self) { i in
                 Circle()
                     .trim(from: segStart(i), to: segEnd(i))
                     .stroke(trackColor, style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt))
@@ -343,17 +364,17 @@ private struct WorkingRingTimer: View {
             }
 
             // Completed stages
-            ForEach(0..<min(currentStage, 4), id: \.self) { i in
+            ForEach(0..<min(currentStage, stageDurations.count), id: \.self) { i in
                 Circle()
                     .trim(from: segStart(i), to: segEnd(i))
                     .stroke(tealDark, style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt))
                     .rotationEffect(.degrees(-90))
             }
 
-            // Current stage partial
-            if currentStage < 4 && stageProgress > 0 {
+            // Current stage — partial fill
+            if currentStage < stageDurations.count && stageProgress > 0 {
                 let s = segStart(currentStage)
-                let e = s + arcLen * min(stageProgress, 1.0)
+                let e = s + arcLen(currentStage) * min(stageProgress, 1.0)
                 Circle()
                     .trim(from: s, to: max(s, e))
                     .stroke(tealDark, style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt))
