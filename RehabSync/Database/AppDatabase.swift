@@ -50,6 +50,23 @@ func createAppDatabase() throws -> DatabaseQueue {
         }
     }
 
+    migrator.registerMigration("v2") { db in
+        try db.alter(table: "exercise") { t in
+            t.add(column: "info",       .text).notNull().defaults(to: "")
+            t.add(column: "device",     .text)
+            t.add(column: "target",     .text).notNull().defaults(to: "")
+            t.add(column: "joint",      .text).notNull().defaults(to: "")
+            t.add(column: "rep_stage1", .integer)
+            t.add(column: "act_stage1", .text)
+            t.add(column: "rep_stage2", .integer)
+            t.add(column: "act_stage2", .text)
+            t.add(column: "rep_stage3", .integer)
+            t.add(column: "act_stage3", .text)
+            t.add(column: "rep_stage4", .integer)
+            t.add(column: "act_stage4", .text)
+        }
+    }
+
     try migrator.migrate(dbQueue)
     return dbQueue
 }
