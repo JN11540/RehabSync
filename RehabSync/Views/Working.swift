@@ -85,6 +85,23 @@ private class WorkingState {
     // Total seconds for one rep
     var repTotal: Int { stages.reduce(0) { $0 + $1.duration } }
 
+    // Ring-driving elapsed/total — covers preparation and exercise phases
+    var ringElapsed: Int {
+        switch phase {
+        case .preparation:           return elapsed
+        case .exercise:              return repElapsed
+        default:                     return 0
+        }
+    }
+
+    var ringTotal: Int {
+        switch phase {
+        case .preparation:           return prepTime
+        case .exercise:              return repTotal
+        default:                     return 0
+        }
+    }
+
     var setDisplay: String {
         switch phase {
         case .exercise(let set, _, _): return "\(set + 1) / \(sets)"
@@ -212,8 +229,8 @@ private struct WorkingLeftPanel: View {
             ZStack {
                 WorkingRingTimer(
                     progress:   arcProgress,
-                    currentSec: state.repElapsed,
-                    totalSec:   state.repTotal
+                    currentSec: state.ringElapsed,
+                    totalSec:   state.ringTotal
                 )
                 .frame(width: 160, height: 160)
 
@@ -248,16 +265,16 @@ private struct WorkingLeftPanel: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 20)
         }
-        .onChange(of: state.repElapsed) { oldValue, newValue in
-            let totalSeg = state.repTotal - 1
+        .onChange(of: state.ringElapsed) { oldValue, newValue in
+            let totalSeg = state.ringTotal - 1
             guard totalSeg > 0 else { return }
             if newValue == 0 && oldValue > 0 {
-                // Rep ended: counter-clockwise erase (right edge sweeps back to left)
+                // Phase ended: counter-clockwise erase back to start
                 withAnimation(.linear(duration: 0.5)) {
                     arcProgress = 0
                 }
             } else if newValue > 0 {
-                // Clockwise fill: advance by one segment
+                // Clockwise fill: advance one step
                 withAnimation(.linear(duration: 1)) {
                     arcProgress = CGFloat(newValue) / CGFloat(totalSeg)
                 }
