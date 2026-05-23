@@ -4,18 +4,14 @@ struct TreatmentView: View {
     let treatment: Treatment
     @State private var contentVM = TreatmentContentViewModel()
     @State private var exerciseVM = ExerciseViewModel()
-    @State private var activeIndex: Int
     @State private var resultVM = TreatmentResultViewModel()
     @State private var completedContentIds: Set<Int> = []
 
-    private var activeIndexKey: String {
-        "activeIndex_\(treatment.id ?? 0)"
-    }
-
-    init(treatment: Treatment) {
-        self.treatment = treatment
-        let key = "activeIndex_\(treatment.id ?? 0)"
-        self._activeIndex = State(initialValue: UserDefaults.standard.integer(forKey: key))
+    private var activeIndex: Int {
+        contentVM.contents
+            .enumerated()
+            .first { !completedContentIds.contains(Int($0.element.id ?? -1)) }
+            .map { $0.offset } ?? max(0, contentVM.contents.count - 1)
     }
 
     private var startDate: String {
@@ -69,11 +65,7 @@ struct TreatmentView: View {
                                         exerciseName: exerciseName(for: content.exercise_id),
                                         width: cardWidth,
                                         height: cardHeight,
-                                        status: cardStatus,
-                                        onTap: {
-                                        activeIndex = index
-                                        UserDefaults.standard.set(index, forKey: activeIndexKey)
-                                    }
+                                        status: cardStatus
                                     )
                                     .id(index)
                                 }
@@ -112,7 +104,6 @@ struct DayCard: View {
     let width: CGFloat
     let height: CGFloat
     let status: DayStatus
-    let onTap: () -> Void
 
     private var date: Date {
         Date(timeIntervalSince1970: TimeInterval(content.date))
@@ -181,7 +172,6 @@ struct DayCard: View {
         .background(status == .active ? Color(red: 0.1, green: 0.25, blue: 0.4) : .white)
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
-        .onTapGesture { onTap() }
     }
 }
 
