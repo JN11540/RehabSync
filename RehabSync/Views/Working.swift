@@ -148,8 +148,8 @@ private struct WorkingRingTimer: View {
     let stageProgress: CGFloat // 0.0–1.0
 
     // Each segment: 82° arc + 8° gap (4° each side) = 90° per quarter
-    private let halfGap: CGFloat = 1.5 / 360.0
-    private let arcLen:  CGFloat = 87.0 / 360.0
+    private let halfGap: CGFloat = 0
+    private let arcLen:  CGFloat = 0.25
     private let lineWidth: CGFloat = 14
 
     private let tealDark   = Color(red: 0.12, green: 0.42, blue: 0.38)
