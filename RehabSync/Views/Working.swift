@@ -336,13 +336,11 @@ private struct WorkingRingTimer: View {
 
             // Single continuous progress arc advancing one second at a time
             let progress = totalSec > 0 ? CGFloat(currentSec) / CGFloat(totalSec) : 0
-            if progress > 0 {
-                Circle()
-                    .trim(from: 0, to: progress)
-                    .stroke(tealDark, style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt))
-                    .rotationEffect(.degrees(-90))
-                    .animation(.linear(duration: 1), value: progress)
-            }
+            Circle()
+                .trim(from: 0, to: progress)
+                .stroke(tealDark, style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt))
+                .rotationEffect(.degrees(-90))
+                .animation(.linear(duration: 1), value: progress)
 
             VStack(spacing: 2) {
                 Text("\(currentSec)\"")
