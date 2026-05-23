@@ -90,6 +90,16 @@ private class WorkingState {
         return min(CGFloat(elapsed) / CGFloat(currentDuration), 1.0)
     }
 
+    // Elapsed seconds within the current rep (accumulates across stages)
+    var repElapsed: Int {
+        guard case .exercise(_, _, let stage) = phase else { return 0 }
+        let prior = (0..<stage).reduce(0) { $0 + (stages[safe: $1]?.duration ?? 0) }
+        return prior + elapsed
+    }
+
+    // Total seconds for one rep
+    var repTotal: Int { stages.reduce(0) { $0 + $1.duration } }
+
     var setDisplay: String {
         switch phase {
         case .exercise(let set, _, _): return "\(set + 1) / \(sets)"
@@ -101,14 +111,10 @@ private class WorkingState {
 
     var repDisplay: String {
         switch phase {
-        case .exercise(let set, let rep, _):
-            return "\(set * reps + rep + 1) / \(sets * reps)"
-        case .setRest(let s):
-            return "\(( s + 1) * reps) / \(sets * reps)"
-        case .finished:
-            return "\(sets * reps) / \(sets * reps)"
-        default:
-            return "- / \(sets * reps)"
+        case .exercise(_, let rep, _): return "\(rep + 1) / \(reps)"
+        case .setRest:                 return "\(reps) / \(reps)"
+        case .finished:                return "\(reps) / \(reps)"
+        default:                       return "- / \(reps)"
         }
     }
 
@@ -219,8 +225,8 @@ private struct WorkingLeftPanel: View {
             // Ring + labels
             ZStack {
                 WorkingRingTimer(
-                    currentSec:    state.elapsed,
-                    totalSec:      state.currentDuration,
+                    currentSec:    state.repElapsed,
+                    totalSec:      state.repTotal,
                     currentStage:  state.ringCurrentStage,
                     stageProgress: state.ringStageProgress
                 )

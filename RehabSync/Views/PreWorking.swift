@@ -275,8 +275,8 @@ private struct ObservationRow: View {
     NavigationStack {
         PreWorking(content: TreatmentContent(
             treatment_id: 1, exercise_id: 1,
-            sets: 3, set_rest_time: 30,
-            reps: 10, rep_training_time: 5, rep_rest_time: 5,
+            sets: 2, set_rest_time: 10,
+            reps: 2, rep_training_time: 5, rep_rest_time: 5,
             date: Int(Date().timeIntervalSince1970)
         ))
     }
