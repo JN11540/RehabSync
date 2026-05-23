@@ -6,6 +6,7 @@ struct PreWorking: View {
     let content: TreatmentContent
     @State private var exerciseVM = ExerciseViewModel()
     @State private var exercise: Exercise? = nil
+    @State private var navigateToWorking = false
 
     var body: some View {
         ZStack {
@@ -14,7 +15,9 @@ struct PreWorking: View {
                 HStack(alignment: .top, spacing: 0) {
                     PreWorkingLeftPanel(
                         exerciseName: exercise?.name ?? "",
-                        info: exercise?.info ?? ""
+                        info: exercise?.info ?? "",
+                        canStart: exercise != nil,
+                        onStart: { navigateToWorking = true }
                     )
                     .frame(width: geo.size.width * 0.5)
 
@@ -27,6 +30,11 @@ struct PreWorking: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(isPresented: $navigateToWorking) {
+            if let exercise {
+                Working(content: content, exercise: exercise)
+            }
+        }
         .onAppear {
             exercise = exerciseVM.fetch(by: content.exercise_id)
         }
@@ -38,6 +46,8 @@ struct PreWorking: View {
 private struct PreWorkingLeftPanel: View {
     let exerciseName: String
     let info: String
+    var canStart: Bool = false
+    var onStart: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -74,7 +84,7 @@ private struct PreWorkingLeftPanel: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10))
             }
 
-            Button {} label: {
+            Button(action: onStart) {
                 HStack(spacing: 8) {
                     Text("Start")
                     Image(systemName: "arrow.up.right")
@@ -83,10 +93,11 @@ private struct PreWorkingLeftPanel: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
                 .background(.white)
-                .foregroundStyle(.primary)
+                .foregroundStyle(canStart ? .primary : Color.gray.opacity(0.4))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.gray.opacity(0.3)))
             }
+            .disabled(!canStart)
         }
         .padding(24)
     }
