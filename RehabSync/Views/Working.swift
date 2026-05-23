@@ -51,10 +51,24 @@ private struct WorkingLeftPanel: View {
                 WorkingRingTimer(stageName: "前傾伸展", currentSec: 6, totalSec: 5, currentStage: 2, stageProgress: 1.0)
                     .frame(width: 160, height: 160)
 
+                // Stage name — outside right
                 Text("前傾伸展")
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
-                    .offset(x: 108)
+                    .offset(x: 200)
+
+                // Pause button — outside left
+                Button(action: {}) {
+                    ZStack {
+                        Circle()
+                            .stroke(Color.gray.opacity(0.35), lineWidth: 1.5)
+                            .frame(width: 34, height: 34)
+                        Image(systemName: "pause.fill")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .offset(x: -200)
             }
             .frame(maxWidth: .infinity, minHeight: 160)
             .padding(.vertical, 20)
@@ -108,7 +122,7 @@ private struct WorkingTopBar: View {
             }
 
             Text(title)
-                .font(.system(size: 17, weight: .semibold))
+                .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
                 .lineLimit(1)
 
