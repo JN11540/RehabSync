@@ -85,9 +85,6 @@ private class WorkingState {
     // Total seconds for one rep
     var repTotal: Int { stages.reduce(0) { $0 + $1.duration } }
 
-    // Duration of each stage (for proportional ring segments)
-    var stageDurations: [Int] { stages.map { $0.duration } }
-
     var setDisplay: String {
         switch phase {
         case .exercise(let set, _, _): return "\(set + 1) / \(sets)"
@@ -187,7 +184,6 @@ private struct WorkingLeftPanel: View {
     let state: WorkingState
     @Environment(\.dismiss) private var dismiss
     @State private var arcProgress: CGFloat = 0
-    @State private var arcEraseFrom: CGFloat = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -215,11 +211,9 @@ private struct WorkingLeftPanel: View {
             // Ring + labels
             ZStack {
                 WorkingRingTimer(
-                    arcFrom:        arcEraseFrom,
-                    arcTo:          arcProgress,
-                    currentSec:     state.repElapsed,
-                    totalSec:       state.repTotal,
-                    stageDurations: state.stageDurations
+                    progress:   arcProgress,
+                    currentSec: state.repElapsed,
+                    totalSec:   state.repTotal
                 )
                 .frame(width: 160, height: 160)
 
@@ -255,21 +249,17 @@ private struct WorkingLeftPanel: View {
             .padding(.bottom, 20)
         }
         .onChange(of: state.repElapsed) { oldValue, newValue in
-            guard state.repTotal > 0 else { return }
+            let totalSeg = state.repTotal - 1
+            guard totalSeg > 0 else { return }
             if newValue == 0 && oldValue > 0 {
-                // Rep ended: erase the arc clockwise (arcFrom sweeps toward arcTo)
-                let end = arcProgress
-                withAnimation(.linear(duration: 0.4)) {
-                    arcEraseFrom = end
-                } completion: {
-                    arcEraseFrom = 0
+                // Rep ended: counter-clockwise erase (right edge sweeps back to left)
+                withAnimation(.linear(duration: 0.5)) {
                     arcProgress = 0
                 }
             } else if newValue > 0 {
-                // Normal forward tick
-                arcEraseFrom = 0
+                // Clockwise fill: advance by one segment
                 withAnimation(.linear(duration: 1)) {
-                    arcProgress = CGFloat(newValue) / CGFloat(state.repTotal)
+                    arcProgress = CGFloat(newValue) / CGFloat(totalSeg)
                 }
             }
         }
@@ -327,44 +317,28 @@ private struct WorkingTopBar: View {
 // MARK: - Ring Timer
 
 private struct WorkingRingTimer: View {
-    let arcFrom: CGFloat        // leading edge (advances during clockwise erase)
-    let arcTo: CGFloat          // trailing edge (normal fill progress)
+    let progress: CGFloat   // 0.0–1.0
     let currentSec: Int
     let totalSec: Int
-    let stageDurations: [Int]
 
     private let lineWidth: CGFloat = 14
     private let tealDark   = Color(red: 0.12, green: 0.42, blue: 0.38)
     private let trackColor = Color(white: 0.88, opacity: 1)
 
-    private var total: CGFloat { CGFloat(stageDurations.reduce(0, +)) }
-
-    private func segStart(_ i: Int) -> CGFloat {
-        guard total > 0 else { return CGFloat(i) / CGFloat(max(stageDurations.count, 1)) }
-        return CGFloat(stageDurations.prefix(i).reduce(0, +)) / total
-    }
-
-    private func segEnd(_ i: Int) -> CGFloat {
-        guard total > 0 else { return CGFloat(i + 1) / CGFloat(max(stageDurations.count, 1)) }
-        return CGFloat(stageDurations.prefix(i + 1).reduce(0, +)) / total
-    }
-
-    // Map a 0-1 fraction to the top-semicircle window [0.5, 1.0]
-    // 0 → left (9 o'clock), 0.5 → top (12 o'clock), 1 → right (3 o'clock)
+    // Maps 0–1 fraction into the top-semicircle window [0.5, 1.0]
+    // 0 = left (9 o'clock), 1 = right (3 o'clock), clockwise via top
     private func semi(_ x: CGFloat) -> CGFloat { 0.5 + x * 0.5 }
 
     var body: some View {
         ZStack {
-            // Background tracks — proportional per stage, top semicircle
-            ForEach(0..<stageDurations.count, id: \.self) { i in
-                Circle()
-                    .trim(from: semi(segStart(i)), to: semi(segEnd(i)))
-                    .stroke(trackColor, style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt))
-            }
-
-            // Progress arc — animated externally via arcFrom / arcTo
+            // Continuous background track (full semicircle)
             Circle()
-                .trim(from: semi(arcFrom), to: semi(arcTo))
+                .trim(from: 0.5, to: 1.0)
+                .stroke(trackColor, style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt))
+
+            // Progress arc: fills clockwise; erases counter-clockwise when progress decreases
+            Circle()
+                .trim(from: 0.5, to: semi(progress))
                 .stroke(tealDark, style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt))
 
             VStack(spacing: 2) {
