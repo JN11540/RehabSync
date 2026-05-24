@@ -52,10 +52,10 @@ struct PostWorking: View {
         let weekContents = contentVM.contents.filter {
             weekInterval.contains(Date(timeIntervalSince1970: TimeInterval($0.date)))
         }
-        return weekContents.reduce(0) {
-            $0 + TreatmentContentViewModel.totalSeconds(
-                content: $1,
-                exercise: exerciseVM.exercises.first { Int($0.id ?? 0) == $1.exercise_id }
+        return weekContents.reduce(0) { acc, item in
+            acc + TreatmentContentViewModel.totalSeconds(
+                content: item,
+                exercise: exerciseVM.exercises.first { Int($0.id ?? 0) == item.exercise_id }
             )
         } / 60
     }
