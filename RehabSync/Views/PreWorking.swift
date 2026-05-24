@@ -110,11 +110,7 @@ private struct PreWorkingRightPanel: View {
     let exercise: Exercise?
 
     private var timeLabel: String {
-        let repTotal = [exercise?.rep_stage1, exercise?.rep_stage2,
-                        exercise?.rep_stage3, exercise?.rep_stage4]
-            .compactMap { $0 }.reduce(0, +)
-        let s = 10 + content.sets * content.reps * repTotal
-              + content.set_rest_time * (content.sets - 1)
+        let s = TreatmentContentViewModel.totalSeconds(content: content, exercise: exercise)
         return String(format: "%02d:%02d", s / 60, s % 60)
     }
 

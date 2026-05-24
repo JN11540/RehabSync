@@ -142,11 +142,7 @@ struct DayCard: View {
         date.formatted(.dateTime.month().day())
     }
     private var totalSeconds: Int {
-        let repTotal = [exercise?.rep_stage1, exercise?.rep_stage2,
-                        exercise?.rep_stage3, exercise?.rep_stage4]
-            .compactMap { $0 }.reduce(0, +)
-        return 10 + content.sets * content.reps * repTotal
-            + content.set_rest_time * (content.sets - 1)
+        TreatmentContentViewModel.totalSeconds(content: content, exercise: exercise)
     }
     private var timeLabel: String {
         let m = totalSeconds / 60
