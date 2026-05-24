@@ -173,6 +173,7 @@ struct Working: View {
     let content: TreatmentContent
     let exercise: Exercise
     @State private var state: WorkingState
+    @State private var navigateToPost = false
 
     init(content: TreatmentContent, exercise: Exercise) {
         self.content  = content
@@ -192,8 +193,14 @@ struct Working: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+        .navigationDestination(isPresented: $navigateToPost) {
+            PostWorking(content: content, exercise: exercise, totalElapsed: state.totalElapsed)
+        }
         .onAppear  { state.start() }
         .onDisappear { state.cancel() }
+        .onChange(of: state.phase) { _, newPhase in
+            if newPhase == .finished { navigateToPost = true }
+        }
     }
 }
 
