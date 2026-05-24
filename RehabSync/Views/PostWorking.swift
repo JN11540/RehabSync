@@ -108,20 +108,6 @@ private struct PostWorkingLeftPanel: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
-                HStack {
-                    Button(action: { dismiss() }) {
-                        ZStack {
-                            Circle()
-                                .fill(Color(red: 0.90, green: 0.88, blue: 0.85))
-                                .frame(width: 44, height: 44)
-                            Image(systemName: "arrow.left")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(.primary)
-                        }
-                    }
-                    Spacer()
-                }
-
                 PostCompletionCard()
 
                 VStack(spacing: 6) {

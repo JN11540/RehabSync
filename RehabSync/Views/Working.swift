@@ -189,8 +189,12 @@ struct Working: View {
             Color(red: 0.96, green: 0.94, blue: 0.91).ignoresSafeArea()
             GeometryReader { geo in
                 HStack(alignment: .top, spacing: 0) {
-                    WorkingLeftPanel(state: state)
-                        .frame(width: geo.size.width * 0.5)
+                    WorkingLeftPanel(state: state, onExit: {
+                        state.cancel()
+                        isCompleted = true
+                        dismiss()
+                    })
+                    .frame(width: geo.size.width * 0.5)
                     Spacer()
                 }
             }
@@ -217,15 +221,12 @@ struct Working: View {
 
 private struct WorkingLeftPanel: View {
     let state: WorkingState
-    @Environment(\.dismiss) private var dismiss
+    let onExit: () -> Void
     @State private var arcProgress: CGFloat = 0
 
     var body: some View {
         VStack(spacing: 0) {
-            WorkingTopBar(title: state.exerciseName, onDismiss: {
-                state.cancel()
-                dismiss()
-            })
+            WorkingTopBar(title: state.exerciseName, onDismiss: onExit)
 
             // Animation guide
             ZStack {
