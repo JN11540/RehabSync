@@ -214,10 +214,11 @@ private struct WorkingLeftPanel: View {
     let state: WorkingState
     let onExit: () -> Void
     @State private var arcProgress: CGFloat = 0
+    @State private var showExitConfirm = false
 
     var body: some View {
         VStack(spacing: 0) {
-            WorkingTopBar(title: state.exerciseName, onDismiss: onExit)
+            WorkingTopBar(title: state.exerciseName, onDismiss: { showExitConfirm = true })
 
             // Animation guide
             ZStack {
@@ -279,16 +280,18 @@ private struct WorkingLeftPanel: View {
             let totalSeg = state.ringTotal - 1
             guard totalSeg > 0 else { return }
             if newValue == 0 && oldValue > 0 {
-                // Phase ended: counter-clockwise erase back to start
                 withAnimation(.linear(duration: 0.5)) {
                     arcProgress = 0
                 }
             } else if newValue > 0 {
-                // Clockwise fill: advance one step
                 withAnimation(.linear(duration: 1)) {
                     arcProgress = CGFloat(newValue) / CGFloat(totalSeg)
                 }
             }
+        }
+        .confirmationDialog("確定要結束訓練嗎？", isPresented: $showExitConfirm, titleVisibility: .visible) {
+            Button("結束訓練", role: .destructive, action: onExit)
+            Button("繼續訓練", role: .cancel) {}
         }
     }
 }

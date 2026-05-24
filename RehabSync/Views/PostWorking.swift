@@ -25,41 +25,6 @@ struct PostWorking: View {
         }
     }
 
-    private var weekInterval: DateInterval {
-        Calendar.current.dateInterval(of: .weekOfYear, for: Date())
-            ?? DateInterval(start: Date(), duration: 7 * 86400)
-    }
-
-    private var weeklyCompletedCount: Int {
-        resultVM.results.filter {
-            weekInterval.contains(Date(timeIntervalSince1970: TimeInterval($0.date)))
-        }.count
-    }
-
-    private var weeklyTotalCount: Int {
-        contentVM.contents.filter {
-            weekInterval.contains(Date(timeIntervalSince1970: TimeInterval($0.date)))
-        }.count
-    }
-
-    private var weeklyActiveMinutes: Int {
-        resultVM.results.filter {
-            weekInterval.contains(Date(timeIntervalSince1970: TimeInterval($0.date)))
-        }.reduce(0) { $0 + $1.total_time } / 60
-    }
-
-    private var weeklyTargetMinutes: Int {
-        let weekContents = contentVM.contents.filter {
-            weekInterval.contains(Date(timeIntervalSince1970: TimeInterval($0.date)))
-        }
-        return weekContents.reduce(0) { acc, item in
-            acc + TreatmentContentViewModel.totalSeconds(
-                content: item,
-                exercise: exerciseVM.exercises.first { Int($0.id ?? 0) == item.exercise_id }
-            )
-        } / 60
-    }
-
     var body: some View {
         ZStack {
             Color(red: 0.96, green: 0.94, blue: 0.91).ignoresSafeArea()
@@ -74,13 +39,7 @@ struct PostWorking: View {
                     )
                     .frame(width: geo.size.width * 0.5)
 
-                    PostWorkingRightPanel(
-                        weeklyCompletedCount: weeklyCompletedCount,
-                        weeklyTotalCount: weeklyTotalCount,
-                        weeklyActiveMinutes: weeklyActiveMinutes,
-                        weeklyTargetMinutes: weeklyTargetMinutes
-                    )
-                    .frame(width: geo.size.width * 0.5)
+                    Spacer()
                 }
             }
         }
@@ -181,46 +140,6 @@ private struct PostWorkingLeftPanel: View {
             }
             .padding(24)
         }
-    }
-}
-
-// MARK: - Right Panel
-
-private struct PostWorkingRightPanel: View {
-    let weeklyCompletedCount: Int
-    let weeklyTotalCount: Int
-    let weeklyActiveMinutes: Int
-    let weeklyTargetMinutes: Int
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("THIS WEEK")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.secondary)
-
-            VStack(spacing: 0) {
-                PostProgressRow(
-                    label: "Weekly workout goal",
-                    valueLabel: "\(weeklyCompletedCount) / \(weeklyTotalCount)",
-                    progress: weeklyTotalCount > 0
-                        ? Double(weeklyCompletedCount) / Double(weeklyTotalCount) : 0
-                )
-                Divider().padding(.horizontal, 4)
-                PostProgressRow(
-                    label: "Active minutes",
-                    valueLabel: "\(weeklyActiveMinutes) / \(weeklyTargetMinutes) min",
-                    progress: weeklyTargetMinutes > 0
-                        ? Double(weeklyActiveMinutes) / Double(weeklyTargetMinutes) : 0
-                )
-            }
-            .padding(.horizontal, 16)
-            .background(.white)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
-
-            Spacer()
-        }
-        .padding(24)
     }
 }
 
@@ -372,40 +291,6 @@ private struct PostSessionRow: View {
         .background(.white)
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .shadow(color: .black.opacity(0.04), radius: 3, y: 1)
-    }
-}
-
-// MARK: - Progress Row
-
-private struct PostProgressRow: View {
-    let label: String
-    let valueLabel: String
-    let progress: Double
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(label)
-                    .font(.system(size: 15))
-                    .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
-                Spacer()
-                Text(valueLabel)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color(red: 0.42, green: 0.40, blue: 0.82))
-            }
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color(red: 0.91, green: 0.91, blue: 0.96))
-                        .frame(height: 8)
-                    Capsule()
-                        .fill(Color(red: 0.42, green: 0.40, blue: 0.82))
-                        .frame(width: geo.size.width * min(max(progress, 0), 1), height: 8)
-                }
-            }
-            .frame(height: 8)
-        }
-        .padding(.vertical, 14)
     }
 }
 
