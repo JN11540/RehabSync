@@ -1,5 +1,6 @@
 import GRDB
 import Observation
+import Foundation
 
 @Observable
 class TreatmentResultViewModel {
@@ -49,5 +50,22 @@ class TreatmentResultViewModel {
             try TreatmentResult.deleteAll(db)
         }
         results = []
+    }
+
+    func postReport(ip: String, payload: TreatmentReportPayload) async throws {
+        guard let url = URL(string: "http://\(ip):8080/treatment-results") else {
+            throw URLError(.badURL)
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(payload)
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+            throw URLError(.badServerResponse,
+                           userInfo: [NSLocalizedDescriptionKey: "伺服器回應 \(code)"])
+        }
     }
 }

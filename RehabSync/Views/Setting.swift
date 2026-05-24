@@ -1,11 +1,17 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-// MARK: - Export Result
+// MARK: - Export Enums
 
 private enum ExportResult {
     case allCompleted
     case incomplete([String])
+}
+
+private enum UploadStatus {
+    case uploading
+    case success
+    case failure(String)
 }
 
 // MARK: - Setting
@@ -80,9 +86,11 @@ struct Setting: View {
 
 private struct ExportSheet: View {
     let treatments: [Treatment]
+    @State private var resultVM = TreatmentResultViewModel()
     @State private var selectedTreatmentId: Int? = nil
     @State private var serverIP = ""
     @State private var exportResult: ExportResult? = nil
+    @State private var uploadStatus: UploadStatus? = nil
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -111,13 +119,13 @@ private struct ExportSheet: View {
 
                 Section {
                     Button("確認匯出") {
-                        checkCompletion()
+                        Task { await confirm() }
                     }
                     .disabled(selectedTreatmentId == nil || treatments.isEmpty)
                 }
 
                 if let result = exportResult {
-                    Section("結果") {
+                    Section("完成狀態") {
                         switch result {
                         case .allCompleted:
                             Label("治療計畫已完成", systemImage: "checkmark.circle.fill")
@@ -134,6 +142,25 @@ private struct ExportSheet: View {
                         }
                     }
                 }
+
+                if let status = uploadStatus {
+                    Section("上傳狀態") {
+                        switch status {
+                        case .uploading:
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                Text("上傳中...")
+                                    .foregroundStyle(.secondary)
+                            }
+                        case .success:
+                            Label("上傳成功", systemImage: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                        case .failure(let msg):
+                            Label("上傳失敗：\(msg)", systemImage: "xmark.circle.fill")
+                                .foregroundStyle(.red)
+                        }
+                    }
+                }
             }
             .navigationTitle("匯出治療計畫")
             .navigationBarTitleDisplayMode(.inline)
@@ -145,15 +172,16 @@ private struct ExportSheet: View {
         }
     }
 
-    private func checkCompletion() {
+    private func confirm() async {
         guard let tid = selectedTreatmentId else { return }
 
+        // Step 1: 本機完成狀態查詢
         let contentVM = TreatmentContentViewModel()
         contentVM.fetchAll(for: tid)
         let allContents = contentVM.contents
 
-        let resultVM = TreatmentResultViewModel()
-        let completedIds = resultVM.fetchCompletedContentIds(for: tid)
+        resultVM.fetchAll(for: tid)
+        let completedIds = Set(resultVM.results.map { $0.treatment_content_id })
 
         let exerciseVM = ExerciseViewModel()
         exerciseVM.fetchAll()
@@ -161,7 +189,6 @@ private struct ExportSheet: View {
         let incompleteContents = allContents.filter {
             !completedIds.contains(Int($0.id ?? -1))
         }
-
         if incompleteContents.isEmpty && !allContents.isEmpty {
             exportResult = .allCompleted
         } else {
@@ -169,6 +196,28 @@ private struct ExportSheet: View {
                 exerciseVM.exercises.first { Int($0.id ?? 0) == content.exercise_id }?.name ?? "未知動作"
             }
             exportResult = .incomplete(names)
+        }
+
+        // Step 2: 建立 POST payload
+        let payload = TreatmentReportPayload(
+            treatment_id: tid,
+            contents: resultVM.results.map {
+                TreatmentResultItem(
+                    treatment_content_id: $0.treatment_content_id,
+                    reps: $0.reps,
+                    total_time: $0.total_time,
+                    date: $0.date
+                )
+            }
+        )
+
+        // Step 3: POST
+        uploadStatus = .uploading
+        do {
+            try await resultVM.postReport(ip: serverIP, payload: payload)
+            uploadStatus = .success
+        } catch {
+            uploadStatus = .failure(error.localizedDescription)
         }
     }
 }

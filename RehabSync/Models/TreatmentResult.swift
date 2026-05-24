@@ -1,5 +1,17 @@
 import GRDB
 
+struct TreatmentReportPayload: Encodable {
+    let treatment_id: Int
+    let contents: [TreatmentResultItem]
+}
+
+struct TreatmentResultItem: Encodable {
+    let treatment_content_id: Int
+    let reps: Int
+    let total_time: Int
+    let date: Int
+}
+
 struct TreatmentResultDTO: Decodable {
     let id: Int
     let treatment_id: Int
