@@ -84,7 +84,7 @@ struct PostWorking: View {
                 }
             }
         }
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             contentVM.fetchAll(for: content.treatment_id)
             exerciseVM.fetchAll()
@@ -103,7 +103,7 @@ private struct PostWorkingLeftPanel: View {
     let exercises: [Exercise]
     let completedIds: Set<Int>
 
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.goHome) private var goHome
 
     var body: some View {
         ScrollView {
@@ -165,7 +165,7 @@ private struct PostWorkingLeftPanel: View {
                     }
                 }
 
-                Button(action: { dismiss() }) {
+                Button(action: { goHome() }) {
                     HStack(spacing: 6) {
                         Text("Finish")
                         Image(systemName: "arrow.up.right")

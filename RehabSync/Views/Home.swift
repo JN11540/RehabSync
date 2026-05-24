@@ -1,5 +1,18 @@
 import SwiftUI
 
+// MARK: - goHome Environment Key
+
+private struct GoHomeKey: EnvironmentKey {
+    static let defaultValue: () -> Void = {}
+}
+
+extension EnvironmentValues {
+    var goHome: () -> Void {
+        get { self[GoHomeKey.self] }
+        set { self[GoHomeKey.self] = newValue }
+    }
+}
+
 struct Home: View {
     var body: some View {
         TabView {
@@ -17,44 +30,52 @@ struct Home: View {
 
 struct HomeContent: View {
     @State private var vm = TreatmentViewModel()
+    @State private var navPath = NavigationPath()
 
     var body: some View {
-        NavigationStack {
-        ZStack {
-            Color(red: 0.96, green: 0.94, blue: 0.91).ignoresSafeArea()
-            VStack(alignment: .leading, spacing: 20) {
-                HomeHeader()
-                    .padding(.horizontal, 24)
-                GeometryReader { geo in
-                    let spacing: CGFloat = 20
-                    let hPad: CGFloat = 24
-                    let usable = geo.size.width - hPad * 2 - spacing
-                    HStack(alignment: .top, spacing: spacing) {
-                        // 左欄 60%
-                        TreatmentPlanSection(vm: vm)
-                            .frame(width: usable * 0.6)
-                            .frame(maxHeight: .infinity, alignment: .top)
+        NavigationStack(path: $navPath) {
+            ZStack {
+                Color(red: 0.96, green: 0.94, blue: 0.91).ignoresSafeArea()
+                VStack(alignment: .leading, spacing: 20) {
+                    HomeHeader()
+                        .padding(.horizontal, 24)
+                    GeometryReader { geo in
+                        let spacing: CGFloat = 20
+                        let hPad: CGFloat = 24
+                        let usable = geo.size.width - hPad * 2 - spacing
+                        HStack(alignment: .top, spacing: spacing) {
+                            // 左欄 60%
+                            TreatmentPlanSection(vm: vm)
+                                .frame(width: usable * 0.6)
+                                .frame(maxHeight: .infinity, alignment: .top)
 
-                        // 右欄 40%
-                        GeometryReader { rightGeo in
-                            VStack(spacing: 16) {
-                                HealthTipCard()
-                                    .frame(height: (rightGeo.size.height - 16) * 0.6)
-                                AssessmentEntryCard()
-                                    .frame(height: (rightGeo.size.height - 16) * 0.4)
+                            // 右欄 40%
+                            GeometryReader { rightGeo in
+                                VStack(spacing: 16) {
+                                    HealthTipCard()
+                                        .frame(height: (rightGeo.size.height - 16) * 0.6)
+                                    AssessmentEntryCard()
+                                        .frame(height: (rightGeo.size.height - 16) * 0.4)
+                                }
                             }
+                            .frame(width: usable * 0.4)
+                            .frame(maxHeight: .infinity)
                         }
-                        .frame(width: usable * 0.4)
-                        .frame(maxHeight: .infinity)
+                        .padding(.horizontal, hPad)
                     }
-                    .padding(.horizontal, hPad)
                 }
+                .padding(.top, 20)
+                .padding(.bottom, 20)
             }
-            .padding(.top, 20)
-            .padding(.bottom, 20)
+            .onAppear { vm.fetchAll() }
+            .navigationDestination(for: TreatmentContent.self) { content in
+                PreWorking(content: content)
+            }
+            .navigationDestination(for: Treatment.self) { treatment in
+                TreatmentView(treatment: treatment)
+            }
         }
-        .onAppear { vm.fetchAll() }
-        } // NavigationStack
+        .environment(\.goHome, { navPath = NavigationPath() })
     }
 }
 
@@ -169,26 +190,22 @@ struct TreatmentPlanCard: View {
             }
 
             HStack(spacing: 12) {
-                NavigationLink {
-                    if let content = activeContent {
-                        PreWorking(content: content)
+                if let content = activeContent {
+                    NavigationLink(value: content) {
+                        HStack(spacing: 6) {
+                            Text("Start")
+                            Image(systemName: "arrow.up.right")
+                        }
+                        .font(.system(size: 16, weight: .medium))
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 10)
+                        .background(.white)
+                        .foregroundStyle(.primary)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.3)))
                     }
-                } label: {
-                    HStack(spacing: 6) {
-                        Text("Start")
-                        Image(systemName: "arrow.up.right")
-                    }
-                    .font(.system(size: 16, weight: .medium))
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 10)
-                    .background(.white)
-                    .foregroundStyle(.primary)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.3)))
                 }
-                NavigationLink {
-                    TreatmentView(treatment: treatment)
-                } label: {
+                NavigationLink(value: treatment) {
                     Text("動作列表")
                         .font(.system(size: 16, weight: .medium))
                         .padding(.horizontal, 18)

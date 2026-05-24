@@ -9,7 +9,7 @@ struct TreatmentImportDTO: Codable {
     let contents: [TreatmentContentImportDTO]
 }
 
-struct Treatment: Codable, FetchableRecord, MutablePersistableRecord {
+struct Treatment: Codable, FetchableRecord, MutablePersistableRecord, Hashable {
     static let databaseTableName = "treatment"
 
     var id: Int64?
