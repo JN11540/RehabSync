@@ -5,7 +5,10 @@ struct TreatmentView: View {
     @State private var contentVM = TreatmentContentViewModel()
     @State private var exerciseVM = ExerciseViewModel()
     @State private var resultVM = TreatmentResultViewModel()
-    @State private var completedContentIds: Set<Int> = []
+
+    private var completedContentIds: Set<Int> {
+        Set(resultVM.results.map { $0.treatment_content_id })
+    }
 
     private var activeContentId: Int64? {
         contentVM.contents
@@ -112,7 +115,7 @@ struct TreatmentView: View {
         .onAppear {
             contentVM.fetchAll(for: Int(treatment.id ?? 0))
             exerciseVM.fetchAll()
-            completedContentIds = resultVM.fetchCompletedContentIds(for: Int(treatment.id ?? 0))
+            resultVM.fetchAll(for: Int(treatment.id ?? 0))
         }
     }
 
