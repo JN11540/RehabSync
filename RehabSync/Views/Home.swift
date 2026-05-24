@@ -146,13 +146,25 @@ struct TreatmentPlanCard: View {
     let treatment: Treatment
     @State private var contentVM = TreatmentContentViewModel()
     @State private var resultVM = TreatmentResultViewModel()
-    @State private var completedContentIds: Set<Int> = []
-    @State private var progress: Double = 0
+    @State private var showCompletedAlert = false
+
+    private var completedContentIds: Set<Int> {
+        Set(resultVM.results.map { $0.treatment_content_id })
+    }
+
+    private var progress: Double {
+        let total = contentVM.contents.count
+        return total > 0 ? Double(completedContentIds.count) / Double(total) : 0
+    }
+
+    private var isAllCompleted: Bool {
+        !contentVM.contents.isEmpty &&
+        contentVM.contents.allSatisfy { completedContentIds.contains(Int($0.id ?? -1)) }
+    }
 
     private var activeContent: TreatmentContent? {
         contentVM.contents
             .first { !completedContentIds.contains(Int($0.id ?? -1)) }
-            ?? contentVM.contents.last
     }
 
     private var startDate: String {
@@ -190,7 +202,28 @@ struct TreatmentPlanCard: View {
             }
 
             HStack(spacing: 12) {
-                if let content = activeContent {
+                if isAllCompleted {
+                    Button {
+                        showCompletedAlert = true
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text("Start")
+                            Image(systemName: "arrow.up.right")
+                        }
+                        .font(.system(size: 16, weight: .medium))
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 10)
+                        .background(.white)
+                        .foregroundStyle(.primary)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.3)))
+                    }
+                    .alert("治療計畫已完成", isPresented: $showCompletedAlert) {
+                        Button("確定", role: .cancel) {}
+                    } message: {
+                        Text("您已完成此治療計畫的所有訓練動作，恭喜您！")
+                    }
+                } else if let content = activeContent {
                     NavigationLink(value: content) {
                         HStack(spacing: 6) {
                             Text("Start")
@@ -231,9 +264,7 @@ struct TreatmentPlanCard: View {
         .onAppear {
             let tid = Int(treatment.id ?? 0)
             contentVM.fetchAll(for: tid)
-            completedContentIds = resultVM.fetchCompletedContentIds(for: tid)
-            let total = contentVM.contents.count
-            progress = total > 0 ? Double(completedContentIds.count) / Double(total) : 0
+            resultVM.fetchAll(for: tid)
         }
     }
 }
