@@ -71,15 +71,17 @@ struct PostWorking: View {
                         todayContents: todayContents,
                         exercises: exerciseVM.exercises,
                         completedIds: completedIds,
-                        weeklyCompletedCount: weeklyCompletedCount,
-                        weeklyTotalCount: weeklyTotalCount,
-                        weeklyActiveMinutes: weeklyActiveMinutes,
-                        weeklyTargetMinutes: weeklyTargetMinutes,
                         onFinish: { dismiss() }
                     )
                     .frame(width: geo.size.width * 0.5)
 
-                    Spacer()
+                    PostWorkingRightPanel(
+                        weeklyCompletedCount: weeklyCompletedCount,
+                        weeklyTotalCount: weeklyTotalCount,
+                        weeklyActiveMinutes: weeklyActiveMinutes,
+                        weeklyTargetMinutes: weeklyTargetMinutes
+                    )
+                    .frame(width: geo.size.width * 0.5)
                 }
             }
         }
@@ -101,10 +103,6 @@ private struct PostWorkingLeftPanel: View {
     let todayContents: [TreatmentContent]
     let exercises: [Exercise]
     let completedIds: Set<Int>
-    let weeklyCompletedCount: Int
-    let weeklyTotalCount: Int
-    let weeklyActiveMinutes: Int
-    let weeklyTargetMinutes: Int
     let onFinish: () -> Void
 
     var body: some View {
@@ -167,32 +165,6 @@ private struct PostWorkingLeftPanel: View {
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("THIS WEEK")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.secondary)
-
-                    VStack(spacing: 0) {
-                        PostProgressRow(
-                            label: "Weekly workout goal",
-                            valueLabel: "\(weeklyCompletedCount) / \(weeklyTotalCount)",
-                            progress: weeklyTotalCount > 0
-                                ? Double(weeklyCompletedCount) / Double(weeklyTotalCount) : 0
-                        )
-                        Divider().padding(.horizontal, 4)
-                        PostProgressRow(
-                            label: "Active minutes",
-                            valueLabel: "\(weeklyActiveMinutes) / \(weeklyTargetMinutes) min",
-                            progress: weeklyTargetMinutes > 0
-                                ? Double(weeklyActiveMinutes) / Double(weeklyTargetMinutes) : 0
-                        )
-                    }
-                    .padding(.horizontal, 16)
-                    .background(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
-                }
-
                 Button(action: onFinish) {
                     HStack(spacing: 6) {
                         Text("Finish")
@@ -209,6 +181,46 @@ private struct PostWorkingLeftPanel: View {
             }
             .padding(24)
         }
+    }
+}
+
+// MARK: - Right Panel
+
+private struct PostWorkingRightPanel: View {
+    let weeklyCompletedCount: Int
+    let weeklyTotalCount: Int
+    let weeklyActiveMinutes: Int
+    let weeklyTargetMinutes: Int
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("THIS WEEK")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            VStack(spacing: 0) {
+                PostProgressRow(
+                    label: "Weekly workout goal",
+                    valueLabel: "\(weeklyCompletedCount) / \(weeklyTotalCount)",
+                    progress: weeklyTotalCount > 0
+                        ? Double(weeklyCompletedCount) / Double(weeklyTotalCount) : 0
+                )
+                Divider().padding(.horizontal, 4)
+                PostProgressRow(
+                    label: "Active minutes",
+                    valueLabel: "\(weeklyActiveMinutes) / \(weeklyTargetMinutes) min",
+                    progress: weeklyTargetMinutes > 0
+                        ? Double(weeklyActiveMinutes) / Double(weeklyTargetMinutes) : 0
+                )
+            }
+            .padding(.horizontal, 16)
+            .background(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
+
+            Spacer()
+        }
+        .padding(24)
     }
 }
 
@@ -259,7 +271,7 @@ private struct PostCompletionCard: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 30)
         }
-        .frame(width: 210, height: 195)
+        .frame(width: 280, height: 150)
     }
 }
 
