@@ -70,8 +70,7 @@ struct PostWorking: View {
                         content: content,
                         todayContents: todayContents,
                         exercises: exerciseVM.exercises,
-                        completedIds: completedIds,
-                        onFinish: { dismiss() }
+                        completedIds: completedIds
                     )
                     .frame(width: geo.size.width * 0.5)
 
@@ -103,11 +102,26 @@ private struct PostWorkingLeftPanel: View {
     let todayContents: [TreatmentContent]
     let exercises: [Exercise]
     let completedIds: Set<Int>
-    let onFinish: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
+                HStack {
+                    Button(action: { dismiss() }) {
+                        ZStack {
+                            Circle()
+                                .fill(Color(red: 0.90, green: 0.88, blue: 0.85))
+                                .frame(width: 44, height: 44)
+                            Image(systemName: "arrow.left")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.primary)
+                        }
+                    }
+                    Spacer()
+                }
+
                 PostCompletionCard()
 
                 VStack(spacing: 6) {
@@ -165,7 +179,7 @@ private struct PostWorkingLeftPanel: View {
                     }
                 }
 
-                Button(action: onFinish) {
+                Button(action: { dismiss() }) {
                     HStack(spacing: 6) {
                         Text("Finish")
                         Image(systemName: "arrow.up.right")

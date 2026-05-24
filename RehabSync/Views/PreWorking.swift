@@ -7,6 +7,8 @@ struct PreWorking: View {
     @State private var exerciseVM = ExerciseViewModel()
     @State private var exercise: Exercise? = nil
     @State private var navigateToWorking = false
+    @State private var workoutCompleted = false
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         ZStack {
@@ -32,11 +34,14 @@ struct PreWorking: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(isPresented: $navigateToWorking) {
             if let exercise {
-                Working(content: content, exercise: exercise)
+                Working(content: content, exercise: exercise, isCompleted: $workoutCompleted)
             }
         }
         .onAppear {
             exercise = exerciseVM.fetch(by: content.exercise_id)
+        }
+        .onChange(of: workoutCompleted) { _, completed in
+            if completed { dismiss() }
         }
     }
 }

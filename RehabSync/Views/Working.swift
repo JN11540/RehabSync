@@ -172,12 +172,15 @@ private extension Array {
 struct Working: View {
     let content: TreatmentContent
     let exercise: Exercise
+    @Binding var isCompleted: Bool
     @State private var state: WorkingState
     @State private var navigateToPost = false
+    @Environment(\.dismiss) private var dismiss
 
-    init(content: TreatmentContent, exercise: Exercise) {
+    init(content: TreatmentContent, exercise: Exercise, isCompleted: Binding<Bool>) {
         self.content  = content
         self.exercise = exercise
+        _isCompleted  = isCompleted
         _state = State(wrappedValue: WorkingState(content: content, exercise: exercise))
     }
 
@@ -200,6 +203,12 @@ struct Working: View {
         .onDisappear { state.cancel() }
         .onChange(of: state.phase) { _, newPhase in
             if newPhase == .finished { navigateToPost = true }
+        }
+        .onChange(of: navigateToPost) { _, isPresented in
+            if !isPresented && state.phase == .finished {
+                isCompleted = true
+                dismiss()
+            }
         }
     }
 }
@@ -468,7 +477,8 @@ private struct WorkingStickFigure: View {
                 rep_stage2: 1, act_stage2: "逐漸收回",
                 rep_stage3: nil, act_stage3: nil,
                 rep_stage4: nil, act_stage4: nil
-            )
+            ),
+            isCompleted: .constant(false)
         )
     }
 }
