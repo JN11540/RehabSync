@@ -174,6 +174,7 @@ struct Working: View {
     let exercise: Exercise
     @State private var state: WorkingState
     @State private var navigateToPost = false
+    @State private var resultVM = TreatmentResultViewModel()
     @Environment(\.goHome) private var goHome
 
     init(content: TreatmentContent, exercise: Exercise) {
@@ -203,7 +204,17 @@ struct Working: View {
         .onAppear  { state.start() }
         .onDisappear { state.cancel() }
         .onChange(of: state.phase) { _, newPhase in
-            if newPhase == .finished { navigateToPost = true }
+            if newPhase == .finished {
+                var result = TreatmentResult(
+                    treatment_id: content.treatment_id,
+                    treatment_content_id: Int(content.id ?? 0),
+                    reps: content.sets * content.reps,
+                    total_time: state.totalElapsed,
+                    date: Int(Date().timeIntervalSince1970)
+                )
+                resultVM.insert(&result)
+                navigateToPost = true
+            }
         }
     }
 }

@@ -7,11 +7,11 @@ struct TreatmentView: View {
     @State private var resultVM = TreatmentResultViewModel()
     @State private var completedContentIds: Set<Int> = []
 
-    private var activeIndex: Int {
+    private var activeContentId: Int64? {
         contentVM.contents
-            .enumerated()
-            .first { !completedContentIds.contains(Int($0.element.id ?? -1)) }
-            .map { $0.offset } ?? max(0, contentVM.contents.count - 1)
+            .filter { !completedContentIds.contains(Int($0.id ?? -1)) }
+            .min(by: { ($0.id ?? .max) < ($1.id ?? .max) })?
+            .id
     }
 
     private var groupedByDate: [(day: Date, items: [(idx: Int, content: TreatmentContent)])] {
@@ -27,7 +27,7 @@ struct TreatmentView: View {
 
     private var activeGroupFirstIdx: Int {
         groupedByDate
-            .first { $0.items.contains { $0.idx == activeIndex } }?
+            .first { $0.items.contains { $0.content.id == activeContentId } }?
             .items.first?.idx ?? 0
     }
 
@@ -76,8 +76,8 @@ struct TreatmentView: View {
                                     HStack(spacing: 10) {
                                         ForEach(group.items, id: \.idx) { item in
                                             let cardStatus: DayStatus =
-                                                item.idx == activeIndex ? .active :
                                                 completedContentIds.contains(Int(item.content.id ?? -1)) ? .done :
+                                                item.content.id == activeContentId ? .active :
                                                 .upcoming
                                             DayCard(
                                                 content: item.content,
