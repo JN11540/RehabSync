@@ -215,10 +215,17 @@ private struct WorkingLeftPanel: View {
     let onExit: () -> Void
     @State private var arcProgress: CGFloat = 0
     @State private var showExitConfirm = false
+    @State private var autoPaused = false
 
     var body: some View {
         VStack(spacing: 0) {
-            WorkingTopBar(title: state.exerciseName, onDismiss: { showExitConfirm = true })
+            WorkingTopBar(title: state.exerciseName, onDismiss: {
+                if !state.isPaused {
+                    state.isPaused = true
+                    autoPaused = true
+                }
+                showExitConfirm = true
+            })
 
             // Animation guide
             ZStack {
@@ -291,7 +298,12 @@ private struct WorkingLeftPanel: View {
         }
         .confirmationDialog("確定要結束訓練嗎？", isPresented: $showExitConfirm, titleVisibility: .visible) {
             Button("結束訓練", role: .destructive, action: onExit)
-            Button("繼續訓練", role: .cancel) {}
+            Button("繼續訓練", role: .cancel) {
+                if autoPaused {
+                    state.isPaused = false
+                    autoPaused = false
+                }
+            }
         }
     }
 }
