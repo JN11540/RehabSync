@@ -49,17 +49,13 @@ struct TreatmentView: View {
                         Text("\(startDate) ～ \(endDate)")
                             .font(.system(size: 18))
                             .foregroundStyle(.secondary)
-                        Text("A simple, beginner-friendly program designed to release tension, improve posture, and build the essential strength of your neck muscles.")
-                            .font(.system(size: 18))
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
                     }
 
                     VStack(alignment: .leading, spacing: 20) {
                         ForEach(groupedByDate, id: \.day) { group in
                             VStack(alignment: .leading, spacing: 10) {
                                 Text(group.day.formatted(.dateTime.month().day()))
-                                    .font(.system(size: 12, weight: .semibold))
+                                    .font(.system(size: 18, weight: .semibold))
                                     .foregroundStyle(.secondary)
                                     .padding(.leading, 2)
 
@@ -135,10 +131,10 @@ struct TreatmentSessionRow: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(exerciseName)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
                 Text(subtitleLabel)
-                    .font(.system(size: 13))
+                    .font(.system(size: 16))
                     .foregroundStyle(.secondary)
             }
 
@@ -162,14 +158,14 @@ struct DayStatusBadge: View {
         switch status {
         case .done:
             Text("Done")
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(Color(red: 0.18, green: 0.65, blue: 0.42))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 5)
                 .overlay(Capsule().stroke(Color(red: 0.18, green: 0.65, blue: 0.42), lineWidth: 1.5))
         case .active:
             Text("In progress")
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 5)
@@ -177,7 +173,7 @@ struct DayStatusBadge: View {
                 .clipShape(Capsule())
         case .upcoming:
             Text("Up next")
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(Color(red: 0.38, green: 0.38, blue: 0.70))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 5)
