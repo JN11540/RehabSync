@@ -28,12 +28,6 @@ struct TreatmentView: View {
         }
     }
 
-    private var activeGroupFirstIdx: Int {
-        groupedByDate
-            .first { $0.items.contains { $0.content.id == activeContentId } }?
-            .items.first?.idx ?? 0
-    }
-
     private var startDate: String {
         Date(timeIntervalSince1970: TimeInterval(treatment.start_time))
             .formatted(.dateTime.year().month().day())
@@ -46,8 +40,8 @@ struct TreatmentView: View {
     var body: some View {
         ZStack {
             Color(red: 0.96, green: 0.94, blue: 0.91).ignoresSafeArea()
-            GeometryReader { geo in
-                VStack(alignment: .leading, spacing: 16) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(treatment.name)
                             .font(.system(size: 36, weight: .bold))
@@ -60,55 +54,32 @@ struct TreatmentView: View {
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    .padding(.horizontal, 24)
 
-                    Label("左右滑動查看全部訓練日", systemImage: "arrow.left.and.right")
-                        .font(.system(size: 18))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 24)
-                        .padding(.top, 12)
-                        .padding(.bottom, 12)
+                    VStack(alignment: .leading, spacing: 20) {
+                        ForEach(groupedByDate, id: \.day) { group in
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text(group.day.formatted(.dateTime.month().day()))
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(.secondary)
+                                    .padding(.leading, 2)
 
-                    let cardHeight = geo.size.height - 320
-                    let cardWidth = cardHeight * (9.0 / 13.0)
-
-                    ScrollViewReader { proxy in
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(alignment: .top, spacing: 16) {
-                                ForEach(groupedByDate, id: \.day) { group in
-                                    HStack(spacing: 10) {
-                                        ForEach(group.items, id: \.idx) { item in
-                                            let cardStatus: DayStatus =
-                                                completedContentIds.contains(Int(item.content.id ?? -1)) ? .done :
-                                                item.content.id == activeContentId ? .active :
-                                                .upcoming
-                                            DayCard(
-                                                content: item.content,
-                                                exercise: exercise(for: item.content.exercise_id),
-                                                exerciseName: exerciseName(for: item.content.exercise_id),
-                                                width: cardWidth,
-                                                height: cardHeight,
-                                                status: cardStatus
-                                            )
-                                        }
-                                    }
-                                    .padding(8)
-                                    .background(Color(red: 0.93, green: 0.91, blue: 0.88))
-                                    .clipShape(RoundedRectangle(cornerRadius: 26))
-                                    .id(group.items.first?.idx ?? 0)
+                                ForEach(group.items, id: \.idx) { item in
+                                    let status: DayStatus =
+                                        completedContentIds.contains(Int(item.content.id ?? -1)) ? .done :
+                                        item.content.id == activeContentId ? .active :
+                                        .upcoming
+                                    TreatmentSessionRow(
+                                        exerciseName: exerciseName(for: item.content.exercise_id),
+                                        content: item.content,
+                                        exercise: exercise(for: item.content.exercise_id),
+                                        status: status
+                                    )
                                 }
-                            }
-                            .padding(.horizontal, 24)
-                            .padding(.bottom, 8)
-                        }
-                        .onChange(of: contentVM.contents.count) { _, _ in
-                            DispatchQueue.main.async {
-                                proxy.scrollTo(activeGroupFirstIdx, anchor: .leading)
                             }
                         }
                     }
                 }
-                .padding(.top, 24)
+                .padding(24)
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -128,82 +99,91 @@ struct TreatmentView: View {
     }
 }
 
-// MARK: - Day Card
+// MARK: - Session Row
 
-struct DayCard: View {
+struct TreatmentSessionRow: View {
+    let exerciseName: String
     let content: TreatmentContent
     let exercise: Exercise?
-    let exerciseName: String
-    let width: CGFloat
-    let height: CGFloat
     let status: DayStatus
 
-    private var date: Date {
-        Date(timeIntervalSince1970: TimeInterval(content.date))
-    }
-    private var dateLabel: String {
-        date.formatted(.dateTime.month().day())
-    }
     private var totalSeconds: Int {
         TreatmentContentViewModel.totalSeconds(content: content, exercise: exercise)
     }
-    private var timeLabel: String {
+
+    private var subtitleLabel: String {
         let m = totalSeconds / 60
         let s = totalSeconds % 60
-        return String(format: "%02d:%02d", m, s)
+        let timeStr = s == 0 ? "\(m) min" : String(format: "%d:%02d", m, s)
+        return "\(content.sets) sets · \(content.sets * content.reps) reps · \(timeStr)"
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Image(systemName: status.icon)
-                .font(.system(size: 36))
-                .foregroundStyle(
-                    status == .done   ? Color.green :
-                    status == .active ? Color.white :
-                    Color(red: 0.15, green: 0.6, blue: 0.55)
-                )
+        HStack(spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(status == .done
+                        ? Color(red: 0.88, green: 0.97, blue: 0.92)
+                        : Color(red: 0.90, green: 0.97, blue: 0.95))
+                    .frame(width: 48, height: 48)
+                Image(systemName: "figure.run")
+                    .font(.system(size: 20))
+                    .foregroundStyle(status == .done
+                        ? Color(red: 0.18, green: 0.65, blue: 0.42)
+                        : Color(red: 0.15, green: 0.55, blue: 0.50))
+            }
 
-            Text(dateLabel)
-                .font(.system(size: 18))
-                .foregroundStyle(status == .done ? Color.gray : (status == .active ? .white.opacity(0.8) : .secondary))
-                .strikethrough(status == .done, color: .gray)
-
-            Text(exerciseName)
-                .font(.system(size: 22, weight: .bold))
-                .foregroundStyle(
-                    status == .done   ? Color.gray :
-                    status == .active ? Color.white :
-                    Color(red: 0.1, green: 0.25, blue: 0.4)
-                )
-                .strikethrough(status == .done, color: .gray)
-                .lineLimit(2)
-
-            Text(status.label)
-                .font(.system(size: 17))
-                .foregroundStyle(status == .done ? Color.gray : (status == .active ? .white.opacity(0.8) : .secondary))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(exerciseName)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
+                Text(subtitleLabel)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+            }
 
             Spacer()
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(timeLabel)
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundStyle(
-                        status == .done   ? Color.gray :
-                        status == .active ? Color.white :
-                        Color(red: 0.1, green: 0.25, blue: 0.4)
-                    )
-                Text("分鐘")
-                    .font(.system(size: 17))
-                    .foregroundStyle(status == .done ? Color.gray : (status == .active ? .white.opacity(0.7) : .secondary))
-            }
+            DayStatusBadge(status: status)
         }
-        .padding(.leading, 10)
-        .padding(.trailing, 16)
-        .padding(.vertical, 24)
-        .frame(width: width, height: height)
-        .background(status == .active ? Color(red: 0.1, green: 0.25, blue: 0.4) : .white)
-        .clipShape(RoundedRectangle(cornerRadius: 20))
-        .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
+        .padding(14)
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .shadow(color: .black.opacity(0.04), radius: 3, y: 1)
+    }
+}
+
+// MARK: - Status Badge
+
+struct DayStatusBadge: View {
+    let status: DayStatus
+
+    var body: some View {
+        switch status {
+        case .done:
+            Text("Done")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color(red: 0.18, green: 0.65, blue: 0.42))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 5)
+                .overlay(Capsule().stroke(Color(red: 0.18, green: 0.65, blue: 0.42), lineWidth: 1.5))
+        case .active:
+            Text("In progress")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 5)
+                .background(Color(red: 0.15, green: 0.6, blue: 0.55))
+                .clipShape(Capsule())
+        case .upcoming:
+            Text("Up next")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color(red: 0.38, green: 0.38, blue: 0.70))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 5)
+                .background(Color(red: 0.92, green: 0.92, blue: 0.98))
+                .clipShape(Capsule())
+        }
     }
 }
 
@@ -211,19 +191,4 @@ struct DayCard: View {
 
 enum DayStatus {
     case done, active, upcoming
-
-    var icon: String {
-        switch self {
-        case .done:     return "checkmark.circle"
-        case .active:   return "play.circle.fill"
-        case .upcoming: return "clock"
-        }
-    }
-    var label: String {
-        switch self {
-        case .done:     return "已完成"
-        case .active:   return "進行中"
-        case .upcoming: return "即將開始"
-        }
-    }
 }
