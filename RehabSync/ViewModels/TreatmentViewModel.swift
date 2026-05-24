@@ -63,8 +63,6 @@ class TreatmentViewModel {
                     sets: item.sets,
                     set_rest_time: item.set_rest_time,
                     reps: item.reps,
-                    rep_training_time: item.rep_training_time,
-                    rep_rest_time: item.rep_rest_time,
                     date: item.date
                 )
                 try content.upsert(db)

@@ -279,7 +279,7 @@ private struct ObservationRow: View {
         PreWorking(content: TreatmentContent(
             treatment_id: 1, exercise_id: 1,
             sets: 2, set_rest_time: 10,
-            reps: 2, rep_training_time: 5, rep_rest_time: 5,
+            reps: 2,
             date: Int(Date().timeIntervalSince1970)
         ))
     }

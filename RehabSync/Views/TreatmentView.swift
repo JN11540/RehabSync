@@ -81,6 +81,7 @@ struct TreatmentView: View {
                                                 .upcoming
                                             DayCard(
                                                 content: item.content,
+                                                exercise: exercise(for: item.content.exercise_id),
                                                 exerciseName: exerciseName(for: item.content.exercise_id),
                                                 width: cardWidth,
                                                 height: cardHeight,
@@ -118,12 +119,17 @@ struct TreatmentView: View {
     private func exerciseName(for id: Int) -> String {
         exerciseVM.exercises.first { Int($0.id ?? 0) == id }?.name ?? "未知動作"
     }
+
+    private func exercise(for id: Int) -> Exercise? {
+        exerciseVM.exercises.first { Int($0.id ?? 0) == id }
+    }
 }
 
 // MARK: - Day Card
 
 struct DayCard: View {
     let content: TreatmentContent
+    let exercise: Exercise?
     let exerciseName: String
     let width: CGFloat
     let height: CGFloat
@@ -136,7 +142,10 @@ struct DayCard: View {
         date.formatted(.dateTime.month().day())
     }
     private var totalSeconds: Int {
-        (content.rep_training_time + content.rep_rest_time) * content.reps * content.sets
+        let repTotal = [exercise?.rep_stage1, exercise?.rep_stage2,
+                        exercise?.rep_stage3, exercise?.rep_stage4]
+            .compactMap { $0 }.reduce(0, +)
+        return 10 + content.sets * content.reps * repTotal
             + content.set_rest_time * (content.sets - 1)
     }
     private var timeLabel: String {

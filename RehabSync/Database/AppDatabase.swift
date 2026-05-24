@@ -33,8 +33,6 @@ func createAppDatabase() throws -> DatabaseQueue {
             t.column("sets", .integer).notNull()
             t.column("set_rest_time", .integer).notNull()
             t.column("reps", .integer).notNull()
-            t.column("rep_training_time", .integer).notNull()
-            t.column("rep_rest_time", .integer).notNull()
             t.column("date", .integer).notNull()
         }
 
@@ -64,6 +62,17 @@ func createAppDatabase() throws -> DatabaseQueue {
             t.add(column: "act_stage3", .text)
             t.add(column: "rep_stage4", .integer)
             t.add(column: "act_stage4", .text)
+        }
+    }
+
+    // Drop legacy columns that are no longer in the model (safe-check for fresh installs)
+    migrator.registerMigration("v3") { db in
+        let cols = try db.columns(in: "treatment_content").map { $0.name }
+        if cols.contains("rep_training_time") {
+            try db.execute(sql: "ALTER TABLE treatment_content DROP COLUMN rep_training_time")
+        }
+        if cols.contains("rep_rest_time") {
+            try db.execute(sql: "ALTER TABLE treatment_content DROP COLUMN rep_rest_time")
         }
     }
 

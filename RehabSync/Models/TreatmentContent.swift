@@ -6,8 +6,6 @@ struct TreatmentContentImportDTO: Codable {
     let sets: Int
     let reps: Int
     let set_rest_time: Int
-    let rep_training_time: Int
-    let rep_rest_time: Int
     let date: Int
 }
 
@@ -20,8 +18,6 @@ struct TreatmentContent: Codable, FetchableRecord, MutablePersistableRecord {
     var sets: Int
     var set_rest_time: Int
     var reps: Int
-    var rep_training_time: Int
-    var rep_rest_time: Int
     var date: Int
 
     mutating func didInsert(_ inserted: InsertionSuccess) {
