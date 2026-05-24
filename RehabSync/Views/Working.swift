@@ -453,14 +453,14 @@ private struct WorkingStickFigure: View {
             exercise: Exercise(
                 id: nil,
                 name: "前後滑行運動",
-                info: "保持站姿，緩慢向前傾",
+                info: "雙腳併攏微屈膝呈預備姿勢，核心收縮。快速向前滑步後立即煞停，再快速滑回起始位置",
                 device: nil,
-                target: "股四頭肌",
+                target: "膝伸展肌群",
                 joint: "膝關節",
-                rep_stage1: 5, act_stage1: "起始站立",
-                rep_stage2: 1, act_stage2: "前傾伸展",
-                rep_stage3: 5, act_stage3: "靜態維持",
-                rep_stage4: 1, act_stage4: "緩慢回正"
+                rep_stage1: 1, act_stage1: "滑步向前",
+                rep_stage2: 1, act_stage2: "逐漸收回",
+                rep_stage3: nil, act_stage3: nil,
+                rep_stage4: nil, act_stage4: nil
             )
         )
     }
