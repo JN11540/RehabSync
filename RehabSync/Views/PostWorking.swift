@@ -63,106 +63,24 @@ struct PostWorking: View {
     var body: some View {
         ZStack {
             Color(red: 0.96, green: 0.94, blue: 0.91).ignoresSafeArea()
-            ScrollView {
-                VStack(spacing: 24) {
-                    PostCompletionCard()
+            GeometryReader { geo in
+                HStack(alignment: .top, spacing: 0) {
+                    PostWorkingLeftPanel(
+                        timeLabel: timeLabel,
+                        content: content,
+                        todayContents: todayContents,
+                        exercises: exerciseVM.exercises,
+                        completedIds: completedIds,
+                        weeklyCompletedCount: weeklyCompletedCount,
+                        weeklyTotalCount: weeklyTotalCount,
+                        weeklyActiveMinutes: weeklyActiveMinutes,
+                        weeklyTargetMinutes: weeklyTargetMinutes,
+                        onFinish: { dismiss() }
+                    )
+                    .frame(width: geo.size.width * 0.5)
 
-                    VStack(spacing: 6) {
-                        Text("Workout complete!")
-                            .font(.system(size: 22, weight: .bold))
-                            .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
-                        Text("You're one step closer to pain-free movement.")
-                            .font(.system(size: 15))
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
-
-                    HStack(spacing: 12) {
-                        PostStatCard(
-                            icon: "clock",
-                            iconBg: Color(red: 1.0, green: 0.90, blue: 0.90),
-                            iconColor: Color(red: 0.94, green: 0.33, blue: 0.33),
-                            value: timeLabel,
-                            label: "Time"
-                        )
-                        PostStatCard(
-                            icon: "square.stack",
-                            iconBg: Color(red: 1.0, green: 0.90, blue: 0.90),
-                            iconColor: Color(red: 0.94, green: 0.33, blue: 0.33),
-                            value: "\(content.sets)",
-                            label: "Sets"
-                        )
-                        PostStatCard(
-                            icon: "repeat",
-                            iconBg: Color(red: 0.93, green: 0.91, blue: 1.0),
-                            iconColor: Color(red: 0.50, green: 0.44, blue: 0.86),
-                            value: "\(content.sets * content.reps)",
-                            label: "Reps"
-                        )
-                    }
-
-                    if !todayContents.isEmpty {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("TODAY'S SESSIONS")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(.secondary)
-
-                            ForEach(todayContents, id: \.id) { item in
-                                let itemExercise = exerciseVM.exercises.first { Int($0.id ?? 0) == item.exercise_id }
-                                let isDone = completedIds.contains(Int(item.id ?? -1))
-                                    || item.id == content.id
-                                PostSessionRow(
-                                    exerciseName: itemExercise?.name ?? "未知動作",
-                                    sets: item.sets,
-                                    reps: item.reps,
-                                    totalSeconds: TreatmentContentViewModel.totalSeconds(content: item, exercise: itemExercise),
-                                    isDone: isDone
-                                )
-                            }
-                        }
-                    }
-
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("THIS WEEK")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.secondary)
-
-                        VStack(spacing: 0) {
-                            PostProgressRow(
-                                label: "Weekly workout goal",
-                                valueLabel: "\(weeklyCompletedCount) / \(weeklyTotalCount)",
-                                progress: weeklyTotalCount > 0
-                                    ? Double(weeklyCompletedCount) / Double(weeklyTotalCount) : 0
-                            )
-                            Divider().padding(.horizontal, 4)
-                            PostProgressRow(
-                                label: "Active minutes",
-                                valueLabel: "\(weeklyActiveMinutes) / \(weeklyTargetMinutes) min",
-                                progress: weeklyTargetMinutes > 0
-                                    ? Double(weeklyActiveMinutes) / Double(weeklyTargetMinutes) : 0
-                            )
-                        }
-                        .padding(.horizontal, 16)
-                        .background(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
-                    }
-
-                    Button(action: { dismiss() }) {
-                        HStack(spacing: 6) {
-                            Text("Finish")
-                            Image(systemName: "arrow.up.right")
-                        }
-                        .font(.system(size: 18, weight: .medium))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 18)
-                        .background(.white)
-                        .foregroundStyle(.primary)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.gray.opacity(0.25)))
-                    }
+                    Spacer()
                 }
-                .padding(24)
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -171,6 +89,125 @@ struct PostWorking: View {
             exerciseVM.fetchAll()
             resultVM.fetchAll(for: content.treatment_id)
             completedIds = resultVM.fetchCompletedContentIds(for: content.treatment_id)
+        }
+    }
+}
+
+// MARK: - Left Panel
+
+private struct PostWorkingLeftPanel: View {
+    let timeLabel: String
+    let content: TreatmentContent
+    let todayContents: [TreatmentContent]
+    let exercises: [Exercise]
+    let completedIds: Set<Int>
+    let weeklyCompletedCount: Int
+    let weeklyTotalCount: Int
+    let weeklyActiveMinutes: Int
+    let weeklyTargetMinutes: Int
+    let onFinish: () -> Void
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 24) {
+                PostCompletionCard()
+
+                VStack(spacing: 6) {
+                    Text("Workout complete!")
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
+                    Text("You're one step closer to pain-free movement.")
+                        .font(.system(size: 15))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+
+                HStack(spacing: 12) {
+                    PostStatCard(
+                        icon: "clock",
+                        iconBg: Color(red: 1.0, green: 0.90, blue: 0.90),
+                        iconColor: Color(red: 0.94, green: 0.33, blue: 0.33),
+                        value: timeLabel,
+                        label: "Time"
+                    )
+                    PostStatCard(
+                        icon: "square.stack",
+                        iconBg: Color(red: 1.0, green: 0.90, blue: 0.90),
+                        iconColor: Color(red: 0.94, green: 0.33, blue: 0.33),
+                        value: "\(content.sets)",
+                        label: "Sets"
+                    )
+                    PostStatCard(
+                        icon: "repeat",
+                        iconBg: Color(red: 0.93, green: 0.91, blue: 1.0),
+                        iconColor: Color(red: 0.50, green: 0.44, blue: 0.86),
+                        value: "\(content.sets * content.reps)",
+                        label: "Reps"
+                    )
+                }
+
+                if !todayContents.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("TODAY'S SESSIONS")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.secondary)
+
+                        ForEach(todayContents, id: \.id) { item in
+                            let itemExercise = exercises.first { Int($0.id ?? 0) == item.exercise_id }
+                            let isDone = completedIds.contains(Int(item.id ?? -1))
+                                || item.id == content.id
+                            PostSessionRow(
+                                exerciseName: itemExercise?.name ?? "未知動作",
+                                sets: item.sets,
+                                reps: item.reps,
+                                totalSeconds: TreatmentContentViewModel.totalSeconds(content: item, exercise: itemExercise),
+                                isDone: isDone
+                            )
+                        }
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("THIS WEEK")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+
+                    VStack(spacing: 0) {
+                        PostProgressRow(
+                            label: "Weekly workout goal",
+                            valueLabel: "\(weeklyCompletedCount) / \(weeklyTotalCount)",
+                            progress: weeklyTotalCount > 0
+                                ? Double(weeklyCompletedCount) / Double(weeklyTotalCount) : 0
+                        )
+                        Divider().padding(.horizontal, 4)
+                        PostProgressRow(
+                            label: "Active minutes",
+                            valueLabel: "\(weeklyActiveMinutes) / \(weeklyTargetMinutes) min",
+                            progress: weeklyTargetMinutes > 0
+                                ? Double(weeklyActiveMinutes) / Double(weeklyTargetMinutes) : 0
+                        )
+                    }
+                    .padding(.horizontal, 16)
+                    .background(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
+                }
+
+                Button(action: onFinish) {
+                    HStack(spacing: 6) {
+                        Text("Finish")
+                        Image(systemName: "arrow.up.right")
+                    }
+                    .font(.system(size: 18, weight: .medium))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 18)
+                    .background(.white)
+                    .foregroundStyle(.primary)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.gray.opacity(0.25)))
+                }
+            }
+            .padding(24)
         }
     }
 }
