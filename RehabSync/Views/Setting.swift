@@ -1,5 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 // MARK: - Export Enums
 
@@ -18,9 +17,6 @@ private enum UploadStatus {
 
 struct Setting: View {
     @State private var vm = TreatmentViewModel()
-    @State private var showFileImporter = false
-    @State private var importError: String?
-    @State private var importSuccess = false
     @State private var showDeleteConfirm = false
     @State private var showExportSheet = false
     @State private var showQRScanner = false
@@ -29,28 +25,6 @@ struct Setting: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            Button("匯入治療計畫（JSON）") {
-                importSuccess = false
-                importError = nil
-                showFileImporter = true
-            }
-            .fileImporter(
-                isPresented: $showFileImporter,
-                allowedContentTypes: [.json]
-            ) { result in
-                switch result {
-                case .success(let url):
-                    do {
-                        try vm.importTreatment(from: url)
-                        importSuccess = true
-                    } catch {
-                        importError = error.localizedDescription
-                    }
-                case .failure(let error):
-                    importError = error.localizedDescription
-                }
-            }
-
             Button("掃描 QR Code") {
                 qrSuccess = false
                 qrError = nil
@@ -85,14 +59,6 @@ struct Setting: View {
                 Button("取消", role: .cancel) {}
             }
 
-            if importSuccess {
-                Text("匯入成功")
-                    .foregroundStyle(.green)
-            }
-            if let err = importError {
-                Text("匯入失敗：\(err)")
-                    .foregroundStyle(.red)
-            }
             if qrSuccess {
                 Text("QR Code 匯入成功")
                     .foregroundStyle(.green)
