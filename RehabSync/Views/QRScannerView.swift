@@ -110,7 +110,18 @@ class QRScannerViewController: UIViewController, AVCaptureMetadataOutputObjectsD
                         from connection: AVCaptureConnection) {
         guard let obj = metadataObjects.first as? AVMetadataMachineReadableCodeObject,
               let code = obj.stringValue else { return }
-        captureSession?.stopRunning()
-        delegate?.didScan(code: code)
+
+        // 先停止掃描避免重複觸發
+        output.setMetadataObjectsDelegate(nil, queue: nil)
+
+        // stopRunning 是 blocking call，移到背景執行
+        DispatchQueue.global(qos: .userInitiated).async {
+            self.captureSession?.stopRunning()
+        }
+
+        // dismiss + callback 在 main thread
+        DispatchQueue.main.async {
+            self.delegate?.didScan(code: code)
+        }
     }
 }
