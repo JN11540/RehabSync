@@ -53,13 +53,18 @@ class QRCodeService {
         guard let payloadStr = String(data: jsonData, encoding: .utf8) else {
             throw QRCodeError.serializationFailed
         }
+        print("[QR] generateSig payloadStr: \(payloadStr)")
         let key = SymmetricKey(data: Data(secret.utf8))
         let mac = HMAC<SHA256>.authenticationCode(for: Data(payloadStr.utf8), using: key)
-        return Data(mac).base64EncodedString()
+        let result = Data(mac).base64EncodedString()
+        print("[QR] generateSig result: \(result)")
+        return result
     }
 
     func verifySig(payload: [String: Any], sig: String) throws -> Bool {
         let expectedSig = try generateSig(payload: payload)
+        print("[QR] verifySig expected: \(expectedSig)")
+        print("[QR] verifySig received: \(sig)")
         guard let expectedData = Data(base64Encoded: expectedSig),
               let sigData    = Data(base64Encoded: sig) else { return false }
         return constantTimeEqual(expectedData, sigData)
@@ -85,6 +90,7 @@ class QRCodeService {
     // MARK: - Verify
 
     func verifyQRCode(qrRaw: String) -> VerifyResult {
+        print("[QR] raw input: \(qrRaw)")
         guard let rawData = qrRaw.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: rawData) as? [String: Any] else {
             return .init(valid: false, data: nil, expiry: nil, reason: "QR Code 格式錯誤，無法解析 JSON")
