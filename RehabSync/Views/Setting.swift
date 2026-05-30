@@ -81,7 +81,6 @@ private struct ExportSheet: View {
     let treatments: [Treatment]
     @State private var resultVM = TreatmentResultViewModel()
     @State private var selectedTreatmentId: Int? = nil
-    @State private var serverIP = ""
     @State private var exportResult: ExportResult? = nil
     @State private var uploadStatus: UploadStatus? = nil
     @Environment(\.dismiss) private var dismiss
@@ -102,12 +101,6 @@ private struct ExportSheet: View {
                         }
                         .pickerStyle(.menu)
                     }
-                }
-
-                Section("伺服器設定") {
-                    TextField("伺服器 IP", text: $serverIP)
-                        .keyboardType(.numbersAndPunctuation)
-                        .autocorrectionDisabled()
                 }
 
                 Section {
@@ -207,7 +200,7 @@ private struct ExportSheet: View {
         // Step 3: POST
         uploadStatus = .uploading
         do {
-            try await resultVM.postReport(ip: serverIP, payload: payload)
+            try await resultVM.postReport(payload: payload)
             uploadStatus = .success
         } catch {
             uploadStatus = .failure(error.localizedDescription)

@@ -52,10 +52,8 @@ class TreatmentResultViewModel {
         results = []
     }
 
-    func postReport(ip: String, payload: TreatmentReportPayload) async throws {
-        guard let url = URL(string: "http://\(ip):8080/treatment-results") else {
-            throw URLError(.badURL)
-        }
+    func postReport(payload: TreatmentReportPayload) async throws {
+        let url = URL(string: "https://therapistclinical-production.up.railway.app/treatment-results")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
