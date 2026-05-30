@@ -42,9 +42,38 @@ class TreatmentViewModel {
 
         let data = try Data(contentsOf: url)
         let dto = try JSONDecoder().decode(TreatmentImportDTO.self, from: data)
-
         try checkDuplicate(id: dto.id)
+        try writeTreatmentDTO(dto)
+        fetchAll()
+    }
 
+    func importFromQRCode(_ scannedStr: String) throws {
+        let result = QRCodeService().verifyQRCode(qrRaw: scannedStr)
+        guard result.valid, let data = result.data else {
+            throw QRImportError.verificationFailed(result.reason ?? "未知錯誤")
+        }
+
+        let jsonData = try JSONSerialization.data(withJSONObject: data)
+        let dto = try JSONDecoder().decode(TreatmentImportDTO.self, from: jsonData)
+        try checkDuplicate(id: dto.id)
+        try writeTreatmentDTO(dto)
+        fetchAll()
+    }
+
+    func verifyQRCode(_ scannedStr: String) -> QRCodeService.VerifyResult {
+        QRCodeService().verifyQRCode(qrRaw: scannedStr)
+    }
+
+    func deleteAll() {
+        TreatmentResultViewModel().deleteAll()
+        TreatmentContentViewModel().deleteAll()
+        try? db.write { db in
+            try Treatment.deleteAll(db)
+        }
+        fetchAll()
+    }
+
+    private func writeTreatmentDTO(_ dto: TreatmentImportDTO) throws {
         try db.write { db in
             var treatment = Treatment(
                 id: Int64(dto.id),
@@ -68,17 +97,6 @@ class TreatmentViewModel {
                 try content.upsert(db)
             }
         }
-
-        fetchAll()
-    }
-
-    func deleteAll() {
-        TreatmentResultViewModel().deleteAll()
-        TreatmentContentViewModel().deleteAll()
-        try? db.write { db in
-            try Treatment.deleteAll(db)
-        }
-        fetchAll()
     }
 
     private func checkDuplicate(id: Int) throws {
@@ -97,6 +115,17 @@ class TreatmentViewModel {
             switch self {
             case .duplicateId(let id):
                 return "治療計畫 ID \(id) 已存在，無法重複匯入"
+            }
+        }
+    }
+
+    enum QRImportError: LocalizedError {
+        case verificationFailed(String)
+
+        var errorDescription: String? {
+            switch self {
+            case .verificationFailed(let reason):
+                return "QR Code 驗證失敗：\(reason)"
             }
         }
     }

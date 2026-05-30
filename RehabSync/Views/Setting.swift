@@ -23,6 +23,9 @@ struct Setting: View {
     @State private var importSuccess = false
     @State private var showDeleteConfirm = false
     @State private var showExportSheet = false
+    @State private var showQRScanner = false
+    @State private var qrSuccess = false
+    @State private var qrError: String?
 
     var body: some View {
         VStack(spacing: 20) {
@@ -45,6 +48,22 @@ struct Setting: View {
                     }
                 case .failure(let error):
                     importError = error.localizedDescription
+                }
+            }
+
+            Button("掃描 QR Code") {
+                qrSuccess = false
+                qrError = nil
+                showQRScanner = true
+            }
+            .sheet(isPresented: $showQRScanner) {
+                QRScannerView { scannedStr in
+                    do {
+                        try vm.importFromQRCode(scannedStr)
+                        qrSuccess = true
+                    } catch {
+                        qrError = error.localizedDescription
+                    }
                 }
             }
 
@@ -72,6 +91,14 @@ struct Setting: View {
             }
             if let err = importError {
                 Text("匯入失敗：\(err)")
+                    .foregroundStyle(.red)
+            }
+            if qrSuccess {
+                Text("QR Code 匯入成功")
+                    .foregroundStyle(.green)
+            }
+            if let err = qrError {
+                Text("QR Code 匯入失敗：\(err)")
                     .foregroundStyle(.red)
             }
         }
