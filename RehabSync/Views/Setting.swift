@@ -65,8 +65,16 @@ struct Setting: View {
                 do {
                     try vm.importFromQRCode(scannedStr)
                     qrSuccess = true
+                    Task {
+                        try? await Task.sleep(for: .seconds(3))
+                        qrSuccess = false
+                    }
                 } catch {
                     qrError = error.localizedDescription
+                    Task {
+                        try? await Task.sleep(for: .seconds(3))
+                        qrError = nil
+                    }
                 }
             }
         }
