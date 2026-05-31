@@ -23,54 +23,89 @@ struct Setting: View {
     @State private var qrSuccess = false
     @State private var qrError: String?
 
+    private let iconBg = Color(red: 0.1, green: 0.25, blue: 0.4)
+
     var body: some View {
-        VStack(spacing: 20) {
-            Button("掃描 QR Code") {
-                qrSuccess = false
-                qrError = nil
-                showQRScanner = true
+        List {
+            Section("其他設定") {
+                SettingRow(icon: "qrcode", iconBg: iconBg, title: "掃描 QR Code") {
+                    qrSuccess = false
+                    qrError = nil
+                    showQRScanner = true
+                }
+
+                SettingRow(icon: "square.and.arrow.up.fill", iconBg: iconBg, title: "匯出治療計畫") {
+                    showExportSheet = true
+                }
+
+                SettingRow(icon: "trash.fill", iconBg: Color(red: 0.75, green: 0.15, blue: 0.15),
+                           title: "移除所有資料", titleColor: .red) {
+                    showDeleteConfirm = true
+                }
             }
-            .sheet(isPresented: $showQRScanner) {
-                QRScannerView { scannedStr in
-                    do {
-                        try vm.importFromQRCode(scannedStr)
-                        qrSuccess = true
-                    } catch {
-                        qrError = error.localizedDescription
+
+            if qrSuccess || qrError != nil {
+                Section {
+                    if qrSuccess {
+                        Label("QR Code 匯入成功", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                    }
+                    if let err = qrError {
+                        Label("QR Code 匯入失敗：\(err)", systemImage: "xmark.circle.fill")
+                            .foregroundStyle(.red)
                     }
                 }
             }
-
-            Button("匯出治療計畫") {
-                showExportSheet = true
-            }
-            .sheet(isPresented: $showExportSheet) {
-                ExportSheet(treatments: vm.treatments)
-            }
-
-            Button("移除所有資料") {
-                showDeleteConfirm = true
-            }
-            .foregroundStyle(.red)
-            .confirmationDialog("確定要移除所有資料？", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
-                Button("移除所有資料", role: .destructive) {
-                    vm.deleteAll()
+        }
+        .listStyle(.insetGrouped)
+        .sheet(isPresented: $showQRScanner) {
+            QRScannerView { scannedStr in
+                do {
+                    try vm.importFromQRCode(scannedStr)
+                    qrSuccess = true
+                } catch {
+                    qrError = error.localizedDescription
                 }
-                Button("取消", role: .cancel) {}
-            }
-
-            if qrSuccess {
-                Text("QR Code 匯入成功")
-                    .foregroundStyle(.green)
-            }
-            if let err = qrError {
-                Text("QR Code 匯入失敗：\(err)")
-                    .foregroundStyle(.red)
             }
         }
-        .padding()
-        .onAppear {
-            vm.fetchAll()
+        .sheet(isPresented: $showExportSheet) {
+            ExportSheet(treatments: vm.treatments)
+        }
+        .confirmationDialog("確定要移除所有資料？", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+            Button("移除所有資料", role: .destructive) { vm.deleteAll() }
+            Button("取消", role: .cancel) {}
+        }
+        .onAppear { vm.fetchAll() }
+    }
+}
+
+// MARK: - Setting Row
+
+private struct SettingRow: View {
+    let icon: String
+    let iconBg: Color
+    let title: String
+    var titleColor: Color = .primary
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 14) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(iconBg)
+                        .frame(width: 34, height: 34)
+                    Image(systemName: icon)
+                        .font(.system(size: 16))
+                        .foregroundStyle(.white)
+                }
+                Text(title)
+                    .foregroundStyle(titleColor)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color(.tertiaryLabel))
+            }
         }
     }
 }
