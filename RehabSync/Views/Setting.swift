@@ -58,6 +58,8 @@ struct Setting: View {
             }
         }
         .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(Color(red: 0.96, green: 0.94, blue: 0.91).ignoresSafeArea())
         .sheet(isPresented: $showQRScanner) {
             QRScannerView { scannedStr in
                 do {
