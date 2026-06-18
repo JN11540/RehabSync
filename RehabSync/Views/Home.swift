@@ -52,7 +52,7 @@ struct HomeContent: View {
                             // 右欄 40%
                             GeometryReader { rightGeo in
                                 VStack(spacing: 16) {
-                                    HealthTipCard()
+                                    BluetoothDeviceCard()
                                         .frame(height: (rightGeo.size.height - 16) * 0.6)
                                     AssessmentEntryCard()
                                         .frame(height: (rightGeo.size.height - 16) * 0.4)
@@ -269,33 +269,178 @@ struct TreatmentPlanCard: View {
     }
 }
 
-// MARK: - Health Tip Card
+// MARK: - Bluetooth Device Card
 
-struct HealthTipCard: View {
+struct BluetoothDeviceCard: View {
+    @State private var btVM = BluetoothViewModel()
+    @State private var showSheet = false
+
+    private let pairedDevices: [(icon: String, name: String, status: String)] = [
+        ("headphones",        "WF-C510",          "已連線"),
+        ("computermouse",     "MX Anywhere 3S",   "已連線"),
+        ("waveform.path.ecg", "ZE1RC0025290009",  "已配對"),
+    ]
+
     var body: some View {
         ZStack(alignment: .topLeading) {
             Color(red: 0.1, green: 0.25, blue: 0.4)
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 8) {
-                    Image(systemName: "lightbulb.fill")
-                        .font(.system(size: 25))
-                        .foregroundStyle(.green)
-                    Text("今日健康提示")
-                        .font(.system(size: 25, weight: .semibold))
+                    Image(systemName: "antenna.radiowaves.left.and.right")
+                        .font(.system(size: 22))
+                        .foregroundStyle(.cyan)
+                    Text("藍芽與裝置")
+                        .font(.system(size: 22, weight: .semibold))
                         .foregroundStyle(.white)
                 }
-                Spacer()
-                Text("定期伸展胸肌有助於預防圓肩姿勢，減輕頸部長期負擔。")
-                    .font(.system(size: 18, weight: .bold))
-                    .italic()
-                    .foregroundStyle(.white)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer()
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(pairedDevices, id: \.name) { device in
+                            DeviceTile(icon: device.icon,
+                                       name: device.name,
+                                       status: device.status)
+                        }
+                        AddDeviceTile {
+                            btVM.startScan()
+                            showSheet = true
+                        }
+                    }
+                    .padding(.bottom, 4)
+                }
             }
             .padding(20)
         }
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .frame(maxWidth: .infinity)
+        .sheet(isPresented: $showSheet, onDismiss: { btVM.stopScan() }) {
+            AddDeviceSheet(vm: btVM)
+                .presentationDetents([.medium])
+                .presentationCornerRadius(16)
+        }
+    }
+}
+
+struct DeviceTile: View {
+    let icon: String
+    let name: String
+    let status: String
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 28))
+                .foregroundStyle(.white)
+            Text(name)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+            HStack(spacing: 4) {
+                Circle()
+                    .fill(.green)
+                    .frame(width: 6, height: 6)
+                Text(status)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.white.opacity(0.8))
+            }
+        }
+        .frame(width: 80, height: 90)
+        .padding(10)
+        .background(.white.opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+struct AddDeviceTile: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                Image(systemName: "plus")
+                    .font(.system(size: 28, weight: .light))
+                    .foregroundStyle(.white)
+                Text("新增裝置")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white)
+            }
+            .frame(width: 80, height: 90)
+            .padding(10)
+            .background(.white.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(.white.opacity(0.3), style: StrokeStyle(lineWidth: 1, dash: [4]))
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Add Device Sheet
+
+struct AddDeviceSheet: View {
+    let vm: BluetoothViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("新增裝置")
+                .font(.system(size: 22, weight: .semibold))
+                .padding(.horizontal, 24)
+                .padding(.top, 28)
+
+            Text("確定您的裝置已開啟且可供探索。在下面選取裝置以連線。")
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 24)
+                .padding(.top, 8)
+
+            Divider().padding(.vertical, 16)
+
+            if vm.discoveredDevices.isEmpty {
+                HStack(spacing: 12) {
+                    ProgressView()
+                    Text("正在掃描…")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 24)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(vm.discoveredDevices) { device in
+                            HStack(spacing: 14) {
+                                Image(systemName: "dot.radiowaves.right")
+                                    .foregroundStyle(.cyan)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(device.name)
+                                        .font(.system(size: 15))
+                                    Text("RSSI: \(device.rssi) dBm")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                            }
+                            .padding(.vertical, 12)
+                            .padding(.horizontal, 24)
+                            Divider().padding(.leading, 56)
+                        }
+                    }
+                }
+            }
+
+            Spacer()
+
+            Divider()
+            HStack {
+                Spacer()
+                Button("取消") { dismiss() }
+                    .font(.system(size: 15))
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 14)
+            }
+        }
     }
 }
 
