@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreBluetooth
 
 // MARK: - goHome Environment Key
 
