@@ -272,6 +272,10 @@ struct TreatmentPlanCard: View {
 
 // MARK: - Bluetooth Device Card
 
+enum LimbSlot {
+    case thigh, calf
+}
+
 struct BoundDevice: Identifiable {
     let id: UUID
     let name: String
@@ -281,12 +285,14 @@ struct BoundDevice: Identifiable {
 struct BluetoothDeviceCard: View {
     @State private var btVM = BluetoothViewModel()
     @State private var showSheet = false
-    @State private var boundDevices: [BoundDevice] = []
+    @State private var connectingFor: LimbSlot = .thigh
+    @State private var thighDevice: BoundDevice? = nil
+    @State private var calfDevice: BoundDevice? = nil
 
     var body: some View {
         ZStack(alignment: .topLeading) {
             Color(red: 0.1, green: 0.25, blue: 0.4)
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 14) {
                 // 標題列
                 HStack(spacing: 8) {
                     Image(systemName: "antenna.radiowaves.left.and.right")
@@ -297,24 +303,33 @@ struct BluetoothDeviceCard: View {
                         .foregroundStyle(.white)
                 }
 
-                // 第一排：新增裝置按鈕
-                AddDeviceTile {
-                    btVM.startScan()
-                    showSheet = true
-                }
-
-                // 第二排起：已綁定裝置直向列表
-                if !boundDevices.isEmpty {
-                    ScrollView(showsIndicators: false) {
-                        VStack(spacing: 8) {
-                            ForEach(boundDevices) { device in
-                                BoundDeviceRow(device: device) {
-                                    btVM.disconnect(id: device.id)
-                                }
-                            }
-                        }
+                // 大腿裝置
+                LimbSlotRow(
+                    label: "大腿裝置",
+                    device: thighDevice,
+                    onAdd: {
+                        connectingFor = .thigh
+                        btVM.startScan()
+                        showSheet = true
+                    },
+                    onRemove: {
+                        if let d = thighDevice { btVM.disconnect(id: d.id) }
                     }
-                }
+                )
+
+                // 小腿裝置
+                LimbSlotRow(
+                    label: "小腿裝置",
+                    device: calfDevice,
+                    onAdd: {
+                        connectingFor = .calf
+                        btVM.startScan()
+                        showSheet = true
+                    },
+                    onRemove: {
+                        if let d = calfDevice { btVM.disconnect(id: d.id) }
+                    }
+                )
             }
             .padding(20)
         }
@@ -322,22 +337,47 @@ struct BluetoothDeviceCard: View {
         .frame(maxWidth: .infinity)
         .onAppear {
             btVM.onConnected = { peripheral in
-                guard !boundDevices.contains(where: { $0.id == peripheral.identifier }) else { return }
-                boundDevices.append(BoundDevice(
+                let device = BoundDevice(
                     id: peripheral.identifier,
                     name: peripheral.name ?? "未知裝置",
                     status: "已連線"
-                ))
+                )
+                switch connectingFor {
+                case .thigh: thighDevice = device
+                case .calf:  calfDevice  = device
+                }
                 showSheet = false
             }
             btVM.onDisconnected = { uuid in
-                boundDevices.removeAll { $0.id == uuid }
+                if thighDevice?.id == uuid { thighDevice = nil }
+                if calfDevice?.id  == uuid { calfDevice  = nil }
             }
         }
         .sheet(isPresented: $showSheet, onDismiss: { btVM.stopScan() }) {
             AddDeviceSheet(vm: btVM)
                 .presentationDetents([.fraction(0.75)])
                 .presentationCornerRadius(16)
+        }
+    }
+}
+
+struct LimbSlotRow: View {
+    let label: String
+    let device: BoundDevice?
+    let onAdd: () -> Void
+    let onRemove: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.white.opacity(0.6))
+
+            if let device {
+                BoundDeviceRow(device: device, onRemove: onRemove)
+            } else {
+                AddDeviceTile(action: onAdd)
+            }
         }
     }
 }
