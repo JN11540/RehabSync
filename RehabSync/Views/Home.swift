@@ -292,7 +292,7 @@ struct BluetoothDeviceCard: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             Color(red: 0.1, green: 0.25, blue: 0.4)
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 22) {
                 // 標題列
                 HStack(spacing: 8) {
                     Image(systemName: "antenna.radiowaves.left.and.right")
@@ -396,6 +396,9 @@ struct BoundDeviceRow: View {
                 Text(device.name)
                     .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(.white)
+                Text(device.id.uuidString)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.white.opacity(0.5))
                 HStack(spacing: 4) {
                     Circle()
                         .fill(.green)
@@ -462,7 +465,7 @@ struct AddDeviceSheet: View {
                 .padding(.top, 28)
 
             Text("確定您的裝置已開啟且可供探索。在下面選取裝置以連線。")
-                .font(.system(size: 14))
+                .font(.system(size: 18))
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 24)
                 .padding(.top, 8)
@@ -473,7 +476,7 @@ struct AddDeviceSheet: View {
                 HStack(spacing: 12) {
                     ProgressView()
                     Text("連線中…")
-                        .font(.system(size: 14))
+                        .font(.system(size: 18))
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -482,7 +485,7 @@ struct AddDeviceSheet: View {
                 HStack(spacing: 12) {
                     ProgressView()
                     Text("正在掃描…")
-                        .font(.system(size: 14))
+                        .font(.system(size: 18))
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -496,18 +499,19 @@ struct AddDeviceSheet: View {
                             } label: {
                                 HStack(spacing: 14) {
                                     Image(systemName: "dot.radiowaves.right")
+                                        .font(.system(size: 18))
                                         .foregroundStyle(.cyan)
-                                    VStack(alignment: .leading, spacing: 2) {
+                                    VStack(alignment: .leading, spacing: 4) {
                                         Text(device.name)
-                                            .font(.system(size: 15))
+                                            .font(.system(size: 18))
                                             .foregroundStyle(.primary)
                                         Text(device.id.uuidString)
-                                            .font(.system(size: 11))
+                                            .font(.system(size: 18))
                                             .foregroundStyle(.secondary)
                                     }
                                     Spacer()
                                     Image(systemName: "chevron.right")
-                                        .font(.system(size: 13))
+                                        .font(.system(size: 18))
                                         .foregroundStyle(.secondary)
                                 }
                                 .padding(.vertical, 12)
@@ -523,7 +527,7 @@ struct AddDeviceSheet: View {
 
             if case .failed(let reason) = vm.connectionState {
                 Text("連線失敗：\(reason)")
-                    .font(.system(size: 13))
+                    .font(.system(size: 18))
                     .foregroundStyle(.red)
                     .padding(.horizontal, 24)
                     .padding(.top, 8)
@@ -535,7 +539,7 @@ struct AddDeviceSheet: View {
             HStack {
                 Spacer()
                 Button("取消") { dismiss() }
-                    .font(.system(size: 15))
+                    .font(.system(size: 18))
                     .padding(.horizontal, 24)
                     .padding(.vertical, 14)
             }
