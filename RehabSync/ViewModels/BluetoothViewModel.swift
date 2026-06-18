@@ -22,8 +22,10 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     var connectionState: DeviceConnectionState = .idle
 
     var onConnected: ((CBPeripheral) -> Void)?
+    var onDisconnected: ((UUID) -> Void)?
 
     private var peripheralMap: [UUID: CBPeripheral] = [:]
+    private(set) var connectedPeripherals: [UUID: CBPeripheral] = [:]
     private var pendingPeripheral: CBPeripheral?
 
     override init() {
@@ -48,19 +50,20 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         isScanning = false
     }
 
-    // MARK: - Connect
+    // MARK: - Connect / Disconnect
 
     func connectDiscovered(_ device: DiscoveredDevice) {
         guard let peripheral = peripheralMap[device.id] else { return }
-        connect(peripheral)
-    }
-
-    private func connect(_ peripheral: CBPeripheral) {
         pendingPeripheral = peripheral
         connectionState = .connecting
         central.stopScan()
         isScanning = false
         central.connect(peripheral, options: nil)
+    }
+
+    func disconnect(id: UUID) {
+        guard let peripheral = connectedPeripherals[id] else { return }
+        central.cancelPeripheralConnection(peripheral)
     }
 
     // MARK: - CBCentralManagerDelegate
@@ -83,6 +86,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     func centralManager(_ central: CBCentralManager,
                         didConnect peripheral: CBPeripheral) {
         connectionState = .connected
+        connectedPeripherals[peripheral.identifier] = peripheral
         onConnected?(peripheral)
         pendingPeripheral = nil
     }
@@ -92,5 +96,12 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
                         error: (any Error)?) {
         connectionState = .failed(error?.localizedDescription ?? "連線失敗")
         pendingPeripheral = nil
+    }
+
+    func centralManager(_ central: CBCentralManager,
+                        didDisconnectPeripheral peripheral: CBPeripheral,
+                        error: (any Error)?) {
+        connectedPeripherals.removeValue(forKey: peripheral.identifier)
+        onDisconnected?(peripheral.identifier)
     }
 }

@@ -272,12 +272,16 @@ struct TreatmentPlanCard: View {
 
 // MARK: - Bluetooth Device Card
 
+struct BoundDevice: Identifiable {
+    let id: UUID
+    let name: String
+    var status: String
+}
+
 struct BluetoothDeviceCard: View {
     @State private var btVM = BluetoothViewModel()
     @State private var showSheet = false
-
-    // 已綁定裝置（後續接真實配對清單）
-    @State private var boundDevices: [(icon: String, name: String, status: String)] = []
+    @State private var boundDevices: [BoundDevice] = []
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -303,11 +307,9 @@ struct BluetoothDeviceCard: View {
                 if !boundDevices.isEmpty {
                     ScrollView(showsIndicators: false) {
                         VStack(spacing: 8) {
-                            ForEach(boundDevices, id: \.name) { device in
-                                BoundDeviceRow(icon: device.icon,
-                                               name: device.name,
-                                               status: device.status) {
-                                    boundDevices.removeAll { $0.name == device.name }
+                            ForEach(boundDevices) { device in
+                                BoundDeviceRow(device: device) {
+                                    btVM.disconnect(id: device.id)
                                 }
                             }
                         }
@@ -320,10 +322,16 @@ struct BluetoothDeviceCard: View {
         .frame(maxWidth: .infinity)
         .onAppear {
             btVM.onConnected = { peripheral in
-                let name = peripheral.name ?? "未知裝置"
-                guard !boundDevices.contains(where: { $0.name == name }) else { return }
-                boundDevices.append((icon: "dot.radiowaves.right", name: name, status: "已連線"))
+                guard !boundDevices.contains(where: { $0.id == peripheral.identifier }) else { return }
+                boundDevices.append(BoundDevice(
+                    id: peripheral.identifier,
+                    name: peripheral.name ?? "未知裝置",
+                    status: "已連線"
+                ))
                 showSheet = false
+            }
+            btVM.onDisconnected = { uuid in
+                boundDevices.removeAll { $0.id == uuid }
             }
         }
         .sheet(isPresented: $showSheet, onDismiss: { btVM.stopScan() }) {
@@ -335,26 +343,24 @@ struct BluetoothDeviceCard: View {
 }
 
 struct BoundDeviceRow: View {
-    let icon: String
-    let name: String
-    let status: String
+    let device: BoundDevice
     let onRemove: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: icon)
+            Image(systemName: "dot.radiowaves.right")
                 .font(.system(size: 20))
                 .foregroundStyle(.white)
                 .frame(width: 32)
             VStack(alignment: .leading, spacing: 2) {
-                Text(name)
+                Text(device.name)
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(.white)
                 HStack(spacing: 4) {
                     Circle()
                         .fill(.green)
                         .frame(width: 6, height: 6)
-                    Text(status)
+                    Text(device.status)
                         .font(.system(size: 12))
                         .foregroundStyle(.white.opacity(0.8))
                 }
