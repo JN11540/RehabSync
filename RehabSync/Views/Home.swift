@@ -275,16 +275,14 @@ struct BluetoothDeviceCard: View {
     @State private var btVM = BluetoothViewModel()
     @State private var showSheet = false
 
-    private let pairedDevices: [(icon: String, name: String, status: String)] = [
-        ("headphones",        "WF-C510",          "已連線"),
-        ("computermouse",     "MX Anywhere 3S",   "已連線"),
-        ("waveform.path.ecg", "ZE1RC0025290009",  "已配對"),
-    ]
+    // 已綁定裝置（後續接真實配對清單）
+    @State private var boundDevices: [(icon: String, name: String, status: String)] = []
 
     var body: some View {
         ZStack(alignment: .topLeading) {
             Color(red: 0.1, green: 0.25, blue: 0.4)
             VStack(alignment: .leading, spacing: 12) {
+                // 標題列
                 HStack(spacing: 8) {
                     Image(systemName: "antenna.radiowaves.left.and.right")
                         .font(.system(size: 22))
@@ -293,19 +291,26 @@ struct BluetoothDeviceCard: View {
                         .font(.system(size: 22, weight: .semibold))
                         .foregroundStyle(.white)
                 }
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        ForEach(pairedDevices, id: \.name) { device in
-                            DeviceTile(icon: device.icon,
-                                       name: device.name,
-                                       status: device.status)
-                        }
-                        AddDeviceTile {
-                            btVM.startScan()
-                            showSheet = true
+
+                // 第一排：新增裝置按鈕
+                AddDeviceTile {
+                    btVM.startScan()
+                    showSheet = true
+                }
+
+                // 第二排起：已綁定裝置直向列表
+                if !boundDevices.isEmpty {
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 8) {
+                            ForEach(boundDevices, id: \.name) { device in
+                                BoundDeviceRow(icon: device.icon,
+                                               name: device.name,
+                                               status: device.status) {
+                                    boundDevices.removeAll { $0.name == device.name }
+                                }
+                            }
                         }
                     }
-                    .padding(.bottom, 4)
                 }
             }
             .padding(20)
@@ -320,33 +325,43 @@ struct BluetoothDeviceCard: View {
     }
 }
 
-struct DeviceTile: View {
+struct BoundDeviceRow: View {
     let icon: String
     let name: String
     let status: String
+    let onRemove: () -> Void
 
     var body: some View {
-        VStack(spacing: 8) {
+        HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 28))
+                .font(.system(size: 20))
                 .foregroundStyle(.white)
-            Text(name)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.white)
-                .lineLimit(1)
-            HStack(spacing: 4) {
-                Circle()
-                    .fill(.green)
-                    .frame(width: 6, height: 6)
-                Text(status)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.white.opacity(0.8))
+                .frame(width: 32)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.white)
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(.green)
+                        .frame(width: 6, height: 6)
+                    Text(status)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.white.opacity(0.8))
+                }
             }
+            Spacer()
+            Button(action: onRemove) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.white.opacity(0.5))
+            }
+            .buttonStyle(.plain)
         }
-        .frame(width: 80, height: 90)
-        .padding(10)
-        .background(.white.opacity(0.12))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(.white.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 }
 
