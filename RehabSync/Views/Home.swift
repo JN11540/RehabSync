@@ -317,13 +317,18 @@ struct BluetoothDeviceCard: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .frame(maxWidth: .infinity)
-        .sheet(isPresented: $showSheet, onDismiss: { btVM.stopScan() }) {
-            AddDeviceSheet(vm: btVM) { selected in
-                guard !boundDevices.contains(where: { $0.name == selected.name }) else { return }
-                boundDevices.append((icon: "dot.radiowaves.right", name: selected.name, status: "已連線"))
+        .onAppear {
+            btVM.onConnected = { peripheral in
+                let name = peripheral.name ?? "未知裝置"
+                guard !boundDevices.contains(where: { $0.name == name }) else { return }
+                boundDevices.append((icon: "dot.radiowaves.right", name: name, status: "已連線"))
+                showSheet = false
             }
-            .presentationDetents([.medium])
-            .presentationCornerRadius(16)
+        }
+        .sheet(isPresented: $showSheet, onDismiss: { btVM.stopScan() }) {
+            AddDeviceSheet(vm: btVM)
+                .presentationDetents([.medium])
+                .presentationCornerRadius(16)
         }
     }
 }
@@ -398,7 +403,6 @@ struct AddDeviceTile: View {
 
 struct AddDeviceSheet: View {
     let vm: BluetoothViewModel
-    let onSelect: (DiscoveredDevice) -> Void
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -416,7 +420,16 @@ struct AddDeviceSheet: View {
 
             Divider().padding(.vertical, 16)
 
-            if vm.discoveredDevices.isEmpty {
+            if vm.connectionState == .connecting {
+                HStack(spacing: 12) {
+                    ProgressView()
+                    Text("連線中…")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 24)
+            } else if vm.discoveredDevices.isEmpty {
                 HStack(spacing: 12) {
                     ProgressView()
                     Text("正在掃描…")
@@ -430,8 +443,7 @@ struct AddDeviceSheet: View {
                     VStack(alignment: .leading, spacing: 0) {
                         ForEach(vm.discoveredDevices) { device in
                             Button {
-                                onSelect(device)
-                                dismiss()
+                                vm.connectDiscovered(device)
                             } label: {
                                 HStack(spacing: 14) {
                                     Image(systemName: "dot.radiowaves.right")
@@ -453,10 +465,19 @@ struct AddDeviceSheet: View {
                                 .padding(.horizontal, 24)
                             }
                             .buttonStyle(.plain)
+                            .disabled(vm.connectionState == .connecting)
                             Divider().padding(.leading, 56)
                         }
                     }
                 }
+            }
+
+            if case .failed(let reason) = vm.connectionState {
+                Text("連線失敗：\(reason)")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.red)
+                    .padding(.horizontal, 24)
+                    .padding(.top, 8)
             }
 
             Spacer()
