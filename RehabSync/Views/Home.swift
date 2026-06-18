@@ -318,9 +318,12 @@ struct BluetoothDeviceCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .frame(maxWidth: .infinity)
         .sheet(isPresented: $showSheet, onDismiss: { btVM.stopScan() }) {
-            AddDeviceSheet(vm: btVM)
-                .presentationDetents([.medium])
-                .presentationCornerRadius(16)
+            AddDeviceSheet(vm: btVM) { selected in
+                guard !boundDevices.contains(where: { $0.name == selected.name }) else { return }
+                boundDevices.append((icon: "dot.radiowaves.right", name: selected.name, status: "已連線"))
+            }
+            .presentationDetents([.medium])
+            .presentationCornerRadius(16)
         }
     }
 }
@@ -395,6 +398,7 @@ struct AddDeviceTile: View {
 
 struct AddDeviceSheet: View {
     let vm: BluetoothViewModel
+    let onSelect: (DiscoveredDevice) -> Void
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -425,20 +429,30 @@ struct AddDeviceSheet: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         ForEach(vm.discoveredDevices) { device in
-                            HStack(spacing: 14) {
-                                Image(systemName: "dot.radiowaves.right")
-                                    .foregroundStyle(.cyan)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(device.name)
-                                        .font(.system(size: 15))
-                                    Text("RSSI: \(device.rssi) dBm")
-                                        .font(.system(size: 12))
+                            Button {
+                                onSelect(device)
+                                dismiss()
+                            } label: {
+                                HStack(spacing: 14) {
+                                    Image(systemName: "dot.radiowaves.right")
+                                        .foregroundStyle(.cyan)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(device.name)
+                                            .font(.system(size: 15))
+                                            .foregroundStyle(.primary)
+                                        Text("RSSI: \(device.rssi) dBm")
+                                            .font(.system(size: 12))
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 13))
                                         .foregroundStyle(.secondary)
                                 }
-                                Spacer()
+                                .padding(.vertical, 12)
+                                .padding(.horizontal, 24)
                             }
-                            .padding(.vertical, 12)
-                            .padding(.horizontal, 24)
+                            .buttonStyle(.plain)
                             Divider().padding(.leading, 56)
                         }
                     }
