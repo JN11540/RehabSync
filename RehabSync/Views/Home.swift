@@ -370,7 +370,7 @@ struct LimbSlotRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(label)
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 18, weight: .medium))
                 .foregroundStyle(.white.opacity(0.6))
 
             if let device {
@@ -394,14 +394,14 @@ struct BoundDeviceRow: View {
                 .frame(width: 32)
             VStack(alignment: .leading, spacing: 2) {
                 Text(device.name)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(.white)
                 HStack(spacing: 4) {
                     Circle()
                         .fill(.green)
                         .frame(width: 6, height: 6)
                     Text(device.status)
-                        .font(.system(size: 12))
+                        .font(.system(size: 18))
                         .foregroundStyle(.white.opacity(0.8))
                 }
             }
@@ -425,20 +425,22 @@ struct AddDeviceTile: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 8) {
+            HStack(spacing: 8) {
                 Image(systemName: "plus")
-                    .font(.system(size: 28, weight: .light))
+                    .font(.system(size: 18, weight: .light))
                     .foregroundStyle(.white)
                 Text("新增裝置")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(.white)
+                Spacer()
             }
-            .frame(width: 80, height: 90)
-            .padding(10)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity)
             .background(.white.opacity(0.08))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: 10)
                     .stroke(.white.opacity(0.3), style: StrokeStyle(lineWidth: 1, dash: [4]))
             )
         }
