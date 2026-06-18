@@ -336,7 +336,7 @@ struct BluetoothDeviceCard: View {
         }
         .sheet(isPresented: $showSheet, onDismiss: { btVM.stopScan() }) {
             AddDeviceSheet(vm: btVM)
-                .presentationDetents([.medium])
+                .presentationDetents([.fraction(0.75)])
                 .presentationCornerRadius(16)
         }
     }
@@ -459,8 +459,8 @@ struct AddDeviceSheet: View {
                                         Text(device.name)
                                             .font(.system(size: 15))
                                             .foregroundStyle(.primary)
-                                        Text("RSSI: \(device.rssi) dBm")
-                                            .font(.system(size: 12))
+                                        Text(device.id.uuidString)
+                                            .font(.system(size: 11))
                                             .foregroundStyle(.secondary)
                                     }
                                     Spacer()

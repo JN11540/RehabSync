@@ -75,11 +75,11 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
                         advertisementData: [String: Any],
                         rssi RSSI: NSNumber) {
         let id = peripheral.identifier
-        peripheralMap[id] = peripheral
-        guard !discoveredDevices.contains(where: { $0.id == id }) else { return }
         let name = peripheral.name
             ?? advertisementData[CBAdvertisementDataLocalNameKey] as? String
-            ?? "未知裝置"
+        guard let name else { return }
+        peripheralMap[id] = peripheral
+        guard !discoveredDevices.contains(where: { $0.id == id }) else { return }
         discoveredDevices.append(DiscoveredDevice(id: id, name: name, rssi: RSSI.intValue))
     }
 
