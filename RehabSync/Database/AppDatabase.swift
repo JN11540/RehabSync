@@ -91,6 +91,42 @@ func createAppDatabase() throws -> DatabaseQueue {
         }
     }
 
+    migrator.registerMigration("v5") { db in
+        try db.create(table: "device") { t in
+            t.autoIncrementedPrimaryKey("id")
+            t.column("device_uuid",  .text).notNull().unique()
+            t.column("device_name",  .text).notNull()
+            t.column("limb",         .integer).notNull()
+            t.column("bluetooth_id", .integer).notNull()
+                .references("bluetooth", onDelete: .setNull)
+        }
+    }
+
+    migrator.registerMigration("v6") { db in
+        try db.create(table: "acc") { t in
+            t.autoIncrementedPrimaryKey("id")
+            t.column("device_id",  .integer).notNull().references("device", onDelete: .cascade)
+            t.column("timestamp", .integer).notNull()
+            t.column("x",         .double).notNull()
+            t.column("y",         .double).notNull()
+            t.column("z",         .double).notNull()
+        }
+        try db.create(table: "gyro") { t in
+            t.autoIncrementedPrimaryKey("id")
+            t.column("device_id",  .integer).notNull().references("device", onDelete: .cascade)
+            t.column("timestamp", .integer).notNull()
+            t.column("pitch",     .double).notNull()
+            t.column("roll",      .double).notNull()
+            t.column("yaw",       .double).notNull()
+        }
+        try db.create(table: "exg") { t in
+            t.autoIncrementedPrimaryKey("id")
+            t.column("device_id",  .integer).notNull().references("device", onDelete: .cascade)
+            t.column("timestamp", .integer).notNull()
+            t.column("value",     .integer).notNull()
+        }
+    }
+
     try migrator.migrate(dbQueue)
     return dbQueue
 }
