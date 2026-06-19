@@ -159,12 +159,18 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
 
     func startRecording(peripheral: CBPeripheral) {
         guard let config = bluetoothConfig,
-              let map = charMap[peripheral.identifier] else { return }
+              let map = charMap[peripheral.identifier] else {
+            print("[REC] guard failed: config=\(bluetoothConfig != nil) map=\(charMap[peripheral.identifier] != nil)")
+            return
+        }
 
         let writeUUID = CBUUID(string: config.write_uuid)
         let accUUID   = CBUUID(string: config.sub_acc_uuid)
         let gyroUUID  = CBUUID(string: config.sub_gyro_uuid)
         let exgUUID   = CBUUID(string: config.sub_exg_uuid)
+
+        print("[REC] charMap keys: \(map.keys.map { $0.uuidString })")
+        print("[REC] exgUUID=\(exgUUID.uuidString) found=\(map[exgUUID] != nil)")
 
         if let writeChar = map[writeUUID] {
             peripheral.writeValue(config.cmd_a0, for: writeChar, type: .withResponse)
@@ -307,6 +313,7 @@ extension BluetoothViewModel: CBPeripheralDelegate {
     func peripheral(_ peripheral: CBPeripheral,
                     didUpdateValueFor characteristic: CBCharacteristic,
                     error: Error?) {
+        print("[BLE] didUpdateValueFor uuid=\(characteristic.uuid.uuidString) len=\(characteristic.value?.count ?? -1)")
         guard let config = bluetoothConfig,
               let data = characteristic.value else { return }
 
