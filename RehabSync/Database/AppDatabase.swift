@@ -91,6 +91,17 @@ func createAppDatabase() throws -> DatabaseQueue {
         }
     }
 
+    migrator.registerMigration("v5") { db in
+        try db.create(table: "device") { t in
+            t.autoIncrementedPrimaryKey("id")
+            t.column("device_uuid",  .text).notNull().unique()
+            t.column("device_name",  .text).notNull()
+            t.column("limb",         .integer).notNull()
+            t.column("bluetooth_id", .integer).notNull()
+                .references("bluetooth", onDelete: .setNull)
+        }
+    }
+
     try migrator.migrate(dbQueue)
     return dbQueue
 }
