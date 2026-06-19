@@ -559,7 +559,10 @@ struct AddDeviceSheet: View {
             Divider()
             HStack {
                 Spacer()
-                Button("取消") { dismiss() }
+                Button("取消") {
+                    vm.cancelPendingConnection()
+                    dismiss()
+                }
                     .font(.system(size: 18))
                     .padding(.horizontal, 24)
                     .padding(.vertical, 14)

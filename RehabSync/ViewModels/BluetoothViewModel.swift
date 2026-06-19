@@ -123,6 +123,15 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         central.cancelPeripheralConnection(peripheral)
     }
 
+    func cancelPendingConnection() {
+        if let peripheral = pendingPeripheral {
+            central.cancelPeripheralConnection(peripheral)
+            pendingPeripheral = nil
+        }
+        connectionState = .idle
+        stopScan()
+    }
+
     // MARK: - CBCentralManagerDelegate
 
     func centralManagerDidUpdateState(_ central: CBCentralManager) {}
