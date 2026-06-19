@@ -1,6 +1,6 @@
 import GRDB
 
-struct Gyro: Codable, FetchableRecord, MutablePersistableRecord {
+struct Gyro: Codable, Identifiable, FetchableRecord, MutablePersistableRecord {
     static let databaseTableName = "gyro"
 
     var id: Int64?

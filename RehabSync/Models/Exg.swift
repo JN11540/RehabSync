@@ -1,6 +1,6 @@
 import GRDB
 
-struct Exg: Codable, FetchableRecord, MutablePersistableRecord {
+struct Exg: Codable, Identifiable, FetchableRecord, MutablePersistableRecord {
     static let databaseTableName = "exg"
 
     var id: Int64?
