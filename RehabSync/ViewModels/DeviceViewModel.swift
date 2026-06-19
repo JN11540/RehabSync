@@ -36,7 +36,7 @@ class DeviceViewModel {
                 var row = Acc(device_id: deviceId, timestamp: timestamp, x: s.x, y: s.y, z: s.z)
                 try row.insert(db)
             }
-        } completion: { _ in }
+        } completion: { _, _ in }
     }
 
     func insertGYRO(deviceId: Int64, timestamp: Int64, samples: [(pitch: Double, roll: Double, yaw: Double)]) {
@@ -45,7 +45,7 @@ class DeviceViewModel {
                 var row = Gyro(device_id: deviceId, timestamp: timestamp, pitch: s.pitch, roll: s.roll, yaw: s.yaw)
                 try row.insert(db)
             }
-        } completion: { _ in }
+        } completion: { _, _ in }
     }
 
     func insertEXGBatch(deviceId: Int64, timestamp: Int64, values: [Int]) {
@@ -54,7 +54,7 @@ class DeviceViewModel {
                 var row = Exg(device_id: deviceId, timestamp: timestamp, value: value)
                 try row.insert(db)
             }
-        } completion: { _ in }
+        } completion: { _, _ in }
     }
 
     private func defaultBluetoothId() -> Int64? {
