@@ -19,6 +19,8 @@ struct DiscoveredDevice: Identifiable {
 @Observable
 final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     private var central: CBCentralManager!
+    private let bleQueue = DispatchQueue(label: "com.rehabsync.ble", qos: .userInitiated)
+
     var discoveredDevices: [DiscoveredDevice] = []
     var isScanning = false
     var connectionState: DeviceConnectionState = .idle
@@ -38,7 +40,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
 
     override init() {
         super.init()
-        central = CBCentralManager(delegate: self, queue: nil)
+        central = CBCentralManager(delegate: self, queue: bleQueue)
     }
 
     // MARK: - Seed
@@ -99,43 +101,58 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     // MARK: - Scan
 
     func startScan() {
-        discoveredDevices = []
-        peripheralMap = [:]
-        guard central.state == .poweredOn else { return }
-        isScanning = true
-        central.scanForPeripherals(withServices: nil, options: [
-            CBCentralManagerScanOptionAllowDuplicatesKey: false
-        ])
+        DispatchQueue.main.async {
+            self.discoveredDevices = []
+            self.peripheralMap = [:]
+        }
+        bleQueue.async {
+            guard self.central.state == .poweredOn else { return }
+            DispatchQueue.main.async { self.isScanning = true }
+            self.central.scanForPeripherals(withServices: nil, options: [
+                CBCentralManagerScanOptionAllowDuplicatesKey: false
+            ])
+        }
     }
 
     func stopScan() {
-        central.stopScan()
-        isScanning = false
+        bleQueue.async { self.central.stopScan() }
+        DispatchQueue.main.async { self.isScanning = false }
     }
 
     // MARK: - Connect / Disconnect
 
     func connectDiscovered(_ device: DiscoveredDevice) {
-        guard let peripheral = peripheralMap[device.id] else { return }
-        pendingPeripheral = peripheral
-        connectionState = .connecting
-        central.stopScan()
-        isScanning = false
-        central.connect(peripheral, options: nil)
+        bleQueue.async {
+            guard let peripheral = self.peripheralMap[device.id] else { return }
+            DispatchQueue.main.async {
+                self.pendingPeripheral = peripheral
+                self.connectionState = .connecting
+                self.isScanning = false
+            }
+            self.central.stopScan()
+            self.central.connect(peripheral, options: nil)
+        }
     }
 
     func disconnect(id: UUID) {
-        guard let peripheral = connectedPeripherals[id] else { return }
-        central.cancelPeripheralConnection(peripheral)
+        bleQueue.async {
+            guard let peripheral = self.connectedPeripherals[id] else { return }
+            self.central.cancelPeripheralConnection(peripheral)
+        }
     }
 
     func cancelPendingConnection() {
-        if let peripheral = pendingPeripheral {
-            central.cancelPeripheralConnection(peripheral)
-            pendingPeripheral = nil
+        bleQueue.async {
+            if let peripheral = self.pendingPeripheral {
+                self.central.cancelPeripheralConnection(peripheral)
+            }
+            DispatchQueue.main.async {
+                self.pendingPeripheral = nil
+                self.connectionState = .idle
+                self.isScanning = false
+            }
+            self.central.stopScan()
         }
-        connectionState = .idle
-        stopScan()
     }
 
     // MARK: - Recording
@@ -158,7 +175,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         if let c = map[gyroUUID] { peripheral.setNotifyValue(true, for: c) }
         if let c = map[exgUUID]  { peripheral.setNotifyValue(true, for: c) }
 
-        isRecording = true
+        DispatchQueue.main.async { self.isRecording = true }
     }
 
     func stopRecording(peripheral: CBPeripheral) {
@@ -173,7 +190,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         if let c = map[gyroUUID] { peripheral.setNotifyValue(false, for: c) }
         if let c = map[exgUUID]  { peripheral.setNotifyValue(false, for: c) }
 
-        isRecording = false
+        DispatchQueue.main.async { self.isRecording = false }
     }
 
     // MARK: - DB Helpers
@@ -202,21 +219,26 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         let name = peripheral.name
             ?? advertisementData[CBAdvertisementDataLocalNameKey] as? String
         guard let name else { return }
-        peripheralMap[id] = peripheral
-        guard !discoveredDevices.contains(where: { $0.id == id }) else { return }
-        discoveredDevices.append(DiscoveredDevice(id: id, name: name, rssi: RSSI.intValue))
+
+        DispatchQueue.main.async {
+            self.peripheralMap[id] = peripheral
+            guard !self.discoveredDevices.contains(where: { $0.id == id }) else { return }
+            self.discoveredDevices.append(DiscoveredDevice(id: id, name: name, rssi: RSSI.intValue))
+        }
     }
 
     func centralManager(_ central: CBCentralManager,
                         didConnect peripheral: CBPeripheral) {
-        connectionState = .connected
-        connectedPeripherals[peripheral.identifier] = peripheral
-        onConnected?(peripheral)
-        pendingPeripheral = nil
+        let config = loadDefaultBluetoothConfig()
+        let device = loadDevice(uuid: peripheral.identifier.uuidString)
 
-        bluetoothConfig = loadDefaultBluetoothConfig()
-        if let d = loadDevice(uuid: peripheral.identifier.uuidString) {
-            deviceIdMap[peripheral.identifier] = d.id
+        DispatchQueue.main.async {
+            self.connectionState = .connected
+            self.connectedPeripherals[peripheral.identifier] = peripheral
+            self.onConnected?(peripheral)
+            self.pendingPeripheral = nil
+            self.bluetoothConfig = config
+            if let d = device { self.deviceIdMap[peripheral.identifier] = d.id }
         }
 
         peripheral.delegate = self
@@ -226,18 +248,22 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     func centralManager(_ central: CBCentralManager,
                         didFailToConnect peripheral: CBPeripheral,
                         error: (any Error)?) {
-        connectionState = .failed(error?.localizedDescription ?? "連線失敗")
-        pendingPeripheral = nil
+        DispatchQueue.main.async {
+            self.connectionState = .failed(error?.localizedDescription ?? "連線失敗")
+            self.pendingPeripheral = nil
+        }
     }
 
     func centralManager(_ central: CBCentralManager,
                         didDisconnectPeripheral peripheral: CBPeripheral,
                         error: (any Error)?) {
-        connectedPeripherals.removeValue(forKey: peripheral.identifier)
-        charMap.removeValue(forKey: peripheral.identifier)
-        deviceIdMap.removeValue(forKey: peripheral.identifier)
-        isRecording = false
-        onDisconnected?(peripheral.identifier)
+        DispatchQueue.main.async {
+            self.connectedPeripherals.removeValue(forKey: peripheral.identifier)
+            self.charMap.removeValue(forKey: peripheral.identifier)
+            self.deviceIdMap.removeValue(forKey: peripheral.identifier)
+            self.isRecording = false
+            self.onDisconnected?(peripheral.identifier)
+        }
     }
 }
 
@@ -265,7 +291,7 @@ extension BluetoothViewModel: CBPeripheralDelegate {
         guard let chars = service.characteristics else { return }
         var map = charMap[peripheral.identifier] ?? [:]
         for char in chars { map[char.uuid] = char }
-        charMap[peripheral.identifier] = map
+        DispatchQueue.main.async { self.charMap[peripheral.identifier] = map }
     }
 
     func peripheral(_ peripheral: CBPeripheral,
@@ -323,14 +349,15 @@ extension BluetoothViewModel: CBPeripheralDelegate {
             guard data.count >= 10 else { return }
             let ch1 = Int(data.int16BE(at: 2))
             let ch2 = Int(data.int16BE(at: 6))
-            deviceVM.insertEXG(deviceId: deviceId, timestamp: timestamp, value: ch1)
-            deviceVM.insertEXG(deviceId: deviceId, timestamp: timestamp, value: ch2)
+            deviceVM.insertEXGBatch(deviceId: deviceId, timestamp: timestamp, values: [ch1, ch2])
+
         } else if flag == 0xE0 || flag == 0xE1 {
             guard data.count >= 131 else { return }
+            var values: [Int] = []
             for i in 0..<64 {
-                let val = Int(data.int16BE(at: 3 + i * 2))
-                deviceVM.insertEXG(deviceId: deviceId, timestamp: timestamp, value: val)
+                values.append(Int(data.int16BE(at: 3 + i * 2)))
             }
+            deviceVM.insertEXGBatch(deviceId: deviceId, timestamp: timestamp, values: values)
         }
     }
 }
