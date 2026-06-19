@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreBluetooth
 
 // MARK: - goHome Environment Key
 
@@ -52,7 +53,7 @@ struct HomeContent: View {
                             // 右欄 40%
                             GeometryReader { rightGeo in
                                 VStack(spacing: 16) {
-                                    HealthTipCard()
+                                    BluetoothDeviceCard()
                                         .frame(height: (rightGeo.size.height - 16) * 0.6)
                                     AssessmentEntryCard()
                                         .frame(height: (rightGeo.size.height - 16) * 0.4)
@@ -269,33 +270,280 @@ struct TreatmentPlanCard: View {
     }
 }
 
-// MARK: - Health Tip Card
+// MARK: - Bluetooth Device Card
 
-struct HealthTipCard: View {
+enum LimbSlot {
+    case thigh, calf
+}
+
+struct BoundDevice: Identifiable {
+    let id: UUID
+    let name: String
+    var status: String
+}
+
+struct BluetoothDeviceCard: View {
+    @State private var btVM = BluetoothViewModel()
+    @State private var showSheet = false
+    @State private var connectingFor: LimbSlot = .thigh
+    @State private var thighDevice: BoundDevice? = nil
+    @State private var calfDevice: BoundDevice? = nil
+
     var body: some View {
         ZStack(alignment: .topLeading) {
             Color(red: 0.1, green: 0.25, blue: 0.4)
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 22) {
+                // 標題列
                 HStack(spacing: 8) {
-                    Image(systemName: "lightbulb.fill")
-                        .font(.system(size: 25))
-                        .foregroundStyle(.green)
-                    Text("今日健康提示")
-                        .font(.system(size: 25, weight: .semibold))
+                    Image(systemName: "antenna.radiowaves.left.and.right")
+                        .font(.system(size: 22))
+                        .foregroundStyle(.cyan)
+                    Text("藍芽與裝置")
+                        .font(.system(size: 22, weight: .semibold))
                         .foregroundStyle(.white)
                 }
-                Spacer()
-                Text("定期伸展胸肌有助於預防圓肩姿勢，減輕頸部長期負擔。")
-                    .font(.system(size: 18, weight: .bold))
-                    .italic()
-                    .foregroundStyle(.white)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer()
+
+                // 大腿裝置
+                LimbSlotRow(
+                    label: "大腿裝置",
+                    device: thighDevice,
+                    onAdd: {
+                        connectingFor = .thigh
+                        btVM.startScan()
+                        showSheet = true
+                    },
+                    onRemove: {
+                        if let d = thighDevice { btVM.disconnect(id: d.id) }
+                    }
+                )
+
+                // 小腿裝置
+                LimbSlotRow(
+                    label: "小腿裝置",
+                    device: calfDevice,
+                    onAdd: {
+                        connectingFor = .calf
+                        btVM.startScan()
+                        showSheet = true
+                    },
+                    onRemove: {
+                        if let d = calfDevice { btVM.disconnect(id: d.id) }
+                    }
+                )
             }
             .padding(20)
         }
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .frame(maxWidth: .infinity)
+        .onAppear {
+            btVM.onConnected = { peripheral in
+                let device = BoundDevice(
+                    id: peripheral.identifier,
+                    name: peripheral.name ?? "未知裝置",
+                    status: "已連線"
+                )
+                switch connectingFor {
+                case .thigh: thighDevice = device
+                case .calf:  calfDevice  = device
+                }
+                showSheet = false
+            }
+            btVM.onDisconnected = { uuid in
+                if thighDevice?.id == uuid { thighDevice = nil }
+                if calfDevice?.id  == uuid { calfDevice  = nil }
+            }
+        }
+        .sheet(isPresented: $showSheet, onDismiss: { btVM.stopScan() }) {
+            AddDeviceSheet(vm: btVM)
+                .presentationDetents([.fraction(0.75)])
+                .presentationCornerRadius(16)
+        }
+    }
+}
+
+struct LimbSlotRow: View {
+    let label: String
+    let device: BoundDevice?
+    let onAdd: () -> Void
+    let onRemove: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label)
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(.white.opacity(0.6))
+
+            if let device {
+                BoundDeviceRow(device: device, onRemove: onRemove)
+            } else {
+                AddDeviceTile(action: onAdd)
+            }
+        }
+    }
+}
+
+struct BoundDeviceRow: View {
+    let device: BoundDevice
+    let onRemove: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "dot.radiowaves.right")
+                .font(.system(size: 20))
+                .foregroundStyle(.white)
+                .frame(width: 32)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(device.name)
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(.white)
+                Text(device.id.uuidString)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.white.opacity(0.5))
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(.green)
+                        .frame(width: 6, height: 6)
+                    Text(device.status)
+                        .font(.system(size: 18))
+                        .foregroundStyle(.white.opacity(0.8))
+                }
+            }
+            Spacer()
+            Button(action: onRemove) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.white.opacity(0.5))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(.white.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+struct AddDeviceTile: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: "plus")
+                    .font(.system(size: 18, weight: .light))
+                    .foregroundStyle(.white)
+                Text("新增裝置")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(.white)
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity)
+            .background(.white.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(.white.opacity(0.3), style: StrokeStyle(lineWidth: 1, dash: [4]))
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Add Device Sheet
+
+struct AddDeviceSheet: View {
+    let vm: BluetoothViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("新增裝置")
+                .font(.system(size: 22, weight: .semibold))
+                .padding(.horizontal, 24)
+                .padding(.top, 28)
+
+            Text("確定您的裝置已開啟且可供探索。在下面選取裝置以連線。")
+                .font(.system(size: 18))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 24)
+                .padding(.top, 8)
+
+            Divider().padding(.vertical, 16)
+
+            if vm.connectionState == .connecting {
+                HStack(spacing: 12) {
+                    ProgressView()
+                    Text("連線中…")
+                        .font(.system(size: 18))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 24)
+            } else if vm.discoveredDevices.isEmpty {
+                HStack(spacing: 12) {
+                    ProgressView()
+                    Text("正在掃描…")
+                        .font(.system(size: 18))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 24)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(vm.discoveredDevices) { device in
+                            Button {
+                                vm.connectDiscovered(device)
+                            } label: {
+                                HStack(spacing: 14) {
+                                    Image(systemName: "dot.radiowaves.right")
+                                        .font(.system(size: 18))
+                                        .foregroundStyle(.cyan)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(device.name)
+                                            .font(.system(size: 18))
+                                            .foregroundStyle(.primary)
+                                        Text(device.id.uuidString)
+                                            .font(.system(size: 18))
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 18))
+                                        .foregroundStyle(.secondary)
+                                }
+                                .padding(.vertical, 12)
+                                .padding(.horizontal, 24)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(vm.connectionState == .connecting)
+                            Divider().padding(.leading, 56)
+                        }
+                    }
+                }
+            }
+
+            if case .failed(let reason) = vm.connectionState {
+                Text("連線失敗：\(reason)")
+                    .font(.system(size: 18))
+                    .foregroundStyle(.red)
+                    .padding(.horizontal, 24)
+                    .padding(.top, 8)
+            }
+
+            Spacer()
+
+            Divider()
+            HStack {
+                Spacer()
+                Button("取消") { dismiss() }
+                    .font(.system(size: 18))
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 14)
+            }
+        }
     }
 }
 

@@ -1,0 +1,13 @@
+[
+  {
+    "write_uuid": "00000000-8535-B5A0-7140-A304D2495CBA",
+    "sub_acc_uuid": "00000000-8535-B5A0-7140-A304D2495CBC",
+    "sub_gyro_uuid": "00000000-8535-B5A0-7140-A304D2495CBD",
+    "sub_exg_uuid": "00000000-8535-B5A0-7140-A304D2495CB8",
+    "acc_sensitivity": 0.061,
+    "gyro_sensitivity": 8.75,
+    "cmd_a0": [160, 1, 4, 4],
+    "cmd_a1": [161, 7],
+    "is_default": 1
+  }
+]
