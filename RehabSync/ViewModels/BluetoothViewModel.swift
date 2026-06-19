@@ -193,6 +193,18 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         DispatchQueue.main.async { self.isRecording = false }
     }
 
+    func startRecordingAll() {
+        for peripheral in connectedPeripherals.values {
+            startRecording(peripheral: peripheral)
+        }
+    }
+
+    func stopRecordingAll() {
+        for peripheral in connectedPeripherals.values {
+            stopRecording(peripheral: peripheral)
+        }
+    }
+
     // MARK: - DB Helpers
 
     private func loadDefaultBluetoothConfig() -> Bluetooth? {

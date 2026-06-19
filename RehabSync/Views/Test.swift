@@ -7,17 +7,48 @@ import CoreBluetooth
 struct TestPage: View {
     let btVM: BluetoothViewModel
 
+    private var anyConnected: Bool {
+        !btVM.connectedPeripherals.isEmpty
+    }
+
     var body: some View {
         ZStack {
             Color(red: 0.96, green: 0.94, blue: 0.91).ignoresSafeArea()
-            GeometryReader { geo in
-                HStack(alignment: .top, spacing: 20) {
-                    DeviceTestCard(btVM: btVM, limb: 0, label: "大腿裝置")
-                    DeviceTestCard(btVM: btVM, limb: 1, label: "小腿裝置")
+            VStack(spacing: 16) {
+                // 共用按鈕列
+                HStack(spacing: 12) {
+                    Button("開始收集") { btVM.startRecordingAll() }
+                        .font(.system(size: 15, weight: .medium))
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(anyConnected && !btVM.isRecording ? Color.green.opacity(0.85) : Color.gray.opacity(0.3))
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .disabled(!anyConnected || btVM.isRecording)
+
+                    Button("停止收集") { btVM.stopRecordingAll() }
+                        .font(.system(size: 15, weight: .medium))
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(btVM.isRecording ? Color.red.opacity(0.85) : Color.gray.opacity(0.3))
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .disabled(!btVM.isRecording)
                 }
-                .padding(24)
-                .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 24)
+
+                // 裝置卡片
+                GeometryReader { geo in
+                    HStack(alignment: .top, spacing: 20) {
+                        DeviceTestCard(btVM: btVM, limb: 0, label: "大腿裝置")
+                        DeviceTestCard(btVM: btVM, limb: 1, label: "小腿裝置")
+                    }
+                    .padding(.horizontal, 24)
+                    .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
+                }
             }
+            .padding(.top, 20)
         }
     }
 }
@@ -62,32 +93,6 @@ struct DeviceTestCard: View {
                     .foregroundStyle(.white.opacity(0.7))
             }
             .padding(.bottom, 14)
-
-            // Buttons
-            HStack(spacing: 12) {
-                Button("開始收集") {
-                    if let p = peripheral { btVM.startRecording(peripheral: p) }
-                }
-                .font(.system(size: 15, weight: .medium))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(peripheral != nil && !btVM.isRecording ? Color.green.opacity(0.8) : Color.gray.opacity(0.3))
-                .foregroundStyle(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .disabled(peripheral == nil || btVM.isRecording)
-
-                Button("停止收集") {
-                    if let p = peripheral { btVM.stopRecording(peripheral: p) }
-                }
-                .font(.system(size: 15, weight: .medium))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(btVM.isRecording ? Color.red.opacity(0.8) : Color.gray.opacity(0.3))
-                .foregroundStyle(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .disabled(!btVM.isRecording)
-            }
-            .padding(.bottom, 16)
 
             Divider().background(.white.opacity(0.3)).padding(.bottom, 14)
 
