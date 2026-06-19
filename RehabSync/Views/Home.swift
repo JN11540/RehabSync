@@ -284,7 +284,6 @@ enum LimbSlot {
 struct BoundDevice: Identifiable {
     let id: UUID
     let name: String
-    var status: String
 }
 
 struct BluetoothDeviceCard: View {
@@ -313,6 +312,7 @@ struct BluetoothDeviceCard: View {
                 LimbSlotRow(
                     label: "大腿裝置",
                     device: thighDevice,
+                    isConnected: thighDevice.map { btVM.connectedPeripherals[$0.id] != nil } ?? false,
                     onAdd: {
                         connectingFor = .thigh
                         btVM.startScan()
@@ -331,6 +331,7 @@ struct BluetoothDeviceCard: View {
                 LimbSlotRow(
                     label: "小腿裝置",
                     device: calfDevice,
+                    isConnected: calfDevice.map { btVM.connectedPeripherals[$0.id] != nil } ?? false,
                     onAdd: {
                         connectingFor = .calf
                         btVM.startScan()
@@ -352,10 +353,10 @@ struct BluetoothDeviceCard: View {
         .onAppear {
             // 從 DB 還原綁定裝置
             if let d = deviceVM.fetch(limb: 0), let uuid = UUID(uuidString: d.device_uuid) {
-                thighDevice = BoundDevice(id: uuid, name: d.device_name, status: "未連線")
+                thighDevice = BoundDevice(id: uuid, name: d.device_name)
             }
             if let d = deviceVM.fetch(limb: 1), let uuid = UUID(uuidString: d.device_uuid) {
-                calfDevice = BoundDevice(id: uuid, name: d.device_name, status: "未連線")
+                calfDevice = BoundDevice(id: uuid, name: d.device_name)
             }
 
             btVM.onConnected = { peripheral in
@@ -367,17 +368,14 @@ struct BluetoothDeviceCard: View {
                 )
                 guard let d = deviceVM.fetch(limb: limb),
                       let uuid = UUID(uuidString: d.device_uuid) else { return }
-                let device = BoundDevice(id: uuid, name: d.device_name, status: "已連線")
+                let device = BoundDevice(id: uuid, name: d.device_name)
                 switch connectingFor {
                 case .thigh: thighDevice = device
                 case .calf:  calfDevice  = device
                 }
                 showSheet = false
             }
-            btVM.onDisconnected = { uuid in
-                if thighDevice?.id == uuid { thighDevice?.status = "未連線" }
-                if calfDevice?.id  == uuid { calfDevice?.status  = "未連線" }
-            }
+            btVM.onDisconnected = { _ in }
         }
         .sheet(isPresented: $showSheet, onDismiss: { btVM.stopScan() }) {
             AddDeviceSheet(vm: btVM)
@@ -390,6 +388,7 @@ struct BluetoothDeviceCard: View {
 struct LimbSlotRow: View {
     let label: String
     let device: BoundDevice?
+    let isConnected: Bool
     let onAdd: () -> Void
     let onRemove: () -> Void
 
@@ -400,7 +399,7 @@ struct LimbSlotRow: View {
                 .foregroundStyle(.white.opacity(0.6))
 
             if let device {
-                BoundDeviceRow(device: device, onRemove: onRemove)
+                BoundDeviceRow(device: device, isConnected: isConnected, onRemove: onRemove)
             } else {
                 AddDeviceTile(action: onAdd)
             }
@@ -410,6 +409,7 @@ struct LimbSlotRow: View {
 
 struct BoundDeviceRow: View {
     let device: BoundDevice
+    let isConnected: Bool
     let onRemove: () -> Void
 
     var body: some View {
@@ -427,9 +427,9 @@ struct BoundDeviceRow: View {
                     .foregroundStyle(.white.opacity(0.5))
                 HStack(spacing: 4) {
                     Circle()
-                        .fill(.green)
+                        .fill(isConnected ? Color.green : Color.gray.opacity(0.5))
                         .frame(width: 6, height: 6)
-                    Text(device.status)
+                    Text(isConnected ? "已連線" : "未連線")
                         .font(.system(size: 18))
                         .foregroundStyle(.white.opacity(0.8))
                 }
