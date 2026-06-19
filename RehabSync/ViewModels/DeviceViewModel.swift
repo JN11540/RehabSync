@@ -19,6 +19,7 @@ class DeviceViewModel {
             limb:         limb,
             bluetooth_id: bluetoothId
         )
+        device.id = Int64(limb)
         try? db.write { db in
             try device.insert(db, onConflict: .replace)
         }
