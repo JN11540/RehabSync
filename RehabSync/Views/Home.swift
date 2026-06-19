@@ -15,15 +15,20 @@ extension EnvironmentValues {
 }
 
 struct Home: View {
+    @State private var btVM = BluetoothViewModel()
+
     var body: some View {
         TabView {
             HomeContent()
                 .tabItem { Label("主頁", systemImage: "house") }
             Statistic()
                 .tabItem { Label("數據", systemImage: "chart.bar") }
+            TestPage(btVM: btVM)
+                .tabItem { Label("測試", systemImage: "flask") }
             Setting()
                 .tabItem { Label("設定", systemImage: "gearshape") }
         }
+        .environment(btVM)
     }
 }
 
@@ -283,7 +288,7 @@ struct BoundDevice: Identifiable {
 }
 
 struct BluetoothDeviceCard: View {
-    @State private var btVM = BluetoothViewModel()
+    @Environment(BluetoothViewModel.self) private var btVM
     @State private var deviceVM = DeviceViewModel()
     @State private var showSheet = false
     @State private var connectingFor: LimbSlot = .thigh
