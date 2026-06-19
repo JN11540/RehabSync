@@ -76,6 +76,21 @@ func createAppDatabase() throws -> DatabaseQueue {
         }
     }
 
+    migrator.registerMigration("v4") { db in
+        try db.create(table: "bluetooth") { t in
+            t.autoIncrementedPrimaryKey("id")
+            t.column("write_uuid",       .text).notNull()
+            t.column("sub_acc_uuid",     .text).notNull()
+            t.column("sub_gyro_uuid",    .text).notNull()
+            t.column("sub_exg_uuid",     .text).notNull()
+            t.column("acc_sensitivity",  .double).notNull()
+            t.column("gyro_sensitivity", .double).notNull()
+            t.column("cmd_a0",           .blob).notNull()
+            t.column("cmd_a1",           .blob).notNull()
+            t.column("is_default",       .integer).notNull().defaults(to: 0)
+        }
+    }
+
     try migrator.migrate(dbQueue)
     return dbQueue
 }

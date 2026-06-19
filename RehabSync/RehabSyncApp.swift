@@ -4,6 +4,7 @@ import SwiftUI
 struct RehabSyncApp: App {
     init() {
         ExerciseViewModel().seedIfNeeded()
+        BluetoothViewModel().seedIfNeeded()
     }
 
     var body: some Scene {
