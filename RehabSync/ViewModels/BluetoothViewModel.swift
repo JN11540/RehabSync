@@ -217,6 +217,11 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             calibAccBuffers[id]  = []
             calibGyroBuffers[id] = []
             calibratingPeripherals.insert(id)
+            // 裝置需要收到指令才會開始推送感測資料
+            if let writeChar = map[CBUUID(string: config.write_uuid)] {
+                peripheral.writeValue(config.cmd_a0, for: writeChar, type: .withResponse)
+                peripheral.writeValue(config.cmd_a1, for: writeChar, type: .withResponse)
+            }
             if let c = map[CBUUID(string: config.sub_acc_uuid)]  { peripheral.setNotifyValue(true, for: c) }
             if let c = map[CBUUID(string: config.sub_gyro_uuid)] { peripheral.setNotifyValue(true, for: c) }
             DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
