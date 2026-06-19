@@ -61,12 +61,14 @@ struct DeviceTestCard: View {
     let label: String
 
     @State private var device: Device? = nil
-    @State private var accRows:  [Acc]  = []
-    @State private var gyroRows: [Gyro] = []
-    @State private var exgRows:  [Exg]  = []
-    @State private var accObs:  AnyDatabaseCancellable? = nil
-    @State private var gyroObs: AnyDatabaseCancellable? = nil
-    @State private var exgObs:  AnyDatabaseCancellable? = nil
+    @State private var accRows:    [Acc]  = []
+    @State private var gyroRows:   [Gyro] = []
+    @State private var exgCh0Rows: [Exg]  = []
+    @State private var exgCh1Rows: [Exg]  = []
+    @State private var accObs:    AnyDatabaseCancellable? = nil
+    @State private var gyroObs:   AnyDatabaseCancellable? = nil
+    @State private var exgCh0Obs: AnyDatabaseCancellable? = nil
+    @State private var exgCh1Obs: AnyDatabaseCancellable? = nil
 
     private var peripheral: CBPeripheral? {
         guard let uuidStr = device?.device_uuid,
@@ -126,14 +128,28 @@ struct DeviceTestCard: View {
                         }
                     }
 
-                    // EXG
-                    SensorSection(title: "EXG") {
-                        if let r = exgRows.first {
+                    // EXG Channel 0
+                    SensorSection(title: "EXG CH0") {
+                        if let r = exgCh0Rows.first {
                             Text("Value: \(r.value)")
                                 .font(.system(size: 15, weight: .semibold, design: .monospaced))
                                 .foregroundStyle(.cyan)
                         }
-                        ForEach(exgRows) { r in
+                        ForEach(exgCh0Rows) { r in
+                            Text("\(r.timestamp)  \(r.value)")
+                                .font(.system(size: 12, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.55))
+                        }
+                    }
+
+                    // EXG Channel 1
+                    SensorSection(title: "EXG CH1") {
+                        if let r = exgCh1Rows.first {
+                            Text("Value: \(r.value)")
+                                .font(.system(size: 15, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(.cyan)
+                        }
+                        ForEach(exgCh1Rows) { r in
                             Text("\(r.timestamp)  \(r.value)")
                                 .font(.system(size: 12, design: .monospaced))
                                 .foregroundStyle(.white.opacity(0.55))
@@ -164,16 +180,22 @@ struct DeviceTestCard: View {
                 .order(Column("id").desc).limit(20).fetchAll($0)
         }.start(in: db, onError: { _ in }, onChange: { gyroRows = $0 })
 
-        exgObs = ValueObservation.tracking {
-            try Exg.filter(Column("device_id") == deviceId)
+        exgCh0Obs = ValueObservation.tracking {
+            try Exg.filter(Column("device_id") == deviceId && Column("channel") == 0)
                 .order(Column("id").desc).limit(20).fetchAll($0)
-        }.start(in: db, onError: { _ in }, onChange: { exgRows = $0 })
+        }.start(in: db, onError: { _ in }, onChange: { exgCh0Rows = $0 })
+
+        exgCh1Obs = ValueObservation.tracking {
+            try Exg.filter(Column("device_id") == deviceId && Column("channel") == 1)
+                .order(Column("id").desc).limit(20).fetchAll($0)
+        }.start(in: db, onError: { _ in }, onChange: { exgCh1Rows = $0 })
     }
 
     private func stopObserving() {
-        accObs  = nil
-        gyroObs = nil
-        exgObs  = nil
+        accObs    = nil
+        gyroObs   = nil
+        exgCh0Obs = nil
+        exgCh1Obs = nil
     }
 }
 

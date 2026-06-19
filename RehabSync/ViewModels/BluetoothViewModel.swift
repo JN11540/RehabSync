@@ -363,20 +363,15 @@ extension BluetoothViewModel: CBPeripheralDelegate {
         guard !data.isEmpty else { return }
         let flag = data[0]
 
-        if flag == 0xE8 {
-            guard data.count >= 10 else { return }
-            let ch1 = Int(data.int16BE(at: 2))
-            let ch2 = Int(data.int16BE(at: 6))
-            deviceVM.insertEXGBatch(deviceId: deviceId, timestamp: timestamp, values: [ch1, ch2])
+        guard flag == 0xE0 || flag == 0xE1 else { return }
+        guard data.count >= 131 else { return }
 
-        } else if flag == 0xE0 || flag == 0xE1 {
-            guard data.count >= 131 else { return }
-            var values: [Int] = []
-            for i in 0..<64 {
-                values.append(Int(data.int16BE(at: 3 + i * 2)))
-            }
-            deviceVM.insertEXGBatch(deviceId: deviceId, timestamp: timestamp, values: values)
+        let channel = flag == 0xE0 ? 0 : 1
+        var values: [Int] = []
+        for i in 0..<64 {
+            values.append(Int(data.int16BE(at: 3 + i * 2)))
         }
+        deviceVM.insertEXGBatch(deviceId: deviceId, timestamp: timestamp, channel: channel, values: values)
     }
 }
 

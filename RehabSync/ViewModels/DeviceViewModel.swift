@@ -49,10 +49,10 @@ class DeviceViewModel {
         } completion: { _, _ in }
     }
 
-    func insertEXGBatch(deviceId: Int64, timestamp: Int64, values: [Int]) {
+    func insertEXGBatch(deviceId: Int64, timestamp: Int64, channel: Int, values: [Int]) {
         db.asyncWrite { db in
             for value in values {
-                var row = Exg(device_id: deviceId, timestamp: timestamp, value: value)
+                var row = Exg(device_id: deviceId, timestamp: timestamp, channel: channel, value: value)
                 try row.insert(db)
             }
         } completion: { _, _ in }
