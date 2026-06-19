@@ -362,6 +362,7 @@ extension BluetoothViewModel: CBPeripheralDelegate {
     private func parseEXG(_ data: Data, deviceId: Int64, timestamp: Int64) {
         guard !data.isEmpty else { return }
         let flag = data[0]
+        print("[EXG] flag=0x\(String(flag, radix: 16, uppercase: true)) len=\(data.count)")
 
         guard flag == 0xE0 || flag == 0xE1 else { return }
         guard data.count >= 131 else { return }
