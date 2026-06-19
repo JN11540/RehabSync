@@ -29,6 +29,23 @@ struct Home: View {
                 .tabItem { Label("設定", systemImage: "gearshape") }
         }
         .environment(btVM)
+        .overlay {
+            if btVM.isCleaningUp {
+                Color.black.opacity(0.5)
+                    .ignoresSafeArea()
+                VStack(spacing: 16) {
+                    Text("正在刪除舊資料")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Text("請稍候，完成後自動關閉")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.7))
+                }
+                .padding(32)
+                .background(Color(red: 0.1, green: 0.25, blue: 0.4))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+            }
+        }
     }
 }
 

@@ -58,6 +58,56 @@ class DeviceViewModel {
         } completion: { _, _ in }
     }
 
+    func cleanupIfNeeded(onStart: (() -> Void)? = nil, onFinish: (() -> Void)? = nil) {
+        let db = DatabaseManager.shared.dbQueue
+
+        guard let counts = try? db.read({ db in (
+            acc:  try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM acc")  ?? 0,
+            gyro: try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM gyro") ?? 0,
+            exg:  try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM exg")  ?? 0
+        )}) else { return }
+
+        let shouldCleanAcc  = counts.acc  >= 17_280_000
+        let shouldCleanGyro = counts.gyro >= 17_280_000
+        let shouldCleanExg  = counts.exg  >= 17_280_000
+
+        guard shouldCleanAcc || shouldCleanGyro || shouldCleanExg else { return }
+
+        DispatchQueue.main.async { onStart?() }
+
+        let deviceIds = (try? db.read { db in
+            try Int64.fetchAll(db, sql: "SELECT id FROM device")
+        }) ?? []
+
+        db.asyncWrite { db in
+            for id in deviceIds {
+                if shouldCleanAcc {
+                    try db.execute(sql: """
+                        DELETE FROM acc WHERE id IN (
+                            SELECT id FROM acc WHERE device_id = ? ORDER BY id ASC LIMIT 720000
+                        )
+                    """, arguments: [id])
+                }
+                if shouldCleanGyro {
+                    try db.execute(sql: """
+                        DELETE FROM gyro WHERE id IN (
+                            SELECT id FROM gyro WHERE device_id = ? ORDER BY id ASC LIMIT 720000
+                        )
+                    """, arguments: [id])
+                }
+                if shouldCleanExg {
+                    try db.execute(sql: """
+                        DELETE FROM exg WHERE id IN (
+                            SELECT id FROM exg WHERE device_id = ? ORDER BY id ASC LIMIT 720000
+                        )
+                    """, arguments: [id])
+                }
+            }
+        } completion: { _, _ in
+            DispatchQueue.main.async { onFinish?() }
+        }
+    }
+
     private func defaultBluetoothId() -> Int64? {
         try? db.read { db in
             try Bluetooth.filter(Column("is_default") == 1).fetchOne(db)?.id
