@@ -38,6 +38,15 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     @ObservationIgnored private var charMap: [UUID: [CBUUID: CBCharacteristic]] = [:]
     @ObservationIgnored private var deviceIdMap: [UUID: Int64] = [:]
 
+    // Calibration — UI state (main thread)
+    var gyroBiases: [UUID: GyroBias] = [:]
+    var calibratingUUIDs: Set<UUID> = []
+    // Calibration — internal (bleQueue)
+    @ObservationIgnored private var calibratingPeripherals: Set<UUID> = []
+    @ObservationIgnored private var calibAccBuffers:   [UUID: [(Double, Double, Double)]] = [:]
+    @ObservationIgnored private var calibGyroBuffers:  [UUID: [(Double, Double, Double)]] = [:]
+    @ObservationIgnored private var gyroCalibrationMap: [UUID: GyroBias] = [:]
+
     override init() {
         super.init()
         central = CBCentralManager(delegate: self, queue: bleQueue)
@@ -193,6 +202,58 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         DispatchQueue.main.async { self.isRecording = false }
     }
 
+    // MARK: - Calibration
+
+    func startCalibration(peripheral: CBPeripheral) {
+        let id = peripheral.identifier
+        DispatchQueue.main.async {
+            self.gyroBiases.removeValue(forKey: id)
+            self.calibratingUUIDs.insert(id)
+        }
+        bleQueue.async { [weak self] in
+            guard let self,
+                  let config = bluetoothConfig,
+                  let map = charMap[id] else { return }
+            calibAccBuffers[id]  = []
+            calibGyroBuffers[id] = []
+            calibratingPeripherals.insert(id)
+            if let c = map[CBUUID(string: config.sub_acc_uuid)]  { peripheral.setNotifyValue(true, for: c) }
+            if let c = map[CBUUID(string: config.sub_gyro_uuid)] { peripheral.setNotifyValue(true, for: c) }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+                self?.bleQueue.async { self?.finishCalibration(peripheral: peripheral) }
+            }
+        }
+    }
+
+    private func finishCalibration(peripheral: CBPeripheral) {
+        let id = peripheral.identifier
+        calibratingPeripherals.remove(id)
+
+        let accBuf  = calibAccBuffers.removeValue(forKey: id)  ?? []
+        let gyroBuf = calibGyroBuffers.removeValue(forKey: id) ?? []
+        let count   = min(accBuf.count, gyroBuf.count)
+
+        let samples = (0..<count).map { i in
+            IMUSample(
+                ax: accBuf[i].0,  ay: accBuf[i].1,  az: accBuf[i].2,
+                gx: gyroBuf[i].0, gy: gyroBuf[i].1, gz: gyroBuf[i].2
+            )
+        }
+
+        let bias = GYROCalibration.calibrate(samples: samples, accStdThreshold: 30.0)
+        if let bias { gyroCalibrationMap[id] = bias }
+
+        if let config = bluetoothConfig, let map = charMap[id] {
+            if let c = map[CBUUID(string: config.sub_acc_uuid)]  { peripheral.setNotifyValue(false, for: c) }
+            if let c = map[CBUUID(string: config.sub_gyro_uuid)] { peripheral.setNotifyValue(false, for: c) }
+        }
+
+        DispatchQueue.main.async {
+            self.calibratingUUIDs.remove(id)
+            if let bias { self.gyroBiases[id] = bias }
+        }
+    }
+
     func startRecordingAll() {
         for peripheral in connectedPeripherals.values {
             startRecording(peripheral: peripheral)
@@ -267,10 +328,12 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     func centralManager(_ central: CBCentralManager,
                         didDisconnectPeripheral peripheral: CBPeripheral,
                         error: (any Error)?) {
+        gyroCalibrationMap.removeValue(forKey: peripheral.identifier)
         DispatchQueue.main.async {
             self.connectedPeripherals.removeValue(forKey: peripheral.identifier)
             self.charMap.removeValue(forKey: peripheral.identifier)
             self.deviceIdMap.removeValue(forKey: peripheral.identifier)
+            self.gyroBiases.removeValue(forKey: peripheral.identifier)
             self.isRecording = false
             self.onDisconnected?(peripheral.identifier)
         }
@@ -310,6 +373,18 @@ extension BluetoothViewModel: CBPeripheralDelegate {
         guard let config = bluetoothConfig,
               let data = characteristic.value else { return }
 
+        let uuid = characteristic.uuid
+
+        // 校正模式：收集到 buffer，不寫 DB
+        if calibratingPeripherals.contains(peripheral.identifier) {
+            if uuid == CBUUID(string: config.sub_acc_uuid) {
+                collectCalibACC(data, id: peripheral.identifier, config: config)
+            } else if uuid == CBUUID(string: config.sub_gyro_uuid) {
+                collectCalibGYRO(data, id: peripheral.identifier, config: config)
+            }
+            return
+        }
+
         // 首次通知時 onConnected 已執行完畢，DB 已有裝置，lazy load device_id
         if deviceIdMap[peripheral.identifier] == nil,
            let d = loadDevice(uuid: peripheral.identifier.uuidString),
@@ -320,12 +395,11 @@ extension BluetoothViewModel: CBPeripheralDelegate {
         guard let deviceId = deviceIdMap[peripheral.identifier] else { return }
 
         let ts = Int64(Date().timeIntervalSince1970 * 1000)
-        let uuid = characteristic.uuid
 
         if uuid == CBUUID(string: config.sub_acc_uuid) {
             parseACC(data, deviceId: deviceId, timestamp: ts, config: config)
         } else if uuid == CBUUID(string: config.sub_gyro_uuid) {
-            parseGYRO(data, deviceId: deviceId, timestamp: ts, config: config)
+            parseGYRO(data, deviceId: deviceId, timestamp: ts, config: config, peripheralId: peripheral.identifier)
         } else if uuid == CBUUID(string: config.sub_exg_uuid) {
             parseEXG(data, deviceId: deviceId, timestamp: ts)
         }
@@ -346,17 +420,46 @@ extension BluetoothViewModel: CBPeripheralDelegate {
         deviceVM.insertACC(deviceId: deviceId, timestamp: timestamp, samples: samples)
     }
 
-    private func parseGYRO(_ data: Data, deviceId: Int64, timestamp: Int64, config: Bluetooth) {
+    private func parseGYRO(_ data: Data, deviceId: Int64, timestamp: Int64, config: Bluetooth, peripheralId: UUID) {
         guard data.count >= 123 else { return }
+        let bias = gyroCalibrationMap[peripheralId]
         var samples: [(pitch: Double, roll: Double, yaw: Double)] = []
         for i in 0..<20 {
             let offset = 3 + i * 6
-            let pitch = Double(data.int16BE(at: offset))     * config.gyro_sensitivity / 1000
-            let roll  = Double(data.int16BE(at: offset + 2)) * config.gyro_sensitivity / 1000
-            let yaw   = Double(data.int16BE(at: offset + 4)) * config.gyro_sensitivity / 1000
+            let pitch = Double(data.int16BE(at: offset))     * config.gyro_sensitivity / 1000 - (bias?.biasX ?? 0)
+            let roll  = Double(data.int16BE(at: offset + 2)) * config.gyro_sensitivity / 1000 - (bias?.biasY ?? 0)
+            let yaw   = Double(data.int16BE(at: offset + 4)) * config.gyro_sensitivity / 1000 - (bias?.biasZ ?? 0)
             samples.append((pitch, roll, yaw))
         }
         deviceVM.insertGYRO(deviceId: deviceId, timestamp: timestamp, samples: samples)
+    }
+
+    private func collectCalibACC(_ data: Data, id: UUID, config: Bluetooth) {
+        guard data.count >= 123 else { return }
+        var buf = calibAccBuffers[id] ?? []
+        for i in 0..<20 {
+            let o = 3 + i * 6
+            buf.append((
+                Double(data.int16BE(at: o))     * config.acc_sensitivity,
+                Double(data.int16BE(at: o + 2)) * config.acc_sensitivity,
+                Double(data.int16BE(at: o + 4)) * config.acc_sensitivity
+            ))
+        }
+        calibAccBuffers[id] = buf
+    }
+
+    private func collectCalibGYRO(_ data: Data, id: UUID, config: Bluetooth) {
+        guard data.count >= 123 else { return }
+        var buf = calibGyroBuffers[id] ?? []
+        for i in 0..<20 {
+            let o = 3 + i * 6
+            buf.append((
+                Double(data.int16BE(at: o))     * config.gyro_sensitivity / 1000,
+                Double(data.int16BE(at: o + 2)) * config.gyro_sensitivity / 1000,
+                Double(data.int16BE(at: o + 4)) * config.gyro_sensitivity / 1000
+            ))
+        }
+        calibGyroBuffers[id] = buf
     }
 
     private func parseEXG(_ data: Data, deviceId: Int64, timestamp: Int64) {
