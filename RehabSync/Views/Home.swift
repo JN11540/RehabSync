@@ -360,11 +360,9 @@ struct BluetoothDeviceCard: View {
                     name: peripheral.name ?? "未知裝置",
                     limb: limb
                 )
-                let device = BoundDevice(
-                    id: peripheral.identifier,
-                    name: peripheral.name ?? "未知裝置",
-                    status: "已連線"
-                )
+                guard let d = deviceVM.fetch(limb: limb),
+                      let uuid = UUID(uuidString: d.device_uuid) else { return }
+                let device = BoundDevice(id: uuid, name: d.device_name, status: "已連線")
                 switch connectingFor {
                 case .thigh: thighDevice = device
                 case .calf:  calfDevice  = device
