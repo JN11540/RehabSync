@@ -231,9 +231,6 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
                         didConnect peripheral: CBPeripheral) {
         // 在 bleQueue 直接賦值，確保 discoverServices 前 config 已就緒
         bluetoothConfig = loadDefaultBluetoothConfig()
-        if let d = loadDevice(uuid: peripheral.identifier.uuidString) {
-            deviceIdMap[peripheral.identifier] = d.id
-        }
 
         peripheral.delegate = self
         peripheral.discoverServices(nil)
@@ -299,8 +296,16 @@ extension BluetoothViewModel: CBPeripheralDelegate {
                     didUpdateValueFor characteristic: CBCharacteristic,
                     error: Error?) {
         guard let config = bluetoothConfig,
-              let data = characteristic.value,
-              let deviceId = deviceIdMap[peripheral.identifier] else { return }
+              let data = characteristic.value else { return }
+
+        // 首次通知時 onConnected 已執行完畢，DB 已有裝置，lazy load device_id
+        if deviceIdMap[peripheral.identifier] == nil,
+           let d = loadDevice(uuid: peripheral.identifier.uuidString),
+           let id = d.id {
+            deviceIdMap[peripheral.identifier] = id
+        }
+
+        guard let deviceId = deviceIdMap[peripheral.identifier] else { return }
 
         let ts = Int64(Date().timeIntervalSince1970 * 1000)
         let uuid = characteristic.uuid
