@@ -121,8 +121,9 @@ func createAppDatabase() throws -> DatabaseQueue {
         }
         try db.create(table: "exg") { t in
             t.autoIncrementedPrimaryKey("id")
-            t.column("device_id",  .integer).notNull().references("device", onDelete: .cascade)
+            t.column("device_id", .integer).notNull().references("device", onDelete: .cascade)
             t.column("timestamp", .integer).notNull()
+            t.column("channel",   .integer).notNull()
             t.column("value",     .integer).notNull()
         }
     }
