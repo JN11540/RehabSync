@@ -34,9 +34,9 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     private var pendingPeripheral: CBPeripheral?
 
     private let deviceVM = DeviceViewModel()
-    private var bluetoothConfig: Bluetooth?
-    private var charMap: [UUID: [CBUUID: CBCharacteristic]] = [:]
-    private var deviceIdMap: [UUID: Int64] = [:]
+    @ObservationIgnored private var bluetoothConfig: Bluetooth?
+    @ObservationIgnored private var charMap: [UUID: [CBUUID: CBCharacteristic]] = [:]
+    @ObservationIgnored private var deviceIdMap: [UUID: Int64] = [:]
 
     override init() {
         super.init()
@@ -229,20 +229,21 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
 
     func centralManager(_ central: CBCentralManager,
                         didConnect peripheral: CBPeripheral) {
-        let config = loadDefaultBluetoothConfig()
-        let device = loadDevice(uuid: peripheral.identifier.uuidString)
+        // 在 bleQueue 直接賦值，確保 discoverServices 前 config 已就緒
+        bluetoothConfig = loadDefaultBluetoothConfig()
+        if let d = loadDevice(uuid: peripheral.identifier.uuidString) {
+            deviceIdMap[peripheral.identifier] = d.id
+        }
+
+        peripheral.delegate = self
+        peripheral.discoverServices(nil)
 
         DispatchQueue.main.async {
             self.connectionState = .connected
             self.connectedPeripherals[peripheral.identifier] = peripheral
             self.onConnected?(peripheral)
             self.pendingPeripheral = nil
-            self.bluetoothConfig = config
-            if let d = device { self.deviceIdMap[peripheral.identifier] = d.id }
         }
-
-        peripheral.delegate = self
-        peripheral.discoverServices(nil)
     }
 
     func centralManager(_ central: CBCentralManager,
@@ -291,7 +292,7 @@ extension BluetoothViewModel: CBPeripheralDelegate {
         guard let chars = service.characteristics else { return }
         var map = charMap[peripheral.identifier] ?? [:]
         for char in chars { map[char.uuid] = char }
-        DispatchQueue.main.async { self.charMap[peripheral.identifier] = map }
+        charMap[peripheral.identifier] = map
     }
 
     func peripheral(_ peripheral: CBPeripheral,
