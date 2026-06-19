@@ -30,6 +30,31 @@ class DeviceViewModel {
         }
     }
 
+    func insertACC(deviceId: Int64, timestamp: Int64, samples: [(x: Double, y: Double, z: Double)]) {
+        try? db.write { db in
+            for s in samples {
+                var row = Acc(device_id: deviceId, timestamp: timestamp, x: s.x, y: s.y, z: s.z)
+                try row.insert(db)
+            }
+        }
+    }
+
+    func insertGYRO(deviceId: Int64, timestamp: Int64, samples: [(pitch: Double, roll: Double, yaw: Double)]) {
+        try? db.write { db in
+            for s in samples {
+                var row = Gyro(device_id: deviceId, timestamp: timestamp, pitch: s.pitch, roll: s.roll, yaw: s.yaw)
+                try row.insert(db)
+            }
+        }
+    }
+
+    func insertEXG(deviceId: Int64, timestamp: Int64, value: Int) {
+        try? db.write { db in
+            var row = Exg(device_id: deviceId, timestamp: timestamp, value: value)
+            try row.insert(db)
+        }
+    }
+
     private func defaultBluetoothId() -> Int64? {
         try? db.read { db in
             try Bluetooth.filter(Column("is_default") == 1).fetchOne(db)?.id
