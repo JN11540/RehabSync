@@ -1,6 +1,7 @@
 import SwiftUI
 import GRDB
 import CoreBluetooth
+import UIKit
 
 // MARK: - TestPage
 
@@ -15,6 +16,10 @@ struct TestPage: View {
         btVM.connectedPeripherals.values.allSatisfy {
             btVM.gyroBiases[$0.identifier] != nil
         }
+    }
+
+    private var canExport: Bool {
+        btVM.recordingStartTime != nil && btVM.recordingEndTime != nil
     }
 
     var body: some View {
@@ -41,6 +46,15 @@ struct TestPage: View {
                         .foregroundStyle(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                         .disabled(!btVM.isRecording)
+
+                    Button("匯出") { exportCSV() }
+                        .font(.system(size: 15, weight: .medium))
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(canExport ? Color.blue.opacity(0.85) : Color.gray.opacity(0.3))
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .disabled(!canExport)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 24)
@@ -56,6 +70,40 @@ struct TestPage: View {
                 }
             }
             .padding(.top, 20)
+        }
+    }
+}
+
+    private func exportCSV() {
+        guard let from = btVM.recordingStartTime,
+              let to   = btVM.recordingEndTime else { return }
+
+        let dvm = DeviceViewModel()
+        let thighAcc  = dvm.fetchACC(deviceId: 0, from: from, to: to)
+        let thighGyro = dvm.fetchGYRO(deviceId: 0, from: from, to: to)
+        let calfAcc   = dvm.fetchACC(deviceId: 1, from: from, to: to)
+        let calfGyro  = dvm.fetchGYRO(deviceId: 1, from: from, to: to)
+
+        let count = min(thighAcc.count, thighGyro.count, calfAcc.count, calfGyro.count)
+        guard count > 0 else { return }
+
+        var lines = ["timestamp,thigh_ax,thigh_ay,thigh_az,thigh_pitch,thigh_roll,thigh_yaw,calf_ax,calf_ay,calf_az,calf_pitch,calf_roll,calf_yaw"]
+        for i in 0..<count {
+            let ts = thighAcc[i].timestamp
+            let ta = thighAcc[i]; let tg = thighGyro[i]
+            let ca = calfAcc[i];  let cg = calfGyro[i]
+            lines.append("\(ts),\(ta.x),\(ta.y),\(ta.z),\(tg.pitch),\(tg.roll),\(tg.yaw),\(ca.x),\(ca.y),\(ca.z),\(cg.pitch),\(cg.roll),\(cg.yaw)")
+        }
+
+        let csv = lines.joined(separator: "\n")
+        let filename = "rehabsync_\(from).csv"
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+        try? csv.write(to: url, atomically: true, encoding: .utf8)
+
+        let av = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let root  = scene.windows.first?.rootViewController {
+            root.present(av, animated: true)
         }
     }
 }
