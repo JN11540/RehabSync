@@ -26,6 +26,8 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     var connectionState: DeviceConnectionState = .idle
     var isRecording = false
     var isCleaningUp = false
+    var recordingStartTime: Int64? = nil
+    var recordingEndTime:   Int64? = nil
 
     var onConnected: ((CBPeripheral) -> Void)?
     var onDisconnected: ((UUID) -> Void)?
@@ -261,12 +263,15 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     }
 
     func startRecordingAll() {
+        recordingStartTime = Int64(Date().timeIntervalSince1970 * 1000)
+        recordingEndTime   = nil
         for peripheral in connectedPeripherals.values {
             startRecording(peripheral: peripheral)
         }
     }
 
     func stopRecordingAll() {
+        recordingEndTime = Int64(Date().timeIntervalSince1970 * 1000)
         for peripheral in connectedPeripherals.values {
             stopRecording(peripheral: peripheral)
         }

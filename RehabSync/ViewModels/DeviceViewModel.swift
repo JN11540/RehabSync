@@ -59,6 +59,28 @@ class DeviceViewModel {
         } completion: { _, _ in }
     }
 
+    func fetchACC(deviceId: Int64, from: Int64, to: Int64) -> [Acc] {
+        (try? db.read { db in
+            try Acc
+                .filter(Column("device_id") == deviceId
+                     && Column("timestamp") >= from
+                     && Column("timestamp") <= to)
+                .order(Column("id").asc)
+                .fetchAll(db)
+        }) ?? []
+    }
+
+    func fetchGYRO(deviceId: Int64, from: Int64, to: Int64) -> [Gyro] {
+        (try? db.read { db in
+            try Gyro
+                .filter(Column("device_id") == deviceId
+                     && Column("timestamp") >= from
+                     && Column("timestamp") <= to)
+                .order(Column("id").asc)
+                .fetchAll(db)
+        }) ?? []
+    }
+
     func cleanupIfNeeded(onStart: (() -> Void)? = nil, onFinish: (() -> Void)? = nil) {
         let db = DatabaseManager.shared.dbQueue
 

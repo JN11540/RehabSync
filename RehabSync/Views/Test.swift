@@ -1,6 +1,7 @@
 import SwiftUI
 import GRDB
 import CoreBluetooth
+import UIKit
 
 // MARK: - TestPage
 
@@ -15,6 +16,10 @@ struct TestPage: View {
         btVM.connectedPeripherals.values.allSatisfy {
             btVM.gyroBiases[$0.identifier] != nil
         }
+    }
+
+    private var canExport: Bool {
+        btVM.recordingStartTime != nil && btVM.recordingEndTime != nil
     }
 
     var body: some View {
@@ -41,6 +46,15 @@ struct TestPage: View {
                         .foregroundStyle(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                         .disabled(!btVM.isRecording)
+
+                    Button("匯出") { exportCSV() }
+                        .font(.system(size: 15, weight: .medium))
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(canExport ? Color.blue.opacity(0.85) : Color.gray.opacity(0.3))
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .disabled(!canExport)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 24)
@@ -58,6 +72,59 @@ struct TestPage: View {
             .padding(.top, 20)
         }
     }
+
+    private func exportCSV() {
+        guard let from = btVM.recordingStartTime,
+              let to   = btVM.recordingEndTime else { return }
+
+        let dvm = DeviceViewModel()
+        var thighAcc  = dvm.fetchACC(deviceId: 0, from: from, to: to)
+        var thighGyro = dvm.fetchGYRO(deviceId: 0, from: from, to: to)
+        var calfAcc   = dvm.fetchACC(deviceId: 1, from: from, to: to)
+        var calfGyro  = dvm.fetchGYRO(deviceId: 1, from: from, to: to)
+
+        guard !thighAcc.isEmpty, !thighGyro.isEmpty,
+              !calfAcc.isEmpty,  !calfGyro.isEmpty else { return }
+
+        let windowStart = max(thighAcc.first!.timestamp, thighGyro.first!.timestamp,
+                              calfAcc.first!.timestamp,  calfGyro.first!.timestamp)
+        let windowEnd   = min(thighAcc.last!.timestamp,  thighGyro.last!.timestamp,
+                              calfAcc.last!.timestamp,   calfGyro.last!.timestamp)
+
+        guard windowStart <= windowEnd else { return }
+
+        thighAcc  = thighAcc.filter  { $0.timestamp >= windowStart && $0.timestamp <= windowEnd }
+        thighGyro = thighGyro.filter { $0.timestamp >= windowStart && $0.timestamp <= windowEnd }
+        calfAcc   = calfAcc.filter   { $0.timestamp >= windowStart && $0.timestamp <= windowEnd }
+        calfGyro  = calfGyro.filter  { $0.timestamp >= windowStart && $0.timestamp <= windowEnd }
+
+        let count = min(thighAcc.count, thighGyro.count, calfAcc.count, calfGyro.count)
+        guard count > 0 else { return }
+
+        var lines = ["timestamp,thigh_ax,thigh_ay,thigh_az,thigh_pitch,thigh_roll,thigh_yaw,calf_ax,calf_ay,calf_az,calf_pitch,calf_roll,calf_yaw"]
+        for i in 0..<count {
+            let ts = thighAcc[i].timestamp
+            let ta = thighAcc[i]; let tg = thighGyro[i]
+            let ca = calfAcc[i];  let cg = calfGyro[i]
+            lines.append("\(ts),\(ta.x),\(ta.y),\(ta.z),\(tg.pitch),\(tg.roll),\(tg.yaw),\(ca.x),\(ca.y),\(ca.z),\(cg.pitch),\(cg.roll),\(cg.yaw)")
+        }
+
+        let csv = lines.joined(separator: "\n")
+        let filename = "rehabsync_\(from).csv"
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+        try? csv.write(to: url, atomically: true, encoding: .utf8)
+
+        let av = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let root  = scene.windows.first?.rootViewController {
+            if let popover = av.popoverPresentationController {
+                popover.sourceView = root.view
+                popover.sourceRect = CGRect(x: root.view.bounds.midX, y: root.view.bounds.midY, width: 0, height: 0)
+                popover.permittedArrowDirections = []
+            }
+            root.present(av, animated: true)
+        }
+    }
 }
 
 // MARK: - DeviceTestCard
@@ -68,12 +135,8 @@ struct DeviceTestCard: View {
     let label: String
 
     @State private var device: Device? = nil
-    @State private var accRows:    [Acc]  = []
-    @State private var gyroRows:   [Gyro] = []
-    @State private var exgCh0Rows: [Exg]  = []
-    @State private var exgCh1Rows: [Exg]  = []
-    @State private var accObs:    AnyDatabaseCancellable? = nil
-    @State private var gyroObs:   AnyDatabaseCancellable? = nil
+    @State private var exgCh0Rows: [Exg] = []
+    @State private var exgCh1Rows: [Exg] = []
     @State private var exgCh0Obs: AnyDatabaseCancellable? = nil
     @State private var exgCh1Obs: AnyDatabaseCancellable? = nil
 
@@ -136,34 +199,6 @@ struct DeviceTestCard: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    // ACC
-                    SensorSection(title: "ACC") {
-                        if let r = accRows.first {
-                            Text("X: \(r.x, specifier: "%.3f")  Y: \(r.y, specifier: "%.3f")  Z: \(r.z, specifier: "%.3f") mg")
-                                .font(.system(size: 15, weight: .semibold, design: .monospaced))
-                                .foregroundStyle(.cyan)
-                        }
-                        ForEach(accRows) { r in
-                            Text("\(r.timestamp)  \(r.x, specifier: "%.2f")  \(r.y, specifier: "%.2f")  \(r.z, specifier: "%.2f")")
-                                .font(.system(size: 12, design: .monospaced))
-                                .foregroundStyle(.white.opacity(0.55))
-                        }
-                    }
-
-                    // GYRO
-                    SensorSection(title: "GYRO") {
-                        if let r = gyroRows.first {
-                            Text("P: \(r.pitch, specifier: "%.3f")  R: \(r.roll, specifier: "%.3f")  Y: \(r.yaw, specifier: "%.3f") dps")
-                                .font(.system(size: 15, weight: .semibold, design: .monospaced))
-                                .foregroundStyle(.cyan)
-                        }
-                        ForEach(gyroRows) { r in
-                            Text("\(r.timestamp)  \(r.pitch, specifier: "%.2f")  \(r.roll, specifier: "%.2f")  \(r.yaw, specifier: "%.2f")")
-                                .font(.system(size: 12, design: .monospaced))
-                                .foregroundStyle(.white.opacity(0.55))
-                        }
-                    }
-
                     // EXG Channel 0
                     SensorSection(title: "EXG CH0") {
                         if let r = exgCh0Rows.first {
@@ -206,16 +241,6 @@ struct DeviceTestCard: View {
         guard let deviceId = device?.id else { return }
         let db = DatabaseManager.shared.dbQueue
 
-        accObs = ValueObservation.tracking {
-            try Acc.filter(Column("device_id") == deviceId)
-                .order(Column("id").desc).limit(20).fetchAll($0)
-        }.start(in: db, onError: { _ in }, onChange: { accRows = $0 })
-
-        gyroObs = ValueObservation.tracking {
-            try Gyro.filter(Column("device_id") == deviceId)
-                .order(Column("id").desc).limit(20).fetchAll($0)
-        }.start(in: db, onError: { _ in }, onChange: { gyroRows = $0 })
-
         exgCh0Obs = ValueObservation.tracking {
             try Exg.filter(Column("device_id") == deviceId && Column("channel") == 0)
                 .order(Column("id").desc).limit(20).fetchAll($0)
@@ -228,8 +253,6 @@ struct DeviceTestCard: View {
     }
 
     private func stopObserving() {
-        accObs    = nil
-        gyroObs   = nil
         exgCh0Obs = nil
         exgCh1Obs = nil
     }
