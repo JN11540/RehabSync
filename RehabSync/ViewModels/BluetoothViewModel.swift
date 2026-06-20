@@ -25,6 +25,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     var isScanning = false
     var connectionState: DeviceConnectionState = .idle
     var isRecording = false
+    var isCleaningUp = false
 
     var onConnected: ((CBPeripheral) -> Void)?
     var onDisconnected: ((UUID) -> Void)?
@@ -269,6 +270,10 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         for peripheral in connectedPeripherals.values {
             stopRecording(peripheral: peripheral)
         }
+        deviceVM.cleanupIfNeeded(
+            onStart:  { self.isCleaningUp = true },
+            onFinish: { self.isCleaningUp = false }
+        )
     }
 
     // MARK: - DB Helpers
