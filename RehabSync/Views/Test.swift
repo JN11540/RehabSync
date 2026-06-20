@@ -72,7 +72,6 @@ struct TestPage: View {
             .padding(.top, 20)
         }
     }
-}
 
     private func exportCSV() {
         guard let from = btVM.recordingStartTime,
