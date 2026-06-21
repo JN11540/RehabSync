@@ -21,13 +21,21 @@ struct TreatmentView: View {
         let todayItems = contentVM.contents.filter {
             Self.cal.isDateInToday(Date(timeIntervalSince1970: TimeInterval($0.date)))
         }
-        // 使用者有明確選取今日動作
+        let completed = Set(resultVM.results.map { $0.treatment_content_id })
         if let uid = selectionState.userSelectedContentId,
            todayItems.contains(where: { $0.id == uid }) {
-            return uid
+            let isNowCompleted = completed.contains(Int(uid))
+            if !isNowCompleted || selectionState.selectedWasCompletedWhenChosen {
+                return uid
+            }
+            // 選取的動作完成後 → 自動跳今日下一個未完成
+            if let next = todayItems.first(where: { !completed.contains(Int($0.id ?? -1)) }) {
+                return next.id
+            }
+            // 今日全部做完 → 跳回第一個
+            return todayItems.first?.id
         }
         // 預設：第一個未完成
-        let completed = Set(resultVM.results.map { $0.treatment_content_id })
         if let first = todayItems.first(where: { !completed.contains(Int($0.id ?? -1)) }) {
             return first.id
         }
@@ -84,6 +92,8 @@ struct TreatmentView: View {
                                     .onTapGesture {
                                         if todayGroup {
                                             selectionState.userSelectedContentId = item.content.id
+                                            // 記錄點選時該動作是否已完成（用於判斷重做意圖）
+                                            selectionState.selectedWasCompletedWhenChosen = isDone
                                         }
                                     }
                                 }
