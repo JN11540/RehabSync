@@ -12,12 +12,6 @@ struct TestPage: View {
         !btVM.connectedPeripherals.isEmpty
     }
 
-    private var allCalibrated: Bool {
-        btVM.connectedPeripherals.values.allSatisfy {
-            btVM.gyroBiases[$0.identifier] != nil
-        }
-    }
-
     private var canExport: Bool {
         btVM.recordingStartTime != nil && btVM.recordingEndTime != nil
     }
@@ -32,11 +26,11 @@ struct TestPage: View {
                         .font(.system(size: 15, weight: .medium))
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
-                        .background(anyConnected && !btVM.isRecording && allCalibrated
+                        .background(anyConnected && !btVM.isRecording
                             ? Color.green.opacity(0.85) : Color.gray.opacity(0.3))
                         .foregroundStyle(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .disabled(!anyConnected || btVM.isRecording || !allCalibrated)
+                        .disabled(!anyConnected || btVM.isRecording)
 
                     Button("停止收集") { btVM.stopRecordingAll() }
                         .font(.system(size: 15, weight: .medium))
@@ -165,35 +159,6 @@ struct DeviceTestCard: View {
                     .foregroundStyle(.white.opacity(0.7))
             }
             .padding(.bottom, 10)
-
-            // 校正列
-            HStack(spacing: 12) {
-                let pid          = peripheral?.identifier ?? UUID()
-                let isCalibrating = btVM.calibratingUUIDs.contains(pid)
-                let isCalibrated  = btVM.gyroBiases[pid] != nil
-
-                Button(isCalibrating ? "校正中..." : (isCalibrated ? "重新校正" : "校正")) {
-                    if let p = peripheral { btVM.startCalibration(peripheral: p) }
-                }
-                .font(.system(size: 14, weight: .medium))
-                .padding(.horizontal, 14)
-                .padding(.vertical, 7)
-                .background(isCalibrated ? Color.cyan.opacity(0.7) : Color.orange.opacity(0.75))
-                .foregroundStyle(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .disabled(peripheral == nil || isCalibrating || btVM.isRecording)
-
-                if isCalibrated {
-                    Text("✓ 已校正")
-                        .font(.system(size: 13, design: .monospaced))
-                        .foregroundStyle(.cyan)
-                } else if !isCalibrating && peripheral != nil {
-                    Text("請先校正再收集")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.orange.opacity(0.8))
-                }
-            }
-            .padding(.bottom, 12)
 
             Divider().background(.white.opacity(0.3)).padding(.bottom, 14)
 
