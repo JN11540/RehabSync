@@ -207,7 +207,7 @@ struct TreatmentPlanCard: View {
             Text("開始")
             Image(systemName: "arrow.up.right")
         }
-        .font(.system(size: 25, weight: .medium))
+        .font(.system(size: 18, weight: .medium))
         .padding(.horizontal, 18)
         .padding(.vertical, 10)
         .background(.white)
@@ -245,10 +245,10 @@ struct TreatmentPlanCard: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("治療計畫名稱：\(treatment.name)")
-                    .font(.system(size: 25, weight: .semibold))
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
                 Text("治療計畫日期：\(startDate) ~ \(endDate)")
-                    .font(.system(size: 25, weight: .semibold))
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
             }
 
@@ -274,7 +274,7 @@ struct TreatmentPlanCard: View {
                 }
                 NavigationLink(value: treatment) {
                     Text("動作列表")
-                        .font(.system(size: 25, weight: .medium))
+                        .font(.system(size: 18, weight: .medium))
                         .padding(.horizontal, 18)
                         .padding(.vertical, 10)
                         .background(.white)
@@ -287,7 +287,7 @@ struct TreatmentPlanCard: View {
                     .tint(Color(red: 0.15, green: 0.6, blue: 0.55))
                     .frame(width: 100)
                 Text("\(Int(progress * 100))%")
-                    .font(.system(size: 16, weight: .medium))
+                    .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(Color(red: 0.15, green: 0.6, blue: 0.55))
             }
         }
