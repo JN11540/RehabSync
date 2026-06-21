@@ -230,7 +230,7 @@ struct TreatmentPlanCard: View {
                         showCompletedAlert = true
                     } label: {
                         HStack(spacing: 6) {
-                            Text("Start")
+                            Text("開始")
                             Image(systemName: "arrow.up.right")
                         }
                         .font(.system(size: 16, weight: .medium))
@@ -249,7 +249,7 @@ struct TreatmentPlanCard: View {
                 } else if let content = activeContent {
                     NavigationLink(value: content) {
                         HStack(spacing: 6) {
-                            Text("Start")
+                            Text("開始")
                             Image(systemName: "arrow.up.right")
                         }
                         .font(.system(size: 16, weight: .medium))
