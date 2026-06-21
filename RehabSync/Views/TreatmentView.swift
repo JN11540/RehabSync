@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TreatmentView: View {
     let treatment: Treatment
+    @Environment(TreatmentSelectionState.self) private var selectionState
     @State private var contentVM = TreatmentContentViewModel()
     @State private var exerciseVM = ExerciseViewModel()
     @State private var resultVM = TreatmentResultViewModel()
@@ -10,11 +11,10 @@ struct TreatmentView: View {
         Set(resultVM.results.map { $0.treatment_content_id })
     }
 
-    private var activeContentId: Int64? {
-        contentVM.contents
-            .filter { !completedContentIds.contains(Int($0.id ?? -1)) }
-            .min(by: { ($0.id ?? .max) < ($1.id ?? .max) })?
-            .id
+    private static let cal = Calendar.current
+
+    private func isToday(_ date: Date) -> Bool {
+        Self.cal.isDateInToday(date)
     }
 
     private var groupedByDate: [(day: Date, items: [(idx: Int, content: TreatmentContent)])] {
@@ -48,16 +48,26 @@ struct TreatmentView: View {
                                     .padding(.leading, 2)
 
                                 ForEach(group.items, id: \.idx) { item in
+                                    let isDone = completedContentIds.contains(Int(item.content.id ?? -1))
+                                    let todayGroup = isToday(group.day)
                                     let status: DayStatus =
-                                        completedContentIds.contains(Int(item.content.id ?? -1)) ? .done :
-                                        item.content.id == activeContentId ? .active :
+                                        isDone ? .done :
+                                        todayGroup ? .active :
                                         .upcoming
+                                    let isSelected = todayGroup && !isDone &&
+                                        selectionState.selectedContentId == item.content.id
                                     TreatmentSessionRow(
                                         exerciseName: exerciseName(for: item.content.exercise_id),
                                         content: item.content,
                                         exercise: exercise(for: item.content.exercise_id),
-                                        status: status
+                                        status: status,
+                                        isSelected: isSelected
                                     )
+                                    .onTapGesture {
+                                        if todayGroup && !isDone {
+                                            selectionState.selectedContentId = item.content.id
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -71,6 +81,15 @@ struct TreatmentView: View {
             contentVM.fetchAll(for: Int(treatment.id ?? 0))
             exerciseVM.fetchAll()
             resultVM.fetchAll(for: Int(treatment.id ?? 0))
+            // 若尚未選取，預設選今日第一個未完成動作
+            if selectionState.selectedContentId == nil {
+                let completed = Set(resultVM.results.map { $0.treatment_content_id })
+                let first = contentVM.contents.first {
+                    Self.cal.isDateInToday(Date(timeIntervalSince1970: TimeInterval($0.date))) &&
+                    !completed.contains(Int($0.id ?? -1))
+                }
+                selectionState.selectedContentId = first?.id
+            }
         }
     }
 
@@ -90,6 +109,7 @@ struct TreatmentSessionRow: View {
     let content: TreatmentContent
     let exercise: Exercise?
     let status: DayStatus
+    var isSelected: Bool = false
 
     private var subtitleLabel: String {
         "\(content.sets) 組 · \(content.reps) 次"
@@ -124,8 +144,13 @@ struct TreatmentSessionRow: View {
             DayStatusBadge(status: status)
         }
         .padding(14)
-        .background(.white)
+        .background(isSelected ? Color(red: 0.15, green: 0.6, blue: 0.55).opacity(0.08) : .white)
         .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color(red: 0.15, green: 0.6, blue: 0.55), lineWidth: 2)
+                .opacity(isSelected ? 1 : 0)
+        )
         .shadow(color: .black.opacity(0.04), radius: 3, y: 1)
     }
 }

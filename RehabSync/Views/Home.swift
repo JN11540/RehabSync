@@ -1,6 +1,13 @@
 import SwiftUI
 import CoreBluetooth
 
+// MARK: - Treatment Selection State
+
+@Observable
+final class TreatmentSelectionState {
+    var selectedContentId: Int64? = nil
+}
+
 // MARK: - goHome Environment Key
 
 private struct GoHomeKey: EnvironmentKey {
@@ -54,6 +61,7 @@ struct Home: View {
 struct HomeContent: View {
     @State private var vm = TreatmentViewModel()
     @State private var navPath = NavigationPath()
+    @State private var selectionState = TreatmentSelectionState()
 
     var body: some View {
         NavigationStack(path: $navPath) {
@@ -98,6 +106,7 @@ struct HomeContent: View {
                 TreatmentView(treatment: treatment)
             }
         }
+        .environment(selectionState)
         .environment(\.goHome, { navPath = NavigationPath() })
     }
 }
@@ -168,6 +177,7 @@ struct TreatmentPlanSection: View {
 struct TreatmentPlanCard: View {
     let treatment: Treatment
     @Environment(BluetoothViewModel.self) private var btVM
+    @Environment(TreatmentSelectionState.self) private var selectionState
     @State private var contentVM = TreatmentContentViewModel()
     @State private var resultVM = TreatmentResultViewModel()
     @State private var showCompletedAlert = false
@@ -187,9 +197,21 @@ struct TreatmentPlanCard: View {
         contentVM.contents.allSatisfy { completedContentIds.contains(Int($0.id ?? -1)) }
     }
 
+    private var todayNonCompleted: [TreatmentContent] {
+        let today = Calendar.current.startOfDay(for: Date())
+        return contentVM.contents.filter {
+            Calendar.current.startOfDay(for: Date(timeIntervalSince1970: TimeInterval($0.date))) == today &&
+            !completedContentIds.contains(Int($0.id ?? -1))
+        }
+    }
+
     private var activeContent: TreatmentContent? {
-        contentVM.contents
-            .first { !completedContentIds.contains(Int($0.id ?? -1)) }
+        if let sid = selectionState.selectedContentId,
+           let selected = todayNonCompleted.first(where: { $0.id == sid }) {
+            return selected
+        }
+        return todayNonCompleted.first
+            ?? contentVM.contents.first { !completedContentIds.contains(Int($0.id ?? -1)) }
     }
 
     private var bothDevicesConnected: Bool {
