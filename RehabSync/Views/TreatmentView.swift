@@ -38,8 +38,12 @@ struct TreatmentView: View {
                             VStack(alignment: .leading, spacing: 10) {
                                 let cal = Calendar.current
                                 let d = group.day
-                                Text("\(cal.component(.year, from: d))年\(cal.component(.month, from: d))月\(cal.component(.day, from: d))日")
-                                    .font(.system(size: 30, weight: .semibold))
+                                let dateStr = String(format: "%d年%d月%d日",
+                                    cal.component(.year, from: d),
+                                    cal.component(.month, from: d),
+                                    cal.component(.day, from: d))
+                                Text(dateStr)
+                                    .font(.system(size: 25, weight: .semibold))
                                     .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
                                     .padding(.leading, 2)
 
@@ -100,7 +104,7 @@ struct TreatmentSessionRow: View {
                         : Color(red: 0.90, green: 0.97, blue: 0.95))
                     .frame(width: 48, height: 48)
                 Image(systemName: "figure.run")
-                    .font(.system(size: 20))
+                    .font(.system(size: 22))
                     .foregroundStyle(status == .done
                         ? Color(red: 0.18, green: 0.65, blue: 0.42)
                         : Color(red: 0.15, green: 0.55, blue: 0.50))
@@ -108,10 +112,10 @@ struct TreatmentSessionRow: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(exerciseName)
-                    .font(.system(size: 25, weight: .semibold))
+                    .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
                 Text(subtitleLabel)
-                    .font(.system(size: 25))
+                    .font(.system(size: 22))
                     .foregroundStyle(.secondary)
             }
 
@@ -135,14 +139,14 @@ struct DayStatusBadge: View {
         switch status {
         case .done:
             Text("完成")
-                .font(.system(size: 16, weight: .medium))
+                .font(.system(size: 22, weight: .medium))
                 .foregroundStyle(Color(red: 0.18, green: 0.65, blue: 0.42))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 5)
                 .overlay(Capsule().stroke(Color(red: 0.18, green: 0.65, blue: 0.42), lineWidth: 1.5))
         case .active:
             Text("進行中")
-                .font(.system(size: 16, weight: .medium))
+                .font(.system(size: 22, weight: .medium))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 5)
@@ -150,7 +154,7 @@ struct DayStatusBadge: View {
                 .clipShape(Capsule())
         case .upcoming:
             Text("即將進行")
-                .font(.system(size: 16, weight: .medium))
+                .font(.system(size: 22, weight: .medium))
                 .foregroundStyle(Color(red: 0.38, green: 0.38, blue: 0.70))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 5)
