@@ -310,6 +310,7 @@ struct BluetoothDeviceCard: View {
     @State private var connectingFor: LimbSlot = .thigh
     @State private var thighDevice: BoundDevice? = nil
     @State private var calfDevice: BoundDevice? = nil
+    @State private var freshlyConnectedPeripheral: CBPeripheral? = nil
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -323,6 +324,26 @@ struct BluetoothDeviceCard: View {
                     Text("藍芽與裝置")
                         .font(.system(size: 22, weight: .semibold))
                         .foregroundStyle(.white)
+                    Spacer()
+                    if thighDevice != nil || calfDevice != nil {
+                        Button {
+                            if let d = thighDevice {
+                                deviceVM.delete(uuid: d.id.uuidString)
+                                btVM.disconnect(id: d.id)
+                                thighDevice = nil
+                            }
+                            if let d = calfDevice {
+                                deviceVM.delete(uuid: d.id.uuidString)
+                                btVM.disconnect(id: d.id)
+                                calfDevice = nil
+                            }
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 22))
+                                .foregroundStyle(.white.opacity(0.5))
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
 
                 // 大腿裝置
@@ -334,13 +355,6 @@ struct BluetoothDeviceCard: View {
                         connectingFor = .thigh
                         btVM.startScan()
                         showSheet = true
-                    },
-                    onRemove: {
-                        if let d = thighDevice {
-                            deviceVM.delete(uuid: d.id.uuidString)
-                            btVM.disconnect(id: d.id)
-                            thighDevice = nil
-                        }
                     }
                 )
 
@@ -349,17 +363,11 @@ struct BluetoothDeviceCard: View {
                     label: "小腿裝置",
                     device: calfDevice,
                     isConnected: calfDevice.map { btVM.connectedPeripherals[$0.id] != nil } ?? false,
+                    addDisabled: thighDevice == nil,
                     onAdd: {
                         connectingFor = .calf
                         btVM.startScan()
                         showSheet = true
-                    },
-                    onRemove: {
-                        if let d = calfDevice {
-                            deviceVM.delete(uuid: d.id.uuidString)
-                            btVM.disconnect(id: d.id)
-                            calfDevice = nil
-                        }
                     }
                 )
             }
@@ -390,14 +398,29 @@ struct BluetoothDeviceCard: View {
                 case .thigh: thighDevice = device
                 case .calf:  calfDevice  = device
                 }
-                showSheet = false
+                freshlyConnectedPeripheral = peripheral
             }
             btVM.onDisconnected = { _ in }
         }
-        .sheet(isPresented: $showSheet, onDismiss: { btVM.stopScan() }) {
-            AddDeviceSheet(vm: btVM)
-                .presentationDetents([.fraction(0.75)])
-                .presentationCornerRadius(16)
+        .sheet(isPresented: $showSheet, onDismiss: {
+            btVM.stopScan()
+            freshlyConnectedPeripheral = nil
+        }) {
+            AddDeviceSheet(
+                vm: btVM,
+                connectedPeripheral: $freshlyConnectedPeripheral,
+                onCalibrationFailed: { peripheral in
+                    deviceVM.delete(uuid: peripheral.identifier.uuidString)
+                    btVM.disconnect(id: peripheral.identifier)
+                    switch connectingFor {
+                    case .thigh: thighDevice = nil
+                    case .calf:  calfDevice  = nil
+                    }
+                }
+            )
+            .presentationDetents([.fraction(0.75)])
+            .presentationCornerRadius(16)
+            .interactiveDismissDisabled(freshlyConnectedPeripheral != nil)
         }
     }
 }
@@ -406,8 +429,8 @@ struct LimbSlotRow: View {
     let label: String
     let device: BoundDevice?
     let isConnected: Bool
+    var addDisabled: Bool = false
     let onAdd: () -> Void
-    let onRemove: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -416,9 +439,11 @@ struct LimbSlotRow: View {
                 .foregroundStyle(.white.opacity(0.6))
 
             if let device {
-                BoundDeviceRow(device: device, isConnected: isConnected, onRemove: onRemove)
+                BoundDeviceRow(device: device, isConnected: isConnected)
             } else {
                 AddDeviceTile(action: onAdd)
+                    .disabled(addDisabled)
+                    .opacity(addDisabled ? 0.35 : 1)
             }
         }
     }
@@ -427,7 +452,6 @@ struct LimbSlotRow: View {
 struct BoundDeviceRow: View {
     let device: BoundDevice
     let isConnected: Bool
-    let onRemove: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
@@ -452,12 +476,6 @@ struct BoundDeviceRow: View {
                 }
             }
             Spacer()
-            Button(action: onRemove) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 20))
-                    .foregroundStyle(.white.opacity(0.5))
-            }
-            .buttonStyle(.plain)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
@@ -498,9 +516,27 @@ struct AddDeviceTile: View {
 
 struct AddDeviceSheet: View {
     let vm: BluetoothViewModel
+    @Binding var connectedPeripheral: CBPeripheral?
+    let onCalibrationFailed: (CBPeripheral) -> Void
     @Environment(\.dismiss) private var dismiss
 
+    @State private var calibrationPhase: CalibrationPhase = .idle
+    @State private var countdown: Int = 5
+
+    enum CalibrationPhase { case idle, ready, calibrating, success, failed }
+
     var body: some View {
+        if let peripheral = connectedPeripheral {
+            calibrationView(peripheral: peripheral)
+        } else {
+            scanningView()
+        }
+    }
+
+    // MARK: Scanning
+
+    @ViewBuilder
+    private func scanningView() -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("新增裝置")
                 .font(.system(size: 22, weight: .semibold))
@@ -585,9 +621,145 @@ struct AddDeviceSheet: View {
                     vm.cancelPendingConnection()
                     dismiss()
                 }
-                    .font(.system(size: 18))
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 14)
+                .font(.system(size: 18))
+                .padding(.horizontal, 24)
+                .padding(.vertical, 14)
+            }
+        }
+    }
+
+    // MARK: Calibration
+
+    @ViewBuilder
+    private func calibrationView(peripheral: CBPeripheral) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("裝置校正")
+                .font(.system(size: 22, weight: .semibold))
+                .padding(.horizontal, 24)
+                .padding(.top, 28)
+
+            Divider().padding(.vertical, 16)
+
+            Spacer()
+
+            VStack(spacing: 24) {
+                switch calibrationPhase {
+                case .idle:
+                    // 裝置平放桌上示意圖
+                    VStack(spacing: 6) {
+                        Image(systemName: "iphone.landscape")
+                            .font(.system(size: 64))
+                            .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Color.secondary.opacity(0.4))
+                            .frame(width: 140, height: 4)
+                    }
+                    VStack(spacing: 10) {
+                        Text("裝置配對成功")
+                            .font(.system(size: 18, weight: .semibold))
+                        Text("請將裝置放置於桌上平放，不要移動，再點擊「確定」。")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    Button("確定") {
+                        calibrationPhase = .ready
+                    }
+                    .font(.system(size: 18, weight: .medium))
+                    .padding(.horizontal, 36)
+                    .padding(.vertical, 13)
+                    .background(Color(red: 0.1, green: 0.25, blue: 0.4))
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                case .ready:
+                    Image(systemName: "gyroscope")
+                        .font(.system(size: 56))
+                        .foregroundStyle(.orange)
+                    VStack(spacing: 10) {
+                        Text("準備校正")
+                            .font(.system(size: 18, weight: .semibold))
+                        Text("裝置保持靜止，點擊「校正」開始 5 秒感測器校正。")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    Button("校正") {
+                        beginCalibration(peripheral: peripheral)
+                    }
+                    .font(.system(size: 18, weight: .medium))
+                    .padding(.horizontal, 36)
+                    .padding(.vertical, 13)
+                    .background(Color.orange)
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                case .calibrating:
+                    ZStack {
+                        Circle()
+                            .stroke(Color.gray.opacity(0.2), lineWidth: 6)
+                            .frame(width: 90, height: 90)
+                        Text("\(countdown)")
+                            .font(.system(size: 40, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
+                    }
+                    Text("校正中，請勿移動裝置…")
+                        .font(.system(size: 16))
+                        .foregroundStyle(.secondary)
+
+                case .success:
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 64))
+                        .foregroundStyle(.green)
+                    Text("校正成功！")
+                        .font(.system(size: 20, weight: .semibold))
+
+                case .failed:
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 64))
+                        .foregroundStyle(.red)
+                    Text("校正失敗，已取消裝置綁定")
+                        .font(.system(size: 18))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 32)
+
+            Spacer()
+        }
+        .onChange(of: vm.calibratingUUIDs) { _, newSet in
+            guard calibrationPhase == .calibrating,
+                  !newSet.contains(peripheral.identifier) else { return }
+            finishCalibration(peripheral: peripheral)
+        }
+    }
+
+    private func beginCalibration(peripheral: CBPeripheral) {
+        calibrationPhase = .calibrating
+        countdown = 5
+        vm.startCalibration(peripheral: peripheral)
+        Task {
+            for i in stride(from: 5, through: 0, by: -1) {
+                countdown = i
+                if i > 0 { try? await Task.sleep(for: .seconds(1)) }
+            }
+        }
+    }
+
+    private func finishCalibration(peripheral: CBPeripheral) {
+        if vm.gyroBiases[peripheral.identifier] != nil {
+            calibrationPhase = .success
+            Task {
+                try? await Task.sleep(for: .seconds(1.5))
+                dismiss()
+            }
+        } else {
+            calibrationPhase = .failed
+            onCalibrationFailed(peripheral)
+            Task {
+                try? await Task.sleep(for: .seconds(2))
+                dismiss()
             }
         }
     }
