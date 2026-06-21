@@ -46,52 +46,67 @@ struct TreatmentView: View {
         }
     }
 
+    private var scrollTargetDay: Date? {
+        let today = Calendar.current.startOfDay(for: Date())
+        if groupedByDate.contains(where: { $0.day == today }) { return today }
+        return groupedByDate.first(where: { $0.day > today })?.day
+    }
+
     var body: some View {
         ZStack {
             Color(red: 0.96, green: 0.94, blue: 0.91).ignoresSafeArea()
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    VStack(alignment: .leading, spacing: 20) {
-                        ForEach(groupedByDate, id: \.day) { group in
-                            VStack(alignment: .leading, spacing: 10) {
-                                let cal = Calendar.current
-                                let d = group.day
-                                let dateStr = String(format: "%d年%d月%d日",
-                                    cal.component(.year, from: d),
-                                    cal.component(.month, from: d),
-                                    cal.component(.day, from: d))
-                                Text(dateStr)
-                                    .font(.system(size: 25, weight: .semibold))
-                                    .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
-                                    .padding(.leading, 2)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        VStack(alignment: .leading, spacing: 20) {
+                            ForEach(groupedByDate, id: \.day) { group in
+                                VStack(alignment: .leading, spacing: 10) {
+                                    let cal = Calendar.current
+                                    let d = group.day
+                                    let dateStr = String(format: "%d年%d月%d日",
+                                        cal.component(.year, from: d),
+                                        cal.component(.month, from: d),
+                                        cal.component(.day, from: d))
+                                    Text(dateStr)
+                                        .font(.system(size: 25, weight: .semibold))
+                                        .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
+                                        .padding(.leading, 2)
 
-                                ForEach(group.items, id: \.idx) { item in
-                                    let isDone = completedContentIds.contains(Int(item.content.id ?? -1))
-                                    let todayGroup = isToday(group.day)
-                                    let status: DayStatus =
-                                        isDone ? .done :
-                                        todayGroup ? .active :
-                                        .upcoming
-                                    let isSelected = todayGroup &&
-                                        item.content.id == todayEffectiveSelectedId
-                                    TreatmentSessionRow(
-                                        exerciseName: exerciseName(for: item.content.exercise_id),
-                                        content: item.content,
-                                        exercise: exercise(for: item.content.exercise_id),
-                                        status: status,
-                                        isSelected: isSelected
-                                    )
-                                    .onTapGesture {
-                                        if todayGroup {
-                                            selectionState.userSelectedContentId = item.content.id
+                                    ForEach(group.items, id: \.idx) { item in
+                                        let isDone = completedContentIds.contains(Int(item.content.id ?? -1))
+                                        let todayGroup = isToday(group.day)
+                                        let status: DayStatus =
+                                            isDone ? .done :
+                                            todayGroup ? .active :
+                                            .upcoming
+                                        let isSelected = todayGroup &&
+                                            item.content.id == todayEffectiveSelectedId
+                                        TreatmentSessionRow(
+                                            exerciseName: exerciseName(for: item.content.exercise_id),
+                                            content: item.content,
+                                            exercise: exercise(for: item.content.exercise_id),
+                                            status: status,
+                                            isSelected: isSelected
+                                        )
+                                        .onTapGesture {
+                                            if todayGroup {
+                                                selectionState.userSelectedContentId = item.content.id
+                                            }
                                         }
                                     }
                                 }
+                                .id(group.day)
                             }
                         }
                     }
+                    .padding(24)
                 }
-                .padding(24)
+                .onChange(of: contentVM.contents) { _, _ in
+                    guard let target = scrollTargetDay else { return }
+                    DispatchQueue.main.async {
+                        proxy.scrollTo(target, anchor: .top)
+                    }
+                }
             }
         }
         .navigationBarTitleDisplayMode(.inline)
