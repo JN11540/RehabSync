@@ -75,9 +75,11 @@ struct TreatmentView: View {
                                     ForEach(group.items, id: \.idx) { item in
                                         let isDone = completedContentIds.contains(Int(item.content.id ?? -1))
                                         let todayGroup = isToday(group.day)
+                                        let isPast = group.day < Calendar.current.startOfDay(for: Date())
                                         let status: DayStatus =
                                             isDone ? .done :
                                             todayGroup ? .active :
+                                            isPast ? .missed :
                                             .upcoming
                                         let isSelected = todayGroup &&
                                             item.content.id == todayEffectiveSelectedId
@@ -209,6 +211,13 @@ struct DayStatusBadge: View {
                 .padding(.vertical, 5)
                 .background(Color(red: 0.92, green: 0.92, blue: 0.98))
                 .clipShape(Capsule())
+        case .missed:
+            Text("未完成")
+                .font(.system(size: 22, weight: .medium))
+                .foregroundStyle(Color(red: 0.75, green: 0.3, blue: 0.25))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 5)
+                .overlay(Capsule().stroke(Color(red: 0.75, green: 0.3, blue: 0.25), lineWidth: 1.5))
         }
     }
 }
@@ -216,5 +225,5 @@ struct DayStatusBadge: View {
 // MARK: - Day Status
 
 enum DayStatus {
-    case done, active, upcoming
+    case done, active, upcoming, missed
 }
