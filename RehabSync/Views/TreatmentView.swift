@@ -92,7 +92,7 @@ struct TreatmentSessionRow: View {
     let status: DayStatus
 
     private var subtitleLabel: String {
-        "\(content.sets) 組 · \(content.sets * content.reps) 次"
+        "\(content.sets) 組 · \(content.reps) 次"
     }
 
     var body: some View {
