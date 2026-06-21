@@ -6,8 +6,6 @@ import CoreBluetooth
 @Observable
 final class TreatmentSelectionState {
     var userSelectedContentId: Int64? = nil
-    // 點選時該動作是否已完成（true = 重做意圖，不自動跳下一個）
-    var selectedWasCompletedWhenChosen: Bool = false
 }
 
 // MARK: - goHome Environment Key
@@ -207,25 +205,17 @@ struct TreatmentPlanCard: View {
     }
 
     private var activeContent: TreatmentContent? {
+        // 使用者選取且尚未完成 → 尊重選取
         if let uid = selectionState.userSelectedContentId,
-           let selected = todayContents.first(where: { $0.id == uid }) {
-            let isNowCompleted = completedContentIds.contains(Int(uid))
-            if !isNowCompleted || selectionState.selectedWasCompletedWhenChosen {
-                // 未完成，或使用者明確點選已完成動作（重做）
-                return selected
-            }
-            // 選取的動作訓練完成後 → 自動跳今日下一個未完成
-            if let next = todayContents.first(where: { !completedContentIds.contains(Int($0.id ?? -1)) }) {
-                return next
-            }
-            // 今日全部做完 → 跳回今日第一個
-            return todayContents.first
+           let selected = todayContents.first(where: { $0.id == uid }),
+           !completedContentIds.contains(Int(uid)) {
+            return selected
         }
-        // 無使用者選取：預設今日第一個未完成
+        // 選取動作已完成，或無選取 → 今日第一個未完成
         if let first = todayContents.first(where: { !completedContentIds.contains(Int($0.id ?? -1)) }) {
             return first
         }
-        // 今日全部做完 → 跳回今日第一個（支援重做）
+        // 今日全部做完 → 跳回今日第一個
         if let first = todayContents.first { return first }
         // 無今日動作 → 整體第一個未完成
         return contentVM.contents.first { !completedContentIds.contains(Int($0.id ?? -1)) }
