@@ -17,6 +17,24 @@ struct TreatmentView: View {
         Self.cal.isDateInToday(date)
     }
 
+    private var todayEffectiveSelectedId: Int64? {
+        let todayItems = contentVM.contents.filter {
+            Self.cal.isDateInToday(Date(timeIntervalSince1970: TimeInterval($0.date)))
+        }
+        // 使用者有明確選取今日動作
+        if let uid = selectionState.userSelectedContentId,
+           todayItems.contains(where: { $0.id == uid }) {
+            return uid
+        }
+        // 預設：第一個未完成
+        let completed = Set(resultVM.results.map { $0.treatment_content_id })
+        if let first = todayItems.first(where: { !completed.contains(Int($0.id ?? -1)) }) {
+            return first.id
+        }
+        // 全部做完 → 跳回第一個
+        return todayItems.first?.id
+    }
+
     private var groupedByDate: [(day: Date, items: [(idx: Int, content: TreatmentContent)])] {
         var dict: [Date: [(Int, TreatmentContent)]] = [:]
         for (i, c) in contentVM.contents.enumerated() {
@@ -55,7 +73,7 @@ struct TreatmentView: View {
                                         todayGroup ? .active :
                                         .upcoming
                                     let isSelected = todayGroup &&
-                                        selectionState.selectedContentId == item.content.id
+                                        item.content.id == todayEffectiveSelectedId
                                     TreatmentSessionRow(
                                         exerciseName: exerciseName(for: item.content.exercise_id),
                                         content: item.content,
@@ -65,7 +83,7 @@ struct TreatmentView: View {
                                     )
                                     .onTapGesture {
                                         if todayGroup {
-                                            selectionState.selectedContentId = item.content.id
+                                            selectionState.userSelectedContentId = item.content.id
                                         }
                                     }
                                 }
@@ -81,15 +99,6 @@ struct TreatmentView: View {
             contentVM.fetchAll(for: Int(treatment.id ?? 0))
             exerciseVM.fetchAll()
             resultVM.fetchAll(for: Int(treatment.id ?? 0))
-            // 若尚未選取，預設選今日第一個未完成動作
-            if selectionState.selectedContentId == nil {
-                let completed = Set(resultVM.results.map { $0.treatment_content_id })
-                let first = contentVM.contents.first {
-                    Self.cal.isDateInToday(Date(timeIntervalSince1970: TimeInterval($0.date))) &&
-                    !completed.contains(Int($0.id ?? -1))
-                }
-                selectionState.selectedContentId = first?.id
-            }
         }
     }
 

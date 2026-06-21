@@ -5,7 +5,7 @@ import CoreBluetooth
 
 @Observable
 final class TreatmentSelectionState {
-    var selectedContentId: Int64? = nil
+    var userSelectedContentId: Int64? = nil
 }
 
 // MARK: - goHome Environment Key
@@ -205,14 +205,19 @@ struct TreatmentPlanCard: View {
     }
 
     private var activeContent: TreatmentContent? {
-        // 明確選取今日動作（含已完成，支援重做）
-        if let sid = selectionState.selectedContentId,
-           let selected = todayContents.first(where: { $0.id == sid }) {
+        // 使用者明確選取今日動作（含已完成，支援重做）
+        if let uid = selectionState.userSelectedContentId,
+           let selected = todayContents.first(where: { $0.id == uid }) {
             return selected
         }
-        // 預設：今日第一個未完成，否則整體第一個未完成
-        return todayContents.first { !completedContentIds.contains(Int($0.id ?? -1)) }
-            ?? contentVM.contents.first { !completedContentIds.contains(Int($0.id ?? -1)) }
+        // 預設：今日第一個未完成
+        if let first = todayContents.first(where: { !completedContentIds.contains(Int($0.id ?? -1)) }) {
+            return first
+        }
+        // 今日全部做完 → 跳回今日第一個（支援重做）
+        if let first = todayContents.first { return first }
+        // 無今日動作 → 整體第一個未完成
+        return contentVM.contents.first { !completedContentIds.contains(Int($0.id ?? -1)) }
     }
 
     private var bothDevicesConnected: Bool {
