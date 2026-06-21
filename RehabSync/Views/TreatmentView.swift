@@ -28,35 +28,19 @@ struct TreatmentView: View {
         }
     }
 
-    private var startDate: String {
-        Date(timeIntervalSince1970: TimeInterval(treatment.start_time))
-            .formatted(.dateTime.year().month().day())
-    }
-    private var endDate: String {
-        Date(timeIntervalSince1970: TimeInterval(treatment.end_time))
-            .formatted(.dateTime.year().month().day())
-    }
-
     var body: some View {
         ZStack {
             Color(red: 0.96, green: 0.94, blue: 0.91).ignoresSafeArea()
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(treatment.name)
-                            .font(.system(size: 36, weight: .bold))
-                            .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
-                        Text("\(startDate) ～ \(endDate)")
-                            .font(.system(size: 18))
-                            .foregroundStyle(.secondary)
-                    }
-
                     VStack(alignment: .leading, spacing: 20) {
                         ForEach(groupedByDate, id: \.day) { group in
                             VStack(alignment: .leading, spacing: 10) {
-                                Text(group.day.formatted(.dateTime.month().day()))
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundStyle(.secondary)
+                                let cal = Calendar.current
+                                let d = group.day
+                                Text("\(cal.component(.year, from: d))年\(cal.component(.month, from: d))月\(cal.component(.day, from: d))日")
+                                    .font(.system(size: 30, weight: .semibold))
+                                    .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
                                     .padding(.leading, 2)
 
                                 ForEach(group.items, id: \.idx) { item in
@@ -103,15 +87,8 @@ struct TreatmentSessionRow: View {
     let exercise: Exercise?
     let status: DayStatus
 
-    private var totalSeconds: Int {
-        TreatmentContentViewModel.totalSeconds(content: content, exercise: exercise)
-    }
-
     private var subtitleLabel: String {
-        let m = totalSeconds / 60
-        let s = totalSeconds % 60
-        let timeStr = s == 0 ? "\(m) min" : String(format: "%d:%02d", m, s)
-        return "\(content.sets) sets · \(content.sets * content.reps) reps · \(timeStr)"
+        "\(content.sets) 組 · \(content.sets * content.reps) 次"
     }
 
     var body: some View {
@@ -131,10 +108,10 @@ struct TreatmentSessionRow: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(exerciseName)
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.system(size: 25, weight: .semibold))
                     .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
                 Text(subtitleLabel)
-                    .font(.system(size: 16))
+                    .font(.system(size: 25))
                     .foregroundStyle(.secondary)
             }
 
@@ -157,14 +134,14 @@ struct DayStatusBadge: View {
     var body: some View {
         switch status {
         case .done:
-            Text("Done")
+            Text("完成")
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(Color(red: 0.18, green: 0.65, blue: 0.42))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 5)
                 .overlay(Capsule().stroke(Color(red: 0.18, green: 0.65, blue: 0.42), lineWidth: 1.5))
         case .active:
-            Text("In progress")
+            Text("進行中")
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 12)
@@ -172,7 +149,7 @@ struct DayStatusBadge: View {
                 .background(Color(red: 0.15, green: 0.6, blue: 0.55))
                 .clipShape(Capsule())
         case .upcoming:
-            Text("Up next")
+            Text("即將進行")
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(Color(red: 0.38, green: 0.38, blue: 0.70))
                 .padding(.horizontal, 12)
