@@ -42,7 +42,7 @@ class TreatmentViewModel {
 
         let data = try Data(contentsOf: url)
         let dto = try JSONDecoder().decode(TreatmentImportDTO.self, from: data)
-        try checkDuplicate(id: dto.id)
+        clearAll()
         try writeTreatmentDTO(dto)
         fetchAll()
     }
