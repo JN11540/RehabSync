@@ -54,7 +54,7 @@ struct TreatmentView: View {
                                         isDone ? .done :
                                         todayGroup ? .active :
                                         .upcoming
-                                    let isSelected = todayGroup && !isDone &&
+                                    let isSelected = todayGroup &&
                                         selectionState.selectedContentId == item.content.id
                                     TreatmentSessionRow(
                                         exerciseName: exerciseName(for: item.content.exercise_id),
@@ -64,7 +64,7 @@ struct TreatmentView: View {
                                         isSelected: isSelected
                                     )
                                     .onTapGesture {
-                                        if todayGroup && !isDone {
+                                        if todayGroup {
                                             selectionState.selectedContentId = item.content.id
                                         }
                                     }

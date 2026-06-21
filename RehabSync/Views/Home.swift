@@ -197,20 +197,21 @@ struct TreatmentPlanCard: View {
         contentVM.contents.allSatisfy { completedContentIds.contains(Int($0.id ?? -1)) }
     }
 
-    private var todayNonCompleted: [TreatmentContent] {
+    private var todayContents: [TreatmentContent] {
         let today = Calendar.current.startOfDay(for: Date())
         return contentVM.contents.filter {
-            Calendar.current.startOfDay(for: Date(timeIntervalSince1970: TimeInterval($0.date))) == today &&
-            !completedContentIds.contains(Int($0.id ?? -1))
+            Calendar.current.startOfDay(for: Date(timeIntervalSince1970: TimeInterval($0.date))) == today
         }
     }
 
     private var activeContent: TreatmentContent? {
+        // 明確選取今日動作（含已完成，支援重做）
         if let sid = selectionState.selectedContentId,
-           let selected = todayNonCompleted.first(where: { $0.id == sid }) {
+           let selected = todayContents.first(where: { $0.id == sid }) {
             return selected
         }
-        return todayNonCompleted.first
+        // 預設：今日第一個未完成，否則整體第一個未完成
+        return todayContents.first { !completedContentIds.contains(Int($0.id ?? -1)) }
             ?? contentVM.contents.first { !completedContentIds.contains(Int($0.id ?? -1)) }
     }
 
@@ -275,14 +276,7 @@ struct TreatmentPlanCard: View {
             }
 
             HStack(spacing: 12) {
-                if isAllCompleted {
-                    Button { showCompletedAlert = true } label: { startLabel }
-                        .alert("治療計畫已完成", isPresented: $showCompletedAlert) {
-                            Button("確定", role: .cancel) {}
-                        } message: {
-                            Text("您已完成此治療計畫的所有訓練動作，恭喜您！")
-                        }
-                } else if let content = activeContent {
+                if let content = activeContent {
                     if bothDevicesConnected {
                         NavigationLink(value: content) { startLabel }
                     } else {
@@ -293,6 +287,13 @@ struct TreatmentPlanCard: View {
                                 Text("請確認大腿與小腿裝置皆已連線，再開始治療。")
                             }
                     }
+                } else if isAllCompleted {
+                    Button { showCompletedAlert = true } label: { startLabel }
+                        .alert("治療計畫已完成", isPresented: $showCompletedAlert) {
+                            Button("確定", role: .cancel) {}
+                        } message: {
+                            Text("您已完成此治療計畫的所有訓練動作，恭喜您！")
+                        }
                 }
                 NavigationLink(value: treatment) {
                     Text("動作列表")
