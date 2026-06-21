@@ -205,13 +205,12 @@ struct TreatmentPlanCard: View {
     }
 
     private var activeContent: TreatmentContent? {
-        // 使用者選取且尚未完成 → 尊重選取
+        // 使用者選取今日任一動作（含已完成）→ 尊重選取
         if let uid = selectionState.userSelectedContentId,
-           let selected = todayContents.first(where: { $0.id == uid }),
-           !completedContentIds.contains(Int(uid)) {
+           let selected = todayContents.first(where: { $0.id == uid }) {
             return selected
         }
-        // 選取動作已完成，或無選取 → 今日第一個未完成
+        // 無使用者選取 → 今日第一個未完成
         if let first = todayContents.first(where: { !completedContentIds.contains(Int($0.id ?? -1)) }) {
             return first
         }

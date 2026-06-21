@@ -22,13 +22,12 @@ struct TreatmentView: View {
             Self.cal.isDateInToday(Date(timeIntervalSince1970: TimeInterval($0.date)))
         }
         let completed = Set(resultVM.results.map { $0.treatment_content_id })
-        // 使用者選取且尚未完成 → 尊重選取
+        // 使用者選取今日任一動作（含已完成）→ 尊重選取
         if let uid = selectionState.userSelectedContentId,
-           todayItems.contains(where: { $0.id == uid }),
-           !completed.contains(Int(uid)) {
+           todayItems.contains(where: { $0.id == uid }) {
             return uid
         }
-        // 選取動作已完成，或無選取 → 今日第一個未完成
+        // 無使用者選取 → 今日第一個未完成
         if let first = todayItems.first(where: { !completed.contains(Int($0.id ?? -1)) }) {
             return first.id
         }
