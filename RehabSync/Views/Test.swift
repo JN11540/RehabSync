@@ -196,25 +196,20 @@ private struct KneeExtensionView: UIViewRepresentable {
 
             view.prepare([scene]) { _ in
                 DispatchQueue.main.async {
-                    // wrapper 不受動畫骨架影響，單獨控制旋轉
-                    let wrapper = SCNNode()
-                    wrapper.eulerAngles = SCNVector3(-Float.pi / 2, 0, 0)
-                    for child in scene.rootNode.childNodes {
-                        child.removeFromParentNode()
-                        wrapper.addChildNode(child)
-                    }
-                    scene.rootNode.addChildNode(wrapper)
+                    // 模型中心在 z=0.887，長軸沿 Z 軸
+                    // 從 Y- 方向側看，讓 Z 顯示為畫面高度
+                    let modelCenter = SCNVector3(0, -0.027, 0.887)
 
                     let camera = SCNCamera()
                     camera.zNear = 0.001
                     camera.zFar = 100000
-                    camera.fieldOfView = 120
+                    camera.fieldOfView = 60
 
                     let camNode = SCNNode()
                     camNode.camera = camera
-                    camNode.position = SCNVector3(0, 0, 0.8)
-                    camNode.look(at: SCNVector3(0, 0, 0))
+                    camNode.position = SCNVector3(0, -2.5, modelCenter.z)
                     scene.rootNode.addChildNode(camNode)
+                    camNode.look(at: modelCenter)
                     view.pointOfView = camNode
                 }
             }
