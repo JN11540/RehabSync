@@ -1,7 +1,7 @@
 import SwiftUI
 import CoreBluetooth
 import UIKit
-import SceneKit
+import RealityKit
 
 // MARK: - TestPage
 
@@ -176,19 +176,19 @@ struct DeviceTestCard: View {
 // MARK: - 3D Model View
 
 private struct KneeExtensionView: UIViewRepresentable {
-    func makeUIView(context: Context) -> SCNView {
-        let view = SCNView()
-        view.allowsCameraControl = true
-        view.autoenablesDefaultLighting = true
-        view.backgroundColor = UIColor(red: 0.96, green: 0.94, blue: 0.91, alpha: 1)
+    func makeUIView(context: Context) -> ARView {
+        let arView = ARView(frame: .zero, cameraMode: .nonAR, automaticallyConfigureSession: false)
+        arView.backgroundColor = UIColor(red: 0.96, green: 0.94, blue: 0.91, alpha: 1)
 
         if let url = Bundle.main.url(forResource: "knee_extension", withExtension: "usdz"),
-           let scene = try? SCNScene(url: url, options: nil) {
-            view.scene = scene
+           let entity = try? Entity.load(contentsOf: url) {
+            let anchor = AnchorEntity(world: .zero)
+            anchor.addChild(entity)
+            arView.scene.anchors.append(anchor)
         }
-        return view
+        return arView
     }
 
-    func updateUIView(_ uiView: SCNView, context: Context) {}
+    func updateUIView(_ uiView: ARView, context: Context) {}
 }
 
