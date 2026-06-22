@@ -194,23 +194,25 @@ private struct KneeExtensionView: UIViewRepresentable {
             let scene = try SCNScene(url: url, options: [.checkConsistency: false])
             view.scene = scene
 
-            // 自動 frame model
+            // 放大模型 + 置中攝影機
             let rootNode = scene.rootNode
-            let (min, max) = rootNode.boundingBox
-            let center = SCNVector3(
-                (min.x + max.x) / 2,
-                (min.y + max.y) / 2,
-                (min.z + max.z) / 2
-            )
-            let size = SCNVector3(max.x - min.x, max.y - min.y, max.z - min.z)
-            let maxDim = Swift.max(size.x, size.y, size.z)
+            let (minB, maxB) = rootNode.boundingBox
+            let cx = (minB.x + maxB.x) / 2
+            let cy = (minB.y + maxB.y) / 2
+            let cz = (minB.z + maxB.z) / 2
+            let maxDim = Swift.max(maxB.x - minB.x, maxB.y - minB.y, maxB.z - minB.z)
+
+            let targetSize: Float = 4.0
+            let s = maxDim > 0 ? targetSize / Float(maxDim) : 1.0
+            rootNode.scale = SCNVector3(s, s, s)
 
             let camera = SCNCamera()
             camera.zNear = 0.01
-            camera.zFar = 1000
+            camera.zFar = 10000
+            camera.fieldOfView = 50
             let camNode = SCNNode()
             camNode.camera = camera
-            camNode.position = SCNVector3(center.x, center.y, center.z + maxDim * 1.5)
+            camNode.position = SCNVector3(cx * s, cy * s, cz * s + targetSize * 1.1)
             scene.rootNode.addChildNode(camNode)
             view.pointOfView = camNode
         } catch {
