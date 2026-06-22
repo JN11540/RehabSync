@@ -178,7 +178,7 @@ struct DeviceTestCard: View {
 private struct KneeExtensionView: UIViewRepresentable {
     func makeUIView(context: Context) -> SCNView {
         let view = SCNView()
-        view.allowsCameraControl = true
+        view.allowsCameraControl = false
         view.autoenablesDefaultLighting = true
         view.backgroundColor = UIColor(red: 0.96, green: 0.94, blue: 0.91, alpha: 1)
         view.loops = true
@@ -215,7 +215,6 @@ private struct KneeExtensionView: UIViewRepresentable {
                     camNode.look(at: SCNVector3(0, 0, 0))
                     scene.rootNode.addChildNode(camNode)
                     view.pointOfView = camNode
-                    view.defaultCameraController.target = SCNVector3(0, 0, 0)
                 }
             }
         } catch {
