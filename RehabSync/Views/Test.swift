@@ -136,30 +136,23 @@ struct DeviceTestCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header
-            HStack(spacing: 8) {
-                Image(systemName: "antenna.radiowaves.left.and.right")
-                    .font(.system(size: 18))
-                    .foregroundStyle(.cyan)
-                Text(label)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.white)
-                Spacer()
-                Circle()
-                    .fill(peripheral != nil ? Color.green : Color.gray.opacity(0.5))
-                    .frame(width: 8, height: 8)
-                Text(peripheral != nil ? "已連線" : "未連線")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.7))
-            }
-            .padding(.bottom, 10)
-
-            Divider().background(.white.opacity(0.3)).padding(.bottom, 14)
-
+        HStack(spacing: 8) {
+            Image(systemName: "antenna.radiowaves.left.and.right")
+                .font(.system(size: 18))
+                .foregroundStyle(.cyan)
+            Text(label)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(.white)
             Spacer()
+            Circle()
+                .fill(peripheral != nil ? Color.green : Color.gray.opacity(0.5))
+                .frame(width: 8, height: 8)
+            Text(peripheral != nil ? "已連線" : "未連線")
+                .font(.system(size: 14))
+                .foregroundStyle(.white.opacity(0.7))
         }
-        .padding(18)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
         .background(Color(red: 0.1, green: 0.25, blue: 0.4))
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .onAppear { startObserving() }
