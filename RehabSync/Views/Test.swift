@@ -192,28 +192,42 @@ private struct KneeExtensionView: UIViewRepresentable {
         }
         do {
             let scene = try SCNScene(url: url, options: [.checkConsistency: false])
-            view.scene = scene
 
-            // 放大模型 + 置中攝影機
-            let rootNode = scene.rootNode
-            let (minB, maxB) = rootNode.boundingBox
-            let cx = (minB.x + maxB.x) / 2
-            let cy = (minB.y + maxB.y) / 2
-            let cz = (minB.z + maxB.z) / 2
-            let maxDim = Swift.max(maxB.x - minB.x, maxB.y - minB.y, maxB.z - minB.z)
+            // 將所有模型節點放入 pivot（避免 scale 影響 camera）
+            let pivot = SCNNode()
+            for child in scene.rootNode.childNodes {
+                child.removeFromParentNode()
+                pivot.addChildNode(child)
+            }
+            scene.rootNode.addChildNode(pivot)
 
-            let targetSize: Float = 4.0
-            let s = maxDim > 0 ? targetSize / Float(maxDim) : 1.0
-            rootNode.scale = SCNVector3(s, s, s)
+            // 計算 bounding sphere 並縮放 pivot
+            let (sphereCenter, radius) = pivot.boundingSphere
+            let targetRadius: Float = 1.5
+            let s: Float = radius > 0 ? targetRadius / Float(radius) : 1.0
+            pivot.scale = SCNVector3(s, s, s)
 
+            // 模型世界中心（pivot 已縮放）
+            let worldCenter = SCNVector3(
+                Float(sphereCenter.x) * s,
+                Float(sphereCenter.y) * s,
+                Float(sphereCenter.z) * s
+            )
+
+            // 攝影機加入 rootNode（不受 pivot scale 影響）
             let camera = SCNCamera()
             camera.zNear = 0.01
             camera.zFar = 10000
-            camera.fieldOfView = 50
+            camera.fieldOfView = 45
             let camNode = SCNNode()
             camNode.camera = camera
-            camNode.position = SCNVector3(cx * s, cy * s, cz * s + targetSize * 1.1)
+            camNode.position = SCNVector3(worldCenter.x, worldCenter.y, worldCenter.z + targetRadius * 3.0)
+            let lookAt = SCNLookAtConstraint(target: pivot)
+            lookAt.isGimbalLockEnabled = true
+            camNode.constraints = [lookAt]
             scene.rootNode.addChildNode(camNode)
+
+            view.scene = scene
             view.pointOfView = camNode
         } catch {
             print("[3D] SCNScene load error: \(error)")
