@@ -206,11 +206,12 @@ private struct KneeExtensionView: UIViewRepresentable {
                     let camera = SCNCamera()
                     camera.zNear = 0.01
                     camera.zFar = 100000
-                    camera.fieldOfView = 50
+                    camera.fieldOfView = 80
 
                     let camNode = SCNNode()
                     camNode.camera = camera
-                    camNode.position = SCNVector3(0, 0, Float(radius) * 2.5)
+                    print("[3D] view frame=\(view.frame)")
+                    camNode.position = SCNVector3(0, 0, 1.5)
                     camNode.look(at: SCNVector3(0, 0, 0))
                     scene.rootNode.addChildNode(camNode)
                     view.pointOfView = camNode
