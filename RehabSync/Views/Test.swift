@@ -1,8 +1,7 @@
 import SwiftUI
 import CoreBluetooth
 import UIKit
-import RealityKit
-import Combine
+import SceneKit
 
 // MARK: - TestPage
 
@@ -177,46 +176,49 @@ struct DeviceTestCard: View {
 // MARK: - 3D Model View
 
 private struct KneeExtensionView: UIViewRepresentable {
-    func makeUIView(context: Context) -> ARView {
-        let arView = ARView(frame: .zero, cameraMode: .nonAR, automaticallyConfigureSession: false)
-        arView.environment.background = .color(UIColor(red: 0.96, green: 0.94, blue: 0.91, alpha: 1))
+    func makeUIView(context: Context) -> SCNView {
+        let view = SCNView()
+        view.allowsCameraControl = true
+        view.autoenablesDefaultLighting = true
+        view.backgroundColor = UIColor(red: 0.96, green: 0.94, blue: 0.91, alpha: 1)
+        view.loops = true
+        view.isPlaying = true
+        view.rendersContinuously = true
+        view.antialiasingMode = .multisampling4X
 
         guard let url = Bundle.main.url(forResource: "knee_extension", withExtension: "usdz") else {
-            return arView
+            print("[3D] knee_extension.usdz not found in bundle")
+            return view
         }
+        do {
+            let scene = try SCNScene(url: url, options: [.checkConsistency: false])
+            view.scene = scene
 
-        Entity.loadAsync(contentsOf: url)
-            .sink(receiveCompletion: { _ in },
-                  receiveValue: { entity in
-                // 自動縮放至適合畫面
-                let bounds = entity.visualBounds(relativeTo: nil)
-                let maxDim = max(bounds.extents.x, bounds.extents.y, bounds.extents.z)
-                if maxDim > 0 {
-                    let scale = 0.8 / maxDim
-                    entity.scale = SIMD3<Float>(repeating: scale)
-                }
-                entity.position = SIMD3<Float>(0, -0.3, -1.0)
+            // 自動 frame model
+            let rootNode = scene.rootNode
+            let (min, max) = rootNode.boundingBox
+            let center = SCNVector3(
+                (min.x + max.x) / 2,
+                (min.y + max.y) / 2,
+                (min.z + max.z) / 2
+            )
+            let size = SCNVector3(max.x - min.x, max.y - min.y, max.z - min.z)
+            let maxDim = Swift.max(size.x, size.y, size.z)
 
-                let anchor = AnchorEntity(world: .zero)
-                anchor.addChild(entity)
-                arView.scene.anchors.append(anchor)
-
-                // 播放所有動畫
-                for anim in entity.availableAnimations {
-                    entity.playAnimation(anim.repeat(), transitionDuration: 0)
-                }
-            })
-            .store(in: &context.coordinator.cancellables)
-
-        return arView
+            let camera = SCNCamera()
+            camera.zNear = 0.01
+            camera.zFar = 1000
+            let camNode = SCNNode()
+            camNode.camera = camera
+            camNode.position = SCNVector3(center.x, center.y, center.z + maxDim * 1.5)
+            scene.rootNode.addChildNode(camNode)
+            view.pointOfView = camNode
+        } catch {
+            print("[3D] SCNScene load error: \(error)")
+        }
+        return view
     }
 
-    func updateUIView(_ uiView: ARView, context: Context) {}
-
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
-    final class Coordinator {
-        var cancellables = Set<AnyCancellable>()
-    }
+    func updateUIView(_ uiView: SCNView, context: Context) {}
 }
 
