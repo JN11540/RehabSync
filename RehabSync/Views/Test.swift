@@ -206,8 +206,10 @@ private struct KneeExtensionView: UIViewRepresentable {
             view.prepare([scene]) { _ in
                 DispatchQueue.main.async {
                     let (sphereCenter, radius) = pivot.boundingSphere
+                    print("[3D] boundingSphere center=\(sphereCenter) radius=\(radius)")
                     let targetRadius: Float = 2.0
                     let s: Float = radius > 0 ? targetRadius / Float(radius) : 1.0
+                    print("[3D] scale s=\(s)")
                     pivot.scale = SCNVector3(s, s, s)
 
                     let worldCenter = SCNVector3(
@@ -215,6 +217,8 @@ private struct KneeExtensionView: UIViewRepresentable {
                         Float(sphereCenter.y) * s,
                         Float(sphereCenter.z) * s
                     )
+                    print("[3D] worldCenter=\(worldCenter)")
+                    print("[3D] camPos z=\(worldCenter.z + targetRadius * 1.8)")
 
                     let camera = SCNCamera()
                     camera.zNear = 0.01
