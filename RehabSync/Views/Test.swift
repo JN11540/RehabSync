@@ -1,6 +1,7 @@
 import SwiftUI
 import CoreBluetooth
 import UIKit
+import SceneKit
 
 // MARK: - TestPage
 
@@ -53,14 +54,20 @@ struct TestPage: View {
                 .padding(.horizontal, 24)
 
                 // 裝置卡片
-                GeometryReader { geo in
-                    HStack(alignment: .top, spacing: 20) {
-                        DeviceTestCard(btVM: btVM, limb: 0, label: "大腿裝置")
-                        DeviceTestCard(btVM: btVM, limb: 1, label: "小腿裝置")
-                    }
-                    .padding(.horizontal, 24)
-                    .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
+                HStack(spacing: 20) {
+                    DeviceTestCard(btVM: btVM, limb: 0, label: "大腿裝置")
+                    DeviceTestCard(btVM: btVM, limb: 1, label: "小腿裝置")
                 }
+                .padding(.horizontal, 24)
+
+                // 3D 動作引導
+                KneeExtensionView()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 400)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .padding(.horizontal, 24)
+
+                Spacer()
             }
             .padding(.top, 20)
         }
@@ -164,5 +171,24 @@ struct DeviceTestCard: View {
     }
 
     private func stopObserving() {}
+}
+
+// MARK: - 3D Model View
+
+private struct KneeExtensionView: UIViewRepresentable {
+    func makeUIView(context: Context) -> SCNView {
+        let view = SCNView()
+        view.allowsCameraControl = true
+        view.autoenablesDefaultLighting = true
+        view.backgroundColor = UIColor(red: 0.96, green: 0.94, blue: 0.91, alpha: 1)
+
+        if let url = Bundle.main.url(forResource: "knee_extension", withExtension: "usdz"),
+           let scene = try? SCNScene(url: url, options: nil) {
+            view.scene = scene
+        }
+        return view
+    }
+
+    func updateUIView(_ uiView: SCNView, context: Context) {}
 }
 
