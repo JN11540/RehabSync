@@ -200,6 +200,9 @@ private struct KneeExtensionView: UIViewRepresentable {
                     let (_, radius) = root.boundingSphere
                     print("[3D] root boundingSphere radius=\(radius)")
 
+                    // 旋轉模型讓它站起來（Blender Z-up → Y-up 修正）
+                    scene.rootNode.eulerAngles = SCNVector3(-Float.pi / 2, 0, 0)
+
                     let camera = SCNCamera()
                     camera.zNear = 0.01
                     camera.zFar = 100000
@@ -207,12 +210,11 @@ private struct KneeExtensionView: UIViewRepresentable {
 
                     let camNode = SCNNode()
                     camNode.camera = camera
-                    camNode.position = SCNVector3(0, 0.88, Float(radius) * 2.5)
-                    camNode.look(at: SCNVector3(0, 0.88, 0))
+                    camNode.position = SCNVector3(0, 0, Float(radius) * 2.5)
+                    camNode.look(at: SCNVector3(0, 0, 0))
                     scene.rootNode.addChildNode(camNode)
                     view.pointOfView = camNode
-
-                    view.defaultCameraController.target = SCNVector3(0, 0.88, 0)
+                    view.defaultCameraController.target = SCNVector3(0, 0, 0)
                 }
             }
         } catch {
