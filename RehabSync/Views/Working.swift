@@ -176,6 +176,7 @@ struct Working: View {
     @State private var navigateToPost = false
     @State private var resultVM = TreatmentResultViewModel()
     @Environment(\.goHome) private var goHome
+    @Environment(TreatmentSelectionState.self) private var selectionState
 
     init(content: TreatmentContent, exercise: Exercise) {
         self.content  = content
@@ -213,6 +214,7 @@ struct Working: View {
                     date: Int(Date().timeIntervalSince1970)
                 )
                 resultVM.insert(&result)
+                selectionState.userSelectedContentId = nil
                 navigateToPost = true
             }
         }

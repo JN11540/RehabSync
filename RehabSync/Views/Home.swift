@@ -1,6 +1,13 @@
 import SwiftUI
 import CoreBluetooth
 
+// MARK: - Treatment Selection State
+
+@Observable
+final class TreatmentSelectionState {
+    var userSelectedContentId: Int64? = nil
+}
+
 // MARK: - goHome Environment Key
 
 private struct GoHomeKey: EnvironmentKey {
@@ -54,6 +61,7 @@ struct Home: View {
 struct HomeContent: View {
     @State private var vm = TreatmentViewModel()
     @State private var navPath = NavigationPath()
+    @State private var selectionState = TreatmentSelectionState()
 
     var body: some View {
         NavigationStack(path: $navPath) {
@@ -98,6 +106,7 @@ struct HomeContent: View {
                 TreatmentView(treatment: treatment)
             }
         }
+        .environment(selectionState)
         .environment(\.goHome, { navPath = NavigationPath() })
     }
 }
@@ -167,9 +176,12 @@ struct TreatmentPlanSection: View {
 
 struct TreatmentPlanCard: View {
     let treatment: Treatment
+    @Environment(BluetoothViewModel.self) private var btVM
+    @Environment(TreatmentSelectionState.self) private var selectionState
     @State private var contentVM = TreatmentContentViewModel()
     @State private var resultVM = TreatmentResultViewModel()
     @State private var showCompletedAlert = false
+    @State private var showBTAlert = false
 
     private var completedContentIds: Set<Int> {
         Set(resultVM.results.map { $0.treatment_content_id })
@@ -185,19 +197,63 @@ struct TreatmentPlanCard: View {
         contentVM.contents.allSatisfy { completedContentIds.contains(Int($0.id ?? -1)) }
     }
 
+    private var todayContents: [TreatmentContent] {
+        let today = Calendar.current.startOfDay(for: Date())
+        return contentVM.contents.filter {
+            Calendar.current.startOfDay(for: Date(timeIntervalSince1970: TimeInterval($0.date))) == today
+        }
+    }
+
     private var activeContent: TreatmentContent? {
-        contentVM.contents
-            .first { !completedContentIds.contains(Int($0.id ?? -1)) }
+        // 使用者選取今日任一動作（含已完成）→ 尊重選取
+        if let uid = selectionState.userSelectedContentId,
+           let selected = todayContents.first(where: { $0.id == uid }) {
+            return selected
+        }
+        // 無使用者選取 → 今日第一個未完成
+        if let first = todayContents.first(where: { !completedContentIds.contains(Int($0.id ?? -1)) }) {
+            return first
+        }
+        // 今日全部做完 → 跳回今日第一個
+        if let first = todayContents.first { return first }
+        // 無今日動作 → 整體第一個未完成
+        return contentVM.contents.first { !completedContentIds.contains(Int($0.id ?? -1)) }
+    }
+
+    private var bothDevicesConnected: Bool {
+        let dvm = DeviceViewModel()
+        guard let thigh = dvm.fetch(limb: 0), let thighUUID = UUID(uuidString: thigh.device_uuid),
+              let calf  = dvm.fetch(limb: 1), let calfUUID  = UUID(uuidString: calf.device_uuid)
+        else { return false }
+        return btVM.connectedPeripherals[thighUUID] != nil &&
+               btVM.connectedPeripherals[calfUUID]  != nil
+    }
+
+    @ViewBuilder
+    private var startLabel: some View {
+        HStack(spacing: 6) {
+            Text("開始")
+            Image(systemName: "arrow.up.right")
+        }
+        .font(.system(size: 18, weight: .medium))
+        .padding(.horizontal, 18)
+        .padding(.vertical, 10)
+        .background(.white)
+        .foregroundStyle(.primary)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.3)))
     }
 
     private var startDate: String {
-        Date(timeIntervalSince1970: TimeInterval(treatment.start_time))
-            .formatted(.dateTime.year().month().day())
+        let d = Date(timeIntervalSince1970: TimeInterval(treatment.start_time))
+        let cal = Calendar.current
+        return "\(cal.component(.year, from: d))年\(cal.component(.month, from: d))月\(cal.component(.day, from: d))日"
     }
 
     private var endDate: String {
-        Date(timeIntervalSince1970: TimeInterval(treatment.end_time))
-            .formatted(.dateTime.year().month().day())
+        let d = Date(timeIntervalSince1970: TimeInterval(treatment.end_time))
+        let cal = Calendar.current
+        return "\(cal.component(.year, from: d))年\(cal.component(.month, from: d))月\(cal.component(.day, from: d))日"
     }
 
     var body: some View {
@@ -216,54 +272,37 @@ struct TreatmentPlanCard: View {
                 .frame(maxHeight: .infinity)
 
             VStack(alignment: .leading, spacing: 6) {
-                Text(treatment.name)
-                    .font(.system(size: 20, weight: .semibold))
+                Text("治療計畫名稱：\(treatment.name)")
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
-                Text("\(startDate) ～ \(endDate)")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
+                Text("治療計畫日期：\(startDate) ~ \(endDate)")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
             }
 
             HStack(spacing: 12) {
-                if isAllCompleted {
-                    Button {
-                        showCompletedAlert = true
-                    } label: {
-                        HStack(spacing: 6) {
-                            Text("Start")
-                            Image(systemName: "arrow.up.right")
+                if let content = activeContent {
+                    if bothDevicesConnected {
+                        NavigationLink(value: content) { startLabel }
+                    } else {
+                        Button { showBTAlert = true } label: { startLabel }
+                            .alert("請先連接藍芽裝置", isPresented: $showBTAlert) {
+                                Button("確定", role: .cancel) {}
+                            } message: {
+                                Text("請確認大腿與小腿裝置皆已連線，再開始治療。")
+                            }
+                    }
+                } else if isAllCompleted {
+                    Button { showCompletedAlert = true } label: { startLabel }
+                        .alert("治療計畫已完成", isPresented: $showCompletedAlert) {
+                            Button("確定", role: .cancel) {}
+                        } message: {
+                            Text("您已完成此治療計畫的所有訓練動作，恭喜您！")
                         }
-                        .font(.system(size: 16, weight: .medium))
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 10)
-                        .background(.white)
-                        .foregroundStyle(.primary)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.3)))
-                    }
-                    .alert("治療計畫已完成", isPresented: $showCompletedAlert) {
-                        Button("確定", role: .cancel) {}
-                    } message: {
-                        Text("您已完成此治療計畫的所有訓練動作，恭喜您！")
-                    }
-                } else if let content = activeContent {
-                    NavigationLink(value: content) {
-                        HStack(spacing: 6) {
-                            Text("Start")
-                            Image(systemName: "arrow.up.right")
-                        }
-                        .font(.system(size: 16, weight: .medium))
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 10)
-                        .background(.white)
-                        .foregroundStyle(.primary)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.3)))
-                    }
                 }
                 NavigationLink(value: treatment) {
                     Text("動作列表")
-                        .font(.system(size: 16, weight: .medium))
+                        .font(.system(size: 18, weight: .medium))
                         .padding(.horizontal, 18)
                         .padding(.vertical, 10)
                         .background(.white)
@@ -276,7 +315,7 @@ struct TreatmentPlanCard: View {
                     .tint(Color(red: 0.15, green: 0.6, blue: 0.55))
                     .frame(width: 100)
                 Text("\(Int(progress * 100))%")
-                    .font(.system(size: 16, weight: .medium))
+                    .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(Color(red: 0.15, green: 0.6, blue: 0.55))
             }
         }
@@ -319,10 +358,10 @@ struct BluetoothDeviceCard: View {
                 // 標題列
                 HStack(spacing: 8) {
                     Image(systemName: "antenna.radiowaves.left.and.right")
-                        .font(.system(size: 22))
+                        .font(.system(size: 25))
                         .foregroundStyle(.cyan)
                     Text("藍芽與裝置")
-                        .font(.system(size: 22, weight: .semibold))
+                        .font(.system(size: 25, weight: .semibold))
                         .foregroundStyle(.white)
                     Spacer()
                     if thighDevice != nil || calfDevice != nil {

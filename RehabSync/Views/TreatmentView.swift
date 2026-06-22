@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TreatmentView: View {
     let treatment: Treatment
+    @Environment(TreatmentSelectionState.self) private var selectionState
     @State private var contentVM = TreatmentContentViewModel()
     @State private var exerciseVM = ExerciseViewModel()
     @State private var resultVM = TreatmentResultViewModel()
@@ -10,11 +11,28 @@ struct TreatmentView: View {
         Set(resultVM.results.map { $0.treatment_content_id })
     }
 
-    private var activeContentId: Int64? {
-        contentVM.contents
-            .filter { !completedContentIds.contains(Int($0.id ?? -1)) }
-            .min(by: { ($0.id ?? .max) < ($1.id ?? .max) })?
-            .id
+    private static let cal = Calendar.current
+
+    private func isToday(_ date: Date) -> Bool {
+        Self.cal.isDateInToday(date)
+    }
+
+    private var todayEffectiveSelectedId: Int64? {
+        let todayItems = contentVM.contents.filter {
+            Self.cal.isDateInToday(Date(timeIntervalSince1970: TimeInterval($0.date)))
+        }
+        let completed = Set(resultVM.results.map { $0.treatment_content_id })
+        // 使用者選取今日任一動作（含已完成）→ 尊重選取
+        if let uid = selectionState.userSelectedContentId,
+           todayItems.contains(where: { $0.id == uid }) {
+            return uid
+        }
+        // 無使用者選取 → 今日第一個未完成
+        if let first = todayItems.first(where: { !completed.contains(Int($0.id ?? -1)) }) {
+            return first.id
+        }
+        // 全部做完 → 跳回今日第一個
+        return todayItems.first?.id
     }
 
     private var groupedByDate: [(day: Date, items: [(idx: Int, content: TreatmentContent)])] {
@@ -28,54 +46,69 @@ struct TreatmentView: View {
         }
     }
 
-    private var startDate: String {
-        Date(timeIntervalSince1970: TimeInterval(treatment.start_time))
-            .formatted(.dateTime.year().month().day())
-    }
-    private var endDate: String {
-        Date(timeIntervalSince1970: TimeInterval(treatment.end_time))
-            .formatted(.dateTime.year().month().day())
+    private var scrollTargetDay: Date? {
+        let today = Calendar.current.startOfDay(for: Date())
+        if groupedByDate.contains(where: { $0.day == today }) { return today }
+        return groupedByDate.first(where: { $0.day > today })?.day
     }
 
     var body: some View {
         ZStack {
             Color(red: 0.96, green: 0.94, blue: 0.91).ignoresSafeArea()
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(treatment.name)
-                            .font(.system(size: 36, weight: .bold))
-                            .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
-                        Text("\(startDate) ～ \(endDate)")
-                            .font(.system(size: 18))
-                            .foregroundStyle(.secondary)
-                    }
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        VStack(alignment: .leading, spacing: 20) {
+                            ForEach(groupedByDate, id: \.day) { group in
+                                VStack(alignment: .leading, spacing: 10) {
+                                    let cal = Calendar.current
+                                    let d = group.day
+                                    let dateStr = String(format: "%d年%d月%d日",
+                                        cal.component(.year, from: d),
+                                        cal.component(.month, from: d),
+                                        cal.component(.day, from: d))
+                                    Text(dateStr)
+                                        .font(.system(size: 25, weight: .semibold))
+                                        .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
+                                        .padding(.leading, 2)
 
-                    VStack(alignment: .leading, spacing: 20) {
-                        ForEach(groupedByDate, id: \.day) { group in
-                            VStack(alignment: .leading, spacing: 10) {
-                                Text(group.day.formatted(.dateTime.month().day()))
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundStyle(.secondary)
-                                    .padding(.leading, 2)
-
-                                ForEach(group.items, id: \.idx) { item in
-                                    let status: DayStatus =
-                                        completedContentIds.contains(Int(item.content.id ?? -1)) ? .done :
-                                        item.content.id == activeContentId ? .active :
-                                        .upcoming
-                                    TreatmentSessionRow(
-                                        exerciseName: exerciseName(for: item.content.exercise_id),
-                                        content: item.content,
-                                        exercise: exercise(for: item.content.exercise_id),
-                                        status: status
-                                    )
+                                    ForEach(group.items, id: \.idx) { item in
+                                        let isDone = completedContentIds.contains(Int(item.content.id ?? -1))
+                                        let todayGroup = isToday(group.day)
+                                        let isPast = group.day < Calendar.current.startOfDay(for: Date())
+                                        let status: DayStatus =
+                                            isDone ? .done :
+                                            todayGroup ? .active :
+                                            isPast ? .missed :
+                                            .upcoming
+                                        let isSelected = todayGroup &&
+                                            item.content.id == todayEffectiveSelectedId
+                                        TreatmentSessionRow(
+                                            exerciseName: exerciseName(for: item.content.exercise_id),
+                                            content: item.content,
+                                            exercise: exercise(for: item.content.exercise_id),
+                                            status: status,
+                                            isSelected: isSelected
+                                        )
+                                        .onTapGesture {
+                                            if todayGroup {
+                                                selectionState.userSelectedContentId = item.content.id
+                                            }
+                                        }
+                                    }
                                 }
+                                .id(group.day)
                             }
                         }
                     }
+                    .padding(24)
                 }
-                .padding(24)
+                .onChange(of: contentVM.contents) { _, _ in
+                    guard let target = scrollTargetDay else { return }
+                    DispatchQueue.main.async {
+                        proxy.scrollTo(target, anchor: .top)
+                    }
+                }
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -102,16 +135,10 @@ struct TreatmentSessionRow: View {
     let content: TreatmentContent
     let exercise: Exercise?
     let status: DayStatus
-
-    private var totalSeconds: Int {
-        TreatmentContentViewModel.totalSeconds(content: content, exercise: exercise)
-    }
+    var isSelected: Bool = false
 
     private var subtitleLabel: String {
-        let m = totalSeconds / 60
-        let s = totalSeconds % 60
-        let timeStr = s == 0 ? "\(m) min" : String(format: "%d:%02d", m, s)
-        return "\(content.sets) sets · \(content.sets * content.reps) reps · \(timeStr)"
+        "\(content.sets) 組 · \(content.reps) 次"
     }
 
     var body: some View {
@@ -123,7 +150,7 @@ struct TreatmentSessionRow: View {
                         : Color(red: 0.90, green: 0.97, blue: 0.95))
                     .frame(width: 48, height: 48)
                 Image(systemName: "figure.run")
-                    .font(.system(size: 20))
+                    .font(.system(size: 22))
                     .foregroundStyle(status == .done
                         ? Color(red: 0.18, green: 0.65, blue: 0.42)
                         : Color(red: 0.15, green: 0.55, blue: 0.50))
@@ -131,10 +158,10 @@ struct TreatmentSessionRow: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(exerciseName)
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
                 Text(subtitleLabel)
-                    .font(.system(size: 16))
+                    .font(.system(size: 22))
                     .foregroundStyle(.secondary)
             }
 
@@ -143,8 +170,13 @@ struct TreatmentSessionRow: View {
             DayStatusBadge(status: status)
         }
         .padding(14)
-        .background(.white)
+        .background(isSelected ? Color(red: 0.15, green: 0.6, blue: 0.55).opacity(0.08) : .white)
         .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color(red: 0.15, green: 0.6, blue: 0.55), lineWidth: 2)
+                .opacity(isSelected ? 1 : 0)
+        )
         .shadow(color: .black.opacity(0.04), radius: 3, y: 1)
     }
 }
@@ -157,28 +189,35 @@ struct DayStatusBadge: View {
     var body: some View {
         switch status {
         case .done:
-            Text("Done")
-                .font(.system(size: 16, weight: .medium))
+            Text("完成")
+                .font(.system(size: 22, weight: .medium))
                 .foregroundStyle(Color(red: 0.18, green: 0.65, blue: 0.42))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 5)
                 .overlay(Capsule().stroke(Color(red: 0.18, green: 0.65, blue: 0.42), lineWidth: 1.5))
         case .active:
-            Text("In progress")
-                .font(.system(size: 16, weight: .medium))
+            Text("進行中")
+                .font(.system(size: 22, weight: .medium))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 5)
                 .background(Color(red: 0.15, green: 0.6, blue: 0.55))
                 .clipShape(Capsule())
         case .upcoming:
-            Text("Up next")
-                .font(.system(size: 16, weight: .medium))
+            Text("即將進行")
+                .font(.system(size: 22, weight: .medium))
                 .foregroundStyle(Color(red: 0.38, green: 0.38, blue: 0.70))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 5)
                 .background(Color(red: 0.92, green: 0.92, blue: 0.98))
                 .clipShape(Capsule())
+        case .missed:
+            Text("未完成")
+                .font(.system(size: 22, weight: .medium))
+                .foregroundStyle(Color(red: 0.75, green: 0.3, blue: 0.25))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 5)
+                .overlay(Capsule().stroke(Color(red: 0.75, green: 0.3, blue: 0.25), lineWidth: 1.5))
         }
     }
 }
@@ -186,5 +225,5 @@ struct DayStatusBadge: View {
 // MARK: - Day Status
 
 enum DayStatus {
-    case done, active, upcoming
+    case done, active, upcoming, missed
 }
