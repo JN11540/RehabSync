@@ -1,5 +1,4 @@
 import SwiftUI
-import GRDB
 import CoreBluetooth
 import UIKit
 
@@ -129,10 +128,6 @@ struct DeviceTestCard: View {
     let label: String
 
     @State private var device: Device? = nil
-    @State private var exgCh0Rows: [Exg] = []
-    @State private var exgCh1Rows: [Exg] = []
-    @State private var exgCh0Obs: AnyDatabaseCancellable? = nil
-    @State private var exgCh1Obs: AnyDatabaseCancellable? = nil
 
     private var peripheral: CBPeripheral? {
         guard let uuidStr = device?.device_uuid,
@@ -162,37 +157,7 @@ struct DeviceTestCard: View {
 
             Divider().background(.white.opacity(0.3)).padding(.bottom, 14)
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    // EXG Channel 0
-                    SensorSection(title: "EXG CH0") {
-                        if let r = exgCh0Rows.first {
-                            Text("Value: \(r.value)")
-                                .font(.system(size: 15, weight: .semibold, design: .monospaced))
-                                .foregroundStyle(.cyan)
-                        }
-                        ForEach(exgCh0Rows) { r in
-                            Text("\(r.timestamp)  \(r.value)")
-                                .font(.system(size: 12, design: .monospaced))
-                                .foregroundStyle(.white.opacity(0.55))
-                        }
-                    }
-
-                    // EXG Channel 1
-                    SensorSection(title: "EXG CH1") {
-                        if let r = exgCh1Rows.first {
-                            Text("Value: \(r.value)")
-                                .font(.system(size: 15, weight: .semibold, design: .monospaced))
-                                .foregroundStyle(.cyan)
-                        }
-                        ForEach(exgCh1Rows) { r in
-                            Text("\(r.timestamp)  \(r.value)")
-                                .font(.system(size: 12, design: .monospaced))
-                                .foregroundStyle(.white.opacity(0.55))
-                        }
-                    }
-                }
-            }
+            Spacer()
         }
         .padding(18)
         .background(Color(red: 0.1, green: 0.25, blue: 0.4))
@@ -203,43 +168,8 @@ struct DeviceTestCard: View {
 
     private func startObserving() {
         device = DeviceViewModel().fetch(limb: limb)
-        guard let deviceId = device?.id else { return }
-        let db = DatabaseManager.shared.dbQueue
-
-        exgCh0Obs = ValueObservation.tracking {
-            try Exg.filter(Column("device_id") == deviceId && Column("channel") == 0)
-                .order(Column("id").desc).limit(20).fetchAll($0)
-        }.start(in: db, onError: { _ in }, onChange: { exgCh0Rows = $0 })
-
-        exgCh1Obs = ValueObservation.tracking {
-            try Exg.filter(Column("device_id") == deviceId && Column("channel") == 1)
-                .order(Column("id").desc).limit(20).fetchAll($0)
-        }.start(in: db, onError: { _ in }, onChange: { exgCh1Rows = $0 })
     }
 
-    private func stopObserving() {
-        exgCh0Obs = nil
-        exgCh1Obs = nil
-    }
+    private func stopObserving() {}
 }
 
-// MARK: - SensorSection
-
-private struct SensorSection<Content: View>: View {
-    let title: String
-    @ViewBuilder let content: () -> Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.5))
-                .kerning(1)
-            content()
-        }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.white.opacity(0.06))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-}
