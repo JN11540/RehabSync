@@ -192,46 +192,27 @@ private struct KneeExtensionView: UIViewRepresentable {
         }
         do {
             let scene = try SCNScene(url: url, options: [.checkConsistency: false])
-
-            // 將所有模型節點放入 pivot（避免 scale 影響 camera）
-            let pivot = SCNNode()
-            for child in scene.rootNode.childNodes {
-                child.removeFromParentNode()
-                pivot.addChildNode(child)
-            }
-            scene.rootNode.addChildNode(pivot)
             view.scene = scene
 
-            // 等 scene 準備好後再計算 bounding sphere
             view.prepare([scene]) { _ in
                 DispatchQueue.main.async {
-                    let (sphereCenter, radius) = pivot.boundingSphere
-                    print("[3D] boundingSphere center=\(sphereCenter) radius=\(radius)")
-                    let targetRadius: Float = 2.0
-                    let s: Float = radius > 0 ? targetRadius / Float(radius) : 1.0
-                    print("[3D] scale s=\(s)")
-                    pivot.scale = SCNVector3(s, s, s)
-
-                    let worldCenter = SCNVector3(
-                        Float(sphereCenter.x) * s,
-                        Float(sphereCenter.y) * s,
-                        Float(sphereCenter.z) * s
-                    )
-                    print("[3D] worldCenter=\(worldCenter)")
-                    print("[3D] camPos z=\(worldCenter.z + targetRadius * 1.8)")
+                    let root = scene.rootNode
+                    let (_, radius) = root.boundingSphere
+                    print("[3D] root boundingSphere radius=\(radius)")
 
                     let camera = SCNCamera()
                     camera.zNear = 0.01
                     camera.zFar = 100000
-                    camera.fieldOfView = 45
+                    camera.fieldOfView = 50
+
                     let camNode = SCNNode()
                     camNode.camera = camera
-                    camNode.position = SCNVector3(worldCenter.x, worldCenter.y, worldCenter.z + targetRadius * 1.8)
-                    let lookAt = SCNLookAtConstraint(target: pivot)
-                    lookAt.isGimbalLockEnabled = true
-                    camNode.constraints = [lookAt]
+                    camNode.position = SCNVector3(0, 0.88, Float(radius) * 2.5)
+                    camNode.look(at: SCNVector3(0, 0.88, 0))
                     scene.rootNode.addChildNode(camNode)
                     view.pointOfView = camNode
+
+                    view.defaultCameraController.target = SCNVector3(0, 0.88, 0)
                 }
             }
         } catch {
