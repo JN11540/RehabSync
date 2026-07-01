@@ -8,7 +8,11 @@ struct Test1: View {
 
     var body: some View {
         ZStack {
-            Color(red: 0.96, green: 0.94, blue: 0.91).ignoresSafeArea()
+            Image("Test1Preview")
+                .resizable()
+                .scaledToFill()
+                .ignoresSafeArea()
+                .clipped()
             GeometryReader { geo in
                 let spacing: CGFloat = 20
                 let hPad: CGFloat = 24
