@@ -44,9 +44,10 @@ private struct Test1Sidebar: View {
         ZStack(alignment: .topLeading) {
             Color.black
             VStack(spacing: 14) {
-                Test1MenuTile(icon: "figure.walk", title: "動作", mint: mint)
-                Test1MenuTile(icon: "square.stack.3d.up", title: "模型", mint: mint)
-                Test1MenuTile(icon: "star", title: "收藏", mint: mint)
+                Test1MenuTile(title: "掃描 QR code", mint: mint)
+                Test1MenuTile(title: "綁定藍芽", mint: mint)
+                Test1MenuTile(title: "訓練菜單", mint: mint)
+                Test1MenuTile(title: "商店", mint: mint)
             }
             .padding(20)
         }
@@ -72,19 +73,16 @@ private struct Test1Sidebar: View {
 }
 
 private struct Test1MenuTile: View {
-    let icon: String
     let title: String
     let mint: Color
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.system(size: 18, weight: .semibold))
+            Spacer()
             Text(title)
                 .font(.system(size: 18, weight: .semibold))
-            Spacer()
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(.black)
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
         .background(mint)
