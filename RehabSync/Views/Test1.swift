@@ -13,7 +13,7 @@ struct Test1: View {
             let usable = geo.size.width - hPad * 2 - spacing
 
             HStack(alignment: .top, spacing: spacing) {
-                Test1Sidebar(navy: navy, mint: mint)
+                Test1Sidebar(mint: mint)
                     .frame(width: usable * 0.35)
                     .padding(.top, 80)
 
@@ -38,12 +38,11 @@ struct Test1: View {
 // MARK: - Sidebar
 
 private struct Test1Sidebar: View {
-    let navy: Color
     let mint: Color
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            navy.opacity(0.5)
+            Color.black
             VStack(spacing: 14) {
                 Test1MenuTile(icon: "figure.walk", title: "動作", mint: mint)
                 Test1MenuTile(icon: "square.stack.3d.up", title: "模型", mint: mint)
@@ -55,7 +54,7 @@ private struct Test1Sidebar: View {
         .overlay(
             ZStack {
                 RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(Color.black, lineWidth: 3)
+                    .strokeBorder(Color.black, lineWidth: 6)
                 RoundedRectangle(cornerRadius: 20)
                     .strokeBorder(
                         LinearGradient(
