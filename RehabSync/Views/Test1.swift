@@ -83,7 +83,7 @@ private struct Test1MenuTile: View {
                 .font(.system(size: 22, weight: .semibold))
         }
         .foregroundStyle(.black)
-        .padding(.horizontal, 44)
+        .padding(.horizontal, 80)
         .padding(.vertical, 14)
         .background(mint)
         .clipShape(RoundedRectangle(cornerRadius: 12))
