@@ -4,7 +4,7 @@ import SwiftUI
 
 struct Test1: View {
     private let navy = Color(red: 0.1, green: 0.25, blue: 0.4)
-    private let mint = Color(red: 0.15, green: 0.6, blue: 0.55)
+    private let mint = Color(red: 0.25, green: 0.85, blue: 0.75)
 
     var body: some View {
         GeometryReader { geo in
@@ -51,6 +51,7 @@ private struct Test1Sidebar: View {
             .padding(20)
         }
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: .black.opacity(0.75), radius: 16, y: 7)
         .overlay(
             ZStack {
                 RoundedRectangle(cornerRadius: 16)
@@ -67,7 +68,6 @@ private struct Test1Sidebar: View {
                     .padding(3)
             }
         )
-        .shadow(color: .black.opacity(0.75), radius: 16, y: 7)
     }
 }
 
