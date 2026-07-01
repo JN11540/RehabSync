@@ -51,7 +51,7 @@ struct Home: View {
             case .test1: Test1()
             }
         }
-        .safeAreaInset(edge: .bottom) {
+        .safeAreaInset(edge: .top) {
             FloatingTabBar(selectedTab: $selectedTab)
         }
         .environment(btVM)
@@ -102,7 +102,7 @@ private struct FloatingTabBar: View {
         .clipShape(RoundedRectangle(cornerRadius: 24))
         .shadow(color: .black.opacity(0.2), radius: 10, y: 4)
         .padding(.horizontal, 24)
-        .padding(.top, 8)
+        .padding(.bottom, 8)
     }
 }
 
