@@ -92,7 +92,7 @@ private struct FloatingTabBar: View {
                         .font(.system(size: 15, weight: selectedTab == tab ? .semibold : .regular))
                         .foregroundStyle(selectedTab == tab ? .white : .white.opacity(0.6))
                         .padding(.horizontal, 26)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 16)
                         .frame(maxWidth: .infinity)
                         .background(
                             RoundedRectangle(cornerRadius: 10)
