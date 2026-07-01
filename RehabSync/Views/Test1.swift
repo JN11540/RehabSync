@@ -87,7 +87,7 @@ private struct Test1MenuTile: View {
         .padding(.vertical, 14)
         .background(mint)
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 40)
+        .padding(.horizontal, 20)
     }
 }
 
