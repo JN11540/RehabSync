@@ -83,22 +83,21 @@ private struct FloatingTabBar: View {
     private let tealGreen = Color(red: 0.35, green: 0.58, blue: 0.53)
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 10) {
             ForEach(HomeTab.allCases, id: \.self) { tab in
                 Button {
                     selectedTab = tab
                 } label: {
                     Text(tab.title)
                         .font(.system(size: 15, weight: selectedTab == tab ? .semibold : .regular))
-                        .foregroundStyle(selectedTab == tab ? .white : .white.opacity(0.5))
+                        .foregroundStyle(selectedTab == tab ? .white : .white.opacity(0.6))
                         .padding(.horizontal, 26)
                         .padding(.vertical, 8)
-                        .background {
-                            if selectedTab == tab {
-                                RoundedRectangle(cornerRadius: 10).fill(tealGreen)
-                            }
-                        }
                         .frame(maxWidth: .infinity)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(selectedTab == tab ? tealGreen : Color.white.opacity(0.08))
+                        )
                 }
                 .buttonStyle(.plain)
             }
