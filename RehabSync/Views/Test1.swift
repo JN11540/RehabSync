@@ -52,6 +52,15 @@ private struct Test1Sidebar: View {
             .padding(20)
         }
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            ZStack {
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(Color.black, lineWidth: 3)
+                RoundedRectangle(cornerRadius: 13)
+                    .strokeBorder(Color(white: 0.35), lineWidth: 8)
+                    .padding(3)
+            }
+        )
     }
 }
 
