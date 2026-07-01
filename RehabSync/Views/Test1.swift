@@ -40,16 +40,14 @@ private struct Test1Sidebar: View {
     let mint: Color
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            Color.black
-            VStack(spacing: 20) {
-                Test1MenuTile(title: "掃描 QR code", mint: mint)
-                Test1MenuTile(title: "綁定藍芽", mint: mint)
-                Test1MenuTile(title: "訓練菜單", mint: mint)
-                Test1MenuTile(title: "商店", mint: mint)
-            }
-            .padding(20)
+        VStack(spacing: 20) {
+            Test1MenuTile(title: "掃描 QR code", mint: mint)
+            Test1MenuTile(title: "綁定藍芽", mint: mint)
+            Test1MenuTile(title: "訓練菜單", mint: mint)
+            Test1MenuTile(title: "商店", mint: mint)
         }
+        .padding(20)
+        .background(Color.black)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: .black.opacity(0.75), radius: 16, y: 7)
         .overlay(
