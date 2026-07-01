@@ -15,6 +15,7 @@ struct Test1: View {
             HStack(alignment: .top, spacing: spacing) {
                 Test1Sidebar(mint: mint)
                     .frame(width: usable * 0.35)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
 
                 Test1PreviewFrame(navy: navy)
                     .frame(width: usable * 0.65)
