@@ -15,7 +15,7 @@ struct Test1: View {
             HStack(alignment: .top, spacing: spacing) {
                 Test1Sidebar(mint: mint)
                     .frame(width: usable * 0.35)
-                    .padding(.top, 140)
+                    .frame(maxHeight: .infinity, alignment: .center)
 
                 Test1PreviewFrame(navy: navy)
                     .frame(width: usable * 0.65)
@@ -57,7 +57,7 @@ private struct Test1Sidebar: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 16)
                     .strokeBorder(Color.black, lineWidth: 6)
-                RoundedRectangle(cornerRadius: 26)
+                RoundedRectangle(cornerRadius: 14)
                     .strokeBorder(
                         LinearGradient(
                             colors: [Color(white: 0.55), Color(white: 0.25)],
