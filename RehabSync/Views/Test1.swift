@@ -15,7 +15,6 @@ struct Test1: View {
             HStack(alignment: .top, spacing: spacing) {
                 Test1Sidebar(navy: navy, mint: mint)
                     .frame(width: usable * 0.35)
-                    .frame(maxHeight: .infinity)
 
                 Test1PreviewFrame(navy: navy)
                     .frame(width: usable * 0.65)
@@ -44,24 +43,10 @@ private struct Test1Sidebar: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             navy.opacity(0.5)
-            VStack(alignment: .leading, spacing: 24) {
-                Text("測試1")
-                    .font(.system(size: 26, weight: .bold))
-                    .foregroundStyle(.white)
-
-                VStack(spacing: 14) {
-                    Test1MenuTile(icon: "figure.walk", title: "動作", mint: mint)
-                    Test1MenuTile(icon: "square.stack.3d.up", title: "模型", mint: mint)
-                    Test1MenuTile(icon: "star", title: "收藏", mint: mint)
-                }
-
-                Divider().background(.white.opacity(0.2))
-
-                VStack(spacing: 0) {
-                    Test1ListRow(icon: "bell", title: "通知")
-                    Test1ListRow(icon: "person.crop.circle", title: "帳戶")
-                    Test1ListRow(icon: "gearshape", title: "設定")
-                }
+            VStack(spacing: 14) {
+                Test1MenuTile(icon: "figure.walk", title: "動作", mint: mint)
+                Test1MenuTile(icon: "square.stack.3d.up", title: "模型", mint: mint)
+                Test1MenuTile(icon: "star", title: "收藏", mint: mint)
             }
             .padding(20)
         }
@@ -87,24 +72,6 @@ private struct Test1MenuTile: View {
         .padding(.vertical, 14)
         .background(mint)
         .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-}
-
-private struct Test1ListRow: View {
-    let icon: String
-    let title: String
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 15))
-                .frame(width: 22)
-            Text(title)
-                .font(.system(size: 15))
-            Spacer()
-        }
-        .foregroundStyle(.white.opacity(0.7))
-        .padding(.vertical, 10)
     }
 }
 
