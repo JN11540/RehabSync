@@ -57,10 +57,18 @@ private struct Test1Sidebar: View {
                 RoundedRectangle(cornerRadius: 16)
                     .strokeBorder(Color.black, lineWidth: 3)
                 RoundedRectangle(cornerRadius: 13)
-                    .strokeBorder(Color(white: 0.35), lineWidth: 8)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [Color(white: 0.55), Color(white: 0.25)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 12
+                    )
                     .padding(3)
             }
         )
+        .shadow(color: .black.opacity(0.4), radius: 9, y: 4)
     }
 }
 
