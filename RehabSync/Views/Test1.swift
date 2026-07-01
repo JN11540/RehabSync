@@ -43,7 +43,7 @@ private struct Test1Sidebar: View {
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            navy
+            navy.opacity(0.5)
             VStack(alignment: .leading, spacing: 24) {
                 Text("測試1")
                     .font(.system(size: 26, weight: .bold))
@@ -116,7 +116,7 @@ private struct Test1PreviewFrame: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 20)
-                .fill(navy.opacity(0.9))
+                .fill(navy.opacity(0.5))
             RoundedRectangle(cornerRadius: 20)
                 .stroke(.white.opacity(0.25), lineWidth: 3)
 
