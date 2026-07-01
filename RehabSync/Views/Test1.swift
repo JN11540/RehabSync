@@ -15,7 +15,7 @@ struct Test1: View {
             HStack(alignment: .top, spacing: spacing) {
                 Test1Sidebar(mint: mint)
                     .frame(width: usable * 0.35)
-                    .padding(.top, 80)
+                    .padding(.top, 140)
 
                 Test1PreviewFrame(navy: navy)
                     .frame(width: usable * 0.65)
@@ -43,7 +43,7 @@ private struct Test1Sidebar: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             Color.black
-            VStack(spacing: 14) {
+            VStack(spacing: 20) {
                 Test1MenuTile(title: "掃描 QR code", mint: mint)
                 Test1MenuTile(title: "綁定藍芽", mint: mint)
                 Test1MenuTile(title: "訓練菜單", mint: mint)
@@ -84,7 +84,7 @@ private struct Test1MenuTile: View {
         }
         .foregroundStyle(.black)
         .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .padding(.vertical, 30)
         .background(mint)
         .overlay(alignment: .leading) {
             HStack(spacing: 14) {
