@@ -95,7 +95,7 @@ private struct FloatingTabBar: View {
                         .padding(.vertical, 8)
                         .background {
                             if selectedTab == tab {
-                                Capsule().fill(tealGreen)
+                                RoundedRectangle(cornerRadius: 10).fill(tealGreen)
                             }
                         }
                         .frame(maxWidth: .infinity)
@@ -105,8 +105,8 @@ private struct FloatingTabBar: View {
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 6)
-        .background(Capsule().fill(.black.opacity(0.75)))
-        .overlay(Capsule().stroke(.black.opacity(0.9), lineWidth: 1))
+        .background(RoundedRectangle(cornerRadius: 10).fill(.black.opacity(0.75)))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(.black.opacity(0.9), lineWidth: 1))
         .shadow(color: .black.opacity(0.2), radius: 10, y: 4)
         .padding(.horizontal, 24)
         .padding(.bottom, 8)
