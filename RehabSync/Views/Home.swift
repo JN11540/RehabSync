@@ -104,8 +104,8 @@ private struct FloatingTabBar: View {
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 6)
-        .background(RoundedRectangle(cornerRadius: 10).fill(.black.opacity(0.45)))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(.black, lineWidth: 1.5))
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color(white: 0.2)))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(.black, lineWidth: 3))
         .shadow(color: .black.opacity(0.2), radius: 10, y: 4)
         .padding(.horizontal, 24)
         .padding(.bottom, 8)
