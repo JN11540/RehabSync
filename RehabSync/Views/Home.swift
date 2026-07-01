@@ -80,8 +80,7 @@ struct Home: View {
 private struct FloatingTabBar: View {
     @Binding var selectedTab: HomeTab
 
-    private let navy = Color(red: 0.1, green: 0.25, blue: 0.4)
-    private let mint = Color(red: 0.15, green: 0.6, blue: 0.55)
+    private let tealGreen = Color(red: 0.35, green: 0.58, blue: 0.53)
 
     var body: some View {
         HStack(spacing: 0) {
@@ -91,15 +90,23 @@ private struct FloatingTabBar: View {
                 } label: {
                     Text(tab.title)
                         .font(.system(size: 15, weight: selectedTab == tab ? .semibold : .regular))
-                        .foregroundStyle(selectedTab == tab ? mint : .white.opacity(0.5))
+                        .foregroundStyle(selectedTab == tab ? .white : .white.opacity(0.5))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background {
+                            if selectedTab == tab {
+                                Capsule().fill(tealGreen)
+                            }
+                        }
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(.vertical, 14)
-        .background(navy)
-        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .padding(.vertical, 10)
+        .padding(.horizontal, 6)
+        .background(Capsule().fill(.black.opacity(0.75)))
+        .overlay(Capsule().stroke(.black.opacity(0.9), lineWidth: 1))
         .shadow(color: .black.opacity(0.2), radius: 10, y: 4)
         .padding(.horizontal, 24)
         .padding(.bottom, 8)
