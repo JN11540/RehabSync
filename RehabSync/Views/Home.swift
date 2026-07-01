@@ -34,6 +34,8 @@ struct Home: View {
                 .tabItem { Label("測試", systemImage: "flask") }
             Setting()
                 .tabItem { Label("設定", systemImage: "gearshape") }
+            Test1()
+                .tabItem { Label("測試1", systemImage: "square.grid.2x2") }
         }
         .environment(btVM)
         .overlay {
