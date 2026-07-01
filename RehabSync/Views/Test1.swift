@@ -56,7 +56,7 @@ private struct Test1Sidebar: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 16)
                     .strokeBorder(Color.black, lineWidth: 6)
-                RoundedRectangle(cornerRadius: 14)
+                RoundedRectangle(cornerRadius: 22)
                     .strokeBorder(
                         LinearGradient(
                             colors: [Color(white: 0.55), Color(white: 0.25)],
