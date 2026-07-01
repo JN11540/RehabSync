@@ -86,6 +86,19 @@ private struct Test1MenuTile: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
         .background(mint)
+        .overlay(alignment: .leading) {
+            HStack(spacing: 14) {
+                Rectangle()
+                    .fill(Color.white.opacity(0.3))
+                    .frame(width: 18, height: 200)
+                    .rotationEffect(.degrees(20))
+                Rectangle()
+                    .fill(Color.white.opacity(0.3))
+                    .frame(width: 9, height: 200)
+                    .rotationEffect(.degrees(20))
+            }
+            .padding(.leading, 28)
+        }
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .padding(.horizontal, 20)
     }
