@@ -47,7 +47,8 @@ private struct Test1Sidebar: View {
             Test1MenuTile(title: "訓練菜單", mint: mint)
             Test1MenuTile(title: "商店", mint: mint)
         }
-        .padding(20)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 28)
         .background(Color.black)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: .black.opacity(0.75), radius: 16, y: 7)
