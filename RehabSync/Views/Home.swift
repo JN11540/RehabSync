@@ -91,7 +91,7 @@ private struct FloatingTabBar: View {
                     Text(tab.title)
                         .font(.system(size: 15, weight: selectedTab == tab ? .semibold : .regular))
                         .foregroundStyle(selectedTab == tab ? .white : .white.opacity(0.5))
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, 26)
                         .padding(.vertical, 8)
                         .background {
                             if selectedTab == tab {
