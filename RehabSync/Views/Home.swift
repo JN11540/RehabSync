@@ -21,21 +21,38 @@ extension EnvironmentValues {
     }
 }
 
+// MARK: - Home Tab
+
+private enum HomeTab: CaseIterable {
+    case home, statistic, test, setting, test1
+
+    var title: String {
+        switch self {
+        case .home: "主頁"
+        case .statistic: "數據"
+        case .test: "測試"
+        case .setting: "設定"
+        case .test1: "測試1"
+        }
+    }
+}
+
 struct Home: View {
     @State private var btVM = BluetoothViewModel()
+    @State private var selectedTab: HomeTab = .home
 
     var body: some View {
-        TabView {
-            HomeContent()
-                .tabItem { Label("主頁", systemImage: "house") }
-            Statistic()
-                .tabItem { Label("數據", systemImage: "chart.bar") }
-            TestPage(btVM: btVM)
-                .tabItem { Label("測試", systemImage: "flask") }
-            Setting()
-                .tabItem { Label("設定", systemImage: "gearshape") }
-            Test1()
-                .tabItem { Label("測試1", systemImage: "square.grid.2x2") }
+        Group {
+            switch selectedTab {
+            case .home: HomeContent()
+            case .statistic: Statistic()
+            case .test: TestPage(btVM: btVM)
+            case .setting: Setting()
+            case .test1: Test1()
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            FloatingTabBar(selectedTab: $selectedTab)
         }
         .environment(btVM)
         .overlay {
@@ -55,6 +72,37 @@ struct Home: View {
                 .clipShape(RoundedRectangle(cornerRadius: 16))
             }
         }
+    }
+}
+
+// MARK: - Floating Tab Bar
+
+private struct FloatingTabBar: View {
+    @Binding var selectedTab: HomeTab
+
+    private let navy = Color(red: 0.1, green: 0.25, blue: 0.4)
+    private let mint = Color(red: 0.15, green: 0.6, blue: 0.55)
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(HomeTab.allCases, id: \.self) { tab in
+                Button {
+                    selectedTab = tab
+                } label: {
+                    Text(tab.title)
+                        .font(.system(size: 15, weight: selectedTab == tab ? .semibold : .regular))
+                        .foregroundStyle(selectedTab == tab ? mint : .white.opacity(0.5))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.vertical, 14)
+        .background(navy)
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .shadow(color: .black.opacity(0.2), radius: 10, y: 4)
+        .padding(.horizontal, 24)
+        .padding(.top, 8)
     }
 }
 
