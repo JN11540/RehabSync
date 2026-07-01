@@ -7,29 +7,30 @@ struct Test1: View {
     private let mint = Color(red: 0.15, green: 0.6, blue: 0.55)
 
     var body: some View {
-        ZStack {
+        GeometryReader { geo in
+            let spacing: CGFloat = 20
+            let hPad: CGFloat = 24
+            let usable = geo.size.width - hPad * 2 - spacing
+
+            HStack(alignment: .top, spacing: spacing) {
+                Test1Sidebar(navy: navy, mint: mint)
+                    .frame(width: usable * 0.35)
+                    .frame(maxHeight: .infinity)
+
+                Test1PreviewFrame(navy: navy)
+                    .frame(width: usable * 0.65)
+                    .frame(maxHeight: .infinity)
+            }
+            .padding(.horizontal, hPad)
+            .padding(.vertical, 20)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .background {
             Image("Test1Preview")
                 .resizable()
                 .scaledToFill()
                 .ignoresSafeArea()
                 .clipped()
-            GeometryReader { geo in
-                let spacing: CGFloat = 20
-                let hPad: CGFloat = 24
-                let usable = geo.size.width - hPad * 2 - spacing
-
-                HStack(alignment: .top, spacing: spacing) {
-                    Test1Sidebar(navy: navy, mint: mint)
-                        .frame(width: usable * 0.35)
-                        .frame(maxHeight: .infinity)
-
-                    Test1PreviewFrame(navy: navy)
-                        .frame(width: usable * 0.65)
-                        .frame(maxHeight: .infinity)
-                }
-                .padding(.horizontal, hPad)
-                .padding(.vertical, 20)
-            }
         }
     }
 }
