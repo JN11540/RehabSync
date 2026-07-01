@@ -80,10 +80,10 @@ private struct Test1MenuTile: View {
         HStack(spacing: 10) {
             Spacer()
             Text(title)
-                .font(.system(size: 18, weight: .semibold))
+                .font(.system(size: 22, weight: .semibold))
         }
         .foregroundStyle(.black)
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 32)
         .padding(.vertical, 14)
         .background(mint)
         .clipShape(RoundedRectangle(cornerRadius: 12))
