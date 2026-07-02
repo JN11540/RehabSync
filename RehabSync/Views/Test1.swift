@@ -5,6 +5,27 @@ import SwiftUI
 struct Test1: View {
     private let mint = Color(red: 0.25, green: 0.85, blue: 0.75)
     @State private var showTrainingImages = false
+    @State private var selectedDate = Date()
+    @State private var treatmentVM = TreatmentViewModel()
+    @State private var contentVM = TreatmentContentViewModel()
+    @State private var exerciseVM = ExerciseViewModel()
+
+    private var todayContents: [TreatmentContent] {
+        let day = Calendar.current.startOfDay(for: selectedDate)
+        return contentVM.contents.filter {
+            Calendar.current.startOfDay(for: Date(timeIntervalSince1970: TimeInterval($0.date))) == day
+        }
+    }
+
+    private func loadTrainingMenu() {
+        treatmentVM.fetchAll()
+        // Test1 沒有治療計畫選擇 UI，先以第一個治療計畫代表「目前的訓練菜單」
+        if let treatmentId = treatmentVM.treatments.first?.id {
+            contentVM.fetchAll(for: Int(treatmentId))
+        }
+        exerciseVM.fetchAll()
+        showTrainingImages = true
+    }
 
     var body: some View {
         GeometryReader { geo in
@@ -13,15 +34,19 @@ struct Test1: View {
             let usable = geo.size.width - hPad * 2 - spacing
 
             HStack(alignment: .top, spacing: spacing) {
-                Test1Sidebar(mint: mint) {
-                    showTrainingImages = true
-                }
-                .frame(width: usable * 0.35)
-                .frame(maxHeight: .infinity, alignment: .bottom)
+                Test1Sidebar(mint: mint, onTrainingMenuTap: loadTrainingMenu)
+                    .frame(width: usable * 0.35)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
 
-                Test1PreviewFrame(mint: mint, showTrainingImages: showTrainingImages)
-                    .frame(width: usable * 0.65)
-                    .frame(maxHeight: .infinity)
+                Test1PreviewFrame(
+                    mint: mint,
+                    showTrainingImages: showTrainingImages,
+                    contents: todayContents,
+                    exercises: exerciseVM.exercises,
+                    selectedDate: $selectedDate
+                )
+                .frame(width: usable * 0.65)
+                .frame(maxHeight: .infinity)
             }
             .padding(.horizontal, hPad)
             .padding(.vertical, 20)
@@ -157,7 +182,9 @@ private struct Test1MenuTile<Icon: View>: View {
 private struct Test1PreviewFrame: View {
     let mint: Color
     var showTrainingImages: Bool = false
-    @State private var selectedDate = Date()
+    let contents: [TreatmentContent]
+    let exercises: [Exercise]
+    @Binding var selectedDate: Date
 
     private var dateString: String {
         let cal = Calendar.current
@@ -165,6 +192,10 @@ private struct Test1PreviewFrame: View {
         let m = cal.component(.month, from: selectedDate)
         let d = cal.component(.day, from: selectedDate)
         return "\(y)年\(m)月\(d)日"
+    }
+
+    private func exerciseName(for content: TreatmentContent) -> String {
+        exercises.first { $0.id == Int64(content.exercise_id) }?.name ?? "未知動作"
     }
 
     var body: some View {
@@ -203,11 +234,26 @@ private struct Test1PreviewFrame: View {
 
                 Group {
                     if showTrainingImages {
-                        HStack(spacing: 16) {
-                            TrainingCard(imageName: "TerminalKneeExtensionIcon", title: "膝關節終端伸展", mint: mint)
-                            TrainingCard(imageName: "PartialSquatIcon", title: "部分蹲", mint: mint)
+                        if contents.isEmpty {
+                            Text("當天沒有安排訓練動作")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.4))
+                        } else {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 16) {
+                                    ForEach(contents, id: \.id) { content in
+                                        TrainingCard(
+                                            imageName: "Exercise\(content.exercise_id)",
+                                            title: exerciseName(for: content),
+                                            subtitle: "\(content.sets) 組 · \(content.reps) 次 · 休息 \(content.set_rest_time) 秒",
+                                            mint: mint
+                                        )
+                                        .frame(width: 220)
+                                    }
+                                }
+                                .padding(40)
+                            }
                         }
-                        .padding(40)
                     } else {
                         VStack(spacing: 10) {
                             Image(systemName: "cube.transparent")
@@ -250,6 +296,7 @@ private struct Test1PreviewFrame: View {
 private struct TrainingCard: View {
     let imageName: String
     let title: String
+    let subtitle: String
     let mint: Color
 
     /// 統一以 terminal_knee_extension_nobg.png 的原始尺寸（1651 x 1886）為圖片區域比例基準
@@ -295,7 +342,7 @@ private struct TrainingCard: View {
                     .stroke(Color.black, lineWidth: 4)
             )
 
-            Text("4組 × 12次 × 組間休息時間120秒")
+            Text(subtitle)
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 14)
