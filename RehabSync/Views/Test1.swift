@@ -230,17 +230,19 @@ private struct TrainingCard: View {
                     .foregroundStyle(.black)
                     .padding(.vertical, 12)
                     .frame(maxWidth: .infinity)
-                    .background(mint)
-                    .overlay(alignment: .center) {
-                        HStack(spacing: 14) {
-                            Rectangle()
-                                .fill(Color.white.opacity(0.3))
-                                .frame(width: 36, height: 200)
-                                .rotationEffect(.degrees(20))
-                            Rectangle()
-                                .fill(Color.white.opacity(0.3))
-                                .frame(width: 20, height: 200)
-                                .rotationEffect(.degrees(20))
+                    .background {
+                        ZStack {
+                            mint
+                            HStack(spacing: 14) {
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.3))
+                                    .frame(width: 46, height: 200)
+                                    .rotationEffect(.degrees(20))
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.3))
+                                    .frame(width: 26, height: 200)
+                                    .rotationEffect(.degrees(20))
+                            }
                         }
                     }
                     .clipped()
