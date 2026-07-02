@@ -218,7 +218,7 @@ private struct TrainingCard: View {
         VStack(spacing: 8) {
             VStack(spacing: 0) {
                 ZStack {
-                    Color.black.opacity(0.25)
+                    Color.black
                     Image(imageName)
                         .resizable()
                         .scaledToFit()
