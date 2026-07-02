@@ -165,15 +165,15 @@ private struct Test1PreviewFrame: View {
 
             if showTrainingImages {
                 HStack(spacing: 16) {
-                    VStack(spacing: 12) {
+                    VStack(spacing: 0) {
                         TrainingImageFrame(imageName: "TerminalKneeExtensionIcon")
                         TrainingActionPill(title: "膝關節終端伸展", mint: mint)
                     }
-                    VStack(spacing: 12) {
+                    VStack(spacing: 0) {
                         TrainingImageFrame(imageName: "PartialSquatIcon")
                         TrainingActionPill(title: "部分蹲", mint: mint)
                     }
-                    VStack(spacing: 12) {
+                    VStack(spacing: 0) {
                         TrainingImageFrame(imageName: "StepTrainingIcon")
                         TrainingActionPill(title: "登階運動", mint: mint)
                     }
@@ -247,8 +247,8 @@ private struct TrainingActionPill: View {
         Text(title)
             .font(.system(size: 18, weight: .semibold))
             .foregroundStyle(.black)
-            .padding(.horizontal, 24)
             .padding(.vertical, 12)
+            .frame(maxWidth: .infinity)
             .background(mint)
             .overlay(alignment: .center) {
                 HStack(spacing: 14) {
