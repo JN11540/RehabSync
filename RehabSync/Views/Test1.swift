@@ -213,42 +213,54 @@ private struct TrainingCard: View {
 
     /// 統一以 terminal_knee_extension_nobg.png 的原始尺寸（1651 x 1886）為圖片區域比例基準
     private static let referenceAspectRatio: CGFloat = 1651.0 / 1886.0
+    private let darkGreen = Color(red: 0.15, green: 0.5, blue: 0.45)
 
     var body: some View {
-        VStack(spacing: 0) {
-            ZStack {
-                Color.black.opacity(0.25)
-                Image(imageName)
-                    .resizable()
-                    .scaledToFit()
-                    .padding(8)
-            }
-            .aspectRatio(Self.referenceAspectRatio, contentMode: .fit)
-
-            Text(title)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(.black)
-                .padding(.vertical, 12)
-                .frame(maxWidth: .infinity)
-                .background(mint)
-                .overlay(alignment: .center) {
-                    HStack(spacing: 14) {
-                        Rectangle()
-                            .fill(Color.white.opacity(0.3))
-                            .frame(width: 36, height: 200)
-                            .rotationEffect(.degrees(20))
-                        Rectangle()
-                            .fill(Color.white.opacity(0.3))
-                            .frame(width: 20, height: 200)
-                            .rotationEffect(.degrees(20))
-                    }
+        VStack(spacing: 10) {
+            VStack(spacing: 0) {
+                ZStack {
+                    Color.black.opacity(0.25)
+                    Image(imageName)
+                        .resizable()
+                        .scaledToFit()
+                        .padding(8)
                 }
+                .aspectRatio(Self.referenceAspectRatio, contentMode: .fit)
+
+                Text(title)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.black)
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity)
+                    .background(mint)
+                    .overlay(alignment: .center) {
+                        HStack(spacing: 14) {
+                            Rectangle()
+                                .fill(Color.white.opacity(0.3))
+                                .frame(width: 36, height: 200)
+                                .rotationEffect(.degrees(20))
+                            Rectangle()
+                                .fill(Color.white.opacity(0.3))
+                                .frame(width: 20, height: 200)
+                                .rotationEffect(.degrees(20))
+                        }
+                    }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.black, lineWidth: 4)
+            )
+
+            Text("4組 X 12次")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .background(darkGreen)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
         }
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.black, lineWidth: 4)
-        )
     }
 }
 
