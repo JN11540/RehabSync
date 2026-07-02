@@ -80,7 +80,8 @@ private struct Test1MenuTile: View {
         HStack(spacing: 10) {
             if let icon {
                 Image(systemName: icon)
-                    .font(.system(size: 50, weight: .semibold))
+                    .font(.system(size: 22, weight: .semibold))
+                    .scaleEffect(1.8)
             }
             Spacer()
             Text(title)
