@@ -163,7 +163,7 @@ private struct Test1PreviewFrame: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 20)
-                .fill(navy.opacity(0.8))
+                .fill(navy.opacity(0.95))
 
             if showTrainingImages {
                 HStack(spacing: 16) {
