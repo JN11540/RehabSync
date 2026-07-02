@@ -223,7 +223,6 @@ private struct TrainingCard: View {
                     Image(imageName)
                         .resizable()
                         .scaledToFit()
-                        .padding(8)
                 }
                 .aspectRatio(Self.referenceAspectRatio, contentMode: .fit)
 
