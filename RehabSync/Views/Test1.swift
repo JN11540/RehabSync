@@ -78,11 +78,11 @@ private struct Test1MenuTile: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Spacer()
             if let icon {
                 Image(systemName: icon)
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.system(size: 50, weight: .semibold))
             }
+            Spacer()
             Text(title)
                 .font(.system(size: 22, weight: .semibold))
         }
