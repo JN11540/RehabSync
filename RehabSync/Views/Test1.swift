@@ -45,7 +45,9 @@ private struct Test1Sidebar: View {
             Test1MenuTile(title: "掃描 QR code", mint: mint) {
                 ColorfulQRIcon()
             }
-            Test1MenuTile(title: "綁定藍芽", mint: mint)
+            Test1MenuTile(title: "裝置連線", mint: mint) {
+                DeviceLinkIcon()
+            }
             Test1MenuTile(title: "訓練菜單", mint: mint)
             Test1MenuTile(title: "商店", mint: mint)
         }
@@ -135,6 +137,24 @@ private struct ColorfulQRIcon: View {
         }
         .frame(width: 34, height: 34)
         .scaleEffect(2.2)
+    }
+}
+
+// MARK: - Device Link Icon
+
+private struct DeviceLinkIcon: View {
+    var body: some View {
+        ZStack {
+            Image(systemName: "bandage.fill")
+                .font(.system(size: 20, weight: .semibold))
+                .offset(x: -6, y: 6)
+            Image(systemName: "antenna.radiowaves.left.and.right")
+                .font(.system(size: 16, weight: .semibold))
+                .offset(x: 10, y: -8)
+        }
+        .foregroundStyle(.black)
+        .frame(width: 34, height: 34)
+        .scaleEffect(1.8)
     }
 }
 
