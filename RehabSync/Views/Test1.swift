@@ -93,9 +93,12 @@ private struct Test1Sidebar: View {
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ),
-                        lineWidth: 18
+                        lineWidth: 25
                     )
                     .padding(3)
+                RoundedRectangle(cornerRadius: 6)
+                    .strokeBorder(Color.black, lineWidth: 6)
+                    .padding(28)
             }
         )
     }
@@ -172,9 +175,12 @@ private struct Test1PreviewFrame: View {
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ),
-                        lineWidth: 18
+                        lineWidth: 25
                     )
                     .padding(3)
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(Color.black, lineWidth: 6)
+                    .padding(28)
             }
         )
     }
