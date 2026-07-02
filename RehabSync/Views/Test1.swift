@@ -164,15 +164,9 @@ private struct Test1PreviewFrame: View {
 
             if showTrainingImages {
                 HStack(spacing: 16) {
-                    Image("TerminalKneeExtensionIcon")
-                        .resizable()
-                        .scaledToFit()
-                    Image("PartialSquatIcon")
-                        .resizable()
-                        .scaledToFit()
-                    Image("StepTrainingIcon")
-                        .resizable()
-                        .scaledToFit()
+                    TrainingImageFrame(imageName: "TerminalKneeExtensionIcon")
+                    TrainingImageFrame(imageName: "PartialSquatIcon")
+                    TrainingImageFrame(imageName: "StepTrainingIcon")
                 }
                 .padding(40)
             } else {
@@ -205,6 +199,30 @@ private struct Test1PreviewFrame: View {
                     .strokeBorder(Color.black, lineWidth: 6)
                     .padding(28)
             }
+        )
+    }
+}
+
+// MARK: - Training Image Frame
+
+private struct TrainingImageFrame: View {
+    let imageName: String
+
+    /// 統一以 terminal_knee_extension_nobg.png 的原始尺寸（1651 x 1886）為外框比例基準
+    private static let referenceAspectRatio: CGFloat = 1651.0 / 1886.0
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.25)
+            Image(imageName)
+                .resizable()
+                .scaledToFit()
+                .padding(8)
+        }
+        .aspectRatio(Self.referenceAspectRatio, contentMode: .fit)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.white.opacity(0.6), lineWidth: 2)
         )
     }
 }
