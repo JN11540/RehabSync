@@ -54,7 +54,7 @@ private struct Test1Sidebar: View {
                     Image(systemName: "antenna.radiowaves.left.and.right")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(Color(red: 0.2, green: 0.5, blue: 0.9))
-                        .offset(x: 6, y: -6)
+                        .offset(x: 6, y: -2)
                 }
                 .scaleEffect(2.8)
             }
