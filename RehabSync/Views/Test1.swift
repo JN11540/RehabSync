@@ -173,31 +173,33 @@ private struct Test1PreviewFrame: View {
                 .fill(Color.black.opacity(0.95))
 
             VStack(spacing: 0) {
-                HStack(spacing: 16) {
-                    Button {
-                        selectedDate = Calendar.current.date(byAdding: .day, value: -1, to: selectedDate) ?? selectedDate
-                    } label: {
-                        Image(systemName: "triangle.fill")
-                            .font(.system(size: 14))
-                            .foregroundStyle(.white)
-                    }
-                    .buttonStyle(.plain)
+                if showTrainingImages {
+                    HStack(spacing: 16) {
+                        Button {
+                            selectedDate = Calendar.current.date(byAdding: .day, value: -1, to: selectedDate) ?? selectedDate
+                        } label: {
+                            Image(systemName: "triangle.fill")
+                                .font(.system(size: 14))
+                                .foregroundStyle(.white)
+                        }
+                        .buttonStyle(.plain)
 
-                    Text(dateString)
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.white)
-
-                    Button {
-                        selectedDate = Calendar.current.date(byAdding: .day, value: 1, to: selectedDate) ?? selectedDate
-                    } label: {
-                        Image(systemName: "triangle.fill")
-                            .font(.system(size: 14))
+                        Text(dateString)
+                            .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(.white)
-                            .rotationEffect(.degrees(180))
+
+                        Button {
+                            selectedDate = Calendar.current.date(byAdding: .day, value: 1, to: selectedDate) ?? selectedDate
+                        } label: {
+                            Image(systemName: "triangle.fill")
+                                .font(.system(size: 14))
+                                .foregroundStyle(.white)
+                                .rotationEffect(.degrees(180))
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
+                    .padding(.top, 48)
                 }
-                .padding(.top, 24)
 
                 Group {
                     if showTrainingImages {
