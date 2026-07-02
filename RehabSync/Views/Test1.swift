@@ -89,11 +89,11 @@ private struct Test1MenuTile: View {
             HStack(spacing: 14) {
                 Rectangle()
                     .fill(Color.white.opacity(0.3))
-                    .frame(width: 26, height: 200)
+                    .frame(width: 36, height: 200)
                     .rotationEffect(.degrees(20))
                 Rectangle()
                     .fill(Color.white.opacity(0.3))
-                    .frame(width: 14, height: 200)
+                    .frame(width: 20, height: 200)
                     .rotationEffect(.degrees(20))
             }
         }
