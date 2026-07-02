@@ -42,7 +42,9 @@ private struct Test1Sidebar: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            Test1MenuTile(icon: "qrcode.viewfinder", title: "掃描 QR code", mint: mint)
+            Test1MenuTile(title: "掃描 QR code", mint: mint) {
+                ColorfulQRIcon()
+            }
             Test1MenuTile(title: "綁定藍芽", mint: mint)
             Test1MenuTile(title: "訓練菜單", mint: mint)
             Test1MenuTile(title: "商店", mint: mint)
@@ -71,18 +73,21 @@ private struct Test1Sidebar: View {
     }
 }
 
-private struct Test1MenuTile: View {
-    var icon: String? = nil
+private struct Test1MenuTile<Icon: View>: View {
     let title: String
     let mint: Color
+    @ViewBuilder var icon: () -> Icon
+
+    init(title: String, mint: Color, @ViewBuilder icon: @escaping () -> Icon = { EmptyView() }) {
+        self.title = title
+        self.mint = mint
+        self.icon = icon
+    }
 
     var body: some View {
         HStack(spacing: 10) {
-            if let icon {
-                Image(systemName: icon)
-                    .font(.system(size: 22, weight: .semibold))
-                    .scaleEffect(1.8)
-            }
+            icon()
+                .padding(.leading, 14)
             Spacer()
             Text(title)
                 .font(.system(size: 22, weight: .semibold))
@@ -105,6 +110,31 @@ private struct Test1MenuTile: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .padding(.horizontal, 20)
+    }
+}
+
+// MARK: - Colorful QR Icon
+
+private struct ColorfulQRIcon: View {
+    private let colors: [Color] = [
+        .red, .white, .orange,
+        .yellow, .red, .white,
+        .orange, .yellow, .red
+    ]
+
+    var body: some View {
+        VStack(spacing: 2) {
+            ForEach(0..<3) { row in
+                HStack(spacing: 2) {
+                    ForEach(0..<3) { col in
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(colors[row * 3 + col])
+                    }
+                }
+            }
+        }
+        .frame(width: 34, height: 34)
+        .scaleEffect(2.2)
     }
 }
 
