@@ -5,6 +5,7 @@ import SwiftUI
 struct Test1: View {
     private let navy = Color(red: 0.1, green: 0.25, blue: 0.4)
     private let mint = Color(red: 0.25, green: 0.85, blue: 0.75)
+    @State private var showTrainingImages = false
 
     var body: some View {
         GeometryReader { geo in
@@ -13,11 +14,13 @@ struct Test1: View {
             let usable = geo.size.width - hPad * 2 - spacing
 
             HStack(alignment: .top, spacing: spacing) {
-                Test1Sidebar(mint: mint)
-                    .frame(width: usable * 0.35)
-                    .frame(maxHeight: .infinity, alignment: .bottom)
+                Test1Sidebar(mint: mint) {
+                    showTrainingImages = true
+                }
+                .frame(width: usable * 0.35)
+                .frame(maxHeight: .infinity, alignment: .bottom)
 
-                Test1PreviewFrame(navy: navy)
+                Test1PreviewFrame(navy: navy, showTrainingImages: showTrainingImages)
                     .frame(width: usable * 0.65)
                     .frame(maxHeight: .infinity)
             }
@@ -39,6 +42,7 @@ struct Test1: View {
 
 private struct Test1Sidebar: View {
     let mint: Color
+    let onTrainingMenuTap: () -> Void
 
     var body: some View {
         VStack(spacing: 20) {
@@ -62,13 +66,16 @@ private struct Test1Sidebar: View {
                 }
                 .scaleEffect(2.8)
             }
-            Test1MenuTile(title: "訓練菜單", mint: mint) {
-                Image("MenuIcon")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 34, height: 34)
-                    .scaleEffect(2.2)
+            Button(action: onTrainingMenuTap) {
+                Test1MenuTile(title: "訓練菜單", mint: mint) {
+                    Image("MenuIcon")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 34, height: 34)
+                        .scaleEffect(2.2)
+                }
             }
+            .buttonStyle(.plain)
             Test1MenuTile(title: "商店", mint: mint) {
                 Image("StoreIcon")
                     .resizable()
@@ -148,19 +155,35 @@ private struct Test1MenuTile<Icon: View>: View {
 
 private struct Test1PreviewFrame: View {
     let navy: Color
+    var showTrainingImages: Bool = false
 
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 20)
                 .fill(navy.opacity(0.5))
 
-            VStack(spacing: 10) {
-                Image(systemName: "cube.transparent")
-                    .font(.system(size: 40))
-                    .foregroundStyle(.white.opacity(0.4))
-                Text("預覽區")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.4))
+            if showTrainingImages {
+                HStack(spacing: 16) {
+                    Image("TerminalKneeExtensionIcon")
+                        .resizable()
+                        .scaledToFit()
+                    Image("PartialSquatIcon")
+                        .resizable()
+                        .scaledToFit()
+                    Image("StepTrainingIcon")
+                        .resizable()
+                        .scaledToFit()
+                }
+                .padding(40)
+            } else {
+                VStack(spacing: 10) {
+                    Image(systemName: "cube.transparent")
+                        .font(.system(size: 40))
+                        .foregroundStyle(.white.opacity(0.4))
+                    Text("預覽區")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.4))
+                }
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 20))
