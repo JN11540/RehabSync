@@ -185,7 +185,7 @@ private struct Test1PreviewFrame: View {
                         .buttonStyle(.plain)
 
                         Text(dateString)
-                            .font(.system(size: 18, weight: .semibold))
+                            .font(.system(size: 30, weight: .semibold))
                             .foregroundStyle(.white)
 
                         Button {
