@@ -157,27 +157,67 @@ private struct Test1MenuTile<Icon: View>: View {
 private struct Test1PreviewFrame: View {
     let mint: Color
     var showTrainingImages: Bool = false
+    @State private var selectedDate = Date()
+
+    private var dateString: String {
+        let cal = Calendar.current
+        let y = cal.component(.year, from: selectedDate)
+        let m = cal.component(.month, from: selectedDate)
+        let d = cal.component(.day, from: selectedDate)
+        return "\(y)年\(m)月\(d)日"
+    }
 
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 20)
                 .fill(Color.black.opacity(0.95))
 
-            if showTrainingImages {
+            VStack(spacing: 0) {
                 HStack(spacing: 16) {
-                    TrainingCard(imageName: "TerminalKneeExtensionIcon", title: "膝關節終端伸展", mint: mint)
-                    TrainingCard(imageName: "PartialSquatIcon", title: "部分蹲", mint: mint)
+                    Button {
+                        selectedDate = Calendar.current.date(byAdding: .day, value: -1, to: selectedDate) ?? selectedDate
+                    } label: {
+                        Image(systemName: "triangle.fill")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.white)
+                    }
+                    .buttonStyle(.plain)
+
+                    Text(dateString)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.white)
+
+                    Button {
+                        selectedDate = Calendar.current.date(byAdding: .day, value: 1, to: selectedDate) ?? selectedDate
+                    } label: {
+                        Image(systemName: "triangle.fill")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.white)
+                            .rotationEffect(.degrees(180))
+                    }
+                    .buttonStyle(.plain)
                 }
-                .padding(40)
-            } else {
-                VStack(spacing: 10) {
-                    Image(systemName: "cube.transparent")
-                        .font(.system(size: 40))
-                        .foregroundStyle(.white.opacity(0.4))
-                    Text("預覽區")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.4))
+                .padding(.top, 24)
+
+                Group {
+                    if showTrainingImages {
+                        HStack(spacing: 16) {
+                            TrainingCard(imageName: "TerminalKneeExtensionIcon", title: "膝關節終端伸展", mint: mint)
+                            TrainingCard(imageName: "PartialSquatIcon", title: "部分蹲", mint: mint)
+                        }
+                        .padding(40)
+                    } else {
+                        VStack(spacing: 10) {
+                            Image(systemName: "cube.transparent")
+                                .font(.system(size: 40))
+                                .foregroundStyle(.white.opacity(0.4))
+                            Text("預覽區")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.4))
+                        }
+                    }
                 }
+                .frame(maxHeight: .infinity)
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 20))
