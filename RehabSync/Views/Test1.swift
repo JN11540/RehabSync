@@ -46,11 +46,17 @@ private struct Test1Sidebar: View {
                 ColorfulQRIcon()
             }
             Test1MenuTile(title: "裝置連線", mint: mint) {
-                Image("KneePadIcon")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 34, height: 34)
-                    .scaleEffect(2.8)
+                ZStack(alignment: .topTrailing) {
+                    Image("KneePadIcon")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 34, height: 34)
+                    Image(systemName: "antenna.radiowaves.left.and.right")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Color(red: 0.2, green: 0.5, blue: 0.9))
+                        .offset(x: 6, y: -6)
+                }
+                .scaleEffect(2.8)
             }
             Test1MenuTile(title: "訓練菜單", mint: mint)
             Test1MenuTile(title: "商店", mint: mint)
