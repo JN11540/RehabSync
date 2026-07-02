@@ -20,7 +20,7 @@ struct Test1: View {
                 .frame(width: usable * 0.35)
                 .frame(maxHeight: .infinity, alignment: .bottom)
 
-                Test1PreviewFrame(navy: navy, showTrainingImages: showTrainingImages)
+                Test1PreviewFrame(navy: navy, mint: mint, showTrainingImages: showTrainingImages)
                     .frame(width: usable * 0.65)
                     .frame(maxHeight: .infinity)
             }
@@ -155,6 +155,7 @@ private struct Test1MenuTile<Icon: View>: View {
 
 private struct Test1PreviewFrame: View {
     let navy: Color
+    let mint: Color
     var showTrainingImages: Bool = false
 
     var body: some View {
@@ -164,9 +165,18 @@ private struct Test1PreviewFrame: View {
 
             if showTrainingImages {
                 HStack(spacing: 16) {
-                    TrainingImageFrame(imageName: "TerminalKneeExtensionIcon")
-                    TrainingImageFrame(imageName: "PartialSquatIcon")
-                    TrainingImageFrame(imageName: "StepTrainingIcon")
+                    VStack(spacing: 12) {
+                        TrainingImageFrame(imageName: "TerminalKneeExtensionIcon")
+                        TrainingActionPill(title: "膝關節終端伸展", mint: mint)
+                    }
+                    VStack(spacing: 12) {
+                        TrainingImageFrame(imageName: "PartialSquatIcon")
+                        TrainingActionPill(title: "部分蹲", mint: mint)
+                    }
+                    VStack(spacing: 12) {
+                        TrainingImageFrame(imageName: "StepTrainingIcon")
+                        TrainingActionPill(title: "登階運動", mint: mint)
+                    }
                 }
                 .padding(40)
             } else {
@@ -222,8 +232,37 @@ private struct TrainingImageFrame: View {
         .aspectRatio(Self.referenceAspectRatio, contentMode: .fit)
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.white.opacity(0.6), lineWidth: 2)
+                .stroke(Color.black, lineWidth: 4)
         )
+    }
+}
+
+// MARK: - Training Action Pill
+
+private struct TrainingActionPill: View {
+    let title: String
+    let mint: Color
+
+    var body: some View {
+        Text(title)
+            .font(.system(size: 18, weight: .semibold))
+            .foregroundStyle(.black)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 12)
+            .background(mint)
+            .overlay(alignment: .center) {
+                HStack(spacing: 14) {
+                    Rectangle()
+                        .fill(Color.white.opacity(0.3))
+                        .frame(width: 36, height: 200)
+                        .rotationEffect(.degrees(20))
+                    Rectangle()
+                        .fill(Color.white.opacity(0.3))
+                        .frame(width: 20, height: 200)
+                        .rotationEffect(.degrees(20))
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
