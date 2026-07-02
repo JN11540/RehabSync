@@ -255,7 +255,7 @@ private struct TrainingCard: View {
                     .stroke(Color.black, lineWidth: 4)
             )
 
-            Text("4組 X 12次")
+            Text("4組 × 12次 × 組間休息時間120秒")
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 14)
