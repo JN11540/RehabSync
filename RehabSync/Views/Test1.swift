@@ -43,7 +43,11 @@ private struct Test1Sidebar: View {
     var body: some View {
         VStack(spacing: 20) {
             Test1MenuTile(title: "掃描 QR code", mint: mint) {
-                ColorfulQRIcon()
+                Image("QRPhoneIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 34, height: 34)
+                    .scaleEffect(2.2)
             }
             Test1MenuTile(title: "裝置連線", mint: mint) {
                 ZStack(alignment: .topTrailing) {
@@ -122,31 +126,6 @@ private struct Test1MenuTile<Icon: View>: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .padding(.horizontal, 20)
-    }
-}
-
-// MARK: - Colorful QR Icon
-
-private struct ColorfulQRIcon: View {
-    private let colors: [Color] = [
-        .red, .white, .orange,
-        .yellow, .red, .white,
-        .orange, .yellow, .red
-    ]
-
-    var body: some View {
-        VStack(spacing: 2) {
-            ForEach(0..<3) { row in
-                HStack(spacing: 2) {
-                    ForEach(0..<3) { col in
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(colors[row * 3 + col])
-                    }
-                }
-            }
-        }
-        .frame(width: 34, height: 34)
-        .scaleEffect(2.2)
     }
 }
 
