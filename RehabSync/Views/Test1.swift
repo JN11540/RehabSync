@@ -216,7 +216,7 @@ private struct TrainingCard: View {
     private let darkGreen = Color(red: 0.15, green: 0.5, blue: 0.45)
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 8) {
             VStack(spacing: 0) {
                 ZStack {
                     Color.black.opacity(0.25)
@@ -260,6 +260,10 @@ private struct TrainingCard: View {
                 .frame(maxWidth: .infinity, alignment: .trailing)
                 .background(darkGreen)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.black, lineWidth: 4)
+                )
         }
     }
 }
