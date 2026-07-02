@@ -46,7 +46,10 @@ private struct Test1Sidebar: View {
                 ColorfulQRIcon()
             }
             Test1MenuTile(title: "裝置連線", mint: mint) {
-                DeviceLinkIcon()
+                Image("KneePadIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 34, height: 34)
             }
             Test1MenuTile(title: "訓練菜單", mint: mint)
             Test1MenuTile(title: "商店", mint: mint)
@@ -137,25 +140,6 @@ private struct ColorfulQRIcon: View {
         }
         .frame(width: 34, height: 34)
         .scaleEffect(2.2)
-    }
-}
-
-// MARK: - Device Link Icon
-
-private struct DeviceLinkIcon: View {
-    var body: some View {
-        ZStack {
-            Image(systemName: "bandage.fill")
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(Color(red: 0.13, green: 0.28, blue: 0.55))
-                .offset(x: -5, y: 5)
-            Image(systemName: "antenna.radiowaves.left.and.right")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(Color(red: 0.3, green: 0.65, blue: 0.92))
-                .offset(x: 11, y: -9)
-        }
-        .frame(width: 34, height: 34)
-        .scaleEffect(1.8)
     }
 }
 
