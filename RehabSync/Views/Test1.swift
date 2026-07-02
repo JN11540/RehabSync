@@ -3,7 +3,6 @@ import SwiftUI
 // MARK: - Test1
 
 struct Test1: View {
-    private let navy = Color(red: 0.1, green: 0.25, blue: 0.4)
     private let mint = Color(red: 0.25, green: 0.85, blue: 0.75)
     @State private var showTrainingImages = false
 
@@ -20,7 +19,7 @@ struct Test1: View {
                 .frame(width: usable * 0.35)
                 .frame(maxHeight: .infinity, alignment: .bottom)
 
-                Test1PreviewFrame(navy: navy, mint: mint, showTrainingImages: showTrainingImages)
+                Test1PreviewFrame(mint: mint, showTrainingImages: showTrainingImages)
                     .frame(width: usable * 0.65)
                     .frame(maxHeight: .infinity)
             }
@@ -156,14 +155,13 @@ private struct Test1MenuTile<Icon: View>: View {
 // MARK: - Preview Frame
 
 private struct Test1PreviewFrame: View {
-    let navy: Color
     let mint: Color
     var showTrainingImages: Bool = false
 
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 20)
-                .fill(navy.opacity(0.95))
+                .fill(Color.black.opacity(0.95))
 
             if showTrainingImages {
                 HStack(spacing: 16) {
