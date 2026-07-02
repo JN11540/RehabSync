@@ -42,7 +42,7 @@ private struct Test1Sidebar: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            Test1MenuTile(title: "掃描 QR code", mint: mint)
+            Test1MenuTile(icon: "qrcode.viewfinder", title: "掃描 QR code", mint: mint)
             Test1MenuTile(title: "綁定藍芽", mint: mint)
             Test1MenuTile(title: "訓練菜單", mint: mint)
             Test1MenuTile(title: "商店", mint: mint)
@@ -72,12 +72,17 @@ private struct Test1Sidebar: View {
 }
 
 private struct Test1MenuTile: View {
+    var icon: String? = nil
     let title: String
     let mint: Color
 
     var body: some View {
         HStack(spacing: 10) {
             Spacer()
+            if let icon {
+                Image(systemName: icon)
+                    .font(.system(size: 20, weight: .semibold))
+            }
             Text(title)
                 .font(.system(size: 22, weight: .semibold))
         }
