@@ -43,7 +43,7 @@ private struct Test1Sidebar: View {
     var body: some View {
         VStack(spacing: 20) {
             Test1MenuTile(title: "掃描 QR code", mint: mint) {
-                Image("QRPhoneIcon")
+                Image("QRCodeRedIcon")
                     .resizable()
                     .scaledToFit()
                     .frame(width: 34, height: 34)
