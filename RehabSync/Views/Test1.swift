@@ -243,6 +243,7 @@ private struct TrainingCard: View {
                                 .rotationEffect(.degrees(20))
                         }
                     }
+                    .clipped()
             }
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .overlay(
