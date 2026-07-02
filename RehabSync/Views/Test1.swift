@@ -167,7 +167,6 @@ private struct Test1PreviewFrame: View {
                 HStack(spacing: 16) {
                     TrainingCard(imageName: "TerminalKneeExtensionIcon", title: "膝關節終端伸展", mint: mint)
                     TrainingCard(imageName: "PartialSquatIcon", title: "部分蹲", mint: mint)
-                    TrainingCard(imageName: "StepTrainingIcon", title: "登階運動", mint: mint)
                 }
                 .padding(40)
             } else {
