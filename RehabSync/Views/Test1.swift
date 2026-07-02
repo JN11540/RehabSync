@@ -133,17 +133,19 @@ private struct Test1MenuTile<Icon: View>: View {
         .foregroundStyle(.black)
         .padding(.horizontal, 16)
         .padding(.vertical, 30)
-        .background(mint)
-        .overlay(alignment: .center) {
-            HStack(spacing: 14) {
-                Rectangle()
-                    .fill(Color.white.opacity(0.3))
-                    .frame(width: 36, height: 200)
-                    .rotationEffect(.degrees(20))
-                Rectangle()
-                    .fill(Color.white.opacity(0.3))
-                    .frame(width: 20, height: 200)
-                    .rotationEffect(.degrees(20))
+        .background {
+            ZStack {
+                mint
+                HStack(spacing: 14) {
+                    Rectangle()
+                        .fill(Color.white.opacity(0.3))
+                        .frame(width: 36, height: 200)
+                        .rotationEffect(.degrees(20))
+                    Rectangle()
+                        .fill(Color.white.opacity(0.3))
+                        .frame(width: 20, height: 200)
+                        .rotationEffect(.degrees(20))
+                }
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
