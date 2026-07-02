@@ -150,8 +150,6 @@ private struct Test1PreviewFrame: View {
         ZStack {
             RoundedRectangle(cornerRadius: 20)
                 .fill(navy.opacity(0.5))
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(.white.opacity(0.25), lineWidth: 3)
 
             VStack(spacing: 10) {
                 Image(systemName: "cube.transparent")
@@ -162,6 +160,23 @@ private struct Test1PreviewFrame: View {
                     .foregroundStyle(.white.opacity(0.4))
             }
         }
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay(
+            ZStack {
+                RoundedRectangle(cornerRadius: 20)
+                    .strokeBorder(Color.black, lineWidth: 6)
+                RoundedRectangle(cornerRadius: 18)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [Color(white: 0.55), Color(white: 0.25)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 18
+                    )
+                    .padding(3)
+            }
+        )
     }
 }
 
