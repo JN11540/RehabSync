@@ -146,13 +146,14 @@ private struct DeviceLinkIcon: View {
     var body: some View {
         ZStack {
             Image(systemName: "bandage.fill")
-                .font(.system(size: 20, weight: .semibold))
-                .offset(x: -6, y: 6)
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(Color(red: 0.13, green: 0.28, blue: 0.55))
+                .offset(x: -5, y: 5)
             Image(systemName: "antenna.radiowaves.left.and.right")
-                .font(.system(size: 16, weight: .semibold))
-                .offset(x: 10, y: -8)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Color(red: 0.3, green: 0.65, blue: 0.92))
+                .offset(x: 11, y: -9)
         }
-        .foregroundStyle(.black)
         .frame(width: 34, height: 34)
         .scaleEffect(1.8)
     }
