@@ -216,7 +216,7 @@ private struct TrainingCard: View {
     private let darkGreen = Color(red: 0.15, green: 0.5, blue: 0.45)
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 0) {
             VStack(spacing: 0) {
                 ZStack {
                     Color.black.opacity(0.25)
