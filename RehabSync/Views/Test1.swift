@@ -47,7 +47,7 @@ private struct Test1Sidebar: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: 34, height: 34)
-                    .scaleEffect(2.2)
+                    .scaleEffect(2.8)
             }
             Test1MenuTile(title: "裝置連線", mint: mint) {
                 ZStack(alignment: .topTrailing) {
@@ -62,7 +62,13 @@ private struct Test1Sidebar: View {
                 }
                 .scaleEffect(2.8)
             }
-            Test1MenuTile(title: "訓練菜單", mint: mint)
+            Test1MenuTile(title: "訓練菜單", mint: mint) {
+                Image("MenuIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 34, height: 34)
+                    .scaleEffect(2.2)
+            }
             Test1MenuTile(title: "商店", mint: mint)
         }
         .padding(.horizontal, 20)
