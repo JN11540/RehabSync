@@ -69,7 +69,13 @@ private struct Test1Sidebar: View {
                     .frame(width: 34, height: 34)
                     .scaleEffect(2.2)
             }
-            Test1MenuTile(title: "商店", mint: mint)
+            Test1MenuTile(title: "商店", mint: mint) {
+                Image("StoreIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 34, height: 34)
+                    .scaleEffect(2.2)
+            }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 28)
