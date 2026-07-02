@@ -165,18 +165,9 @@ private struct Test1PreviewFrame: View {
 
             if showTrainingImages {
                 HStack(spacing: 16) {
-                    VStack(spacing: 0) {
-                        TrainingImageFrame(imageName: "TerminalKneeExtensionIcon")
-                        TrainingActionPill(title: "膝關節終端伸展", mint: mint)
-                    }
-                    VStack(spacing: 0) {
-                        TrainingImageFrame(imageName: "PartialSquatIcon")
-                        TrainingActionPill(title: "部分蹲", mint: mint)
-                    }
-                    VStack(spacing: 0) {
-                        TrainingImageFrame(imageName: "StepTrainingIcon")
-                        TrainingActionPill(title: "登階運動", mint: mint)
-                    }
+                    TrainingCard(imageName: "TerminalKneeExtensionIcon", title: "膝關節終端伸展", mint: mint)
+                    TrainingCard(imageName: "PartialSquatIcon", title: "部分蹲", mint: mint)
+                    TrainingCard(imageName: "StepTrainingIcon", title: "登階運動", mint: mint)
                 }
                 .padding(40)
             } else {
@@ -213,56 +204,51 @@ private struct Test1PreviewFrame: View {
     }
 }
 
-// MARK: - Training Image Frame
+// MARK: - Training Card
 
-private struct TrainingImageFrame: View {
+private struct TrainingCard: View {
     let imageName: String
+    let title: String
+    let mint: Color
 
-    /// 統一以 terminal_knee_extension_nobg.png 的原始尺寸（1651 x 1886）為外框比例基準
+    /// 統一以 terminal_knee_extension_nobg.png 的原始尺寸（1651 x 1886）為圖片區域比例基準
     private static let referenceAspectRatio: CGFloat = 1651.0 / 1886.0
 
     var body: some View {
-        ZStack {
-            Color.black.opacity(0.25)
-            Image(imageName)
-                .resizable()
-                .scaledToFit()
-                .padding(8)
+        VStack(spacing: 0) {
+            ZStack {
+                Color.black.opacity(0.25)
+                Image(imageName)
+                    .resizable()
+                    .scaledToFit()
+                    .padding(8)
+            }
+            .aspectRatio(Self.referenceAspectRatio, contentMode: .fit)
+
+            Text(title)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(.black)
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity)
+                .background(mint)
+                .overlay(alignment: .center) {
+                    HStack(spacing: 14) {
+                        Rectangle()
+                            .fill(Color.white.opacity(0.3))
+                            .frame(width: 36, height: 200)
+                            .rotationEffect(.degrees(20))
+                        Rectangle()
+                            .fill(Color.white.opacity(0.3))
+                            .frame(width: 20, height: 200)
+                            .rotationEffect(.degrees(20))
+                    }
+                }
         }
-        .aspectRatio(Self.referenceAspectRatio, contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
                 .stroke(Color.black, lineWidth: 4)
         )
-    }
-}
-
-// MARK: - Training Action Pill
-
-private struct TrainingActionPill: View {
-    let title: String
-    let mint: Color
-
-    var body: some View {
-        Text(title)
-            .font(.system(size: 18, weight: .semibold))
-            .foregroundStyle(.black)
-            .padding(.vertical, 12)
-            .frame(maxWidth: .infinity)
-            .background(mint)
-            .overlay(alignment: .center) {
-                HStack(spacing: 14) {
-                    Rectangle()
-                        .fill(Color.white.opacity(0.3))
-                        .frame(width: 36, height: 200)
-                        .rotationEffect(.degrees(20))
-                    Rectangle()
-                        .fill(Color.white.opacity(0.3))
-                        .frame(width: 20, height: 200)
-                        .rotationEffect(.degrees(20))
-                }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
