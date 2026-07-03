@@ -392,6 +392,7 @@ private struct DeviceImageCard: View {
     let imageName: String
     let title: String
     let mint: Color
+    var isConnected: Bool = false
 
     /// 以 knee_pads_thigh.png / knee_pads_calf.png 的原始尺寸（557 x 844）為圖片區域比例基準
     private static let referenceAspectRatio: CGFloat = 557.0 / 844.0
@@ -436,7 +437,7 @@ private struct DeviceImageCard: View {
                     .stroke(Color.black, lineWidth: 4)
             )
 
-            Text("")
+            Text(isConnected ? "" : "--")
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 14)
@@ -449,6 +450,7 @@ private struct DeviceImageCard: View {
                         .stroke(Color.black, lineWidth: 4)
                 )
         }
+        .opacity(isConnected ? 1 : 0.5)
     }
 }
 
