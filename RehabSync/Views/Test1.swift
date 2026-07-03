@@ -443,7 +443,7 @@ private struct AddDeviceModal: View {
                         onSelect: { btVM.connectDiscovered($0) }
                     )
 
-                    DeviceImageCard(imageName: "KneePadsThighIcon", title: "大腿裝置", mint: mint)
+                    DeviceImageCard(imageName: "KneePadsThighIcon", title: "大腿裝置", mint: mint, isConnected: true)
                         .frame(width: 220)
                         .frame(maxWidth: .infinity)
                 }
