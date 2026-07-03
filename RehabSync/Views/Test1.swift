@@ -95,21 +95,35 @@ struct Test1: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 if showAddDeviceModal {
-                    AddDeviceModal(
-                        mint: mint,
-                        limb: addDeviceLimb,
-                        limbTitle: addDeviceLimb == 0 ? "大腿裝置" : "小腿裝置",
-                        imageName: addDeviceLimb == 0 ? "KneePadsThighIcon" : "KneePadsCalfIcon",
-                        savedDevice: addDeviceLimb == 0 ? thighDevice : calfDevice,
-                        onCancel: {
-                            showAddDeviceModal = false
-                            refreshDevices()
-                        },
-                        onConfirm: {
-                            showAddDeviceModal = false
-                            refreshDevices()
+                    Group {
+                        if addDeviceLimb == 0 {
+                            ThighAddDeviceModal(
+                                mint: mint,
+                                savedDevice: thighDevice,
+                                onCancel: {
+                                    showAddDeviceModal = false
+                                    refreshDevices()
+                                },
+                                onConfirm: {
+                                    showAddDeviceModal = false
+                                    refreshDevices()
+                                }
+                            )
+                        } else {
+                            CalfAddDeviceModal(
+                                mint: mint,
+                                savedDevice: calfDevice,
+                                onCancel: {
+                                    showAddDeviceModal = false
+                                    refreshDevices()
+                                },
+                                onConfirm: {
+                                    showAddDeviceModal = false
+                                    refreshDevices()
+                                }
+                            )
                         }
-                    )
+                    }
                     .padding(.horizontal, hPad)
                     .padding(.vertical, 20)
                 }
@@ -434,9 +448,51 @@ private struct DeviceConnectionButtons: View {
     }
 }
 
-// MARK: - Add Device Modal
+// MARK: - Thigh / Calf Add Device Modals
 
-private struct AddDeviceModal: View {
+/// 大腿裝置與小腿裝置各自獨立的新增裝置視窗，各自擁有獨立的 view identity，
+/// 避免切換裝置部位時共用同一個 view instance 導致連線中的裝置被彼此的取消/確認操作誤動到。
+private struct ThighAddDeviceModal: View {
+    let mint: Color
+    var savedDevice: Device? = nil
+    let onCancel: () -> Void
+    let onConfirm: () -> Void
+
+    var body: some View {
+        DeviceBindModal(
+            mint: mint,
+            limb: 0,
+            limbTitle: "大腿裝置",
+            imageName: "KneePadsThighIcon",
+            savedDevice: savedDevice,
+            onCancel: onCancel,
+            onConfirm: onConfirm
+        )
+    }
+}
+
+private struct CalfAddDeviceModal: View {
+    let mint: Color
+    var savedDevice: Device? = nil
+    let onCancel: () -> Void
+    let onConfirm: () -> Void
+
+    var body: some View {
+        DeviceBindModal(
+            mint: mint,
+            limb: 1,
+            limbTitle: "小腿裝置",
+            imageName: "KneePadsCalfIcon",
+            savedDevice: savedDevice,
+            onCancel: onCancel,
+            onConfirm: onConfirm
+        )
+    }
+}
+
+// MARK: - Device Bind Modal (shared implementation)
+
+private struct DeviceBindModal: View {
     let mint: Color
     let limb: Int
     let limbTitle: String
