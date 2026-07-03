@@ -253,26 +253,32 @@ private struct Test1PreviewFrame: View {
                                 .font(.system(size: 16, weight: .medium))
                                 .foregroundStyle(.white.opacity(0.4))
                         } else {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 16) {
-                                    ForEach(contents, id: \.id) { content in
-                                        TrainingCard(
-                                            imageName: "Exercise\(content.exercise_id)",
-                                            title: exerciseName(for: content),
-                                            subtitle: "\(content.sets) 組 · \(content.reps) 次 · 休息 \(content.set_rest_time) 秒",
-                                            mint: mint,
-                                            isDone: completedContentIds.contains(Int(content.id ?? -1)),
-                                            isSelectable: isToday,
-                                            isSelected: isToday && selectedContentId == content.id
-                                        )
-                                        .frame(width: 220)
-                                        .onTapGesture {
-                                            guard isToday else { return }
-                                            selectedContentId = content.id
+                            VStack(spacing: 12) {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 16) {
+                                        ForEach(contents, id: \.id) { content in
+                                            TrainingCard(
+                                                imageName: "Exercise\(content.exercise_id)",
+                                                title: exerciseName(for: content),
+                                                subtitle: "\(content.sets) 組 · \(content.reps) 次 · 休息 \(content.set_rest_time) 秒",
+                                                mint: mint,
+                                                isDone: completedContentIds.contains(Int(content.id ?? -1)),
+                                                isSelectable: isToday,
+                                                isSelected: isToday && selectedContentId == content.id
+                                            )
+                                            .frame(width: 220)
+                                            .onTapGesture {
+                                                guard isToday else { return }
+                                                selectedContentId = content.id
+                                            }
                                         }
                                     }
+                                    .padding(.horizontal, 40)
+                                    .padding(.top, 40)
                                 }
-                                .padding(40)
+
+                                IconLegend()
+                                    .padding(.bottom, 24)
                             }
                         }
                     } else {
@@ -312,6 +318,33 @@ private struct Test1PreviewFrame: View {
                     .padding(28)
             }
         )
+    }
+}
+
+// MARK: - Icon Legend
+
+private struct IconLegend: View {
+    var body: some View {
+        HStack(spacing: 24) {
+            HStack(spacing: 6) {
+                Image("FinishIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 20, height: 20)
+                Text("完成")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.8))
+            }
+            HStack(spacing: 6) {
+                Image("UnfinishIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 20, height: 20)
+                Text("未完成")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.8))
+            }
+        }
     }
 }
 
@@ -389,10 +422,6 @@ private struct TrainingCard: View {
                         .stroke(Color.black, lineWidth: 4)
                 )
         }
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(mint, lineWidth: isSelected ? 4 : 0)
-        )
         .opacity(isSelectable ? 1 : 0.4)
         .allowsHitTesting(isSelectable)
     }
