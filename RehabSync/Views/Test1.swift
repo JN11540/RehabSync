@@ -357,7 +357,9 @@ private struct DeviceConnectionButtons: View {
             }
             HStack(spacing: 24) {
                 DeviceImageCard(imageName: "KneePadsThighIcon", title: "大腿裝置", mint: mint)
+                    .frame(width: 220)
                 DeviceImageCard(imageName: "KneePadsCalfIcon", title: "小腿裝置", mint: mint)
+                    .frame(width: 220)
             }
             Spacer()
         }
