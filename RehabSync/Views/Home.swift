@@ -23,11 +23,10 @@ extension EnvironmentValues {
 // MARK: - Home Tab
 
 private enum HomeTab: CaseIterable {
-    case statistic, test, setting, test1
+    case test, setting, test1
 
     var title: String {
         switch self {
-        case .statistic: "數據"
         case .test: "測試"
         case .setting: "設定"
         case .test1: "測試1"
@@ -42,7 +41,6 @@ struct Home: View {
     var body: some View {
         Group {
             switch selectedTab {
-            case .statistic: Statistic()
             case .test: TestPage(btVM: btVM)
             case .setting: Setting()
             case .test1: Test1()
