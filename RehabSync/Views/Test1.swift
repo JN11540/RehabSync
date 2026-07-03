@@ -12,7 +12,7 @@ private enum Test1PreviewMode {
 struct Test1: View {
     private let mint = Color(red: 0.25, green: 0.85, blue: 0.75)
     @Environment(BluetoothViewModel.self) private var btVM
-    @State private var previewMode: Test1PreviewMode = .none
+    @State private var previewMode: Test1PreviewMode = .device
     @State private var showAddDeviceModal = false
     @State private var addDeviceLimb = 0
     @State private var selectedDate = Date()
@@ -152,6 +152,7 @@ struct Test1: View {
                 .ignoresSafeArea()
                 .clipped()
         }
+        .onAppear { refreshDevices() }
         .onReceive(Timer.publish(every: 5, on: .main, in: .common).autoconnect()) { _ in
             checkBoundDevicesReachable()
         }
