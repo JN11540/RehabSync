@@ -9,6 +9,7 @@ struct Test1: View {
     @State private var treatmentVM = TreatmentViewModel()
     @State private var contentVM = TreatmentContentViewModel()
     @State private var exerciseVM = ExerciseViewModel()
+    @State private var resultVM = TreatmentResultViewModel()
 
     private var todayContents: [TreatmentContent] {
         let day = Calendar.current.startOfDay(for: selectedDate)
@@ -17,11 +18,17 @@ struct Test1: View {
         }
     }
 
+    // 比照主頁（Home.swift）的完成判斷：treatment_content_id 是否已有 TreatmentResult 紀錄
+    private var completedContentIds: Set<Int> {
+        Set(resultVM.results.map { $0.treatment_content_id })
+    }
+
     private func loadTrainingMenu() {
         treatmentVM.fetchAll()
         // Test1 沒有治療計畫選擇 UI，先以第一個治療計畫代表「目前的訓練菜單」
         if let treatmentId = treatmentVM.treatments.first?.id {
             contentVM.fetchAll(for: Int(treatmentId))
+            resultVM.fetchAll(for: Int(treatmentId))
         }
         exerciseVM.fetchAll()
         showTrainingImages = true
@@ -43,6 +50,7 @@ struct Test1: View {
                     showTrainingImages: showTrainingImages,
                     contents: todayContents,
                     exercises: exerciseVM.exercises,
+                    completedContentIds: completedContentIds,
                     selectedDate: $selectedDate
                 )
                 .frame(width: usable * 0.65)
@@ -184,6 +192,7 @@ private struct Test1PreviewFrame: View {
     var showTrainingImages: Bool = false
     let contents: [TreatmentContent]
     let exercises: [Exercise]
+    let completedContentIds: Set<Int>
     @Binding var selectedDate: Date
 
     private var dateString: String {
@@ -246,7 +255,8 @@ private struct Test1PreviewFrame: View {
                                             imageName: "Exercise\(content.exercise_id)",
                                             title: exerciseName(for: content),
                                             subtitle: "\(content.sets) 組 · \(content.reps) 次 · 休息 \(content.set_rest_time) 秒",
-                                            mint: mint
+                                            mint: mint,
+                                            isDone: completedContentIds.contains(Int(content.id ?? -1))
                                         )
                                         .frame(width: 220)
                                     }
@@ -298,6 +308,7 @@ private struct TrainingCard: View {
     let title: String
     let subtitle: String
     let mint: Color
+    var isDone: Bool = false
 
     /// 統一以 terminal_knee_extension_nobg.png 的原始尺寸（1651 x 1886）為圖片區域比例基準
     private static let referenceAspectRatio: CGFloat = 1651.0 / 1886.0
@@ -306,11 +317,18 @@ private struct TrainingCard: View {
     var body: some View {
         VStack(spacing: 8) {
             VStack(spacing: 0) {
-                ZStack {
-                    Color.black
-                    Image(imageName)
+                ZStack(alignment: .topTrailing) {
+                    ZStack {
+                        Color.black
+                        Image(imageName)
+                            .resizable()
+                            .scaledToFit()
+                    }
+                    Image(isDone ? "FinishIcon" : "UnfinishIcon")
                         .resizable()
                         .scaledToFit()
+                        .frame(width: 28, height: 28)
+                        .padding(6)
                 }
                 .aspectRatio(Self.referenceAspectRatio, contentMode: .fit)
 
