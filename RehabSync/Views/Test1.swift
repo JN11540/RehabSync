@@ -431,7 +431,7 @@ private struct AddDeviceModal: View {
                     .frame(height: 8)
                     .offset(y: -10)
 
-                HStack(alignment: .top) {
+                HStack(alignment: .top, spacing: 0) {
                     VStack(spacing: 14) {
                         ForEach(0..<5, id: \.self) { _ in
                             RoundedRectangle(cornerRadius: 6)
@@ -439,11 +439,13 @@ private struct AddDeviceModal: View {
                                 .frame(height: 44)
                         }
                     }
-                    .frame(width: 180)
+                    .frame(maxWidth: .infinity)
 
                     Spacer()
+                        .frame(maxWidth: .infinity)
                 }
-                .padding(24)
+                .padding(.horizontal, 24)
+                .padding(.top, 56)
 
                 Spacer()
             }
