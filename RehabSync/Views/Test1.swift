@@ -446,12 +446,12 @@ private struct AddDeviceModal: View {
                         }
                     }
                     .frame(maxWidth: .infinity)
-                    .overlay(alignment: .top) {
+                    .overlay(alignment: .topLeading) {
                         Text("大腿裝置")
                             .font(.system(size: 30, weight: .semibold))
                             .foregroundStyle(Color.white)
                             .fixedSize()
-                            .offset(y: -36)
+                            .offset(y: -44)
                     }
 
                     ZStack {
