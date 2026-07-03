@@ -1,10 +1,16 @@
 import SwiftUI
 
+// MARK: - Preview Mode
+
+private enum Test1PreviewMode {
+    case none, training, device
+}
+
 // MARK: - Test1
 
 struct Test1: View {
     private let mint = Color(red: 0.25, green: 0.85, blue: 0.75)
-    @State private var showTrainingImages = false
+    @State private var previewMode: Test1PreviewMode = .none
     @State private var selectedDate = Date()
     @State private var treatmentVM = TreatmentViewModel()
     @State private var contentVM = TreatmentContentViewModel()
@@ -31,7 +37,11 @@ struct Test1: View {
             resultVM.fetchAll(for: Int(treatmentId))
         }
         exerciseVM.fetchAll()
-        showTrainingImages = true
+        previewMode = .training
+    }
+
+    private func showDeviceConnection() {
+        previewMode = .device
     }
 
     var body: some View {
@@ -41,13 +51,17 @@ struct Test1: View {
             let usable = geo.size.width - hPad * 2 - spacing
 
             HStack(alignment: .top, spacing: spacing) {
-                Test1Sidebar(mint: mint, onTrainingMenuTap: loadTrainingMenu)
+                Test1Sidebar(
+                    mint: mint,
+                    onDeviceConnectionTap: showDeviceConnection,
+                    onTrainingMenuTap: loadTrainingMenu
+                )
                     .frame(width: usable * 0.35)
                     .frame(maxHeight: .infinity, alignment: .bottom)
 
                 Test1PreviewFrame(
                     mint: mint,
-                    showTrainingImages: showTrainingImages,
+                    mode: previewMode,
                     contents: todayContents,
                     exercises: exerciseVM.exercises,
                     completedContentIds: completedContentIds,
@@ -74,6 +88,7 @@ struct Test1: View {
 
 private struct Test1Sidebar: View {
     let mint: Color
+    let onDeviceConnectionTap: () -> Void
     let onTrainingMenuTap: () -> Void
 
     var body: some View {
@@ -85,19 +100,22 @@ private struct Test1Sidebar: View {
                     .frame(width: 34, height: 34)
                     .scaleEffect(2.8)
             }
-            Test1MenuTile(title: "裝置連線", mint: mint) {
-                ZStack(alignment: .topTrailing) {
-                    Image("KneePadIcon")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 34, height: 34)
-                    Image(systemName: "antenna.radiowaves.left.and.right")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(Color(red: 0.2, green: 0.5, blue: 0.9))
-                        .offset(x: 8, y: 0)
+            Button(action: onDeviceConnectionTap) {
+                Test1MenuTile(title: "裝置連線", mint: mint) {
+                    ZStack(alignment: .topTrailing) {
+                        Image("KneePadIcon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 34, height: 34)
+                        Image(systemName: "antenna.radiowaves.left.and.right")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(Color(red: 0.2, green: 0.5, blue: 0.9))
+                            .offset(x: 8, y: 0)
+                    }
+                    .scaleEffect(2.8)
                 }
-                .scaleEffect(2.8)
             }
+            .buttonStyle(.plain)
             Button(action: onTrainingMenuTap) {
                 Test1MenuTile(title: "訓練菜單", mint: mint) {
                     Image("MenuIcon")
@@ -189,7 +207,7 @@ private struct Test1MenuTile<Icon: View>: View {
 
 private struct Test1PreviewFrame: View {
     let mint: Color
-    var showTrainingImages: Bool = false
+    var mode: Test1PreviewMode = .none
     let contents: [TreatmentContent]
     let exercises: [Exercise]
     let completedContentIds: Set<Int>
@@ -218,7 +236,7 @@ private struct Test1PreviewFrame: View {
                 .fill(Color.black.opacity(0.95))
 
             VStack(spacing: 0) {
-                if showTrainingImages {
+                if mode == .training {
                     HStack(spacing: 16) {
                         Button {
                             selectedDate = Calendar.current.date(byAdding: .day, value: -1, to: selectedDate) ?? selectedDate
@@ -247,7 +265,8 @@ private struct Test1PreviewFrame: View {
                 }
 
                 Group {
-                    if showTrainingImages {
+                    switch mode {
+                    case .training:
                         if contents.isEmpty {
                             Text("當天沒有安排訓練動作")
                                 .font(.system(size: 16, weight: .medium))
@@ -282,7 +301,9 @@ private struct Test1PreviewFrame: View {
                                     .padding(.bottom, 24)
                             }
                         }
-                    } else {
+                    case .device:
+                        DeviceConnectionButtons()
+                    case .none:
                         VStack(spacing: 10) {
                             Image(systemName: "cube.transparent")
                                 .font(.system(size: 40))
@@ -319,6 +340,35 @@ private struct Test1PreviewFrame: View {
                     .padding(28)
             }
         )
+    }
+}
+
+// MARK: - Device Connection Buttons
+
+private struct DeviceConnectionButtons: View {
+    var body: some View {
+        VStack(spacing: 20) {
+            DeviceActionCapsule(title: "新增裝置")
+            DeviceActionCapsule(title: "重新連線")
+            DeviceActionCapsule(title: "刪除裝置")
+            Spacer()
+        }
+        .padding(.horizontal, 60)
+        .padding(.top, 48)
+    }
+}
+
+private struct DeviceActionCapsule: View {
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .font(.system(size: 22, weight: .semibold))
+            .foregroundStyle(.black)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 18)
+            .background(Color.white)
+            .clipShape(Capsule())
     }
 }
 
