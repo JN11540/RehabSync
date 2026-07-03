@@ -317,7 +317,7 @@ private struct TrainingCard: View {
     var body: some View {
         VStack(spacing: 8) {
             VStack(spacing: 0) {
-                ZStack(alignment: .topTrailing) {
+                ZStack(alignment: .topLeading) {
                     ZStack {
                         Color.black
                         Image(imageName)
@@ -327,7 +327,7 @@ private struct TrainingCard: View {
                     Image(isDone ? "FinishIcon" : "UnfinishIcon")
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 28, height: 28)
+                        .frame(width: 40, height: 40)
                         .padding(6)
                 }
                 .aspectRatio(Self.referenceAspectRatio, contentMode: .fit)
