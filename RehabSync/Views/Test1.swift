@@ -78,7 +78,7 @@ struct Test1: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 if showAddDeviceModal {
-                    AddDeviceModal { showAddDeviceModal = false }
+                    AddDeviceModal(mint: mint) { showAddDeviceModal = false }
                         .padding(.horizontal, hPad)
                         .padding(.vertical, 20)
                 }
@@ -407,6 +407,7 @@ private struct DeviceActionCapsule: View {
 // MARK: - Add Device Modal
 
 private struct AddDeviceModal: View {
+    let mint: Color
     let onClose: () -> Void
     @Environment(BluetoothViewModel.self) private var btVM
 
@@ -442,7 +443,8 @@ private struct AddDeviceModal: View {
                         onSelect: { btVM.connectDiscovered($0) }
                     )
 
-                    Spacer()
+                    DeviceImageCard(imageName: "KneePadsThighIcon", title: "大腿裝置", mint: mint)
+                        .frame(width: 220)
                         .frame(maxWidth: .infinity)
                 }
                 .padding(.horizontal, 24)
