@@ -423,6 +423,8 @@ private struct AddDeviceModal: View {
     let onClose: () -> Void
     @Environment(BluetoothViewModel.self) private var btVM
     @State private var thighDevice: DiscoveredDevice? = nil
+    @State private var deviceVM = DeviceViewModel()
+    @State private var savedThighDevice: Device? = nil
 
     private let darkGreen = Color(red: 0.15, green: 0.5, blue: 0.45)
     private let brightGreen = Color(red: 0.3, green: 0.8, blue: 0.78)
@@ -432,9 +434,18 @@ private struct AddDeviceModal: View {
         return btVM.connectedPeripherals[thighDevice.id] != nil
     }
 
+    private var hasThighInfo: Bool {
+        (isThighConnected && thighDevice != nil) || savedThighDevice != nil
+    }
+
     private var thighConnectedInfo: String? {
-        guard let thighDevice else { return nil }
-        return "\(thighDevice.name) · \(thighDevice.id.uuidString)"
+        if isThighConnected, let thighDevice {
+            return "\(thighDevice.name) · \(thighDevice.id.uuidString)"
+        }
+        if let savedThighDevice {
+            return "\(savedThighDevice.device_name) · \(savedThighDevice.device_uuid)"
+        }
+        return nil
     }
 
     private var connectingDeviceId: UUID? {
@@ -480,7 +491,7 @@ private struct AddDeviceModal: View {
                         imageName: "KneePadsThighIcon",
                         title: "大腿裝置",
                         mint: mint,
-                        isConnected: isThighConnected,
+                        isConnected: hasThighInfo,
                         connectedInfo: thighConnectedInfo,
                         dimWhenDisconnected: false
                     )
@@ -533,7 +544,10 @@ private struct AddDeviceModal: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear { btVM.startScan() }
+        .onAppear {
+            btVM.startScan()
+            savedThighDevice = deviceVM.fetch(limb: 0)
+        }
         .onDisappear { btVM.stopScan() }
     }
 }
