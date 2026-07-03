@@ -302,7 +302,7 @@ private struct Test1PreviewFrame: View {
                             }
                         }
                     case .device:
-                        DeviceConnectionButtons()
+                        DeviceConnectionButtons(mint: mint)
                     case .none:
                         VStack(spacing: 10) {
                             Image(systemName: "cube.transparent")
@@ -346,12 +346,18 @@ private struct Test1PreviewFrame: View {
 // MARK: - Device Connection Buttons
 
 private struct DeviceConnectionButtons: View {
+    let mint: Color
+
     var body: some View {
-        VStack {
+        VStack(spacing: 24) {
             HStack(spacing: 16) {
                 DeviceActionCapsule(title: "新增裝置")
                 DeviceActionCapsule(title: "重新連線")
                 DeviceActionCapsule(title: "刪除裝置")
+            }
+            HStack(spacing: 24) {
+                DeviceImageCard(imageName: "KneePadsThighIcon", title: "大腿裝置", mint: mint)
+                DeviceImageCard(imageName: "KneePadsCalfIcon", title: "小腿裝置", mint: mint)
             }
             Spacer()
         }
@@ -375,6 +381,72 @@ private struct DeviceActionCapsule: View {
                 RoundedRectangle(cornerRadius: 8)
                     .stroke(Color.gray, lineWidth: 2)
             )
+    }
+}
+
+// MARK: - Device Image Card
+
+private struct DeviceImageCard: View {
+    let imageName: String
+    let title: String
+    let mint: Color
+
+    /// 以 knee_pads_thigh.png / knee_pads_calf.png 的原始尺寸（557 x 844）為圖片區域比例基準
+    private static let referenceAspectRatio: CGFloat = 557.0 / 844.0
+    private let darkGreen = Color(red: 0.15, green: 0.5, blue: 0.45)
+
+    var body: some View {
+        VStack(spacing: 8) {
+            VStack(spacing: 0) {
+                ZStack {
+                    Color.black
+                    Image(imageName)
+                        .resizable()
+                        .scaledToFit()
+                }
+                .aspectRatio(Self.referenceAspectRatio, contentMode: .fit)
+
+                Text(title)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.black)
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity)
+                    .background {
+                        ZStack {
+                            mint
+                            HStack(spacing: 14) {
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.3))
+                                    .frame(width: 46, height: 200)
+                                    .rotationEffect(.degrees(20))
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.3))
+                                    .frame(width: 26, height: 200)
+                                    .rotationEffect(.degrees(20))
+                            }
+                        }
+                    }
+                    .clipped()
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.black, lineWidth: 4)
+            )
+
+            Text("")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .background(darkGreen)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.black, lineWidth: 4)
+                )
+        }
     }
 }
 
