@@ -347,42 +347,79 @@ private struct Test1PreviewFrame: View {
 
 private struct DeviceConnectionButtons: View {
     let mint: Color
+    @State private var showAddDeviceModal = false
 
     var body: some View {
         VStack(spacing: 24) {
             HStack(spacing: 16) {
-                DeviceActionCapsule(title: "新增裝置")
-                DeviceActionCapsule(title: "重新連線")
-                DeviceActionCapsule(title: "刪除裝置")
+                DeviceActionCapsule(title: "新增裝置") { showAddDeviceModal = true }
+                DeviceActionCapsule(title: "重新連線") {}
+                DeviceActionCapsule(title: "刪除裝置") {}
             }
-            HStack(spacing: 24) {
-                DeviceImageCard(imageName: "KneePadsThighIcon", title: "大腿裝置", mint: mint)
-                    .frame(width: 220)
-                DeviceImageCard(imageName: "KneePadsCalfIcon", title: "小腿裝置", mint: mint)
-                    .frame(width: 220)
+
+            ZStack {
+                HStack(spacing: 24) {
+                    DeviceImageCard(imageName: "KneePadsThighIcon", title: "大腿裝置", mint: mint)
+                        .frame(width: 220)
+                    DeviceImageCard(imageName: "KneePadsCalfIcon", title: "小腿裝置", mint: mint)
+                        .frame(width: 220)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+
+                if showAddDeviceModal {
+                    AddDeviceModal { showAddDeviceModal = false }
+                }
             }
-            Spacer()
+            .frame(maxHeight: .infinity)
         }
         .padding(.horizontal, 40)
         .padding(.top, 48)
+        .padding(.bottom, 24)
     }
 }
 
 private struct DeviceActionCapsule: View {
     let title: String
+    let action: () -> Void
 
     var body: some View {
-        Text(title)
-            .font(.system(size: 18, weight: .semibold))
-            .foregroundStyle(.black)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(Color.white)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.gray, lineWidth: 2)
-            )
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(.black)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(Color.white)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.gray, lineWidth: 2)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Add Device Modal
+
+private struct AddDeviceModal: View {
+    let onClose: () -> Void
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white)
+                .shadow(color: .black.opacity(0.3), radius: 12, y: 4)
+
+            Button(action: onClose) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(.black)
+                    .padding(16)
+            }
+            .buttonStyle(.plain)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
