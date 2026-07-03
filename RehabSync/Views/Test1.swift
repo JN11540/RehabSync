@@ -463,7 +463,7 @@ private struct DeviceConnectionButtons: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .padding(.horizontal, 40)
-        .padding(.top, 48)
+        .padding(.top, 72)
         .padding(.bottom, 24)
     }
 }
