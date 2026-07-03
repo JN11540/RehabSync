@@ -167,13 +167,6 @@ private struct Test1Sidebar: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            Test1MenuTile(title: "關卡", mint: mint) {
-                Image("LevelIcon")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 34, height: 34)
-                    .scaleEffect(2.8)
-            }
             Button(action: onDeviceConnectionTap) {
                 Test1MenuTile(title: "裝置連線", mint: mint) {
                     ZStack(alignment: .topTrailing) {
@@ -206,6 +199,13 @@ private struct Test1Sidebar: View {
                     .scaledToFit()
                     .frame(width: 34, height: 34)
                     .scaleEffect(2.2)
+            }
+            Test1MenuTile(title: "關卡", mint: mint) {
+                Image("LevelIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 34, height: 34)
+                    .scaleEffect(2.8)
             }
         }
         .padding(.horizontal, 20)
