@@ -417,8 +417,8 @@ private struct AddDeviceModal: View {
 
             VStack(spacing: 0) {
                 Rectangle()
-                    .fill(Color.white.opacity(0.12))
-                    .frame(height: 36)
+                    .fill(Color(white: 0.85))
+                    .frame(height: 72)
                 Spacer()
             }
 
