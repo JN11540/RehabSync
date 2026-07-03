@@ -347,13 +347,15 @@ private struct Test1PreviewFrame: View {
 
 private struct DeviceConnectionButtons: View {
     var body: some View {
-        VStack(spacing: 20) {
-            DeviceActionCapsule(title: "新增裝置")
-            DeviceActionCapsule(title: "重新連線")
-            DeviceActionCapsule(title: "刪除裝置")
+        VStack {
+            HStack(spacing: 16) {
+                DeviceActionCapsule(title: "新增裝置")
+                DeviceActionCapsule(title: "重新連線")
+                DeviceActionCapsule(title: "刪除裝置")
+            }
             Spacer()
         }
-        .padding(.horizontal, 60)
+        .padding(.horizontal, 40)
         .padding(.top, 48)
     }
 }
@@ -368,7 +370,11 @@ private struct DeviceActionCapsule: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 18)
             .background(Color.white)
-            .clipShape(Capsule())
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.gray, lineWidth: 2)
+            )
     }
 }
 
