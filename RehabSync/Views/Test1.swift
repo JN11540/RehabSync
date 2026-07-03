@@ -54,6 +54,16 @@ struct Test1: View {
         calfDevice = deviceVM.fetch(limb: 1)
     }
 
+    private func unbindThigh() {
+        if let thighDevice { deviceVM.delete(uuid: thighDevice.device_uuid) }
+        refreshDevices()
+    }
+
+    private func unbindCalf() {
+        if let calfDevice { deviceVM.delete(uuid: calfDevice.device_uuid) }
+        refreshDevices()
+    }
+
     var body: some View {
         GeometryReader { geo in
             let spacing: CGFloat = 20
@@ -79,7 +89,9 @@ struct Test1: View {
                         selectedDate: $selectedDate,
                         thighDevice: thighDevice,
                         calfDevice: calfDevice,
-                        onAddDeviceTap: { showAddDeviceModal = true }
+                        onAddDeviceTap: { showAddDeviceModal = true },
+                        onUnbindThigh: unbindThigh,
+                        onUnbindCalf: unbindCalf
                     )
                     .frame(width: usable * 0.65)
                     .frame(maxHeight: .infinity)
@@ -247,6 +259,8 @@ private struct Test1PreviewFrame: View {
     var thighDevice: Device? = nil
     var calfDevice: Device? = nil
     var onAddDeviceTap: () -> Void = {}
+    var onUnbindThigh: () -> Void = {}
+    var onUnbindCalf: () -> Void = {}
     @State private var selectedContentId: Int64? = nil
 
     private var isToday: Bool {
@@ -337,7 +351,14 @@ private struct Test1PreviewFrame: View {
                             }
                         }
                     case .device:
-                        DeviceConnectionButtons(mint: mint, thighDevice: thighDevice, calfDevice: calfDevice, onAddDeviceTap: onAddDeviceTap)
+                        DeviceConnectionButtons(
+                            mint: mint,
+                            thighDevice: thighDevice,
+                            calfDevice: calfDevice,
+                            onAddDeviceTap: onAddDeviceTap,
+                            onUnbindThigh: onUnbindThigh,
+                            onUnbindCalf: onUnbindCalf
+                        )
                     case .none:
                         VStack(spacing: 10) {
                             Image(systemName: "cube.transparent")
@@ -385,6 +406,8 @@ private struct DeviceConnectionButtons: View {
     var thighDevice: Device? = nil
     var calfDevice: Device? = nil
     var onAddDeviceTap: () -> Void = {}
+    var onUnbindThigh: () -> Void = {}
+    var onUnbindCalf: () -> Void = {}
 
     var body: some View {
         VStack(spacing: 24) {
@@ -395,7 +418,8 @@ private struct DeviceConnectionButtons: View {
                     mint: mint,
                     isConnected: thighDevice != nil,
                     connectedInfo: thighDevice.map { "\($0.device_name) · \($0.device_uuid)" },
-                    dimWhenDisconnected: false
+                    dimWhenDisconnected: false,
+                    onUnbind: onUnbindThigh
                 )
                 .frame(width: 220)
                 .contentShape(Rectangle())
@@ -406,7 +430,8 @@ private struct DeviceConnectionButtons: View {
                     mint: mint,
                     isConnected: calfDevice != nil,
                     connectedInfo: calfDevice.map { "\($0.device_name) · \($0.device_uuid)" },
-                    dimWhenDisconnected: false
+                    dimWhenDisconnected: false,
+                    onUnbind: onUnbindCalf
                 )
                 .frame(width: 220)
             }
@@ -700,6 +725,7 @@ private struct DeviceImageCard: View {
     var isConnected: Bool = false
     var connectedInfo: String? = nil
     var dimWhenDisconnected: Bool = true
+    var onUnbind: (() -> Void)? = nil
 
     /// 以 knee_pads_thigh.png / knee_pads_calf.png 的原始尺寸（557 x 844）為圖片區域比例基準
     private static let referenceAspectRatio: CGFloat = 557.0 / 844.0
@@ -758,6 +784,25 @@ private struct DeviceImageCard: View {
                     RoundedRectangle(cornerRadius: 8)
                         .stroke(Color.black, lineWidth: 4)
                 )
+
+            if let onUnbind {
+                Button(action: onUnbind) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.white)
+                        Circle()
+                            .strokeBorder(Color.black, lineWidth: 1.5)
+                        Circle()
+                            .strokeBorder(Color.black, lineWidth: 1.5)
+                            .padding(3)
+                        Image(systemName: "xmark")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.black)
+                    }
+                    .frame(width: 32, height: 32)
+                }
+                .buttonStyle(.plain)
+            }
         }
         .opacity(dimWhenDisconnected && !isConnected ? 0.5 : 1)
     }
