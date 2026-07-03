@@ -448,14 +448,14 @@ private struct AddDeviceModal: View {
                     .frame(maxWidth: .infinity)
 
                     ZStack {
-                        RoundedRectangle(cornerRadius: 4)
+                        RoundedRectangle(cornerRadius: 10)
                             .fill(darkGreen)
-                        RoundedRectangle(cornerRadius: 4)
+                        RoundedRectangle(cornerRadius: 8)
                             .fill(Color(white: 0.85))
                             .frame(width: 15, height: 120)
                         RoundedRectangle(cornerRadius: 3)
                             .fill(Color.white)
-                            .frame(width: 8, height: 80)
+                            .frame(width: 8, height: 100)
                     }
                     .frame(width: 20, height: 356)
 
