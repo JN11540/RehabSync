@@ -416,9 +416,14 @@ private struct AddDeviceModal: View {
                 .shadow(color: .black.opacity(0.3), radius: 12, y: 4)
 
             VStack(spacing: 0) {
-                Rectangle()
-                    .fill(Color(white: 0.85))
-                    .frame(height: 72)
+                ZStack {
+                    Rectangle()
+                        .fill(Color(white: 0.85))
+                    Text("新增裝置")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(.white)
+                }
+                .frame(height: 72)
                 Rectangle()
                     .fill(Color(white: 0.3))
                     .frame(height: 8)
