@@ -463,7 +463,8 @@ private struct ThighAddDeviceModal: View {
             mint: mint,
             limb: 0,
             limbTitle: "大腿裝置",
-            imageName: "KneePadsThighIcon",
+            connectedImageName: "KneeThighConnectedIcon",
+            disconnectedImageName: "KneeThighDisconnectedIcon",
             savedDevice: savedDevice,
             onCancel: onCancel,
             onConfirm: onConfirm
@@ -482,7 +483,8 @@ private struct CalfAddDeviceModal: View {
             mint: mint,
             limb: 1,
             limbTitle: "小腿裝置",
-            imageName: "KneePadsCalfIcon",
+            connectedImageName: "KneeCalfConnectedIcon",
+            disconnectedImageName: "KneeCalfDisconnectedIcon",
             savedDevice: savedDevice,
             onCancel: onCancel,
             onConfirm: onConfirm
@@ -496,7 +498,8 @@ private struct DeviceBindModal: View {
     let mint: Color
     let limb: Int
     let limbTitle: String
-    let imageName: String
+    let connectedImageName: String
+    let disconnectedImageName: String
     var savedDevice: Device? = nil
     let onCancel: () -> Void
     let onConfirm: () -> Void
@@ -514,6 +517,10 @@ private struct DeviceBindModal: View {
 
     private var hasSelectedInfo: Bool {
         (isSelectedConnected && selectedDevice != nil) || savedDevice != nil
+    }
+
+    private var previewImageName: String {
+        hasSelectedInfo ? connectedImageName : disconnectedImageName
     }
 
     private var selectedConnectedInfo: String? {
@@ -585,7 +592,7 @@ private struct DeviceBindModal: View {
                     .padding(.top, 24)
 
                     DeviceImageCard(
-                        imageName: imageName,
+                        imageName: previewImageName,
                         title: limbTitle,
                         mint: mint,
                         isConnected: hasSelectedInfo,
