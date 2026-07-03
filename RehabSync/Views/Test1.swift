@@ -541,7 +541,8 @@ private struct DeviceScanColumn: View {
                 }
             }
             .offset(y: -scrollOffset)
-            .frame(maxWidth: .infinity, height: visibleHeight, alignment: .top)
+            .frame(height: visibleHeight, alignment: .top)
+            .frame(maxWidth: .infinity)
             .clipped()
             .overlay(alignment: .topLeading) {
                 Text(title)
