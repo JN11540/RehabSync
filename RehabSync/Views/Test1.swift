@@ -410,9 +410,20 @@ private struct AddDeviceModal: View {
     let mint: Color
     let onClose: () -> Void
     @Environment(BluetoothViewModel.self) private var btVM
+    @State private var thighDevice: DiscoveredDevice? = nil
 
     private let darkGreen = Color(red: 0.15, green: 0.5, blue: 0.45)
     private let brightGreen = Color(red: 0.3, green: 0.8, blue: 0.78)
+
+    private var isThighConnected: Bool {
+        guard let thighDevice else { return false }
+        return btVM.connectedPeripherals[thighDevice.id] != nil
+    }
+
+    private var thighConnectedInfo: String? {
+        guard let thighDevice else { return nil }
+        return "\(thighDevice.name) · \(thighDevice.id.uuidString)"
+    }
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -440,12 +451,24 @@ private struct AddDeviceModal: View {
                         devices: btVM.discoveredDevices,
                         darkGreen: darkGreen,
                         brightGreen: brightGreen,
-                        onSelect: { btVM.connectDiscovered($0) }
+                        onSelect: { device in
+                            thighDevice = device
+                            btVM.connectDiscovered(device)
+                        }
                     )
+                    .padding(.top, 24)
 
-                    DeviceImageCard(imageName: "KneePadsThighIcon", title: "大腿裝置", mint: mint, isConnected: true)
-                        .frame(width: 220)
-                        .frame(maxWidth: .infinity)
+                    DeviceImageCard(
+                        imageName: "KneePadsThighIcon",
+                        title: "大腿裝置",
+                        mint: mint,
+                        isConnected: isThighConnected,
+                        connectedInfo: thighConnectedInfo,
+                        dimWhenDisconnected: false
+                    )
+                    .frame(width: 220)
+                    .frame(maxWidth: .infinity)
+                    .offset(y: -24)
                 }
                 .padding(.horizontal, 24)
                 .padding(.top, 80)
@@ -595,6 +618,8 @@ private struct DeviceImageCard: View {
     let title: String
     let mint: Color
     var isConnected: Bool = false
+    var connectedInfo: String? = nil
+    var dimWhenDisconnected: Bool = true
 
     /// 以 knee_pads_thigh.png / knee_pads_calf.png 的原始尺寸（557 x 844）為圖片區域比例基準
     private static let referenceAspectRatio: CGFloat = 557.0 / 844.0
@@ -639,9 +664,11 @@ private struct DeviceImageCard: View {
                     .stroke(Color.black, lineWidth: 4)
             )
 
-            Text(isConnected ? "" : "--")
+            Text(isConnected ? (connectedInfo ?? "") : "--")
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
                 .frame(maxWidth: .infinity, alignment: .trailing)
@@ -652,7 +679,7 @@ private struct DeviceImageCard: View {
                         .stroke(Color.black, lineWidth: 4)
                 )
         }
-        .opacity(isConnected ? 1 : 0.5)
+        .opacity(dimWhenDisconnected && !isConnected ? 0.5 : 1)
     }
 }
 
