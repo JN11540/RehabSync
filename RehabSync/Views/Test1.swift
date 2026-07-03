@@ -499,6 +499,25 @@ private struct AddDeviceModal: View {
                 .padding(16)
             }
             .buttonStyle(.plain)
+
+            Button(action: onClose) {
+                ZStack {
+                    Circle()
+                        .fill(Color.white)
+                    Circle()
+                        .strokeBorder(Color.black, lineWidth: 1.5)
+                    Circle()
+                        .strokeBorder(Color.black, lineWidth: 1.5)
+                        .padding(4)
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(.black)
+                }
+                .frame(width: 40, height: 40)
+                .padding(16)
+            }
+            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
         }
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
