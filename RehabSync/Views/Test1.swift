@@ -433,25 +433,26 @@ private struct AddDeviceModal: View {
                     .offset(y: -10)
 
                 HStack(alignment: .top, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("大腿裝置")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundStyle(Color.white)
-
-                        VStack(spacing: 14) {
-                            ForEach(0..<5, id: \.self) { _ in
-                                ZStack {
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .fill(darkGreen)
-                                    RoundedRectangle(cornerRadius: 5)
-                                        .fill(brightGreen)
-                                        .padding(3)
-                                }
-                                .frame(height: 60)
+                    VStack(spacing: 14) {
+                        ForEach(0..<5, id: \.self) { _ in
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(darkGreen)
+                                RoundedRectangle(cornerRadius: 5)
+                                    .fill(brightGreen)
+                                    .padding(3)
                             }
+                            .frame(height: 60)
                         }
                     }
                     .frame(maxWidth: .infinity)
+                    .overlay(alignment: .top) {
+                        Text("大腿裝置")
+                            .font(.system(size: 30, weight: .semibold))
+                            .foregroundStyle(Color.white)
+                            .fixedSize()
+                            .offset(y: -36)
+                    }
 
                     ZStack {
                         RoundedRectangle(cornerRadius: 10)
