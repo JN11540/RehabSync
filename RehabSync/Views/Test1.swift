@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 // MARK: - Preview Mode
 
@@ -10,6 +11,7 @@ private enum Test1PreviewMode {
 
 struct Test1: View {
     private let mint = Color(red: 0.25, green: 0.85, blue: 0.75)
+    @Environment(BluetoothViewModel.self) private var btVM
     @State private var previewMode: Test1PreviewMode = .none
     @State private var showAddDeviceModal = false
     @State private var addDeviceLimb = 0
@@ -58,6 +60,20 @@ struct Test1: View {
     private func openAddDevice(limb: Int) {
         addDeviceLimb = limb
         showAddDeviceModal = true
+    }
+
+    /// 每 5 秒檢查已綁定裝置是否仍偵測得到（存在於 btVM.connectedPeripherals），偵測不到就自動解除綁定。
+    private func checkBoundDevicesReachable() {
+        guard previewMode == .device, !showAddDeviceModal else { return }
+        if let thighDevice, let uuid = UUID(uuidString: thighDevice.device_uuid),
+           btVM.connectedPeripherals[uuid] == nil {
+            deviceVM.delete(uuid: thighDevice.device_uuid)
+        }
+        if let calfDevice, let uuid = UUID(uuidString: calfDevice.device_uuid),
+           btVM.connectedPeripherals[uuid] == nil {
+            deviceVM.delete(uuid: calfDevice.device_uuid)
+        }
+        refreshDevices()
     }
 
     var body: some View {
@@ -135,6 +151,9 @@ struct Test1: View {
                 .scaledToFill()
                 .ignoresSafeArea()
                 .clipped()
+        }
+        .onReceive(Timer.publish(every: 5, on: .main, in: .common).autoconnect()) { _ in
+            checkBoundDevicesReachable()
         }
     }
 }
