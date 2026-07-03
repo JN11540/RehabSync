@@ -194,6 +194,11 @@ private struct Test1PreviewFrame: View {
     let exercises: [Exercise]
     let completedContentIds: Set<Int>
     @Binding var selectedDate: Date
+    @State private var selectedContentId: Int64? = nil
+
+    private var isToday: Bool {
+        Calendar.current.isDateInToday(selectedDate)
+    }
 
     private var dateString: String {
         let cal = Calendar.current
@@ -256,9 +261,15 @@ private struct Test1PreviewFrame: View {
                                             title: exerciseName(for: content),
                                             subtitle: "\(content.sets) 組 · \(content.reps) 次 · 休息 \(content.set_rest_time) 秒",
                                             mint: mint,
-                                            isDone: completedContentIds.contains(Int(content.id ?? -1))
+                                            isDone: completedContentIds.contains(Int(content.id ?? -1)),
+                                            isSelectable: isToday,
+                                            isSelected: isToday && selectedContentId == content.id
                                         )
                                         .frame(width: 220)
+                                        .onTapGesture {
+                                            guard isToday else { return }
+                                            selectedContentId = content.id
+                                        }
                                     }
                                 }
                                 .padding(40)
@@ -277,6 +288,9 @@ private struct Test1PreviewFrame: View {
                 }
                 .frame(maxHeight: .infinity)
             }
+        }
+        .onChange(of: selectedDate) { _, _ in
+            selectedContentId = nil
         }
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .overlay(
@@ -309,6 +323,8 @@ private struct TrainingCard: View {
     let subtitle: String
     let mint: Color
     var isDone: Bool = false
+    var isSelectable: Bool = true
+    var isSelected: Bool = false
 
     /// 統一以 terminal_knee_extension_nobg.png 的原始尺寸（1651 x 1886）為圖片區域比例基準
     private static let referenceAspectRatio: CGFloat = 1651.0 / 1886.0
@@ -373,6 +389,12 @@ private struct TrainingCard: View {
                         .stroke(Color.black, lineWidth: 4)
                 )
         }
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(mint, lineWidth: isSelected ? 4 : 0)
+        )
+        .opacity(isSelectable ? 1 : 0.4)
+        .allowsHitTesting(isSelectable)
     }
 }
 
