@@ -409,6 +409,8 @@ private struct DeviceActionCapsule: View {
 private struct AddDeviceModal: View {
     let onClose: () -> Void
 
+    private let darkGreen = Color(red: 0.15, green: 0.5, blue: 0.45)
+
     var body: some View {
         ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: 16)
@@ -428,6 +430,21 @@ private struct AddDeviceModal: View {
                     .fill(Color(white: 0.3))
                     .frame(height: 8)
                     .offset(y: -10)
+
+                HStack(alignment: .top) {
+                    VStack(spacing: 14) {
+                        ForEach(0..<5, id: \.self) { _ in
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(darkGreen)
+                                .frame(height: 44)
+                        }
+                    }
+                    .frame(width: 180)
+
+                    Spacer()
+                }
+                .padding(24)
+
                 Spacer()
             }
 
