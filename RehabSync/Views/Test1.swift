@@ -481,7 +481,7 @@ private struct AddDeviceModal: View {
     }
 
     private func handleConfirm() {
-        if let thighDevice, btVM.connectedPeripherals[thighDevice.id] != nil {
+        if let thighDevice {
             deviceVM.insert(uuid: thighDevice.id.uuidString, name: thighDevice.name, limb: 0)
         }
         onConfirm()
