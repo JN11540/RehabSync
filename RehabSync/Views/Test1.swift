@@ -453,9 +453,9 @@ private struct AddDeviceModal: View {
                         RoundedRectangle(cornerRadius: 4)
                             .fill(Color(white: 0.85))
                             .frame(width: 15, height: 120)
-                        RoundedRectangle(cornerRadius: 4)
+                        RoundedRectangle(cornerRadius: 3)
                             .fill(Color.white)
-                            .frame(width: 13, height: 120)
+                            .frame(width: 8, height: 80)
                     }
                     .frame(width: 20, height: 356)
 
