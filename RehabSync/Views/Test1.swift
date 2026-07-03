@@ -365,14 +365,14 @@ private struct DeviceActionCapsule: View {
 
     var body: some View {
         Text(title)
-            .font(.system(size: 22, weight: .semibold))
+            .font(.system(size: 18, weight: .semibold))
             .foregroundStyle(.black)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 18)
+            .padding(.vertical, 12)
             .background(Color.white)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
             .overlay(
-                RoundedRectangle(cornerRadius: 10)
+                RoundedRectangle(cornerRadius: 8)
                     .stroke(Color.gray, lineWidth: 2)
             )
     }
