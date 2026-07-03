@@ -412,14 +412,24 @@ private struct AddDeviceModal: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.white)
+                .fill(Color.black.opacity(0.95))
                 .shadow(color: .black.opacity(0.3), radius: 12, y: 4)
 
             Button(action: onClose) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(.black)
-                    .padding(16)
+                ZStack {
+                    Circle()
+                        .fill(Color.white)
+                    Circle()
+                        .strokeBorder(Color.black, lineWidth: 1.5)
+                    Circle()
+                        .strokeBorder(Color.black, lineWidth: 1.5)
+                        .padding(4)
+                    Image(systemName: "xmark")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(.black)
+                }
+                .frame(width: 40, height: 40)
+                .padding(16)
             }
             .buttonStyle(.plain)
         }
