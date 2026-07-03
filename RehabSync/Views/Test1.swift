@@ -383,12 +383,6 @@ private struct DeviceConnectionButtons: View {
 
     var body: some View {
         VStack(spacing: 24) {
-            HStack(spacing: 16) {
-                DeviceActionCapsule(title: "新增裝置", action: onAddDeviceTap)
-                DeviceActionCapsule(title: "重新連線") {}
-                DeviceActionCapsule(title: "刪除裝置") {}
-            }
-
             HStack(spacing: 24) {
                 DeviceImageCard(
                     imageName: "KneePadsThighIcon",
@@ -409,28 +403,6 @@ private struct DeviceConnectionButtons: View {
         .padding(.horizontal, 40)
         .padding(.top, 48)
         .padding(.bottom, 24)
-    }
-}
-
-private struct DeviceActionCapsule: View {
-    let title: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(.black)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(Color.white)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.gray, lineWidth: 2)
-                )
-        }
-        .buttonStyle(.plain)
     }
 }
 
