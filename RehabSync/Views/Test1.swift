@@ -408,6 +408,7 @@ private struct DeviceActionCapsule: View {
 
 private struct AddDeviceModal: View {
     let onClose: () -> Void
+    @Environment(BluetoothViewModel.self) private var btVM
 
     private let darkGreen = Color(red: 0.15, green: 0.5, blue: 0.45)
     private let brightGreen = Color(red: 0.3, green: 0.8, blue: 0.78)
@@ -433,38 +434,13 @@ private struct AddDeviceModal: View {
                     .offset(y: -10)
 
                 HStack(alignment: .top, spacing: 16) {
-                    VStack(spacing: 14) {
-                        ForEach(0..<5, id: \.self) { _ in
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(darkGreen)
-                                RoundedRectangle(cornerRadius: 5)
-                                    .fill(brightGreen)
-                                    .padding(3)
-                            }
-                            .frame(height: 60)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .overlay(alignment: .topLeading) {
-                        Text("大腿裝置")
-                            .font(.system(size: 30, weight: .semibold))
-                            .foregroundStyle(Color.white)
-                            .fixedSize()
-                            .offset(y: -44)
-                    }
-
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(darkGreen)
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color(white: 0.85))
-                            .frame(width: 15, height: 120)
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(Color.white)
-                            .frame(width: 8, height: 100)
-                    }
-                    .frame(width: 20, height: 356)
+                    DeviceScanColumn(
+                        title: "大腿裝置",
+                        devices: btVM.discoveredDevices,
+                        darkGreen: darkGreen,
+                        brightGreen: brightGreen,
+                        onSelect: { btVM.connectDiscovered($0) }
+                    )
 
                     Spacer()
                         .frame(maxWidth: .infinity)
@@ -495,6 +471,109 @@ private struct AddDeviceModal: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear { btVM.startScan() }
+        .onDisappear { btVM.stopScan() }
+    }
+}
+
+// MARK: - Device Scan Column
+
+/// 左側「大腿裝置」掃描結果清單：固定顯示高度為 5 個項目，超出時可用右側直式膠囊上下拖曳捲動。
+private struct DeviceScanColumn: View {
+    let title: String
+    let devices: [DiscoveredDevice]
+    let darkGreen: Color
+    let brightGreen: Color
+    let onSelect: (DiscoveredDevice) -> Void
+
+    @State private var scrollOffset: CGFloat = 0
+
+    private let itemHeight: CGFloat = 60
+    private let itemSpacing: CGFloat = 14
+    private let visibleHeight: CGFloat = 356
+    private let trackWidth: CGFloat = 20
+    private let thumbMinHeight: CGFloat = 40
+
+    private var contentHeight: CGFloat {
+        guard !devices.isEmpty else { return visibleHeight }
+        return CGFloat(devices.count) * itemHeight + CGFloat(devices.count - 1) * itemSpacing
+    }
+    private var maxScroll: CGFloat { max(contentHeight - visibleHeight, 0) }
+    private var thumbHeight: CGFloat {
+        guard contentHeight > visibleHeight else { return visibleHeight }
+        return max(visibleHeight * visibleHeight / contentHeight, thumbMinHeight)
+    }
+    private var thumbTravel: CGFloat { max(visibleHeight - thumbHeight, 0) }
+    private var thumbOffset: CGFloat {
+        guard maxScroll > 0 else { return 0 }
+        return (scrollOffset / maxScroll) * thumbTravel
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 16) {
+            VStack(spacing: itemSpacing) {
+                if devices.isEmpty {
+                    Text("掃描中…")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .frame(height: itemHeight)
+                } else {
+                    ForEach(devices) { device in
+                        Button {
+                            onSelect(device)
+                        } label: {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(darkGreen)
+                                RoundedRectangle(cornerRadius: 5)
+                                    .fill(brightGreen)
+                                    .padding(3)
+                                Text(device.name)
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(.black)
+                                    .lineLimit(1)
+                                    .padding(.horizontal, 14)
+                            }
+                            .frame(height: itemHeight)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .offset(y: -scrollOffset)
+            .frame(maxWidth: .infinity, height: visibleHeight, alignment: .top)
+            .clipped()
+            .overlay(alignment: .topLeading) {
+                Text(title)
+                    .font(.system(size: 30, weight: .semibold))
+                    .foregroundStyle(Color.white)
+                    .fixedSize()
+                    .offset(y: -44)
+            }
+
+            ZStack(alignment: .top) {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(darkGreen)
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color(white: 0.85))
+                    .frame(width: 15, height: thumbHeight)
+                    .offset(y: thumbOffset)
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(Color.white)
+                    .frame(width: 8, height: max(thumbHeight - 20, 10))
+                    .offset(y: thumbOffset + 10)
+            }
+            .frame(width: trackWidth, height: visibleHeight)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        guard maxScroll > 0, thumbTravel > 0 else { return }
+                        let newThumbOffset = min(max(0, value.location.y - thumbHeight / 2), thumbTravel)
+                        scrollOffset = (newThumbOffset / thumbTravel) * maxScroll
+                    }
+            )
+        }
     }
 }
 
@@ -674,4 +753,5 @@ private struct TrainingCard: View {
 
 #Preview {
     Test1()
+        .environment(BluetoothViewModel())
 }
