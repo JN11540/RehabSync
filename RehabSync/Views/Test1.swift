@@ -89,7 +89,10 @@ struct Test1: View {
                     AddDeviceModal(
                         mint: mint,
                         savedThighDevice: thighDevice,
-                        onCancel: { showAddDeviceModal = false },
+                        onCancel: {
+                            showAddDeviceModal = false
+                            refreshThighDevice()
+                        },
                         onConfirm: {
                             showAddDeviceModal = false
                             refreshThighDevice()
@@ -476,6 +479,7 @@ private struct AddDeviceModal: View {
             } else {
                 btVM.cancelPendingConnection()
             }
+            deviceVM.delete(uuid: thighDevice.id.uuidString)
         }
         onCancel()
     }
