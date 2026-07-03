@@ -436,7 +436,7 @@ private struct AddDeviceModal: View {
                         ForEach(0..<5, id: \.self) { _ in
                             RoundedRectangle(cornerRadius: 6)
                                 .fill(darkGreen)
-                                .frame(height: 44)
+                                .frame(height: 60)
                         }
                     }
                     .frame(maxWidth: .infinity)
@@ -445,7 +445,7 @@ private struct AddDeviceModal: View {
                         .frame(maxWidth: .infinity)
                 }
                 .padding(.horizontal, 24)
-                .padding(.top, 56)
+                .padding(.top, 80)
 
                 Spacer()
             }
