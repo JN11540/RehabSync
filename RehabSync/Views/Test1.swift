@@ -420,8 +420,8 @@ private struct AddDeviceModal: View {
                     Rectangle()
                         .fill(Color(white: 0.85))
                     Text("新增裝置")
-                        .font(.system(size: 24, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .font(.system(size: 32, weight: .semibold))
+                        .foregroundStyle(Color.white)
                 }
                 .frame(height: 72)
                 Rectangle()
