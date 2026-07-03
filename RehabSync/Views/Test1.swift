@@ -410,7 +410,7 @@ private struct AddDeviceModal: View {
     let onClose: () -> Void
 
     private let darkGreen = Color(red: 0.15, green: 0.5, blue: 0.45)
-    private let brightGreen = Color(red: 0.2, green: 0.65, blue: 0.58)
+    private let brightGreen = Color(red: 0.3, green: 0.8, blue: 0.78)
 
     var body: some View {
         ZStack(alignment: .topLeading) {
