@@ -17,6 +17,8 @@ struct Test1: View {
     @State private var contentVM = TreatmentContentViewModel()
     @State private var exerciseVM = ExerciseViewModel()
     @State private var resultVM = TreatmentResultViewModel()
+    @State private var deviceVM = DeviceViewModel()
+    @State private var thighDevice: Device? = nil
 
     private var todayContents: [TreatmentContent] {
         let day = Calendar.current.startOfDay(for: selectedDate)
@@ -43,6 +45,11 @@ struct Test1: View {
 
     private func showDeviceConnection() {
         previewMode = .device
+        refreshThighDevice()
+    }
+
+    private func refreshThighDevice() {
+        thighDevice = deviceVM.fetch(limb: 0)
     }
 
     var body: some View {
@@ -68,6 +75,7 @@ struct Test1: View {
                         exercises: exerciseVM.exercises,
                         completedContentIds: completedContentIds,
                         selectedDate: $selectedDate,
+                        thighDevice: thighDevice,
                         onAddDeviceTap: { showAddDeviceModal = true }
                     )
                     .frame(width: usable * 0.65)
@@ -78,9 +86,17 @@ struct Test1: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 if showAddDeviceModal {
-                    AddDeviceModal(mint: mint) { showAddDeviceModal = false }
-                        .padding(.horizontal, hPad)
-                        .padding(.vertical, 20)
+                    AddDeviceModal(
+                        mint: mint,
+                        savedThighDevice: thighDevice,
+                        onCancel: { showAddDeviceModal = false },
+                        onConfirm: {
+                            showAddDeviceModal = false
+                            refreshThighDevice()
+                        }
+                    )
+                    .padding(.horizontal, hPad)
+                    .padding(.vertical, 20)
                 }
             }
         }
@@ -222,6 +238,7 @@ private struct Test1PreviewFrame: View {
     let exercises: [Exercise]
     let completedContentIds: Set<Int>
     @Binding var selectedDate: Date
+    var thighDevice: Device? = nil
     var onAddDeviceTap: () -> Void = {}
     @State private var selectedContentId: Int64? = nil
 
@@ -313,7 +330,7 @@ private struct Test1PreviewFrame: View {
                             }
                         }
                     case .device:
-                        DeviceConnectionButtons(mint: mint, onAddDeviceTap: onAddDeviceTap)
+                        DeviceConnectionButtons(mint: mint, thighDevice: thighDevice, onAddDeviceTap: onAddDeviceTap)
                     case .none:
                         VStack(spacing: 10) {
                             Image(systemName: "cube.transparent")
@@ -358,9 +375,8 @@ private struct Test1PreviewFrame: View {
 
 private struct DeviceConnectionButtons: View {
     let mint: Color
+    var thighDevice: Device? = nil
     var onAddDeviceTap: () -> Void = {}
-    @State private var deviceVM = DeviceViewModel()
-    @State private var thighDevice: Device? = nil
 
     var body: some View {
         VStack(spacing: 24) {
@@ -389,7 +405,6 @@ private struct DeviceConnectionButtons: View {
         }
         .padding(.horizontal, 40)
         .padding(.top, 48)
-        .onAppear { thighDevice = deviceVM.fetch(limb: 0) }
         .padding(.bottom, 24)
     }
 }
@@ -420,11 +435,12 @@ private struct DeviceActionCapsule: View {
 
 private struct AddDeviceModal: View {
     let mint: Color
-    let onClose: () -> Void
+    var savedThighDevice: Device? = nil
+    let onCancel: () -> Void
+    let onConfirm: () -> Void
     @Environment(BluetoothViewModel.self) private var btVM
     @State private var thighDevice: DiscoveredDevice? = nil
-    @State private var deviceVM = DeviceViewModel()
-    @State private var savedThighDevice: Device? = nil
+    private let deviceVM = DeviceViewModel()
 
     private let darkGreen = Color(red: 0.15, green: 0.5, blue: 0.45)
     private let brightGreen = Color(red: 0.3, green: 0.8, blue: 0.78)
@@ -451,6 +467,24 @@ private struct AddDeviceModal: View {
     private var connectingDeviceId: UUID? {
         guard let thighDevice, case .connecting = btVM.connectionState else { return nil }
         return thighDevice.id
+    }
+
+    private func handleCancel() {
+        if let thighDevice {
+            if btVM.connectedPeripherals[thighDevice.id] != nil {
+                btVM.disconnect(id: thighDevice.id)
+            } else {
+                btVM.cancelPendingConnection()
+            }
+        }
+        onCancel()
+    }
+
+    private func handleConfirm() {
+        if let thighDevice, btVM.connectedPeripherals[thighDevice.id] != nil {
+            deviceVM.insert(uuid: thighDevice.id.uuidString, name: thighDevice.name, limb: 0)
+        }
+        onConfirm()
     }
 
     var body: some View {
@@ -505,7 +539,7 @@ private struct AddDeviceModal: View {
                 Spacer()
             }
 
-            Button(action: onClose) {
+            Button(action: handleCancel) {
                 ZStack {
                     Circle()
                         .fill(Color.white)
@@ -523,7 +557,7 @@ private struct AddDeviceModal: View {
             }
             .buttonStyle(.plain)
 
-            Button(action: onClose) {
+            Button(action: handleConfirm) {
                 ZStack {
                     Circle()
                         .fill(Color.white)
@@ -544,10 +578,7 @@ private struct AddDeviceModal: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear {
-            btVM.startScan()
-            savedThighDevice = deviceVM.fetch(limb: 0)
-        }
+        .onAppear { btVM.startScan() }
         .onDisappear { btVM.stopScan() }
     }
 }
