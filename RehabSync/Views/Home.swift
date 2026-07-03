@@ -517,6 +517,10 @@ struct BluetoothDeviceCard: View {
             .presentationCornerRadius(16)
             .interactiveDismissDisabled(freshlyConnectedPeripheral != nil)
         }
+        .onDisappear {
+            btVM.onConnected = nil
+            btVM.onDisconnected = nil
+        }
     }
 }
 
