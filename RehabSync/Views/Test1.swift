@@ -528,11 +528,19 @@ private struct DeviceScanColumn: View {
                                 RoundedRectangle(cornerRadius: 5)
                                     .fill(brightGreen)
                                     .padding(3)
-                                Text(device.name)
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(.black)
-                                    .lineLimit(1)
-                                    .padding(.horizontal, 14)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(device.name)
+                                        .font(.system(size: 15, weight: .semibold))
+                                        .foregroundStyle(.black)
+                                        .lineLimit(1)
+                                    Text(device.id.uuidString)
+                                        .font(.system(size: 10, weight: .regular))
+                                        .foregroundStyle(.black.opacity(0.6))
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.6)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 14)
                             }
                             .frame(height: itemHeight)
                         }
