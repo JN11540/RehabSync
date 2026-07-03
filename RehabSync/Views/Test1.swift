@@ -12,6 +12,7 @@ struct Test1: View {
     private let mint = Color(red: 0.25, green: 0.85, blue: 0.75)
     @State private var previewMode: Test1PreviewMode = .none
     @State private var showAddDeviceModal = false
+    @State private var addDeviceLimb = 0
     @State private var selectedDate = Date()
     @State private var treatmentVM = TreatmentViewModel()
     @State private var contentVM = TreatmentContentViewModel()
@@ -54,6 +55,11 @@ struct Test1: View {
         calfDevice = deviceVM.fetch(limb: 1)
     }
 
+    private func openAddDevice(limb: Int) {
+        addDeviceLimb = limb
+        showAddDeviceModal = true
+    }
+
     var body: some View {
         GeometryReader { geo in
             let spacing: CGFloat = 20
@@ -79,7 +85,7 @@ struct Test1: View {
                         selectedDate: $selectedDate,
                         thighDevice: thighDevice,
                         calfDevice: calfDevice,
-                        onAddDeviceTap: { showAddDeviceModal = true }
+                        onAddDeviceTap: openAddDevice
                     )
                     .frame(width: usable * 0.65)
                     .frame(maxHeight: .infinity)
@@ -91,7 +97,10 @@ struct Test1: View {
                 if showAddDeviceModal {
                     AddDeviceModal(
                         mint: mint,
-                        savedThighDevice: thighDevice,
+                        limb: addDeviceLimb,
+                        limbTitle: addDeviceLimb == 0 ? "大腿裝置" : "小腿裝置",
+                        imageName: addDeviceLimb == 0 ? "KneePadsThighIcon" : "KneePadsCalfIcon",
+                        savedDevice: addDeviceLimb == 0 ? thighDevice : calfDevice,
                         onCancel: {
                             showAddDeviceModal = false
                             refreshDevices()
@@ -246,7 +255,7 @@ private struct Test1PreviewFrame: View {
     @Binding var selectedDate: Date
     var thighDevice: Device? = nil
     var calfDevice: Device? = nil
-    var onAddDeviceTap: () -> Void = {}
+    var onAddDeviceTap: (Int) -> Void = { _ in }
     @State private var selectedContentId: Int64? = nil
 
     private var isToday: Bool {
@@ -389,7 +398,7 @@ private struct DeviceConnectionButtons: View {
     let mint: Color
     var thighDevice: Device? = nil
     var calfDevice: Device? = nil
-    var onAddDeviceTap: () -> Void = {}
+    var onAddDeviceTap: (Int) -> Void = { _ in }
 
     var body: some View {
         VStack(spacing: 24) {
@@ -404,7 +413,7 @@ private struct DeviceConnectionButtons: View {
                 )
                 .frame(width: 220)
                 .contentShape(Rectangle())
-                .onTapGesture { onAddDeviceTap() }
+                .onTapGesture { onAddDeviceTap(0) }
                 DeviceImageCard(
                     imageName: calfDevice != nil ? "KneeCalfConnectedIcon" : "KneeCalfDisconnectedIcon",
                     title: "小腿裝置",
@@ -414,6 +423,8 @@ private struct DeviceConnectionButtons: View {
                     dimWhenDisconnected: false
                 )
                 .frame(width: 220)
+                .contentShape(Rectangle())
+                .onTapGesture { onAddDeviceTap(1) }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
@@ -427,55 +438,58 @@ private struct DeviceConnectionButtons: View {
 
 private struct AddDeviceModal: View {
     let mint: Color
-    var savedThighDevice: Device? = nil
+    let limb: Int
+    let limbTitle: String
+    let imageName: String
+    var savedDevice: Device? = nil
     let onCancel: () -> Void
     let onConfirm: () -> Void
     @Environment(BluetoothViewModel.self) private var btVM
-    @State private var thighDevice: DiscoveredDevice? = nil
+    @State private var selectedDevice: DiscoveredDevice? = nil
     private let deviceVM = DeviceViewModel()
 
     private let darkGreen = Color(red: 0.15, green: 0.5, blue: 0.45)
     private let brightGreen = Color(red: 0.3, green: 0.8, blue: 0.78)
 
-    private var isThighConnected: Bool {
-        guard let thighDevice else { return false }
-        return btVM.connectedPeripherals[thighDevice.id] != nil
+    private var isSelectedConnected: Bool {
+        guard let selectedDevice else { return false }
+        return btVM.connectedPeripherals[selectedDevice.id] != nil
     }
 
-    private var hasThighInfo: Bool {
-        (isThighConnected && thighDevice != nil) || savedThighDevice != nil
+    private var hasSelectedInfo: Bool {
+        (isSelectedConnected && selectedDevice != nil) || savedDevice != nil
     }
 
-    private var thighConnectedInfo: String? {
-        if isThighConnected, let thighDevice {
-            return "\(thighDevice.name) · \(thighDevice.id.uuidString)"
+    private var selectedConnectedInfo: String? {
+        if isSelectedConnected, let selectedDevice {
+            return "\(selectedDevice.name) · \(selectedDevice.id.uuidString)"
         }
-        if let savedThighDevice {
-            return "\(savedThighDevice.device_name) · \(savedThighDevice.device_uuid)"
+        if let savedDevice {
+            return "\(savedDevice.device_name) · \(savedDevice.device_uuid)"
         }
         return nil
     }
 
     private var connectingDeviceId: UUID? {
-        guard let thighDevice, case .connecting = btVM.connectionState else { return nil }
-        return thighDevice.id
+        guard let selectedDevice, case .connecting = btVM.connectionState else { return nil }
+        return selectedDevice.id
     }
 
     private func handleCancel() {
-        if let thighDevice {
-            if btVM.connectedPeripherals[thighDevice.id] != nil {
-                btVM.disconnect(id: thighDevice.id)
+        if let selectedDevice {
+            if btVM.connectedPeripherals[selectedDevice.id] != nil {
+                btVM.disconnect(id: selectedDevice.id)
             } else {
                 btVM.cancelPendingConnection()
             }
-            deviceVM.delete(uuid: thighDevice.id.uuidString)
+            deviceVM.delete(uuid: selectedDevice.id.uuidString)
         }
         onCancel()
     }
 
     private func handleConfirm() {
-        if let thighDevice {
-            deviceVM.insert(uuid: thighDevice.id.uuidString, name: thighDevice.name, limb: 0)
+        if let selectedDevice {
+            deviceVM.insert(uuid: selectedDevice.id.uuidString, name: selectedDevice.name, limb: limb)
         }
         onConfirm()
     }
@@ -502,24 +516,24 @@ private struct AddDeviceModal: View {
 
                 HStack(alignment: .top, spacing: 16) {
                     DeviceScanColumn(
-                        title: "大腿裝置",
+                        title: limbTitle,
                         devices: btVM.discoveredDevices,
                         darkGreen: darkGreen,
                         brightGreen: brightGreen,
                         connectingDeviceId: connectingDeviceId,
                         onSelect: { device in
-                            thighDevice = device
+                            selectedDevice = device
                             btVM.connectDiscovered(device)
                         }
                     )
                     .padding(.top, 24)
 
                     DeviceImageCard(
-                        imageName: "KneePadsThighIcon",
-                        title: "大腿裝置",
+                        imageName: imageName,
+                        title: limbTitle,
                         mint: mint,
-                        isConnected: hasThighInfo,
-                        connectedInfo: thighConnectedInfo,
+                        isConnected: hasSelectedInfo,
+                        connectedInfo: selectedConnectedInfo,
                         dimWhenDisconnected: false
                     )
                     .frame(width: 220)
