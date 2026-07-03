@@ -410,6 +410,7 @@ private struct AddDeviceModal: View {
     let onClose: () -> Void
 
     private let darkGreen = Color(red: 0.15, green: 0.5, blue: 0.45)
+    private let brightGreen = Color(red: 0.2, green: 0.65, blue: 0.58)
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -434,9 +435,14 @@ private struct AddDeviceModal: View {
                 HStack(alignment: .top, spacing: 0) {
                     VStack(spacing: 14) {
                         ForEach(0..<5, id: \.self) { _ in
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(darkGreen)
-                                .frame(height: 60)
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(darkGreen)
+                                RoundedRectangle(cornerRadius: 5)
+                                    .fill(brightGreen)
+                                    .padding(3)
+                            }
+                            .frame(height: 60)
                         }
                     }
                     .frame(maxWidth: .infinity)
