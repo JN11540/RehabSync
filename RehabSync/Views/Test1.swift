@@ -421,7 +421,8 @@ private struct AddDeviceModal: View {
                     .frame(height: 72)
                 Rectangle()
                     .fill(Color(white: 0.3))
-                    .frame(height: 2)
+                    .frame(height: 8)
+                    .offset(y: -10)
                 Spacer()
             }
 
