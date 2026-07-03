@@ -11,6 +11,7 @@ private enum Test1PreviewMode {
 struct Test1: View {
     private let mint = Color(red: 0.25, green: 0.85, blue: 0.75)
     @State private var previewMode: Test1PreviewMode = .none
+    @State private var showAddDeviceModal = false
     @State private var selectedDate = Date()
     @State private var treatmentVM = TreatmentViewModel()
     @State private var contentVM = TreatmentContentViewModel()
@@ -50,29 +51,38 @@ struct Test1: View {
             let hPad: CGFloat = 24
             let usable = geo.size.width - hPad * 2 - spacing
 
-            HStack(alignment: .top, spacing: spacing) {
-                Test1Sidebar(
-                    mint: mint,
-                    onDeviceConnectionTap: showDeviceConnection,
-                    onTrainingMenuTap: loadTrainingMenu
-                )
-                    .frame(width: usable * 0.35)
-                    .frame(maxHeight: .infinity, alignment: .bottom)
+            ZStack {
+                HStack(alignment: .top, spacing: spacing) {
+                    Test1Sidebar(
+                        mint: mint,
+                        onDeviceConnectionTap: showDeviceConnection,
+                        onTrainingMenuTap: loadTrainingMenu
+                    )
+                        .frame(width: usable * 0.35)
+                        .frame(maxHeight: .infinity, alignment: .bottom)
 
-                Test1PreviewFrame(
-                    mint: mint,
-                    mode: previewMode,
-                    contents: todayContents,
-                    exercises: exerciseVM.exercises,
-                    completedContentIds: completedContentIds,
-                    selectedDate: $selectedDate
-                )
-                .frame(width: usable * 0.65)
-                .frame(maxHeight: .infinity)
+                    Test1PreviewFrame(
+                        mint: mint,
+                        mode: previewMode,
+                        contents: todayContents,
+                        exercises: exerciseVM.exercises,
+                        completedContentIds: completedContentIds,
+                        selectedDate: $selectedDate,
+                        onAddDeviceTap: { showAddDeviceModal = true }
+                    )
+                    .frame(width: usable * 0.65)
+                    .frame(maxHeight: .infinity)
+                }
+                .padding(.horizontal, hPad)
+                .padding(.vertical, 20)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                if showAddDeviceModal {
+                    AddDeviceModal { showAddDeviceModal = false }
+                        .padding(.horizontal, hPad)
+                        .padding(.vertical, 20)
+                }
             }
-            .padding(.horizontal, hPad)
-            .padding(.vertical, 20)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background {
             Image("Test1Preview")
@@ -212,6 +222,7 @@ private struct Test1PreviewFrame: View {
     let exercises: [Exercise]
     let completedContentIds: Set<Int>
     @Binding var selectedDate: Date
+    var onAddDeviceTap: () -> Void = {}
     @State private var selectedContentId: Int64? = nil
 
     private var isToday: Bool {
@@ -302,7 +313,7 @@ private struct Test1PreviewFrame: View {
                             }
                         }
                     case .device:
-                        DeviceConnectionButtons(mint: mint)
+                        DeviceConnectionButtons(mint: mint, onAddDeviceTap: onAddDeviceTap)
                     case .none:
                         VStack(spacing: 10) {
                             Image(systemName: "cube.transparent")
@@ -347,30 +358,23 @@ private struct Test1PreviewFrame: View {
 
 private struct DeviceConnectionButtons: View {
     let mint: Color
-    @State private var showAddDeviceModal = false
+    var onAddDeviceTap: () -> Void = {}
 
     var body: some View {
         VStack(spacing: 24) {
             HStack(spacing: 16) {
-                DeviceActionCapsule(title: "新增裝置") { showAddDeviceModal = true }
+                DeviceActionCapsule(title: "新增裝置", action: onAddDeviceTap)
                 DeviceActionCapsule(title: "重新連線") {}
                 DeviceActionCapsule(title: "刪除裝置") {}
             }
 
-            ZStack {
-                HStack(spacing: 24) {
-                    DeviceImageCard(imageName: "KneePadsThighIcon", title: "大腿裝置", mint: mint)
-                        .frame(width: 220)
-                    DeviceImageCard(imageName: "KneePadsCalfIcon", title: "小腿裝置", mint: mint)
-                        .frame(width: 220)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-
-                if showAddDeviceModal {
-                    AddDeviceModal { showAddDeviceModal = false }
-                }
+            HStack(spacing: 24) {
+                DeviceImageCard(imageName: "KneePadsThighIcon", title: "大腿裝置", mint: mint)
+                    .frame(width: 220)
+                DeviceImageCard(imageName: "KneePadsCalfIcon", title: "小腿裝置", mint: mint)
+                    .frame(width: 220)
             }
-            .frame(maxHeight: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .padding(.horizontal, 40)
         .padding(.top, 48)
