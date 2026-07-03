@@ -415,6 +415,13 @@ private struct AddDeviceModal: View {
                 .fill(Color.black.opacity(0.95))
                 .shadow(color: .black.opacity(0.3), radius: 12, y: 4)
 
+            VStack(spacing: 0) {
+                Rectangle()
+                    .fill(Color.white.opacity(0.12))
+                    .frame(height: 36)
+                Spacer()
+            }
+
             Button(action: onClose) {
                 ZStack {
                     Circle()
@@ -433,6 +440,7 @@ private struct AddDeviceModal: View {
             }
             .buttonStyle(.plain)
         }
+        .clipShape(RoundedRectangle(cornerRadius: 16))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
