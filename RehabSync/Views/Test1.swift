@@ -731,7 +731,7 @@ private struct DeviceImageCard: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
                 .padding(.horizontal, 14)
-                .padding(.vertical, 8)
+                .frame(height: 36)
                 .frame(maxWidth: .infinity, alignment: .trailing)
                 .background(darkGreen)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
