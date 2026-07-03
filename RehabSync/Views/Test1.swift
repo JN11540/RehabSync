@@ -425,6 +425,11 @@ private struct AddDeviceModal: View {
         return "\(thighDevice.name) · \(thighDevice.id.uuidString)"
     }
 
+    private var connectingDeviceId: UUID? {
+        guard let thighDevice, case .connecting = btVM.connectionState else { return nil }
+        return thighDevice.id
+    }
+
     var body: some View {
         ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: 16)
@@ -451,6 +456,7 @@ private struct AddDeviceModal: View {
                         devices: btVM.discoveredDevices,
                         darkGreen: darkGreen,
                         brightGreen: brightGreen,
+                        connectingDeviceId: connectingDeviceId,
                         onSelect: { device in
                             thighDevice = device
                             btVM.connectDiscovered(device)
@@ -509,6 +515,7 @@ private struct DeviceScanColumn: View {
     let devices: [DiscoveredDevice]
     let darkGreen: Color
     let brightGreen: Color
+    var connectingDeviceId: UUID? = nil
     let onSelect: (DiscoveredDevice) -> Void
 
     @State private var scrollOffset: CGFloat = 0
@@ -566,6 +573,15 @@ private struct DeviceScanColumn: View {
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.horizontal, 14)
+
+                                if device.id == connectingDeviceId {
+                                    HStack {
+                                        Spacer()
+                                        ProgressView()
+                                            .tint(.black)
+                                    }
+                                    .padding(.trailing, 14)
+                                }
                             }
                             .frame(height: itemHeight)
                         }
