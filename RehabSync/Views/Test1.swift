@@ -588,7 +588,7 @@ private struct DeviceBindModal: View {
                         .fill(Color(white: 0.85))
                     Text("新增裝置")
                         .font(.system(size: 32, weight: .semibold))
-                        .foregroundStyle(Color.white)
+                        .foregroundStyle(Color.black)
                 }
                 .frame(height: 72)
                 Rectangle()
