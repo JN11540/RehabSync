@@ -359,6 +359,8 @@ private struct Test1PreviewFrame: View {
 private struct DeviceConnectionButtons: View {
     let mint: Color
     var onAddDeviceTap: () -> Void = {}
+    @State private var deviceVM = DeviceViewModel()
+    @State private var thighDevice: Device? = nil
 
     var body: some View {
         VStack(spacing: 24) {
@@ -369,10 +371,17 @@ private struct DeviceConnectionButtons: View {
             }
 
             HStack(spacing: 24) {
-                DeviceImageCard(imageName: "KneePadsThighIcon", title: "大腿裝置", mint: mint, dimWhenDisconnected: false)
-                    .frame(width: 220)
-                    .contentShape(Rectangle())
-                    .onTapGesture { onAddDeviceTap() }
+                DeviceImageCard(
+                    imageName: "KneePadsThighIcon",
+                    title: "大腿裝置",
+                    mint: mint,
+                    isConnected: thighDevice != nil,
+                    connectedInfo: thighDevice.map { "\($0.device_name) · \($0.device_uuid)" },
+                    dimWhenDisconnected: false
+                )
+                .frame(width: 220)
+                .contentShape(Rectangle())
+                .onTapGesture { onAddDeviceTap() }
                 DeviceImageCard(imageName: "KneePadsCalfIcon", title: "小腿裝置", mint: mint, dimWhenDisconnected: false)
                     .frame(width: 220)
             }
@@ -380,6 +389,7 @@ private struct DeviceConnectionButtons: View {
         }
         .padding(.horizontal, 40)
         .padding(.top, 48)
+        .onAppear { thighDevice = deviceVM.fetch(limb: 0) }
         .padding(.bottom, 24)
     }
 }
