@@ -278,6 +278,7 @@ private struct Test1PreviewFrame: View {
                                 }
 
                                 IconLegend()
+                                    .padding(.top, 16)
                                     .padding(.bottom, 24)
                             }
                         }
@@ -330,18 +331,18 @@ private struct IconLegend: View {
                 Image("FinishIcon")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 20, height: 20)
+                    .frame(width: 30, height: 30)
                 Text("完成")
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: 30, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.8))
             }
             HStack(spacing: 6) {
                 Image("UnfinishIcon")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 20, height: 20)
+                    .frame(width: 30, height: 30)
                 Text("未完成")
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: 30, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.8))
             }
         }
