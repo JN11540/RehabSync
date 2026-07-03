@@ -19,6 +19,7 @@ struct Test1: View {
     @State private var resultVM = TreatmentResultViewModel()
     @State private var deviceVM = DeviceViewModel()
     @State private var thighDevice: Device? = nil
+    @State private var calfDevice: Device? = nil
 
     private var todayContents: [TreatmentContent] {
         let day = Calendar.current.startOfDay(for: selectedDate)
@@ -45,11 +46,12 @@ struct Test1: View {
 
     private func showDeviceConnection() {
         previewMode = .device
-        refreshThighDevice()
+        refreshDevices()
     }
 
-    private func refreshThighDevice() {
+    private func refreshDevices() {
         thighDevice = deviceVM.fetch(limb: 0)
+        calfDevice = deviceVM.fetch(limb: 1)
     }
 
     var body: some View {
@@ -76,6 +78,7 @@ struct Test1: View {
                         completedContentIds: completedContentIds,
                         selectedDate: $selectedDate,
                         thighDevice: thighDevice,
+                        calfDevice: calfDevice,
                         onAddDeviceTap: { showAddDeviceModal = true }
                     )
                     .frame(width: usable * 0.65)
@@ -91,11 +94,11 @@ struct Test1: View {
                         savedThighDevice: thighDevice,
                         onCancel: {
                             showAddDeviceModal = false
-                            refreshThighDevice()
+                            refreshDevices()
                         },
                         onConfirm: {
                             showAddDeviceModal = false
-                            refreshThighDevice()
+                            refreshDevices()
                         }
                     )
                     .padding(.horizontal, hPad)
@@ -242,6 +245,7 @@ private struct Test1PreviewFrame: View {
     let completedContentIds: Set<Int>
     @Binding var selectedDate: Date
     var thighDevice: Device? = nil
+    var calfDevice: Device? = nil
     var onAddDeviceTap: () -> Void = {}
     @State private var selectedContentId: Int64? = nil
 
@@ -333,7 +337,7 @@ private struct Test1PreviewFrame: View {
                             }
                         }
                     case .device:
-                        DeviceConnectionButtons(mint: mint, thighDevice: thighDevice, onAddDeviceTap: onAddDeviceTap)
+                        DeviceConnectionButtons(mint: mint, thighDevice: thighDevice, calfDevice: calfDevice, onAddDeviceTap: onAddDeviceTap)
                     case .none:
                         VStack(spacing: 10) {
                             Image(systemName: "cube.transparent")
@@ -379,13 +383,14 @@ private struct Test1PreviewFrame: View {
 private struct DeviceConnectionButtons: View {
     let mint: Color
     var thighDevice: Device? = nil
+    var calfDevice: Device? = nil
     var onAddDeviceTap: () -> Void = {}
 
     var body: some View {
         VStack(spacing: 24) {
             HStack(spacing: 24) {
                 DeviceImageCard(
-                    imageName: "KneePadsThighIcon",
+                    imageName: thighDevice != nil ? "KneeThighConnectedIcon" : "KneeThighDisconnectedIcon",
                     title: "大腿裝置",
                     mint: mint,
                     isConnected: thighDevice != nil,
@@ -395,8 +400,15 @@ private struct DeviceConnectionButtons: View {
                 .frame(width: 220)
                 .contentShape(Rectangle())
                 .onTapGesture { onAddDeviceTap() }
-                DeviceImageCard(imageName: "KneePadsCalfIcon", title: "小腿裝置", mint: mint, dimWhenDisconnected: false)
-                    .frame(width: 220)
+                DeviceImageCard(
+                    imageName: calfDevice != nil ? "KneeCalfConnectedIcon" : "KneeCalfDisconnectedIcon",
+                    title: "小腿裝置",
+                    mint: mint,
+                    isConnected: calfDevice != nil,
+                    connectedInfo: calfDevice.map { "\($0.device_name) · \($0.device_uuid)" },
+                    dimWhenDisconnected: false
+                )
+                .frame(width: 220)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
