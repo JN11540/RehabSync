@@ -50,11 +50,9 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     @ObservationIgnored private var calibGyroBuffers:  [UUID: [(Double, Double, Double)]] = [:]
     @ObservationIgnored private var gyroCalibrationMap: [UUID: GyroBias] = [:]
 
-    // Baseline Calibration ＆ Estimated Real Angle（皆只用加速度計）— UI state (main thread)
+    // Baseline Calibration（膝角基準值，只用加速度計）— UI state (main thread)
     var isCollectingBaseline = false
     var baselineResult: Double? = nil
-    var isEstimatingRealAngle = false
-    var estimatedRealAngleSamples: [(t: Double, angle: Double)] = []
     // 共用的加速度計收集機制 — internal (bleQueue)，收集期間不寫入資料庫
     @ObservationIgnored private var accOnlyCollecting: Set<UUID> = []
     @ObservationIgnored private var accOnlyBuffers: [UUID: [(timestamp: Int64, x: Double, y: Double, z: Double)]] = [:]
@@ -395,57 +393,6 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         return (abs(mean) * 10).rounded() / 10
     }
 
-    // MARK: - Estimated Real Angle（預估真實角度，固定 5Hz 重新採樣）
-
-    /// 錄製大腿與小腿加速度計 5 秒，收集期間不寫入資料庫，結束後以已知的 baseline 換算成預估真實角度，
-    /// 並重新採樣成固定 5Hz（每秒 5 筆）。
-    func startEstimateRealAngle(thighPeripheral: CBPeripheral, calfPeripheral: CBPeripheral, baseline: Double) {
-        DispatchQueue.main.async {
-            self.estimatedRealAngleSamples = []
-            self.isEstimatingRealAngle = true
-        }
-        beginAccOnlyCollection(thighPeripheral: thighPeripheral, calfPeripheral: calfPeripheral, durationSec: 5) { [weak self] thighSamples, calfSamples in
-            let result = Self.computeEstimatedRealAngle(thighSamples: thighSamples, calfSamples: calfSamples, baseline: baseline)
-            DispatchQueue.main.async {
-                self?.estimatedRealAngleSamples = result
-                self?.isEstimatingRealAngle = false
-            }
-        }
-    }
-
-    /// 移植自 baseline_5hz_resample.py（build_baseline_mapping_table / angle_to_real / resample_at_fixed_rate）
-    /// + calibration_phase.py（inclination_deg / compute_knee_angle）：
-    /// 用加速度算膝角，依已知 baseline 建立對應表換算成預估真實角度，再用線性內插重新採樣成固定 5Hz。
-    static func computeEstimatedRealAngle(
-        thighSamples: [(timestamp: Int64, x: Double, y: Double, z: Double)],
-        calfSamples: [(timestamp: Int64, x: Double, y: Double, z: Double)],
-        baseline: Double,
-        maxStep: Int = 70,
-        maxRealAngleDeg: Double = 90,
-        sampleRateHz: Double = 5
-    ) -> [(t: Double, angle: Double)] {
-        guard !thighSamples.isEmpty, !calfSamples.isEmpty else { return [] }
-
-        let thighIncline = smoothedIncline(thighSamples)
-        let calfIncline  = smoothedIncline(calfSamples)
-        let count = min(thighIncline.count, calfIncline.count)
-        guard count >= 2 else { return [] }
-
-        var tSecs: [Double] = []
-        var kneeAngles: [Double] = []
-        for i in 0..<count {
-            kneeAngles.append(thighIncline[i].incline - calfIncline[i].incline)
-            tSecs.append(Double(thighIncline[i].t) / 1000.0)
-        }
-
-        let table = baselineMappingTable(baseline: baseline, maxStep: maxStep, maxRealAngleDeg: maxRealAngleDeg)
-        let realAngles = kneeAngles.map { angleToReal(abs($0), table: table) }
-
-        let resampled = resample(tSec: tSecs, values: realAngles, sampleRateHz: sampleRateHz)
-        guard let t0 = resampled.first?.t else { return [] }
-        return resampled.map { (t: (($0.t - t0) * 10).rounded() / 10, angle: ($0.value * 10).rounded() / 10) }
-    }
-
     /// 對應 inclination_deg：以重力向量計算肢段相對垂直線的傾角（度）
     private static func inclinationDeg(_ x: Double, _ y: Double, _ z: Double) -> Double {
         atan2(x, (y * y + z * z).squareRoot()) * 180 / .pi
@@ -481,18 +428,6 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     /// 對應 angle_to_real：線性內插，超出對應表範圍時常數外插（跟 np.interp 行為一致）
     private static func angleToReal(_ measuredAbsDeg: Double, table: [(measuredAbs: Double, realAngle: Double)]) -> Double {
         linearInterp(measuredAbsDeg, xs: table.map(\.measuredAbs), ys: table.map(\.realAngle))
-    }
-
-    /// 對應 resample_at_fixed_rate：用線性內插把不規則時間間隔的序列重新採樣成固定頻率
-    private static func resample(tSec: [Double], values: [Double], sampleRateHz: Double) -> [(t: Double, value: Double)] {
-        guard tSec.count >= 2, tSec.count == values.count,
-              let tStart = tSec.min(), let tEnd = tSec.max() else { return [] }
-        let dt = 1.0 / sampleRateHz
-        let nSamples = Int(((tEnd - tStart) / dt).rounded(.down)) + 1
-        return (0..<nSamples).map { i in
-            let t = tStart + Double(i) * dt
-            return (t, linearInterp(t, xs: tSec, ys: values))
-        }
     }
 
     /// 對應 np.interp：對已依 x 遞增排序的 (xs, ys) 做線性內插，x 超出範圍時取頭尾常數值
