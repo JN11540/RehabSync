@@ -497,7 +497,7 @@ private struct Test1PreviewFrame: View {
                                     }
                                 }
                                 .padding(.horizontal, sidePadding)
-                                .padding(.top, 4)
+                                .padding(.top, -4)
                                 .offset(x: -trainingScrollOffset)
                                 .frame(width: viewportWidth, alignment: .leading)
                                 .clipped()
@@ -524,7 +524,7 @@ private struct Test1PreviewFrame: View {
                                 .padding(.horizontal, sidePadding)
 
                                 IconLegend()
-                                    .padding(.top, 4)
+                                    .padding(.top, 14)
                                     .padding(.bottom, 24)
                             }
                         }
