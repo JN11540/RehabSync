@@ -59,6 +59,18 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     @ObservationIgnored private var accOnlyCollecting: Set<UUID> = []
     @ObservationIgnored private var accOnlyBuffers: [UUID: [(timestamp: Int64, x: Double, y: Double, z: Double)]] = [:]
 
+    // Live Estimated Real Angle（即時預估真實角度，固定 5Hz 更新）— UI state (main thread)
+    var isLiveEstimating = false
+    var currentEstimatedRealAngle: Double? = nil
+    // internal (bleQueue)：只記住「最新一筆」傾角，實際計算交給 liveTickTimer 每 0.2 秒統一處理
+    @ObservationIgnored private var liveEstimating: Set<UUID> = []
+    @ObservationIgnored private var liveThighId: UUID?
+    @ObservationIgnored private var liveCalfId: UUID?
+    @ObservationIgnored private var liveThighIncline: Double?
+    @ObservationIgnored private var liveCalfIncline: Double?
+    @ObservationIgnored private var liveBaselineTable: [(measuredAbs: Double, realAngle: Double)] = []
+    @ObservationIgnored private var liveTickTimer: Timer?
+
     override init() {
         super.init()
         central = CBCentralManager(delegate: self, queue: bleQueue)
@@ -498,6 +510,98 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         return ys.last!
     }
 
+    // MARK: - Live Estimated Real Angle（即時預估真實角度）
+
+    /// 開始持續錄製大腿與小腿加速度計，收集期間不寫入資料庫。跟批次版「預估真實角度」不同，
+    /// 這裡不是錄固定秒數後一次計算，而是持續追蹤兩側「最新一筆」傾角，
+    /// 由 `liveTickTimer` 每 0.2 秒（5Hz）讀一次最新值換算成預估真實角度並更新到畫面。
+    func startLiveEstimateRealAngle(thighPeripheral: CBPeripheral, calfPeripheral: CBPeripheral, baseline: Double) {
+        let thighId = thighPeripheral.identifier
+        let calfId  = calfPeripheral.identifier
+
+        DispatchQueue.main.async {
+            self.currentEstimatedRealAngle = nil
+            self.isLiveEstimating = true
+            self.liveTickTimer?.invalidate()
+            self.liveTickTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+                self?.tickLiveEstimatedRealAngle()
+            }
+        }
+
+        bleQueue.async { [weak self] in
+            guard let self, let config = bluetoothConfig else { return }
+            let wasRecording = DispatchQueue.main.sync { self.isRecording }
+
+            liveThighId = thighId
+            liveCalfId  = calfId
+            liveThighIncline = nil
+            liveCalfIncline  = nil
+            liveBaselineTable = Self.baselineMappingTable(baseline: baseline, maxStep: 70, maxRealAngleDeg: 90)
+            liveEstimating = [thighId, calfId]
+
+            for peripheral in [thighPeripheral, calfPeripheral] {
+                guard let map = charMap[peripheral.identifier] else { continue }
+                if !wasRecording, let writeChar = map[CBUUID(string: config.write_uuid)] {
+                    peripheral.writeValue(config.cmd_a0, for: writeChar, type: .withResponse)
+                    peripheral.writeValue(config.cmd_a1, for: writeChar, type: .withResponse)
+                }
+                if let c = map[CBUUID(string: config.sub_acc_uuid)] { peripheral.setNotifyValue(true, for: c) }
+            }
+        }
+    }
+
+    /// 停止即時預估：關掉 Timer，並在沒有其他一般收集正在進行時把 ACC notify 關掉。
+    func stopLiveEstimateRealAngle(thighPeripheral: CBPeripheral, calfPeripheral: CBPeripheral) {
+        DispatchQueue.main.async {
+            self.liveTickTimer?.invalidate()
+            self.liveTickTimer = nil
+            self.isLiveEstimating = false
+        }
+        bleQueue.async { [weak self] in
+            guard let self else { return }
+            let wasRecording = DispatchQueue.main.sync { self.isRecording }
+            liveEstimating = []
+            if !wasRecording, let config = bluetoothConfig {
+                for peripheral in [thighPeripheral, calfPeripheral] {
+                    if let map = charMap[peripheral.identifier],
+                       let c = map[CBUUID(string: config.sub_acc_uuid)] {
+                        peripheral.setNotifyValue(false, for: c)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Timer callback（main thread 觸發），跳回 bleQueue 讀最新值計算，算完再寫回主執行緒的 UI 屬性。
+    private func tickLiveEstimatedRealAngle() {
+        bleQueue.async { [weak self] in
+            guard let self,
+                  let thigh = liveThighIncline,
+                  let calf  = liveCalfIncline else { return }
+            let kneeAngle = thigh - calf
+            let realAngle = Self.angleToReal(abs(kneeAngle), table: liveBaselineTable)
+            let rounded = (realAngle * 10).rounded() / 10
+            DispatchQueue.main.async { self.currentEstimatedRealAngle = rounded }
+        }
+    }
+
+    /// 只把這一包 20 筆瞬間取樣平均成一個傾角並覆蓋成「最新值」，不計算角度、不發布到畫面。
+    private func handleLiveAccPacket(_ data: Data, id: UUID, config: Bluetooth) {
+        guard data.count >= 123 else { return }
+        var sumIncline = 0.0
+        for i in 0..<20 {
+            let o = 3 + i * 6
+            let x = Double(data.int16BE(at: o))     * config.acc_sensitivity
+            let y = Double(data.int16BE(at: o + 2)) * config.acc_sensitivity
+            let z = Double(data.int16BE(at: o + 4)) * config.acc_sensitivity
+            sumIncline += Self.inclinationDeg(x, y, z)
+        }
+        let incline = sumIncline / 20.0
+
+        if id == liveThighId { liveThighIncline = incline }
+        if id == liveCalfId  { liveCalfIncline  = incline }
+    }
+
     func startRecordingAll() {
         recordingStartTime = Int64(Date().timeIntervalSince1970 * 1000)
         recordingEndTime   = nil
@@ -640,6 +744,14 @@ extension BluetoothViewModel: CBPeripheralDelegate {
         if accOnlyCollecting.contains(peripheral.identifier) {
             if uuid == CBUUID(string: config.sub_acc_uuid) {
                 collectAccOnly(data, id: peripheral.identifier, config: config)
+            }
+            return
+        }
+
+        // 即時預估真實角度：只更新最新值，不寫 DB
+        if liveEstimating.contains(peripheral.identifier) {
+            if uuid == CBUUID(string: config.sub_acc_uuid) {
+                handleLiveAccPacket(data, id: peripheral.identifier, config: config)
             }
             return
         }

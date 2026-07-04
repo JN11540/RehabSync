@@ -82,7 +82,7 @@ struct TestPage: View {
                         ? Color.orange.opacity(0.85) : Color.gray.opacity(0.3))
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .disabled(!bothConnected || btVM.isCollectingBaseline)
+                    .disabled(!bothConnected || btVM.isCollectingBaseline || btVM.isLiveEstimating)
 
                     if btVM.isCollectingBaseline {
                         Text("收集中…")
@@ -106,7 +106,7 @@ struct TestPage: View {
                         ? Color.purple.opacity(0.85) : Color.gray.opacity(0.3))
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .disabled(!canEstimateRealAngle || btVM.isEstimatingRealAngle)
+                    .disabled(!canEstimateRealAngle || btVM.isEstimatingRealAngle || btVM.isLiveEstimating)
 
                     if btVM.isEstimatingRealAngle {
                         Text("收集中…")
@@ -123,6 +123,32 @@ struct TestPage: View {
                             }
                         }
                         .frame(width: 260)
+                    }
+
+                    Button(btVM.isLiveEstimating ? "停止即時預估" : "開始即時預估") {
+                        guard let pair = thighAndCalfPeripherals else { return }
+                        if btVM.isLiveEstimating {
+                            btVM.stopLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+                        } else if let baseline = btVM.baselineResult, baseline >= 0 {
+                            btVM.startLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf, baseline: baseline)
+                        }
+                    }
+                    .font(.system(size: 15, weight: .medium))
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(btVM.isLiveEstimating ? Color.red.opacity(0.85)
+                        : (canEstimateRealAngle ? Color.teal.opacity(0.85) : Color.gray.opacity(0.3)))
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .disabled(!btVM.isLiveEstimating && (!canEstimateRealAngle || btVM.isCollectingBaseline || btVM.isEstimatingRealAngle))
+
+                    if let angle = btVM.currentEstimatedRealAngle {
+                        Text(String(format: "%.1f°", angle))
+                            .font(.system(size: 20, weight: .bold, design: .monospaced))
+                    } else if btVM.isLiveEstimating {
+                        Text("等待資料…")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.secondary)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
