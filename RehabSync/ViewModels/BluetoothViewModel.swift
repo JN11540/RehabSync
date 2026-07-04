@@ -297,25 +297,39 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
 
             DispatchQueue.main.asyncAfter(deadline: .now() + durationSec) { [weak self] in
                 self?.bleQueue.async {
-                    guard let self else { return }
-                    accOnlyCollecting = []
-
-                    let thighSamples = accOnlyBuffers.removeValue(forKey: thighPeripheral.identifier) ?? []
-                    let calfSamples  = accOnlyBuffers.removeValue(forKey: calfPeripheral.identifier)  ?? []
-
-                    if !wasRecording, let config = bluetoothConfig {
-                        for peripheral in [thighPeripheral, calfPeripheral] {
-                            if let map = charMap[peripheral.identifier],
-                               let c = map[CBUUID(string: config.sub_acc_uuid)] {
-                                peripheral.setNotifyValue(false, for: c)
-                            }
-                        }
-                    }
-
-                    completion(thighSamples, calfSamples)
+                    self?.finishAccOnlyCollection(
+                        thighPeripheral: thighPeripheral,
+                        calfPeripheral: calfPeripheral,
+                        wasRecording: wasRecording,
+                        completion: completion
+                    )
                 }
             }
         }
+    }
+
+    private func finishAccOnlyCollection(
+        thighPeripheral: CBPeripheral,
+        calfPeripheral: CBPeripheral,
+        wasRecording: Bool,
+        completion: (_ thighSamples: [(timestamp: Int64, x: Double, y: Double, z: Double)],
+                     _ calfSamples: [(timestamp: Int64, x: Double, y: Double, z: Double)]) -> Void
+    ) {
+        accOnlyCollecting = []
+
+        let thighSamples = accOnlyBuffers.removeValue(forKey: thighPeripheral.identifier) ?? []
+        let calfSamples  = accOnlyBuffers.removeValue(forKey: calfPeripheral.identifier)  ?? []
+
+        if !wasRecording, let config = bluetoothConfig {
+            for peripheral in [thighPeripheral, calfPeripheral] {
+                if let map = charMap[peripheral.identifier],
+                   let c = map[CBUUID(string: config.sub_acc_uuid)] {
+                    peripheral.setNotifyValue(false, for: c)
+                }
+            }
+        }
+
+        completion(thighSamples, calfSamples)
     }
 
     // MARK: - Baseline Calibration（膝角基準值）
