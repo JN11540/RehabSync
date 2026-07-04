@@ -8,8 +8,13 @@ import UIKit
 struct TestPage: View {
     let btVM: BluetoothViewModel
 
-    private var anyConnected: Bool {
-        !btVM.connectedPeripherals.isEmpty
+    private var bothConnected: Bool {
+        let dvm = DeviceViewModel()
+        guard let thigh = dvm.fetch(limb: 0), let thighUUID = UUID(uuidString: thigh.device_uuid),
+              let calf  = dvm.fetch(limb: 1), let calfUUID  = UUID(uuidString: calf.device_uuid)
+        else { return false }
+        return btVM.connectedPeripherals[thighUUID] != nil &&
+               btVM.connectedPeripherals[calfUUID]  != nil
     }
 
     private var canExport: Bool {
@@ -26,11 +31,11 @@ struct TestPage: View {
                         .font(.system(size: 15, weight: .medium))
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
-                        .background(anyConnected && !btVM.isRecording
+                        .background(bothConnected && !btVM.isRecording
                             ? Color.green.opacity(0.85) : Color.gray.opacity(0.3))
                         .foregroundStyle(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .disabled(!anyConnected || btVM.isRecording)
+                        .disabled(!bothConnected || btVM.isRecording)
 
                     Button("停止收集") { btVM.stopRecordingAll() }
                         .font(.system(size: 15, weight: .medium))
