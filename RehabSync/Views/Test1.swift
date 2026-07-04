@@ -1043,7 +1043,7 @@ private struct WearingStepImage: View {
     let mint: Color
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 0) {
             ZStack(alignment: .topLeading) {
                 Color.black
                 Image(imageName)
@@ -1064,12 +1064,11 @@ private struct WearingStepImage: View {
             )
 
             Text(caption)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(.black)
                 .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 10)
-                .padding(.vertical, 10)
+                .frame(height: 100)
                 .frame(maxWidth: .infinity)
                 .background(mint)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
