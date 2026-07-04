@@ -11,21 +11,37 @@ struct PreWorking2: View {
         ZStack {
             Color.black.opacity(0.8).ignoresSafeArea()
 
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.white)
-                .padding(40)
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color.white)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(Color(white: 0.6), lineWidth: 2)
+                    )
+
+                Button(action: { dismiss() }) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.white)
+                        Circle()
+                            .strokeBorder(Color.black, lineWidth: 1.5)
+                        Circle()
+                            .strokeBorder(Color.black, lineWidth: 1.5)
+                            .padding(4)
+                        Image(systemName: "xmark")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(.black)
+                    }
+                    .frame(width: 40, height: 40)
+                    .padding(16)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(40)
 
             Text(exercise?.name ?? "未知動作")
                 .font(.system(size: 28, weight: .bold))
                 .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
-        }
-        .overlay(alignment: .topLeading) {
-            Button(action: { dismiss() }) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 28))
-                    .foregroundStyle(.secondary)
-            }
-            .padding(20)
         }
     }
 }
