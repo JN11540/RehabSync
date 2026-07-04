@@ -511,10 +511,10 @@ private struct Test1PreviewFrame: View {
                                 .foregroundStyle(.white)
                                 .padding(.top, 48)
 
-                            HStack(spacing: 20) {
-                                WearingStepImage(imageName: "WearingKneePads1Icon", step: 1)
-                                WearingStepImage(imageName: "WearingKneePads2Icon", step: 2)
-                                WearingStepImage(imageName: "WearingKneePads3Icon", step: 3)
+                            HStack(alignment: .top, spacing: 20) {
+                                WearingStepImage(imageName: "WearingKneePads1Icon", step: 1, caption: "坐下並將腿部伸直", mint: mint)
+                                WearingStepImage(imageName: "WearingKneePads2Icon", step: 2, caption: "將腳套入，從小腿拉至膝蓋", mint: mint)
+                                WearingStepImage(imageName: "WearingKneePads3Icon", step: 3, caption: "護膝上有三角形標誌，該三角形黑布是對應到膝蓋位置", mint: mint)
                             }
                             .padding(.horizontal, 40)
 
@@ -1039,26 +1039,45 @@ private struct IconLegend: View {
 private struct WearingStepImage: View {
     let imageName: String
     let step: Int
+    let caption: String
+    let mint: Color
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            Color.black
-            Image(imageName)
-                .resizable()
-                .scaledToFit()
-            Text("\(step)")
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: 28, height: 28)
-                .background(Circle().fill(Color(red: 0.15, green: 0.6, blue: 0.55)))
-                .padding(6)
+        VStack(spacing: 8) {
+            ZStack(alignment: .topLeading) {
+                Color.black
+                Image(imageName)
+                    .resizable()
+                    .scaledToFit()
+                Text("\(step)")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 28, height: 28)
+                    .background(Circle().fill(Color(red: 0.15, green: 0.6, blue: 0.55)))
+                    .padding(6)
+            }
+            .aspectRatio(557.0 / 844.0, contentMode: .fit)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.black, lineWidth: 4)
+            )
+
+            Text(caption)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.black)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity)
+                .background(mint)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.black, lineWidth: 4)
+                )
         }
-        .aspectRatio(557.0 / 844.0, contentMode: .fit)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.black, lineWidth: 4)
-        )
     }
 }
 
