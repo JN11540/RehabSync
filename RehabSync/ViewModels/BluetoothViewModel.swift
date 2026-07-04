@@ -50,6 +50,13 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     @ObservationIgnored private var calibGyroBuffers:  [UUID: [(Double, Double, Double)]] = [:]
     @ObservationIgnored private var gyroCalibrationMap: [UUID: GyroBias] = [:]
 
+    // Baseline Calibration（膝角基準值，只用加速度計）— UI state (main thread)
+    var isCollectingBaseline = false
+    var baselineResult: Double? = nil
+    // Baseline Calibration — internal (bleQueue)，收集期間不寫入資料庫
+    @ObservationIgnored private var baselineCollecting: Set<UUID> = []
+    @ObservationIgnored private var baselineAccBuffers: [UUID: [(timestamp: Int64, x: Double, y: Double, z: Double)]] = [:]
+
     override init() {
         super.init()
         central = CBCentralManager(delegate: self, queue: bleQueue)
@@ -258,6 +265,117 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         }
     }
 
+    // MARK: - Baseline Calibration（膝角基準值）
+
+    /// 錄製大腿與小腿加速度計 5 秒，收集期間不寫入資料庫，結束後計算膝角基準值。
+    func startBaselineCalibration(thighPeripheral: CBPeripheral, calfPeripheral: CBPeripheral) {
+        DispatchQueue.main.async {
+            self.baselineResult = nil
+            self.isCollectingBaseline = true
+        }
+        bleQueue.async { [weak self] in
+            guard let self, let config = bluetoothConfig else { return }
+            let wasRecording = DispatchQueue.main.sync { self.isRecording }
+
+            baselineAccBuffers[thighPeripheral.identifier] = []
+            baselineAccBuffers[calfPeripheral.identifier]  = []
+            baselineCollecting = [thighPeripheral.identifier, calfPeripheral.identifier]
+
+            for peripheral in [thighPeripheral, calfPeripheral] {
+                guard let map = charMap[peripheral.identifier] else { continue }
+                if !wasRecording, let writeChar = map[CBUUID(string: config.write_uuid)] {
+                    peripheral.writeValue(config.cmd_a0, for: writeChar, type: .withResponse)
+                    peripheral.writeValue(config.cmd_a1, for: writeChar, type: .withResponse)
+                }
+                if let c = map[CBUUID(string: config.sub_acc_uuid)] { peripheral.setNotifyValue(true, for: c) }
+            }
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+                self?.bleQueue.async {
+                    self?.finishBaselineCalibration(
+                        thighPeripheral: thighPeripheral,
+                        calfPeripheral: calfPeripheral,
+                        wasRecording: wasRecording
+                    )
+                }
+            }
+        }
+    }
+
+    private func finishBaselineCalibration(thighPeripheral: CBPeripheral, calfPeripheral: CBPeripheral, wasRecording: Bool) {
+        baselineCollecting = []
+
+        let thighSamples = baselineAccBuffers.removeValue(forKey: thighPeripheral.identifier) ?? []
+        let calfSamples  = baselineAccBuffers.removeValue(forKey: calfPeripheral.identifier)  ?? []
+
+        if !wasRecording, let config = bluetoothConfig {
+            for peripheral in [thighPeripheral, calfPeripheral] {
+                if let map = charMap[peripheral.identifier],
+                   let c = map[CBUUID(string: config.sub_acc_uuid)] {
+                    peripheral.setNotifyValue(false, for: c)
+                }
+            }
+        }
+
+        let result = Self.computeBaselineAngle(thighSamples: thighSamples, calfSamples: calfSamples)
+        DispatchQueue.main.async {
+            self.baselineResult = result
+            self.isCollectingBaseline = false
+        }
+    }
+
+    /// 移植自 baseline_check.py（check_whole_range_stable）+ calibration_phase.py（inclination_deg / compute_knee_angle）：
+    /// 用加速度算大腿、小腿相對重力的傾角，膝角 = 大腿傾角 - 小腿傾角；整段錄製視為單一區間，
+    /// 標準差（樣本標準差）<= 1.5° 且時長 >= 1 秒才算穩定，穩定則回傳角度平均值的絕對值（四捨五入到小數1位），否則回傳 -1。
+    static func computeBaselineAngle(
+        thighSamples: [(timestamp: Int64, x: Double, y: Double, z: Double)],
+        calfSamples: [(timestamp: Int64, x: Double, y: Double, z: Double)],
+        stdThresholdDeg: Double = 1.5,
+        minDurationSec: Double = 1.0
+    ) -> Double {
+        func inclinationDeg(_ x: Double, _ y: Double, _ z: Double) -> Double {
+            atan2(x, (y * y + z * z).squareRoot()) * 180 / .pi
+        }
+
+        // 依 timestamp 分組平均，濾掉同一個 timestamp 底下多筆瞬間取樣的高頻雜訊
+        func smoothedIncline(_ samples: [(timestamp: Int64, x: Double, y: Double, z: Double)]) -> [(t: Int64, incline: Double)] {
+            var sums: [Int64: (sum: Double, count: Int)] = [:]
+            for s in samples {
+                let incline = inclinationDeg(s.x, s.y, s.z)
+                var g = sums[s.timestamp] ?? (0, 0)
+                g.sum += incline
+                g.count += 1
+                sums[s.timestamp] = g
+            }
+            return sums.map { (t: $0.key, incline: $0.value.sum / Double($0.value.count)) }
+                .sorted { $0.t < $1.t }
+        }
+
+        guard !thighSamples.isEmpty, !calfSamples.isEmpty else { return -1 }
+
+        let thighIncline = smoothedIncline(thighSamples)
+        let calfIncline  = smoothedIncline(calfSamples)
+        let count = min(thighIncline.count, calfIncline.count)
+        guard count >= 2 else { return -1 }
+
+        // 大腿與小腿分別平滑後，依時間順序逐一配對計算膝角
+        var kneeAngles: [Double] = []
+        var tSecs: [Double] = []
+        for i in 0..<count {
+            kneeAngles.append(thighIncline[i].incline - calfIncline[i].incline)
+            tSecs.append(Double(thighIncline[i].t) / 1000.0)
+        }
+
+        let duration = tSecs.max()! - tSecs.min()!
+        let mean = kneeAngles.reduce(0, +) / Double(kneeAngles.count)
+        let variance = kneeAngles.reduce(0) { $0 + ($1 - mean) * ($1 - mean) } / Double(kneeAngles.count - 1)
+        let std = variance.squareRoot()
+
+        guard std <= stdThresholdDeg, duration >= minDurationSec else { return -1 }
+
+        return (abs(mean) * 10).rounded() / 10
+    }
+
     func startRecordingAll() {
         recordingStartTime = Int64(Date().timeIntervalSince1970 * 1000)
         recordingEndTime   = nil
@@ -396,6 +514,14 @@ extension BluetoothViewModel: CBPeripheralDelegate {
             return
         }
 
+        // 膝角基準值校正模式：收集到 buffer，不寫 DB
+        if baselineCollecting.contains(peripheral.identifier) {
+            if uuid == CBUUID(string: config.sub_acc_uuid) {
+                collectBaselineACC(data, id: peripheral.identifier, config: config)
+            }
+            return
+        }
+
         // 首次通知時 onConnected 已執行完畢，DB 已有裝置，lazy load device_id
         if deviceIdMap[peripheral.identifier] == nil,
            let d = loadDevice(uuid: peripheral.identifier.uuidString),
@@ -471,6 +597,22 @@ extension BluetoothViewModel: CBPeripheralDelegate {
             ))
         }
         calibGyroBuffers[id] = buf
+    }
+
+    private func collectBaselineACC(_ data: Data, id: UUID, config: Bluetooth) {
+        guard data.count >= 123 else { return }
+        let ts = Int64(Date().timeIntervalSince1970 * 1000)
+        var buf = baselineAccBuffers[id] ?? []
+        for i in 0..<20 {
+            let o = 3 + i * 6
+            buf.append((
+                timestamp: ts,
+                x: Double(data.int16BE(at: o))     * config.acc_sensitivity,
+                y: Double(data.int16BE(at: o + 2)) * config.acc_sensitivity,
+                z: Double(data.int16BE(at: o + 4)) * config.acc_sensitivity
+            ))
+        }
+        baselineAccBuffers[id] = buf
     }
 
     private func parseEXG(_ data: Data, deviceId: Int64, timestamp: Int64) {

@@ -21,6 +21,16 @@ struct TestPage: View {
         btVM.recordingStartTime != nil && btVM.recordingEndTime != nil
     }
 
+    private var thighAndCalfPeripherals: (thigh: CBPeripheral, calf: CBPeripheral)? {
+        let dvm = DeviceViewModel()
+        guard let thigh = dvm.fetch(limb: 0), let thighUUID = UUID(uuidString: thigh.device_uuid),
+              let calf  = dvm.fetch(limb: 1), let calfUUID  = UUID(uuidString: calf.device_uuid),
+              let thighPeripheral = btVM.connectedPeripherals[thighUUID],
+              let calfPeripheral  = btVM.connectedPeripherals[calfUUID]
+        else { return nil }
+        return (thighPeripheral, calfPeripheral)
+    }
+
     var body: some View {
         ZStack {
             Color(red: 0.96, green: 0.94, blue: 0.91).ignoresSafeArea()
@@ -54,6 +64,30 @@ struct TestPage: View {
                         .foregroundStyle(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                         .disabled(!canExport)
+
+                    Button("校正") {
+                        if let pair = thighAndCalfPeripherals {
+                            btVM.startBaselineCalibration(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+                        }
+                    }
+                    .font(.system(size: 15, weight: .medium))
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(bothConnected && !btVM.isCollectingBaseline
+                        ? Color.orange.opacity(0.85) : Color.gray.opacity(0.3))
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .disabled(!bothConnected || btVM.isCollectingBaseline)
+
+                    if btVM.isCollectingBaseline {
+                        Text("收集中…")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.secondary)
+                    } else if let result = btVM.baselineResult {
+                        Text(result < 0 ? "-1" : String(format: "%.1f°", result))
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(result < 0 ? .red : .primary)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 24)
