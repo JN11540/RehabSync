@@ -95,7 +95,7 @@ private struct FloatingTabBar: View {
 // MARK: - Preview Mode
 
 private enum Test1PreviewMode {
-    case none, training, device
+    case none, training, device, wearing
 }
 
 // MARK: - Test1
@@ -143,6 +143,10 @@ struct Test1: View {
         refreshDevices()
     }
 
+    private func showWearing() {
+        previewMode = .wearing
+    }
+
     private func refreshDevices() {
         thighDevice = deviceVM.fetch(limb: 0)
         calfDevice = deviceVM.fetch(limb: 1)
@@ -178,6 +182,7 @@ struct Test1: View {
                     Test1Sidebar(
                         mint: mint,
                         onDeviceConnectionTap: showDeviceConnection,
+                        onWearingTap: showWearing,
                         onTrainingMenuTap: loadTrainingMenu
                     )
                         .frame(width: usable * 0.35)
@@ -255,6 +260,7 @@ struct Test1: View {
 private struct Test1Sidebar: View {
     let mint: Color
     let onDeviceConnectionTap: () -> Void
+    let onWearingTap: () -> Void
     let onTrainingMenuTap: () -> Void
 
     var body: some View {
@@ -269,13 +275,16 @@ private struct Test1Sidebar: View {
                 }
             }
             .buttonStyle(.plain)
-            Test1MenuTile(title: "護膝穿戴", mint: mint) {
-                Image("KneePadIcon")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 34, height: 34)
-                    .scaleEffect(1.6)
+            Button(action: onWearingTap) {
+                Test1MenuTile(title: "護膝穿戴", mint: mint) {
+                    Image("KneePadIcon")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 34, height: 34)
+                        .scaleEffect(1.6)
+                }
             }
+            .buttonStyle(.plain)
             Button(action: onTrainingMenuTap) {
                 Test1MenuTile(title: "訓練菜單", mint: mint) {
                     Image("MenuIcon")
@@ -494,6 +503,22 @@ private struct Test1PreviewFrame: View {
                             calfDevice: calfDevice,
                             onAddDeviceTap: onAddDeviceTap
                         )
+                    case .wearing:
+                        VStack(spacing: 24) {
+                            Text("穿戴方式")
+                                .font(.system(size: 30, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .padding(.top, 48)
+
+                            HStack(spacing: 20) {
+                                WearingStepImage(imageName: "WearingKneePads1Icon", step: 1)
+                                WearingStepImage(imageName: "WearingKneePads2Icon", step: 2)
+                                WearingStepImage(imageName: "WearingKneePads3Icon", step: 3)
+                            }
+                            .padding(.horizontal, 40)
+
+                            Spacer()
+                        }
                     case .none:
                         VStack(spacing: 10) {
                             Image(systemName: "cube.transparent")
@@ -1005,6 +1030,34 @@ private struct IconLegend: View {
                     .foregroundStyle(.white.opacity(0.8))
             }
         }
+    }
+}
+
+// MARK: - Wearing Step Image
+
+private struct WearingStepImage: View {
+    let imageName: String
+    let step: Int
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            Color.black
+            Image(imageName)
+                .resizable()
+                .scaledToFit()
+            Text("\(step)")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 28, height: 28)
+                .background(Circle().fill(Color(red: 0.15, green: 0.6, blue: 0.55)))
+                .padding(6)
+        }
+        .aspectRatio(557.0 / 844.0, contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.black, lineWidth: 4)
+        )
     }
 }
 
