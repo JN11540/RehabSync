@@ -519,6 +519,12 @@ private struct Test1PreviewFrame: View {
                             .padding(.horizontal, 40)
                             .padding(.top, 20)
 
+                            Rectangle()
+                                .fill(Color(red: 0.15, green: 0.5, blue: 0.45))
+                                .frame(height: 20)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .padding(.horizontal, 40)
+
                             Spacer()
                         }
                     case .none:
