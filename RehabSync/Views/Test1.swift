@@ -1043,7 +1043,7 @@ private struct WearingStepImage: View {
     let mint: Color
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: -4) {
             ZStack(alignment: .topLeading) {
                 Color.black
                 Image(imageName)
