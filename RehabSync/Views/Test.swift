@@ -21,6 +21,10 @@ struct TestPage: View {
         btVM.recordingStartTime != nil && btVM.recordingEndTime != nil
     }
 
+    private var canEstimateRealAngle: Bool {
+        bothConnected && btVM.baselineResult != nil
+    }
+
     private var thighAndCalfPeripherals: (thigh: CBPeripheral, calf: CBPeripheral)? {
         let dvm = DeviceViewModel()
         guard let thigh = dvm.fetch(limb: 0), let thighUUID = UUID(uuidString: thigh.device_uuid),
@@ -84,18 +88,16 @@ struct TestPage: View {
                             .font(.system(size: 14))
                             .foregroundStyle(.secondary)
                     } else if let result = btVM.baselineResult {
-                        Text(result < 0 ? "-1" : String(format: "%.1f°", result))
+                        Text(String(format: "%.1f°", result))
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(result < 0 ? .red : .primary)
+                            .foregroundStyle(.primary)
                     }
 
                     Button(btVM.isLiveEstimating ? "停止即時預估" : "開始即時預估") {
                         guard let pair = thighAndCalfPeripherals else { return }
                         if btVM.isLiveEstimating {
                             btVM.stopLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
-                        } else {
-                            // 尚未校正（或校正失敗）時，使用預設 baseline 82.3
-                            let baseline = (btVM.baselineResult != nil && btVM.baselineResult! >= 0) ? btVM.baselineResult! : 82.3
+                        } else if let baseline = btVM.baselineResult {
                             btVM.startLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf, baseline: baseline)
                         }
                     }
@@ -103,10 +105,10 @@ struct TestPage: View {
                     .padding(.horizontal, 20)
                     .padding(.vertical, 10)
                     .background(btVM.isLiveEstimating ? Color.red.opacity(0.85)
-                        : (bothConnected ? Color.teal.opacity(0.85) : Color.gray.opacity(0.3)))
+                        : (canEstimateRealAngle ? Color.teal.opacity(0.85) : Color.gray.opacity(0.3)))
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .disabled(!btVM.isLiveEstimating && (!bothConnected || btVM.isCollectingBaseline))
+                    .disabled(!btVM.isLiveEstimating && (!canEstimateRealAngle || btVM.isCollectingBaseline))
 
                     if let angle = btVM.currentEstimatedRealAngle {
                         Text(String(format: "%.1f°", angle))

@@ -66,7 +66,8 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     @ObservationIgnored private var liveCalfId: UUID?
     @ObservationIgnored private var liveThighIncline: Double?
     @ObservationIgnored private var liveCalfIncline: Double?
-    @ObservationIgnored private var liveBaselineTable: [(measuredAbs: Double, realAngle: Double)] = []
+    @ObservationIgnored private var liveBaselineTable: [(measured: Double, realAngle: Double)] = []
+    @ObservationIgnored private var liveShift: Double = 0
     @ObservationIgnored private var liveTickTimer: Timer?
 
     override init() {
@@ -361,19 +362,19 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
 
     /// 移植自 baseline_check.py（check_whole_range_stable）+ calibration_phase.py（inclination_deg / compute_knee_angle）：
     /// 用加速度算大腿、小腿相對重力的傾角，膝角 = 大腿傾角 - 小腿傾角；整段錄製視為單一區間，
-    /// 標準差（樣本標準差）<= 1.5° 且時長 >= 1 秒才算穩定，穩定則回傳角度平均值的絕對值（四捨五入到小數1位），否則回傳 -1。
+    /// 標準差（樣本標準差）<= 1.5° 且時長 >= 1 秒才算穩定，穩定則回傳角度平均值（保留正負號，四捨五入到小數1位），否則回傳 nil。
     static func computeBaselineAngle(
         thighSamples: [(timestamp: Int64, x: Double, y: Double, z: Double)],
         calfSamples: [(timestamp: Int64, x: Double, y: Double, z: Double)],
         stdThresholdDeg: Double = 1.5,
         minDurationSec: Double = 1.0
-    ) -> Double {
-        guard !thighSamples.isEmpty, !calfSamples.isEmpty else { return -1 }
+    ) -> Double? {
+        guard !thighSamples.isEmpty, !calfSamples.isEmpty else { return nil }
 
         let thighIncline = smoothedIncline(thighSamples)
         let calfIncline  = smoothedIncline(calfSamples)
         let count = min(thighIncline.count, calfIncline.count)
-        guard count >= 2 else { return -1 }
+        guard count >= 2 else { return nil }
 
         // 大腿與小腿分別平滑後，依時間順序逐一配對計算膝角
         var kneeAngles: [Double] = []
@@ -388,9 +389,9 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         let variance = kneeAngles.reduce(0) { $0 + ($1 - mean) * ($1 - mean) } / Double(kneeAngles.count - 1)
         let std = variance.squareRoot()
 
-        guard std <= stdThresholdDeg, duration >= minDurationSec else { return -1 }
+        guard std <= stdThresholdDeg, duration >= minDurationSec else { return nil }
 
-        return (abs(mean) * 10).rounded() / 10
+        return (mean * 10).rounded() / 10
     }
 
     /// 對應 inclination_deg：以重力向量計算肢段相對垂直線的傾角（度）
@@ -414,20 +415,22 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             .sorted { $0.t < $1.t }
     }
 
-    /// 對應 build_baseline_mapping_table：以 baseline 為起點建立 (量測角度絕對值 -> 預估真實角度) 對應表，依量測角度絕對值排序
+    /// 對應 build_baseline_mapping_table：以 baseline 為起點建立 (量測角度 -> 預估真實角度) 對應表，依量測角度排序。
+    /// 呼叫端必須確保傳進來的 `baseline` 已經是非負值（例如原本是負的就先平移過），這裡不再對 baseline + step 取絕對值，
+    /// 避免 baseline 到 baseline+maxStep 之間跨過 0 時，同一個量測值對應到兩個不同 step 的歧義。
     private static func baselineMappingTable(
         baseline: Double, maxStep: Int, maxRealAngleDeg: Double
-    ) -> [(measuredAbs: Double, realAngle: Double)] {
+    ) -> [(measured: Double, realAngle: Double)] {
         (0...maxStep).map { step in
-            let measuredAbs = abs(baseline + Double(step))
+            let measured = baseline + Double(step)
             let realAngle = maxRealAngleDeg - Double(step) * (maxRealAngleDeg / Double(maxStep))
-            return (measuredAbs, realAngle)
-        }.sorted { $0.measuredAbs < $1.measuredAbs }
+            return (measured, realAngle)
+        }.sorted { $0.measured < $1.measured }
     }
 
     /// 對應 angle_to_real：線性內插，超出對應表範圍時常數外插（跟 np.interp 行為一致）
-    private static func angleToReal(_ measuredAbsDeg: Double, table: [(measuredAbs: Double, realAngle: Double)]) -> Double {
-        linearInterp(measuredAbsDeg, xs: table.map(\.measuredAbs), ys: table.map(\.realAngle))
+    private static func angleToReal(_ measuredDeg: Double, table: [(measured: Double, realAngle: Double)]) -> Double {
+        linearInterp(measuredDeg, xs: table.map(\.measured), ys: table.map(\.realAngle))
     }
 
     /// 對應 np.interp：對已依 x 遞增排序的 (xs, ys) 做線性內插，x 超出範圍時取頭尾常數值
@@ -471,7 +474,10 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             liveCalfId  = calfId
             liveThighIncline = nil
             liveCalfIncline  = nil
-            liveBaselineTable = Self.baselineMappingTable(baseline: baseline, maxStep: 70, maxRealAngleDeg: 90)
+            // baseline 若為負值，整體平移到 15（正值），量測到的膝角也要平移同樣的量，
+            // 兩邊平移量一致，相對關係不變，藉此避免 baseline ~ baseline+maxStep 跨過 0 的歧義。
+            liveShift = baseline < 0 ? (abs(baseline) + 15) : 0
+            liveBaselineTable = Self.baselineMappingTable(baseline: baseline + liveShift, maxStep: 70, maxRealAngleDeg: 90)
             liveEstimating = [thighId, calfId]
 
             for peripheral in [thighPeripheral, calfPeripheral] {
@@ -514,7 +520,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
                   let thigh = liveThighIncline,
                   let calf  = liveCalfIncline else { return }
             let kneeAngle = thigh - calf
-            let realAngle = Self.angleToReal(abs(kneeAngle), table: liveBaselineTable)
+            let realAngle = Self.angleToReal(kneeAngle + liveShift, table: liveBaselineTable)
             let rounded = (realAngle * 10).rounded() / 10
             DispatchQueue.main.async { self.currentEstimatedRealAngle = rounded }
         }
