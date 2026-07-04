@@ -1077,6 +1077,11 @@ private struct WearingStepImage: View {
                         .stroke(Color.black, lineWidth: 4)
                 )
         }
+        .padding(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color.black, lineWidth: 4)
+        )
     }
 }
 
