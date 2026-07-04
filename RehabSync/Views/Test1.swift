@@ -1057,11 +1057,10 @@ private struct WearingStepImage: View {
                     .padding(6)
             }
             .aspectRatio(420.0 / 536.0, contentMode: .fit)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.black, lineWidth: 4)
-            )
+
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 4)
 
             Text(caption)
                 .font(.system(size: 18, weight: .semibold))
@@ -1071,15 +1070,10 @@ private struct WearingStepImage: View {
                 .frame(height: 100)
                 .frame(maxWidth: .infinity)
                 .background(mint)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.black, lineWidth: 4)
-                )
         }
-        .padding(8)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: 8)
                 .stroke(Color.black, lineWidth: 4)
         )
     }
