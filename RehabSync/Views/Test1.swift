@@ -1108,7 +1108,7 @@ private struct WearingProgressSlider: View {
 
     private let trackHeight: CGFloat = 20
     private let thumbHeight: CGFloat = 12
-    private let innerHeightRatio: CGFloat = 0.85
+    private let innerHeightRatio: CGFloat = 0.95
     private let minThumbWidth: CGFloat = 40
 
     var body: some View {
