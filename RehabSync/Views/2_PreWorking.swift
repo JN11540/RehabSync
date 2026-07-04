@@ -18,6 +18,12 @@ struct PreWorking2: View {
                         RoundedRectangle(cornerRadius: 20)
                             .stroke(Color(white: 0.6), lineWidth: 5)
                     )
+                    .overlay(alignment: .top) {
+                        Text("穿戴方式")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundStyle(.black)
+                            .padding(.top, 24)
+                    }
 
                 Button(action: { dismiss() }) {
                     ZStack {
@@ -40,7 +46,7 @@ struct PreWorking2: View {
             .padding(.top, 40)
             .padding(.bottom, 40)
             .padding(.leading, 60)
-            .padding(.trailing, 200)
+            .padding(.trailing, 400)
 
             Text(exercise?.name ?? "未知動作")
                 .font(.system(size: 28, weight: .bold))
