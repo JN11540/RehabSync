@@ -21,11 +21,6 @@ struct TestPage: View {
         btVM.recordingStartTime != nil && btVM.recordingEndTime != nil
     }
 
-    private var canEstimateRealAngle: Bool {
-        guard bothConnected, let baseline = btVM.baselineResult else { return false }
-        return baseline >= 0
-    }
-
     private var thighAndCalfPeripherals: (thigh: CBPeripheral, calf: CBPeripheral)? {
         let dvm = DeviceViewModel()
         guard let thigh = dvm.fetch(limb: 0), let thighUUID = UUID(uuidString: thigh.device_uuid),
@@ -94,42 +89,13 @@ struct TestPage: View {
                             .foregroundStyle(result < 0 ? .red : .primary)
                     }
 
-                    Button("預估真實角度") {
-                        if let pair = thighAndCalfPeripherals, let baseline = btVM.baselineResult, baseline >= 0 {
-                            btVM.startEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf, baseline: baseline)
-                        }
-                    }
-                    .font(.system(size: 15, weight: .medium))
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 10)
-                    .background(canEstimateRealAngle && !btVM.isEstimatingRealAngle
-                        ? Color.purple.opacity(0.85) : Color.gray.opacity(0.3))
-                    .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .disabled(!canEstimateRealAngle || btVM.isEstimatingRealAngle || btVM.isLiveEstimating)
-
-                    if btVM.isEstimatingRealAngle {
-                        Text("收集中…")
-                            .font(.system(size: 14))
-                            .foregroundStyle(.secondary)
-                    } else if !btVM.estimatedRealAngleSamples.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach(Array(btVM.estimatedRealAngleSamples.enumerated()), id: \.offset) { _, sample in
-                                    Text(String(format: "%.1fs:%.1f°", sample.t, sample.angle))
-                                        .font(.system(size: 11, design: .monospaced))
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                        .frame(width: 260)
-                    }
-
                     Button(btVM.isLiveEstimating ? "停止即時預估" : "開始即時預估") {
                         guard let pair = thighAndCalfPeripherals else { return }
                         if btVM.isLiveEstimating {
                             btVM.stopLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
-                        } else if let baseline = btVM.baselineResult, baseline >= 0 {
+                        } else {
+                            // 尚未校正（或校正失敗）時，使用預設 baseline 82.3
+                            let baseline = (btVM.baselineResult != nil && btVM.baselineResult! >= 0) ? btVM.baselineResult! : 82.3
                             btVM.startLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf, baseline: baseline)
                         }
                     }
@@ -137,10 +103,10 @@ struct TestPage: View {
                     .padding(.horizontal, 20)
                     .padding(.vertical, 10)
                     .background(btVM.isLiveEstimating ? Color.red.opacity(0.85)
-                        : (canEstimateRealAngle ? Color.teal.opacity(0.85) : Color.gray.opacity(0.3)))
+                        : (bothConnected ? Color.teal.opacity(0.85) : Color.gray.opacity(0.3)))
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .disabled(!btVM.isLiveEstimating && (!canEstimateRealAngle || btVM.isCollectingBaseline || btVM.isEstimatingRealAngle))
+                    .disabled(!btVM.isLiveEstimating && (!bothConnected || btVM.isCollectingBaseline))
 
                     if let angle = btVM.currentEstimatedRealAngle {
                         Text(String(format: "%.1f°", angle))
