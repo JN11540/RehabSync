@@ -9,7 +9,11 @@ struct PreWorking2: View {
 
     var body: some View {
         ZStack {
-            Color(red: 0.96, green: 0.94, blue: 0.91).ignoresSafeArea()
+            Color.black.opacity(0.8).ignoresSafeArea()
+
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.white)
+                .padding(40)
 
             Text(exercise?.name ?? "未知動作")
                 .font(.system(size: 28, weight: .bold))
