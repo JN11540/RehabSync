@@ -376,6 +376,7 @@ private struct Test1MenuTile<Icon: View>: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .padding(.horizontal, 20)
+        .contentShape(Rectangle())
     }
 }
 
