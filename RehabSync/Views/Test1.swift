@@ -1268,6 +1268,7 @@ private struct TrainingCard: View {
                         .scaledToFit()
                         .frame(width: 26, height: 26)
                         .padding(4)
+                        .offset(y: -8)
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 8))
