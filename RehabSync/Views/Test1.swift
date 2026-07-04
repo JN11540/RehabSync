@@ -261,17 +261,11 @@ private struct Test1Sidebar: View {
         VStack(spacing: 14) {
             Button(action: onDeviceConnectionTap) {
                 Test1MenuTile(title: "裝置連線", mint: mint) {
-                    ZStack(alignment: .topTrailing) {
-                        Image("KneePadIcon")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 34, height: 34)
-                        Image(systemName: "antenna.radiowaves.left.and.right")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(Color(red: 0.2, green: 0.5, blue: 0.9))
-                            .offset(x: 8, y: 0)
-                    }
-                    .scaleEffect(1.5)
+                    Image("BluetoothIcon")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 34, height: 34)
+                        .scaleEffect(2.0)
                 }
             }
             .buttonStyle(.plain)
@@ -280,7 +274,7 @@ private struct Test1Sidebar: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: 34, height: 34)
-                    .scaleEffect(1.2)
+                    .scaleEffect(1.6)
             }
             Button(action: onTrainingMenuTap) {
                 Test1MenuTile(title: "訓練菜單", mint: mint) {
@@ -288,7 +282,7 @@ private struct Test1Sidebar: View {
                         .resizable()
                         .scaledToFit()
                         .frame(width: 34, height: 34)
-                        .scaleEffect(1.2)
+                        .scaleEffect(1.6)
                 }
             }
             .buttonStyle(.plain)
@@ -297,14 +291,14 @@ private struct Test1Sidebar: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: 34, height: 34)
-                    .scaleEffect(1.2)
+                    .scaleEffect(1.6)
             }
             Test1MenuTile(title: "關卡", mint: mint) {
                 Image("LevelIcon")
                     .resizable()
                     .scaledToFit()
                     .frame(width: 34, height: 34)
-                    .scaleEffect(1.5)
+                    .scaleEffect(2.0)
             }
         }
         .padding(.horizontal, 20)
@@ -348,7 +342,7 @@ private struct Test1MenuTile<Icon: View>: View {
     var body: some View {
         HStack(spacing: 10) {
             icon()
-                .padding(.leading, 14)
+                .padding(.leading, 6)
             Spacer()
             Text(title)
                 .font(.system(size: 22, weight: .semibold))
