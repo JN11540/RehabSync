@@ -13,7 +13,7 @@ struct PreWorking2: View {
 
             ZStack(alignment: .topLeading) {
                 RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.white)
+                    .fill(Color(red: 0.85, green: 0.93, blue: 0.98))
                     .overlay(
                         RoundedRectangle(cornerRadius: 20)
                             .stroke(Color(white: 0.6), lineWidth: 5)
@@ -40,7 +40,7 @@ struct PreWorking2: View {
             .padding(.top, 40)
             .padding(.bottom, 40)
             .padding(.leading, 60)
-            .padding(.trailing, 100)
+            .padding(.trailing, 200)
 
             Text(exercise?.name ?? "未知動作")
                 .font(.system(size: 28, weight: .bold))
