@@ -261,7 +261,7 @@ private struct Test1Sidebar: View {
         VStack(spacing: 14) {
             Button(action: onDeviceConnectionTap) {
                 Test1MenuTile(title: "裝置連線", mint: mint) {
-                    Image("BluetoothIcon")
+                    Image("KneeWithTwoGearsIcon")
                         .resizable()
                         .scaledToFit()
                         .frame(width: 34, height: 34)
