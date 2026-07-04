@@ -1041,6 +1041,7 @@ private struct WearingStepGallery: View {
     private let viewportWidth: CGFloat = 740
 
     @State private var scrollOffset: CGFloat = 0
+    @State private var dragStartOffset: CGFloat = 0
 
     private let steps: [(image: String, step: Int, caption: String)] = [
         ("WearingKneePads1Icon", 1, "坐下並將腿部伸直"),
@@ -1068,6 +1069,18 @@ private struct WearingStepGallery: View {
             .offset(x: -scrollOffset)
             .frame(width: viewportWidth, alignment: .leading)
             .clipped()
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture()
+                    .onChanged { value in
+                        guard maxScrollOffset > 0 else { return }
+                        let proposed = dragStartOffset - value.translation.width
+                        scrollOffset = min(max(proposed, 0), maxScrollOffset)
+                    }
+                    .onEnded { _ in
+                        dragStartOffset = scrollOffset
+                    }
+            )
 
             WearingProgressSlider(
                 thumbFraction: contentWidth > 0 ? viewportWidth / contentWidth : 1,
@@ -1095,7 +1108,7 @@ private struct WearingProgressSlider: View {
 
     private let trackHeight: CGFloat = 20
     private let thumbHeight: CGFloat = 12
-    private let innerHeightRatio: CGFloat = 0.5
+    private let innerHeightRatio: CGFloat = 0.85
     private let minThumbWidth: CGFloat = 40
 
     var body: some View {
