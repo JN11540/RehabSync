@@ -382,6 +382,14 @@ private struct Test1PreviewFrame: View {
     var calfDevice: Device? = nil
     var onAddDeviceTap: (Int) -> Void = { _ in }
     @State private var selectedContentId: Int64? = nil
+    @State private var showPreWorking = false
+    @State private var preWorkingContent: TreatmentContent? = nil
+
+    /// exercise id -> {id}_PreWorking.swift 對應表。之後每新增一個 {id}_PreWorking.swift，
+    /// 就在這裡加一個 case，是否跳轉、跳轉到哪個畫面都只看這張表，不需要改別的地方。
+    private static let preWorkingBuilders: [Int: (TreatmentContent, Exercise?) -> AnyView] = [
+        2: { content, exercise in AnyView(PreWorking2(content: content, exercise: exercise)) }
+    ]
 
     private var isToday: Bool {
         Calendar.current.isDateInToday(selectedDate)
@@ -396,7 +404,11 @@ private struct Test1PreviewFrame: View {
     }
 
     private func exerciseName(for content: TreatmentContent) -> String {
-        exercises.first { $0.id == Int64(content.exercise_id) }?.name ?? "未知動作"
+        exercise(for: content)?.name ?? "未知動作"
+    }
+
+    private func exercise(for content: TreatmentContent) -> Exercise? {
+        exercises.first { $0.id == Int64(content.exercise_id) }
     }
 
     var body: some View {
@@ -458,6 +470,10 @@ private struct Test1PreviewFrame: View {
                                             .onTapGesture {
                                                 guard isToday else { return }
                                                 selectedContentId = content.id
+                                                if Self.preWorkingBuilders[content.exercise_id] != nil {
+                                                    preWorkingContent = content
+                                                    showPreWorking = true
+                                                }
                                             }
                                         }
                                     }
@@ -514,6 +530,11 @@ private struct Test1PreviewFrame: View {
                     .padding(28)
             }
         )
+        .fullScreenCover(isPresented: $showPreWorking) {
+            if let preWorkingContent, let build = Self.preWorkingBuilders[preWorkingContent.exercise_id] {
+                build(preWorkingContent, exercise(for: preWorkingContent))
+            }
+        }
     }
 }
 
