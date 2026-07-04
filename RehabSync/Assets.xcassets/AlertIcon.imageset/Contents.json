@@ -1,17 +1,17 @@
 {
   "images" : [
     {
-      "filename" : "unfinish_icon.png",
+      "filename" : "alert_icon.png",
       "idiom" : "universal",
       "scale" : "1x"
     },
     {
-      "filename" : "unfinish_icon.png",
+      "filename" : "alert_icon.png",
       "idiom" : "universal",
       "scale" : "2x"
     },
     {
-      "filename" : "unfinish_icon.png",
+      "filename" : "alert_icon.png",
       "idiom" : "universal",
       "scale" : "3x"
     }

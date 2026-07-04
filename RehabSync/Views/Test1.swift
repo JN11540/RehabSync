@@ -1018,7 +1018,7 @@ private struct IconLegend: View {
                     .foregroundStyle(.white.opacity(0.8))
             }
             HStack(spacing: 6) {
-                Image("UnfinishIcon")
+                Image("AlertIcon")
                     .resizable()
                     .scaledToFit()
                     .frame(width: 30, height: 30)
@@ -1239,7 +1239,7 @@ private struct TrainingCard: View {
                             .resizable()
                             .scaledToFit()
                     }
-                    Image(isDone ? "FinishIcon" : "UnfinishIcon")
+                    Image(isDone ? "FinishIcon" : "AlertIcon")
                         .resizable()
                         .scaledToFit()
                         .frame(width: 40, height: 40)
