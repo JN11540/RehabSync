@@ -175,7 +175,6 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
 
         let writeUUID = CBUUID(string: config.write_uuid)
         let accUUID   = CBUUID(string: config.sub_acc_uuid)
-        let gyroUUID  = CBUUID(string: config.sub_gyro_uuid)
         let exgUUID   = CBUUID(string: config.sub_exg_uuid)
 
         if let writeChar = map[writeUUID] {
@@ -184,7 +183,6 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         }
 
         if let c = map[accUUID]  { peripheral.setNotifyValue(true, for: c) }
-        if let c = map[gyroUUID] { peripheral.setNotifyValue(true, for: c) }
         if let c = map[exgUUID]  { peripheral.setNotifyValue(true, for: c) }
 
         DispatchQueue.main.async { self.isRecording = true }
@@ -195,11 +193,9 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
               let map = charMap[peripheral.identifier] else { return }
 
         let accUUID  = CBUUID(string: config.sub_acc_uuid)
-        let gyroUUID = CBUUID(string: config.sub_gyro_uuid)
         let exgUUID  = CBUUID(string: config.sub_exg_uuid)
 
         if let c = map[accUUID]  { peripheral.setNotifyValue(false, for: c) }
-        if let c = map[gyroUUID] { peripheral.setNotifyValue(false, for: c) }
         if let c = map[exgUUID]  { peripheral.setNotifyValue(false, for: c) }
 
         DispatchQueue.main.async { self.isRecording = false }

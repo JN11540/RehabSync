@@ -73,34 +73,27 @@ struct TestPage: View {
 
         let dvm = DeviceViewModel()
         var thighAcc  = dvm.fetchACC(deviceId: 0, from: from, to: to)
-        var thighGyro = dvm.fetchGYRO(deviceId: 0, from: from, to: to)
         var calfAcc   = dvm.fetchACC(deviceId: 1, from: from, to: to)
-        var calfGyro  = dvm.fetchGYRO(deviceId: 1, from: from, to: to)
 
-        guard !thighAcc.isEmpty, !thighGyro.isEmpty,
-              !calfAcc.isEmpty,  !calfGyro.isEmpty else { return }
+        guard !thighAcc.isEmpty, !calfAcc.isEmpty else { return }
 
-        let windowStart = max(thighAcc.first!.timestamp, thighGyro.first!.timestamp,
-                              calfAcc.first!.timestamp,  calfGyro.first!.timestamp)
-        let windowEnd   = min(thighAcc.last!.timestamp,  thighGyro.last!.timestamp,
-                              calfAcc.last!.timestamp,   calfGyro.last!.timestamp)
+        let windowStart = max(thighAcc.first!.timestamp, calfAcc.first!.timestamp)
+        let windowEnd   = min(thighAcc.last!.timestamp,  calfAcc.last!.timestamp)
 
         guard windowStart <= windowEnd else { return }
 
         thighAcc  = thighAcc.filter  { $0.timestamp >= windowStart && $0.timestamp <= windowEnd }
-        thighGyro = thighGyro.filter { $0.timestamp >= windowStart && $0.timestamp <= windowEnd }
         calfAcc   = calfAcc.filter   { $0.timestamp >= windowStart && $0.timestamp <= windowEnd }
-        calfGyro  = calfGyro.filter  { $0.timestamp >= windowStart && $0.timestamp <= windowEnd }
 
-        let count = min(thighAcc.count, thighGyro.count, calfAcc.count, calfGyro.count)
+        let count = min(thighAcc.count, calfAcc.count)
         guard count > 0 else { return }
 
-        var lines = ["timestamp,thigh_ax,thigh_ay,thigh_az,thigh_pitch,thigh_roll,thigh_yaw,calf_ax,calf_ay,calf_az,calf_pitch,calf_roll,calf_yaw"]
+        var lines = ["timestamp,thigh_ax,thigh_ay,thigh_az,calf_ax,calf_ay,calf_az"]
         for i in 0..<count {
             let ts = thighAcc[i].timestamp
-            let ta = thighAcc[i]; let tg = thighGyro[i]
-            let ca = calfAcc[i];  let cg = calfGyro[i]
-            lines.append("\(ts),\(ta.x),\(ta.y),\(ta.z),\(tg.pitch),\(tg.roll),\(tg.yaw),\(ca.x),\(ca.y),\(ca.z),\(cg.pitch),\(cg.roll),\(cg.yaw)")
+            let ta = thighAcc[i]
+            let ca = calfAcc[i]
+            lines.append("\(ts),\(ta.x),\(ta.y),\(ta.z),\(ca.x),\(ca.y),\(ca.z)")
         }
 
         let csv = lines.joined(separator: "\n")
