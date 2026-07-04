@@ -258,7 +258,7 @@ private struct Test1Sidebar: View {
     let onTrainingMenuTap: () -> Void
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 14) {
             Button(action: onDeviceConnectionTap) {
                 Test1MenuTile(title: "裝置連線", mint: mint) {
                     ZStack(alignment: .topTrailing) {
@@ -275,6 +275,13 @@ private struct Test1Sidebar: View {
                 }
             }
             .buttonStyle(.plain)
+            Test1MenuTile(title: "護膝穿戴", mint: mint) {
+                Image("WearingKneePads1Icon")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 34, height: 34)
+                    .scaleEffect(2.2)
+            }
             Button(action: onTrainingMenuTap) {
                 Test1MenuTile(title: "訓練菜單", mint: mint) {
                     Image("MenuIcon")
@@ -348,7 +355,7 @@ private struct Test1MenuTile<Icon: View>: View {
         }
         .foregroundStyle(.black)
         .padding(.horizontal, 16)
-        .padding(.vertical, 30)
+        .padding(.vertical, 18)
         .background {
             ZStack {
                 mint
