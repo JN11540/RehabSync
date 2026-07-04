@@ -517,6 +517,7 @@ private struct Test1PreviewFrame: View {
                                 WearingStepImage(imageName: "WearingKneePads3Icon", step: 3, caption: "護膝上有三角形標誌，該三角形黑布是對應到膝蓋位置", mint: mint)
                             }
                             .padding(.horizontal, 40)
+                            .padding(.top, 20)
 
                             Spacer()
                         }
@@ -1069,7 +1070,22 @@ private struct WearingStepImage: View {
                 .padding(.horizontal, 10)
                 .frame(height: 100)
                 .frame(maxWidth: .infinity)
-                .background(mint)
+                .background {
+                    ZStack {
+                        mint
+                        HStack(spacing: 14) {
+                            Rectangle()
+                                .fill(Color.white.opacity(0.3))
+                                .frame(width: 46, height: 200)
+                                .rotationEffect(.degrees(20))
+                            Rectangle()
+                                .fill(Color.white.opacity(0.3))
+                                .frame(width: 26, height: 200)
+                                .rotationEffect(.degrees(20))
+                        }
+                    }
+                }
+                .clipped()
         }
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
