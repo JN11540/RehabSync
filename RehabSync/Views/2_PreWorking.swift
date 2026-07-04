@@ -16,7 +16,7 @@ struct PreWorking2: View {
                     .fill(Color.white)
                     .overlay(
                         RoundedRectangle(cornerRadius: 20)
-                            .stroke(Color(white: 0.6), lineWidth: 2)
+                            .stroke(Color(white: 0.6), lineWidth: 5)
                     )
 
                 Button(action: { dismiss() }) {
@@ -37,7 +37,10 @@ struct PreWorking2: View {
                 }
                 .buttonStyle(.plain)
             }
-            .padding(40)
+            .padding(.top, 40)
+            .padding(.bottom, 40)
+            .padding(.leading, 60)
+            .padding(.trailing, 100)
 
             Text(exercise?.name ?? "未知動作")
                 .font(.system(size: 28, weight: .bold))
