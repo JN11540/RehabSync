@@ -532,7 +532,7 @@ private struct Test1PreviewFrame: View {
                                 Capsule()
                                     .fill(Color.white)
                                     .frame(height: 6)
-                                    .padding(.horizontal, 70)
+                                    .padding(.horizontal, 36)
                             }
                             .padding(.horizontal, 40)
 
