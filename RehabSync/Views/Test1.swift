@@ -511,24 +511,8 @@ private struct Test1PreviewFrame: View {
                                 .foregroundStyle(.white)
                                 .padding(.top, 48)
 
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(alignment: .top, spacing: 20) {
-                                    WearingStepImage(imageName: "WearingKneePads1Icon", step: 1, caption: "坐下並將腿部伸直", mint: mint)
-                                        .frame(width: 220)
-                                    WearingStepImage(imageName: "WearingKneePads2Icon", step: 2, caption: "將腳套入，從小腿拉至膝蓋", mint: mint)
-                                        .frame(width: 220)
-                                    WearingStepImage(imageName: "WearingKneePads3Icon", step: 3, caption: "護膝上有三角形標誌，該三角形黑布是對應到膝蓋位置", mint: mint)
-                                        .frame(width: 220)
-                                    WearingStepImage(imageName: "WearingKneePads4Icon", step: 4, caption: "扣釘與感測器裝置進行扣合", mint: mint)
-                                        .frame(width: 220)
-                                }
-                                .padding(.horizontal, 40)
+                            WearingStepGallery(mint: mint)
                                 .padding(.top, 20)
-                            }
-                            .frame(width: 740)
-
-                            WearingProgressSlider()
-                                .padding(.horizontal, 40)
 
                             Spacer()
                         }
@@ -1046,22 +1030,80 @@ private struct IconLegend: View {
     }
 }
 
+// MARK: - Wearing Step Gallery
+
+private struct WearingStepGallery: View {
+    let mint: Color
+
+    private let cardWidth: CGFloat = 220
+    private let spacing: CGFloat = 20
+    private let sidePadding: CGFloat = 40
+    private let viewportWidth: CGFloat = 740
+
+    @State private var scrollOffset: CGFloat = 0
+
+    private let steps: [(image: String, step: Int, caption: String)] = [
+        ("WearingKneePads1Icon", 1, "坐下並將腿部伸直"),
+        ("WearingKneePads2Icon", 2, "將腳套入，從小腿拉至膝蓋"),
+        ("WearingKneePads3Icon", 3, "護膝上有三角形標誌，該三角形黑布是對應到膝蓋位置"),
+        ("WearingKneePads4Icon", 4, "扣釘與感測器裝置進行扣合")
+    ]
+
+    private var contentWidth: CGFloat {
+        sidePadding * 2 + CGFloat(steps.count) * cardWidth + CGFloat(steps.count - 1) * spacing
+    }
+    private var maxScrollOffset: CGFloat {
+        max(contentWidth - viewportWidth, 0)
+    }
+
+    var body: some View {
+        VStack(spacing: 24) {
+            HStack(alignment: .top, spacing: spacing) {
+                ForEach(steps, id: \.step) { step in
+                    WearingStepImage(imageName: step.image, step: step.step, caption: step.caption, mint: mint)
+                        .frame(width: cardWidth)
+                }
+            }
+            .padding(.horizontal, sidePadding)
+            .offset(x: -scrollOffset)
+            .frame(width: viewportWidth, alignment: .leading)
+            .clipped()
+
+            WearingProgressSlider(
+                thumbFraction: contentWidth > 0 ? viewportWidth / contentWidth : 1,
+                scrollFraction: Binding(
+                    get: { maxScrollOffset > 0 ? scrollOffset / maxScrollOffset : 0 },
+                    set: { newValue in
+                        scrollOffset = newValue * maxScrollOffset
+                    }
+                )
+            )
+            .padding(.horizontal, sidePadding)
+        }
+    }
+}
+
 // MARK: - Wearing Progress Slider
 
 private struct WearingProgressSlider: View {
-    @State private var thumbOffset: CGFloat = 0
+    /// 拇指佔軌道寬度的比例（可視範圍 / 內容總寬）
+    let thumbFraction: CGFloat
+    /// 目前捲動位置（0 = 最左，1 = 最右），與拇指位置雙向連動
+    @Binding var scrollFraction: CGFloat
+
     @State private var dragStartOffset: CGFloat = 0
-    @State private var hasCentered = false
 
     private let trackHeight: CGFloat = 20
-    private let thumbWidth: CGFloat = 90
     private let thumbHeight: CGFloat = 12
-    private let innerWidth: CGFloat = 40
-    private let innerHeight: CGFloat = 6
+    private let innerHeightRatio: CGFloat = 0.5
+    private let minThumbWidth: CGFloat = 40
 
     var body: some View {
         GeometryReader { geo in
-            let maxOffset = max(geo.size.width - thumbWidth, 0)
+            let trackWidth = geo.size.width
+            let thumbWidth = max(trackWidth * min(thumbFraction, 1), minThumbWidth)
+            let maxOffset = max(trackWidth - thumbWidth, 0)
+            let thumbOffset = scrollFraction * maxOffset
 
             ZStack(alignment: .leading) {
                 Capsule()
@@ -1074,15 +1116,17 @@ private struct WearingProgressSlider: View {
                         .frame(width: thumbWidth, height: thumbHeight)
                     Capsule()
                         .fill(Color.white)
-                        .frame(width: innerWidth, height: innerHeight)
+                        .frame(width: thumbWidth * innerHeightRatio, height: 6)
                 }
                 .frame(width: thumbWidth, height: trackHeight)
                 .offset(x: thumbOffset)
                 .gesture(
                     DragGesture()
                         .onChanged { value in
+                            guard maxOffset > 0 else { return }
                             let proposed = dragStartOffset + value.translation.width
-                            thumbOffset = min(max(proposed, 0), maxOffset)
+                            let clamped = min(max(proposed, 0), maxOffset)
+                            scrollFraction = clamped / maxOffset
                         }
                         .onEnded { _ in
                             dragStartOffset = thumbOffset
@@ -1090,9 +1134,6 @@ private struct WearingProgressSlider: View {
                 )
             }
             .onAppear {
-                guard !hasCentered else { return }
-                hasCentered = true
-                thumbOffset = maxOffset / 2
                 dragStartOffset = thumbOffset
             }
         }
