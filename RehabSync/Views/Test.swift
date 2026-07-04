@@ -21,6 +21,11 @@ struct TestPage: View {
         btVM.recordingStartTime != nil && btVM.recordingEndTime != nil
     }
 
+    private var canEstimateRealAngle: Bool {
+        guard bothConnected, let baseline = btVM.baselineResult else { return false }
+        return baseline >= 0
+    }
+
     private var thighAndCalfPeripherals: (thigh: CBPeripheral, calf: CBPeripheral)? {
         let dvm = DeviceViewModel()
         guard let thigh = dvm.fetch(limb: 0), let thighUUID = UUID(uuidString: thigh.device_uuid),
@@ -87,6 +92,37 @@ struct TestPage: View {
                         Text(result < 0 ? "-1" : String(format: "%.1f°", result))
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(result < 0 ? .red : .primary)
+                    }
+
+                    Button("預估真實角度") {
+                        if let pair = thighAndCalfPeripherals, let baseline = btVM.baselineResult, baseline >= 0 {
+                            btVM.startEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf, baseline: baseline)
+                        }
+                    }
+                    .font(.system(size: 15, weight: .medium))
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(canEstimateRealAngle && !btVM.isEstimatingRealAngle
+                        ? Color.purple.opacity(0.85) : Color.gray.opacity(0.3))
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .disabled(!canEstimateRealAngle || btVM.isEstimatingRealAngle)
+
+                    if btVM.isEstimatingRealAngle {
+                        Text("收集中…")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.secondary)
+                    } else if !btVM.estimatedRealAngleSamples.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(Array(btVM.estimatedRealAngleSamples.enumerated()), id: \.offset) { _, sample in
+                                    Text(String(format: "%.1fs:%.1f°", sample.t, sample.angle))
+                                        .font(.system(size: 11, design: .monospaced))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        .frame(width: 260)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
