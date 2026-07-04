@@ -511,14 +511,21 @@ private struct Test1PreviewFrame: View {
                                 .foregroundStyle(.white)
                                 .padding(.top, 48)
 
-                            HStack(alignment: .top, spacing: 20) {
-                                WearingStepImage(imageName: "WearingKneePads1Icon", step: 1, caption: "坐下並將腿部伸直", mint: mint)
-                                WearingStepImage(imageName: "WearingKneePads2Icon", step: 2, caption: "將腳套入，從小腿拉至膝蓋", mint: mint)
-                                WearingStepImage(imageName: "WearingKneePads3Icon", step: 3, caption: "護膝上有三角形標誌，該三角形黑布是對應到膝蓋位置", mint: mint)
-                                WearingStepImage(imageName: "WearingKneePads4Icon", step: 4, caption: "扣釘與感測器裝置進行扣合", mint: mint)
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(alignment: .top, spacing: 20) {
+                                    WearingStepImage(imageName: "WearingKneePads1Icon", step: 1, caption: "坐下並將腿部伸直", mint: mint)
+                                        .frame(width: 220)
+                                    WearingStepImage(imageName: "WearingKneePads2Icon", step: 2, caption: "將腳套入，從小腿拉至膝蓋", mint: mint)
+                                        .frame(width: 220)
+                                    WearingStepImage(imageName: "WearingKneePads3Icon", step: 3, caption: "護膝上有三角形標誌，該三角形黑布是對應到膝蓋位置", mint: mint)
+                                        .frame(width: 220)
+                                    WearingStepImage(imageName: "WearingKneePads4Icon", step: 4, caption: "扣釘與感測器裝置進行扣合", mint: mint)
+                                        .frame(width: 220)
+                                }
+                                .padding(.horizontal, 40)
+                                .padding(.top, 20)
                             }
-                            .padding(.horizontal, 40)
-                            .padding(.top, 20)
+                            .frame(width: 740)
 
                             WearingProgressSlider()
                                 .padding(.horizontal, 40)
