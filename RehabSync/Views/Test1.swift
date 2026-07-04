@@ -271,16 +271,16 @@ private struct Test1Sidebar: View {
                             .foregroundStyle(Color(red: 0.2, green: 0.5, blue: 0.9))
                             .offset(x: 8, y: 0)
                     }
-                    .scaleEffect(2.8)
+                    .scaleEffect(1.5)
                 }
             }
             .buttonStyle(.plain)
             Test1MenuTile(title: "護膝穿戴", mint: mint) {
-                Image("WearingKneePads1Icon")
+                Image("KneePadIcon")
                     .resizable()
                     .scaledToFit()
                     .frame(width: 34, height: 34)
-                    .scaleEffect(2.2)
+                    .scaleEffect(1.2)
             }
             Button(action: onTrainingMenuTap) {
                 Test1MenuTile(title: "訓練菜單", mint: mint) {
@@ -288,7 +288,7 @@ private struct Test1Sidebar: View {
                         .resizable()
                         .scaledToFit()
                         .frame(width: 34, height: 34)
-                        .scaleEffect(2.2)
+                        .scaleEffect(1.2)
                 }
             }
             .buttonStyle(.plain)
@@ -297,14 +297,14 @@ private struct Test1Sidebar: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: 34, height: 34)
-                    .scaleEffect(2.2)
+                    .scaleEffect(1.2)
             }
             Test1MenuTile(title: "關卡", mint: mint) {
                 Image("LevelIcon")
                     .resizable()
                     .scaledToFit()
                     .frame(width: 34, height: 34)
-                    .scaleEffect(2.8)
+                    .scaleEffect(1.5)
             }
         }
         .padding(.horizontal, 20)
