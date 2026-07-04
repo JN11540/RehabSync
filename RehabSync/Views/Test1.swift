@@ -515,26 +515,13 @@ private struct Test1PreviewFrame: View {
                                 WearingStepImage(imageName: "WearingKneePads1Icon", step: 1, caption: "坐下並將腿部伸直", mint: mint)
                                 WearingStepImage(imageName: "WearingKneePads2Icon", step: 2, caption: "將腳套入，從小腿拉至膝蓋", mint: mint)
                                 WearingStepImage(imageName: "WearingKneePads3Icon", step: 3, caption: "護膝上有三角形標誌，該三角形黑布是對應到膝蓋位置", mint: mint)
+                                WearingStepImage(imageName: "WearingKneePads4Icon", step: 4, caption: "扣釘與感測器裝置進行扣合", mint: mint)
                             }
                             .padding(.horizontal, 40)
                             .padding(.top, 20)
 
-                            ZStack {
-                                Capsule()
-                                    .fill(Color(red: 0.15, green: 0.5, blue: 0.45))
-                                    .frame(height: 20)
-
-                                Capsule()
-                                    .fill(Color(white: 0.85))
-                                    .frame(height: 12)
-                                    .padding(.horizontal, 30)
-
-                                Capsule()
-                                    .fill(Color.white)
-                                    .frame(height: 6)
-                                    .padding(.horizontal, 36)
-                            }
-                            .padding(.horizontal, 40)
+                            WearingProgressSlider()
+                                .padding(.horizontal, 40)
 
                             Spacer()
                         }
@@ -1049,6 +1036,60 @@ private struct IconLegend: View {
                     .foregroundStyle(.white.opacity(0.8))
             }
         }
+    }
+}
+
+// MARK: - Wearing Progress Slider
+
+private struct WearingProgressSlider: View {
+    @State private var thumbOffset: CGFloat = 0
+    @State private var dragStartOffset: CGFloat = 0
+    @State private var hasCentered = false
+
+    private let trackHeight: CGFloat = 20
+    private let thumbWidth: CGFloat = 90
+    private let thumbHeight: CGFloat = 12
+    private let innerWidth: CGFloat = 40
+    private let innerHeight: CGFloat = 6
+
+    var body: some View {
+        GeometryReader { geo in
+            let maxOffset = max(geo.size.width - thumbWidth, 0)
+
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color(red: 0.15, green: 0.5, blue: 0.45))
+                    .frame(height: trackHeight)
+
+                ZStack {
+                    Capsule()
+                        .fill(Color(white: 0.85))
+                        .frame(width: thumbWidth, height: thumbHeight)
+                    Capsule()
+                        .fill(Color.white)
+                        .frame(width: innerWidth, height: innerHeight)
+                }
+                .frame(width: thumbWidth, height: trackHeight)
+                .offset(x: thumbOffset)
+                .gesture(
+                    DragGesture()
+                        .onChanged { value in
+                            let proposed = dragStartOffset + value.translation.width
+                            thumbOffset = min(max(proposed, 0), maxOffset)
+                        }
+                        .onEnded { _ in
+                            dragStartOffset = thumbOffset
+                        }
+                )
+            }
+            .onAppear {
+                guard !hasCentered else { return }
+                hasCentered = true
+                thumbOffset = maxOffset / 2
+                dragStartOffset = thumbOffset
+            }
+        }
+        .frame(height: trackHeight)
     }
 }
 
