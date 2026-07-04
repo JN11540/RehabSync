@@ -20,10 +20,16 @@ struct PreWorking2: View {
                     )
                     .overlay(alignment: .top) {
                         Text("穿戴方式")
-                            .font(.system(size: 20, weight: .bold))
+                            .font(.system(size: 28, weight: .bold))
                             .foregroundStyle(.black)
                             .padding(.top, 24)
                     }
+
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color(red: 0.70, green: 0.80, blue: 0.86))
+                    .padding(.top, 80)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 24)
 
                 Button(action: { dismiss() }) {
                     ZStack {
@@ -47,10 +53,6 @@ struct PreWorking2: View {
             .padding(.bottom, 40)
             .padding(.leading, 60)
             .padding(.trailing, 400)
-
-            Text(exercise?.name ?? "未知動作")
-                .font(.system(size: 28, weight: .bold))
-                .foregroundStyle(Color(red: 0.1, green: 0.25, blue: 0.4))
         }
     }
 }
