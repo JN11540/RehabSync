@@ -395,6 +395,8 @@ private struct Test1PreviewFrame: View {
     @State private var selectedContentId: Int64? = nil
     @State private var showPreWorking = false
     @State private var preWorkingContent: TreatmentContent? = nil
+    @State private var trainingScrollOffset: CGFloat = 0
+    @State private var trainingDragStartOffset: CGFloat = 0
 
     /// exercise id -> {id}_PreWorking.swift 對應表。之後每新增一個 {id}_PreWorking.swift，
     /// 就在這裡加一個 case，是否跳轉、跳轉到哪個畫面都只看這張表，不需要改別的地方。
@@ -464,36 +466,65 @@ private struct Test1PreviewFrame: View {
                                 .font(.system(size: 16, weight: .medium))
                                 .foregroundStyle(.white.opacity(0.4))
                         } else {
+                            let cardWidth: CGFloat = 220
+                            let cardSpacing: CGFloat = 16
+                            let sidePadding: CGFloat = 40
+                            let viewportWidth: CGFloat = 740
+                            let contentWidth = sidePadding * 2 + CGFloat(contents.count) * cardWidth + CGFloat(max(contents.count - 1, 0)) * cardSpacing
+                            let maxOffset = max(contentWidth - viewportWidth, 0)
+
                             VStack(spacing: 12) {
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 16) {
-                                        ForEach(contents, id: \.id) { content in
-                                            TrainingCard(
-                                                imageName: "Exercise\(content.exercise_id)",
-                                                title: exerciseName(for: content),
-                                                subtitle: "\(content.sets) 組 · \(content.reps) 次 · 休息 \(content.set_rest_time) 秒",
-                                                mint: mint,
-                                                isDone: completedContentIds.contains(Int(content.id ?? -1)),
-                                                isSelectable: isToday,
-                                                isSelected: isToday && selectedContentId == content.id
-                                            )
-                                            .frame(width: 220)
-                                            .onTapGesture {
-                                                guard isToday else { return }
-                                                selectedContentId = content.id
-                                                if Self.preWorkingBuilders[content.exercise_id] != nil {
-                                                    preWorkingContent = content
-                                                    showPreWorking = true
-                                                }
+                                HStack(spacing: cardSpacing) {
+                                    ForEach(contents, id: \.id) { content in
+                                        TrainingCard(
+                                            imageName: "Exercise\(content.exercise_id)",
+                                            title: exerciseName(for: content),
+                                            subtitle: "\(content.sets) 組 · \(content.reps) 次 · 休息 \(content.set_rest_time) 秒",
+                                            mint: mint,
+                                            isDone: completedContentIds.contains(Int(content.id ?? -1)),
+                                            isSelectable: isToday,
+                                            isSelected: isToday && selectedContentId == content.id
+                                        )
+                                        .frame(width: cardWidth)
+                                        .onTapGesture {
+                                            guard isToday else { return }
+                                            selectedContentId = content.id
+                                            if Self.preWorkingBuilders[content.exercise_id] != nil {
+                                                preWorkingContent = content
+                                                showPreWorking = true
                                             }
                                         }
                                     }
-                                    .padding(.horizontal, 40)
-                                    .padding(.top, 20)
                                 }
+                                .padding(.horizontal, sidePadding)
+                                .padding(.top, 4)
+                                .offset(x: -trainingScrollOffset)
+                                .frame(width: viewportWidth, alignment: .leading)
+                                .clipped()
+                                .contentShape(Rectangle())
+                                .gesture(
+                                    DragGesture()
+                                        .onChanged { value in
+                                            guard maxOffset > 0 else { return }
+                                            let proposed = trainingDragStartOffset - value.translation.width
+                                            trainingScrollOffset = min(max(proposed, 0), maxOffset)
+                                        }
+                                        .onEnded { _ in
+                                            trainingDragStartOffset = trainingScrollOffset
+                                        }
+                                )
+
+                                WearingProgressSlider(
+                                    thumbFraction: contentWidth > 0 ? viewportWidth / contentWidth : 1,
+                                    scrollFraction: Binding(
+                                        get: { maxOffset > 0 ? trainingScrollOffset / maxOffset : 0 },
+                                        set: { newValue in trainingScrollOffset = newValue * maxOffset }
+                                    )
+                                )
+                                .padding(.horizontal, sidePadding)
 
                                 IconLegend()
-                                    .padding(.top, 16)
+                                    .padding(.top, 4)
                                     .padding(.bottom, 24)
                             }
                         }
