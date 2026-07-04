@@ -1043,7 +1043,7 @@ private struct WearingStepImage: View {
     let mint: Color
 
     var body: some View {
-        VStack(spacing: -4) {
+        VStack(spacing: 0) {
             ZStack(alignment: .topLeading) {
                 Color.black
                 Image(imageName)
@@ -1056,7 +1056,7 @@ private struct WearingStepImage: View {
                     .background(Circle().fill(Color(red: 0.15, green: 0.6, blue: 0.55)))
                     .padding(6)
             }
-            .aspectRatio(557.0 / 844.0, contentMode: .fit)
+            .aspectRatio(420.0 / 536.0, contentMode: .fit)
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
