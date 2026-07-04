@@ -1232,42 +1232,43 @@ private struct TrainingCard: View {
     var body: some View {
         VStack(spacing: 8) {
             VStack(spacing: 0) {
-                ZStack(alignment: .topLeading) {
-                    ZStack {
-                        Color.black
-                        Image(imageName)
-                            .resizable()
-                            .scaledToFit()
-                    }
-                    Image(isDone ? "FinishIcon" : "AlertIcon")
+                ZStack {
+                    Color.black
+                    Image(imageName)
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 40, height: 40)
-                        .padding(6)
                 }
                 .aspectRatio(Self.referenceAspectRatio, contentMode: .fit)
 
-                Text(title)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.black)
-                    .padding(.vertical, 12)
-                    .frame(maxWidth: .infinity)
-                    .background {
-                        ZStack {
-                            mint
-                            HStack(spacing: 14) {
-                                Rectangle()
-                                    .fill(Color.white.opacity(0.3))
-                                    .frame(width: 46, height: 200)
-                                    .rotationEffect(.degrees(20))
-                                Rectangle()
-                                    .fill(Color.white.opacity(0.3))
-                                    .frame(width: 26, height: 200)
-                                    .rotationEffect(.degrees(20))
+                ZStack(alignment: .topLeading) {
+                    Text(title)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.black)
+                        .padding(.vertical, 12)
+                        .frame(maxWidth: .infinity)
+                        .background {
+                            ZStack {
+                                mint
+                                HStack(spacing: 14) {
+                                    Rectangle()
+                                        .fill(Color.white.opacity(0.3))
+                                        .frame(width: 46, height: 200)
+                                        .rotationEffect(.degrees(20))
+                                    Rectangle()
+                                        .fill(Color.white.opacity(0.3))
+                                        .frame(width: 26, height: 200)
+                                        .rotationEffect(.degrees(20))
+                                }
                             }
                         }
-                    }
-                    .clipped()
+                        .clipped()
+
+                    Image(isDone ? "FinishIcon" : "AlertIcon")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 26, height: 26)
+                        .padding(4)
+                }
             }
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .overlay(
