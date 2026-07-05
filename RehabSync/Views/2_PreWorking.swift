@@ -77,7 +77,7 @@ struct PreWorking2: View {
                             Image("WearPadAndGearsIcon")
                                 .resizable()
                                 .scaledToFit()
-                                .frame(maxWidth: .infinity)
+                                .frame(maxWidth: .infinity, maxHeight: 380)
                                 .padding(4)
                             AssureLabel(text: "護膝穿戴了嗎？")
                                 .padding(.horizontal, 4)
