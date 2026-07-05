@@ -18,7 +18,8 @@ struct PreWorking2: View {
         switch step {
         case 0: return "確認裝備齊全"
         case 1: return "準備椅子"
-        default: return "校正"
+        case 2: return "校正"
+        default: return "膝關節終端伸展測試"
         }
     }
 
@@ -174,6 +175,13 @@ struct PreWorking2: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
                         .padding(.trailing, 40)
                     }
+                } else if step == 3 {
+                    Image("OnlyLegIcon")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 500, height: 500)
+                        .padding(.horizontal, 24)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
 
                 Button(action: {
