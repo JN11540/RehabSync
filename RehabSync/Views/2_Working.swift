@@ -28,7 +28,7 @@ struct Working2: View {
                         .strokeBorder(Color.black, lineWidth: 1.5)
                         .padding(6)
                 }
-                .frame(width: 40, height: 300)
+                .frame(width: 40, height: 500)
 
                 ZStack {
                     Circle()
