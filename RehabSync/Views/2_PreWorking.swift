@@ -81,7 +81,20 @@ struct PreWorking2: View {
                 }
                 .buttonStyle(.plain)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-                .padding(.trailing, 24)
+                .padding(.trailing, 0)
+
+                if !showAssureStep {
+                    Button(action: { showAssureStep = true }) {
+                        Image("ArrowIcon")
+                            .resizable()
+                            .scaledToFit()
+                            .scaleEffect(x: -1, y: 1)
+                            .frame(width: 150, height: 150)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                    .padding(.leading, 0)
+                }
             }
             .padding(.top, 40)
             .padding(.bottom, 40)
