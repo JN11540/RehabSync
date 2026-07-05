@@ -6,7 +6,15 @@ struct PreWorking2: View {
     let content: TreatmentContent
     let exercise: Exercise?
     @Environment(\.dismiss) private var dismiss
-    @State private var showAssureStep = true
+    @State private var step = 0
+
+    private var stepTitle: String {
+        switch step {
+        case 0: return "確認裝備齊全"
+        case 1: return "準備椅子"
+        default: return "校正"
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -20,13 +28,13 @@ struct PreWorking2: View {
                             .stroke(Color(white: 0.6), lineWidth: 5)
                     )
                     .overlay(alignment: .top) {
-                        Text(showAssureStep ? "確認裝備齊全" : "準備椅子")
+                        Text(stepTitle)
                             .font(.system(size: 28, weight: .bold))
                             .foregroundStyle(.black)
                             .padding(.top, 24)
                     }
 
-                if showAssureStep {
+                if step == 0 {
                     HStack(spacing: 24) {
                         VStack(spacing: 0) {
                             Image("Assure1Icon")
@@ -53,7 +61,7 @@ struct PreWorking2: View {
                     .padding(.leading, 24)
                     .padding(.trailing, 174)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
+                } else if step == 1 {
                     VStack(spacing: 12) {
                         Image("ChairIcon")
                             .resizable()
@@ -66,6 +74,34 @@ struct PreWorking2: View {
                     }
                     .padding(.horizontal, 24)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if step == 2 {
+                    HStack(spacing: 24) {
+                        VStack(spacing: 12) {
+                            Image("StopNoMoveIcon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 500, height: 500)
+
+                            Text("請坐在椅子上，將膝蓋保持 90 度彎曲。點擊『校正』按鈕後，請維持身體靜止不動 5 秒鐘喔！")
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundStyle(.black)
+                        }
+
+                        Button(action: {}) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color(red: 0.25, green: 0.85, blue: 0.75))
+                                Text("校正")
+                                    .font(.system(size: 22, weight: .bold))
+                                    .foregroundStyle(.black)
+                            }
+                            .frame(width: 100, height: 100)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.leading, 24)
+                    .padding(.trailing, 174)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                 }
 
                 Button(action: { dismiss() }) {
@@ -86,18 +122,20 @@ struct PreWorking2: View {
                 }
                 .buttonStyle(.plain)
 
-                Button(action: { showAssureStep = false }) {
-                    Image("ArrowIcon")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 150, height: 150)
+                if step < 2 {
+                    Button(action: { step += 1 }) {
+                        Image("ArrowIcon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 150, height: 150)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                    .padding(.trailing, 0)
                 }
-                .buttonStyle(.plain)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-                .padding(.trailing, 0)
 
-                if !showAssureStep {
-                    Button(action: { showAssureStep = true }) {
+                if step > 0 {
+                    Button(action: { step -= 1 }) {
                         Image("ArrowIcon")
                             .resizable()
                             .scaledToFit()
