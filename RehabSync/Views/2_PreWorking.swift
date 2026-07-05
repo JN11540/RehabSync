@@ -25,30 +25,25 @@ struct PreWorking2: View {
                             .padding(.top, 24)
                     }
 
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color(red: 0.70, green: 0.80, blue: 0.86))
-                    .overlay(
-                        HStack(spacing: 40) {
-                            VStack(spacing: 16) {
-                                Image("Assure1Icon")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .padding(24)
-                                AssureLabel(text: "裝置連線")
-                            }
-                            VStack(spacing: 16) {
-                                Image("Assure2Icon")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .padding(24)
-                                AssureLabel(text: "護膝穿戴")
-                            }
-                        }
-                        .padding(.bottom, 24)
-                    )
-                    .padding(.top, 80)
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 24)
+                VStack(spacing: 12) {
+                    VStack(spacing: 12) {
+                        Image("Assure1Icon")
+                            .resizable()
+                            .scaledToFit()
+                            .padding(4)
+                        AssureLabel(text: "裝置連線")
+                    }
+                    VStack(spacing: 12) {
+                        Image("Assure2Icon")
+                            .resizable()
+                            .scaledToFit()
+                            .padding(4)
+                        AssureLabel(text: "護膝穿戴")
+                    }
+                }
+                .padding(.top, 80)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 24)
 
                 Button(action: { dismiss() }) {
                     ZStack {
