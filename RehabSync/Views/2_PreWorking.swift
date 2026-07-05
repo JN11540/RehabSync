@@ -71,16 +71,10 @@ struct PreWorking2: View {
                 .buttonStyle(.plain)
 
                 Button(action: {}) {
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundStyle(.black)
-                        .frame(width: 160, height: 72)
-                        .background(Color(red: 0.25, green: 0.85, blue: 0.75))
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14)
-                                .stroke(Color.black, lineWidth: 4)
-                        )
+                    Image("ArrowIcon")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 60, height: 60)
                 }
                 .buttonStyle(.plain)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
