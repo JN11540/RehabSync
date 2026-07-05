@@ -44,6 +44,20 @@ struct PreWorking2: View {
         return (thighPeripheral, calfPeripheral)
     }
 
+    private func toggleLiveTest() {
+        guard let pair = thighAndCalfPeripherals else { return }
+        if btVM.isLiveEstimating {
+            btVM.stopLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+        } else if let baseline = btVM.baselineResult {
+            btVM.startLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf, baseline: baseline)
+        }
+    }
+
+    private func stopLiveTestIfNeeded() {
+        guard btVM.isLiveEstimating, let pair = thighAndCalfPeripherals else { return }
+        btVM.stopLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+    }
+
     var body: some View {
         ZStack {
             Color.black.opacity(0.8).ignoresSafeArea()
@@ -190,12 +204,6 @@ struct PreWorking2: View {
                             .frame(width: 500, height: 500)
                             .rotationEffect(.degrees(legRotation))
                             .offset(x: 170, y: 50)
-                            .onAppear {
-                                legRotation = -90
-                                withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
-                                    legRotation = 0
-                                }
-                            }
 
                         Image("StopNoMoveIcon")
                             .resizable()
@@ -205,10 +213,32 @@ struct PreWorking2: View {
                     }
                     .padding(.horizontal, 24)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                    VStack(spacing: 12) {
+                        Button(action: toggleLiveTest) {
+                            Text(btVM.isLiveEstimating ? "停止測試" : "測試")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 160, height: 56)
+                                .background(btVM.isLiveEstimating ? Color.red.opacity(0.85) : Color.teal.opacity(0.85))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!btVM.isLiveEstimating && (thighAndCalfPeripherals == nil || btVM.baselineResult == nil))
+
+                        if let angle = btVM.currentEstimatedRealAngle {
+                            Text(String(format: "%.1f°", angle))
+                                .font(.system(size: 24, weight: .bold, design: .monospaced))
+                                .foregroundStyle(.black)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .padding(.bottom, 40)
                 }
 
                 Button(action: {
                     if step == 2 { resetCalibration() }
+                    if step == 3 { stopLiveTestIfNeeded() }
                     dismiss()
                 }) {
                     ZStack {
@@ -243,6 +273,7 @@ struct PreWorking2: View {
                 if step > 0 {
                     Button(action: {
                         if step == 2 || step == 3 { resetCalibration() }
+                        if step == 3 { stopLiveTestIfNeeded() }
                         step -= 1
                     }) {
                         Image("ArrowIcon")
@@ -274,6 +305,17 @@ struct PreWorking2: View {
         .onChange(of: step) { oldValue, newValue in
             if oldValue == 2 && newValue != 2 {
                 resetCalibration()
+            }
+            if oldValue == 3 && newValue != 3 {
+                stopLiveTestIfNeeded()
+            }
+            if newValue == 3 {
+                legRotation = -90
+            }
+        }
+        .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
+            withAnimation(.easeInOut(duration: 0.2)) {
+                legRotation = -(newValue ?? 90)
             }
         }
     }
