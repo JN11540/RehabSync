@@ -12,21 +12,39 @@ struct Working2: View {
             Color.black.ignoresSafeArea()
 
             VStack(spacing: 12) {
-                ZStack {
-                    Capsule()
-                        .fill(Color(white: 0.35))
-                    Capsule()
-                        .fill(Color.white)
-                        .padding(3)
-                    Capsule()
-                        .strokeBorder(Color.black, lineWidth: 1.5)
-                        .padding(3)
-                    Capsule()
-                        .fill(Color.blue)
-                        .padding(6)
-                    Capsule()
-                        .strokeBorder(Color.black, lineWidth: 1.5)
-                        .padding(6)
+                GeometryReader { geo in
+                    let h = geo.size.height
+
+                    ZStack {
+                        Capsule()
+                            .fill(Color(white: 0.35))
+                        Capsule()
+                            .fill(Color.white)
+                            .padding(3)
+                        Capsule()
+                            .strokeBorder(Color.black, lineWidth: 1.5)
+                            .padding(3)
+                        Capsule()
+                            .fill(Color.blue)
+                            .padding(6)
+                        Capsule()
+                            .strokeBorder(Color.black, lineWidth: 1.5)
+                            .padding(6)
+
+                        ForEach(1..<5) { i in
+                            Rectangle()
+                                .fill(Color.black)
+                                .frame(width: 28, height: 1.5)
+                                .position(x: 20, y: h * CGFloat(i) / 5)
+                        }
+
+                        ForEach(0..<5) { i in
+                            Text("\(5 - i)")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .position(x: 40 + 20, y: h * (CGFloat(i) + 0.5) / 5)
+                        }
+                    }
                 }
                 .frame(width: 40, height: 400)
 
