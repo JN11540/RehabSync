@@ -10,6 +10,9 @@ struct PreWorking2: View {
     @Environment(BluetoothViewModel.self) private var btVM
     @State private var step = 0
     @State private var didAttemptCalibration = false
+    @State private var calibrationCountdown = 5
+    @State private var countdownTimer: Timer?
+    @State private var showSuccessArrow = false
 
     private var stepTitle: String {
         switch step {
@@ -17,6 +20,16 @@ struct PreWorking2: View {
         case 1: return "準備椅子"
         default: return "校正"
         }
+    }
+
+    private func resetCalibration() {
+        didAttemptCalibration = false
+        calibrationCountdown = 5
+        countdownTimer?.invalidate()
+        countdownTimer = nil
+        showSuccessArrow = false
+        btVM.baselineResult = nil
+        btVM.isCollectingBaseline = false
     }
 
     private var thighAndCalfPeripherals: (thigh: CBPeripheral, calf: CBPeripheral)? {
@@ -104,19 +117,30 @@ struct PreWorking2: View {
                     .padding(.horizontal, 24)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                    VStack(spacing: 12) {
-                        if btVM.baselineResult != nil {
-                            Button(action: { step += 1 }) {
-                                Image("ArrowIcon")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 150, height: 150)
-                            }
-                            .buttonStyle(.plain)
-                        } else {
+                    if showSuccessArrow {
+                        Button(action: { step += 1 }) {
+                            Image("ArrowIcon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 150, height: 150)
+                        }
+                        .buttonStyle(.plain)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                        .padding(.trailing, 0)
+                    } else {
+                        VStack(spacing: 12) {
                             Button(action: {
                                 guard let pair = thighAndCalfPeripherals else { return }
                                 didAttemptCalibration = true
+                                calibrationCountdown = 5
+                                countdownTimer?.invalidate()
+                                countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
+                                    if calibrationCountdown > 1 {
+                                        calibrationCountdown -= 1
+                                    } else {
+                                        timer.invalidate()
+                                    }
+                                }
                                 btVM.startBaselineCalibration(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
                             }) {
                                 ZStack {
@@ -124,7 +148,7 @@ struct PreWorking2: View {
                                         .fill(Color(red: 0.99, green: 0.88, blue: 0.49))
                                     Circle()
                                         .strokeBorder(Color.black, lineWidth: 6)
-                                    Text("校正")
+                                    Text(btVM.isCollectingBaseline ? "\(calibrationCountdown)" : "校正")
                                         .font(.system(size: 28, weight: .bold))
                                         .foregroundStyle(.black)
                                 }
@@ -137,18 +161,25 @@ struct PreWorking2: View {
                                 Text("裝置未連線")
                                     .font(.system(size: 16, weight: .semibold))
                                     .foregroundStyle(.red)
+                            } else if btVM.baselineResult != nil {
+                                Text("校正成功！")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(.green)
                             } else if didAttemptCalibration && !btVM.isCollectingBaseline {
                                 Text("校正失敗，請重試！")
                                     .font(.system(size: 16, weight: .semibold))
                                     .foregroundStyle(.red)
                             }
                         }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                        .padding(.trailing, 40)
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-                    .padding(.trailing, 40)
                 }
 
-                Button(action: { dismiss() }) {
+                Button(action: {
+                    if step == 2 { resetCalibration() }
+                    dismiss()
+                }) {
                     ZStack {
                         Circle()
                             .fill(Color.white)
@@ -179,7 +210,10 @@ struct PreWorking2: View {
                 }
 
                 if step > 0 {
-                    Button(action: { step -= 1 }) {
+                    Button(action: {
+                        if step == 2 { resetCalibration() }
+                        step -= 1
+                    }) {
                         Image("ArrowIcon")
                             .resizable()
                             .scaledToFit()
@@ -195,6 +229,16 @@ struct PreWorking2: View {
             .padding(.bottom, 40)
             .padding(.leading, 60)
             .padding(.trailing, 60)
+        }
+        .onChange(of: btVM.baselineResult) { _, newValue in
+            if newValue != nil {
+                showSuccessArrow = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    showSuccessArrow = true
+                }
+            } else {
+                showSuccessArrow = false
+            }
         }
     }
 }
