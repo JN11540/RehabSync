@@ -19,7 +19,7 @@ struct PreWorking2: View {
                             .stroke(Color(white: 0.6), lineWidth: 5)
                     )
                     .overlay(alignment: .top) {
-                        Text("穿戴方式")
+                        Text("確認裝備齊全")
                             .font(.system(size: 28, weight: .bold))
                             .foregroundStyle(.black)
                             .padding(.top, 24)
@@ -27,6 +27,12 @@ struct PreWorking2: View {
 
                 RoundedRectangle(cornerRadius: 10)
                     .fill(Color(red: 0.70, green: 0.80, blue: 0.86))
+                    .overlay(
+                        Image("WearPadAndGearsIcon")
+                            .resizable()
+                            .scaledToFit()
+                            .padding(24)
+                    )
                     .padding(.top, 80)
                     .padding(.horizontal, 24)
                     .padding(.bottom, 24)
