@@ -41,6 +41,7 @@ struct PreWorking2: View {
                     .overlay(
                         RoundedRectangle(cornerRadius: 16)
                             .stroke(Color(white: 0.35), lineWidth: 1.5)
+                            .padding(.horizontal, 8)
                     )
 
                     VStack(spacing: 0) {
@@ -58,6 +59,7 @@ struct PreWorking2: View {
                     .overlay(
                         RoundedRectangle(cornerRadius: 16)
                             .stroke(Color(white: 0.35), lineWidth: 1.5)
+                            .padding(.horizontal, 8)
                     )
                 }
                 .padding(.top, 80)
