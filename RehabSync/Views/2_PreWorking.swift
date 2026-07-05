@@ -30,10 +30,12 @@ struct PreWorking2: View {
                         Image("Assure1Icon")
                             .resizable()
                             .scaledToFit()
+                            .frame(maxWidth: .infinity)
                             .padding(4)
                         AssureLabel(text: "裝置連線")
                             .padding(.horizontal, 4)
                     }
+                    .frame(maxWidth: .infinity)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
@@ -44,10 +46,12 @@ struct PreWorking2: View {
                         Image("Assure2Icon")
                             .resizable()
                             .scaledToFit()
+                            .frame(maxWidth: .infinity)
                             .padding(4)
                         AssureLabel(text: "護膝穿戴")
                             .padding(.horizontal, 4)
                     }
+                    .frame(maxWidth: .infinity)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
