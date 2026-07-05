@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreBluetooth
 
 // MARK: - PreWorking2
 
@@ -6,7 +7,9 @@ struct PreWorking2: View {
     let content: TreatmentContent
     let exercise: Exercise?
     @Environment(\.dismiss) private var dismiss
+    @Environment(BluetoothViewModel.self) private var btVM
     @State private var step = 0
+    @State private var didAttemptCalibration = false
 
     private var stepTitle: String {
         switch step {
@@ -14,6 +17,16 @@ struct PreWorking2: View {
         case 1: return "準備椅子"
         default: return "校正"
         }
+    }
+
+    private var thighAndCalfPeripherals: (thigh: CBPeripheral, calf: CBPeripheral)? {
+        let dvm = DeviceViewModel()
+        guard let thigh = dvm.fetch(limb: 0), let thighUUID = UUID(uuidString: thigh.device_uuid),
+              let calf  = dvm.fetch(limb: 1), let calfUUID  = UUID(uuidString: calf.device_uuid),
+              let thighPeripheral = btVM.connectedPeripherals[thighUUID],
+              let calfPeripheral  = btVM.connectedPeripherals[calfUUID]
+        else { return nil }
+        return (thighPeripheral, calfPeripheral)
     }
 
     var body: some View {
@@ -91,19 +104,42 @@ struct PreWorking2: View {
                     .padding(.horizontal, 24)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                    Button(action: {}) {
-                        ZStack {
-                            Circle()
-                                .fill(Color(red: 0.99, green: 0.88, blue: 0.49))
-                            Circle()
-                                .strokeBorder(Color.black, lineWidth: 6)
-                            Text("校正")
-                                .font(.system(size: 28, weight: .bold))
-                                .foregroundStyle(.black)
+                    VStack(spacing: 12) {
+                        if btVM.baselineResult != nil {
+                            Button(action: { step += 1 }) {
+                                Image("ArrowIcon")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 150, height: 150)
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            Button(action: {
+                                guard let pair = thighAndCalfPeripherals else { return }
+                                didAttemptCalibration = true
+                                btVM.startBaselineCalibration(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+                            }) {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color(red: 0.99, green: 0.88, blue: 0.49))
+                                    Circle()
+                                        .strokeBorder(Color.black, lineWidth: 6)
+                                    Text("校正")
+                                        .font(.system(size: 28, weight: .bold))
+                                        .foregroundStyle(.black)
+                                }
+                                .frame(width: 200, height: 200)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(btVM.isCollectingBaseline)
+
+                            if didAttemptCalibration && !btVM.isCollectingBaseline {
+                                Text("校正失敗，請重試！")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(.red)
+                            }
                         }
-                        .frame(width: 200, height: 200)
                     }
-                    .buttonStyle(.plain)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
                     .padding(.trailing, 40)
                 }
@@ -183,4 +219,5 @@ private struct AssureLabel: View {
         ),
         exercise: nil
     )
+    .environment(BluetoothViewModel())
 }
