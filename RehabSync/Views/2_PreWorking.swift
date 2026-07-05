@@ -34,14 +34,27 @@ struct PreWorking2: View {
                                 .scaledToFit()
                                 .padding(24)
 
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("裝置連線：感測器已成功透過藍牙與 App 綁定。")
-                                Text("護膝配戴：長版護膝已完整覆蓋左膝，膝蓋上下方均維持均等包覆。")
-                                Text("感測器固定：綁定完成後，感測器已確實扣入護膝專屬固定座。")
+                            HStack(spacing: 16) {
+                                Text("裝置連線")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundStyle(.black)
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 10)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(Color.white)
+                                    )
+
+                                Text("護膝穿戴")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundStyle(.black)
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 10)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(Color.white)
+                                    )
                             }
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(.black)
-                            .padding(.horizontal, 24)
                             .padding(.bottom, 24)
                         }
                     )
