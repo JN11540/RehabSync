@@ -47,12 +47,15 @@ struct Working2: View {
                         Capsule()
                             .strokeBorder(Color.black, lineWidth: 1.5)
                             .padding(3)
-                        ZStack(alignment: .bottom) {
-                            Capsule()
-                                .fill(Color.blue)
-                            Rectangle()
-                                .fill(Color.yellow)
-                                .frame(height: max(0, h - 12) * CGFloat(holdElapsed / Self.holdDuration))
+                        GeometryReader { fillGeo in
+                            ZStack(alignment: .bottom) {
+                                Capsule()
+                                    .fill(Color.blue)
+                                Rectangle()
+                                    .fill(Color.yellow)
+                                    .frame(height: fillGeo.size.height * CGFloat(holdElapsed / Self.holdDuration))
+                            }
+                            .clipShape(Capsule())
                         }
                         .padding(6)
                         .clipShape(Capsule())
@@ -93,7 +96,7 @@ struct Working2: View {
                         .padding(4)
 
                     if let angle = btVM.currentEstimatedRealAngle {
-                        Text(String(format: "%.0f", angle))
+                        Text(String(format: "%.0f°", angle))
                             .font(.system(size: 50, weight: .bold))
                             .foregroundStyle(angle <= Self.holdThreshold ? .red : .black)
                             .minimumScaleFactor(0.3)
