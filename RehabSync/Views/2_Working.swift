@@ -73,14 +73,32 @@ struct Working2: View {
                         Text("5")
                             .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(.white)
-                            .position(x: 40 + 20, y: 0)
+                            .position(x: -20, y: 0)
 
                         ForEach(1..<5) { i in
                             Text("\(5 - i)")
                                 .font(.system(size: 20, weight: .semibold))
                                 .foregroundStyle(.white)
-                                .position(x: 40 + 20, y: h * CGFloat(i) / 5)
+                                .position(x: -20, y: h * CGFloat(i) / 5)
                         }
+
+                        Image("BigFishIcon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 32, height: 32)
+                            .position(x: 40 + 30, y: 0)
+
+                        Image("MiddleFishIcon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 32, height: 32)
+                            .position(x: 40 + 30, y: h * 2 / 5)
+
+                        Image("SmallFishIcon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 32, height: 32)
+                            .position(x: 40 + 30, y: h * 4 / 5)
                     }
                 }
                 .frame(width: 40, height: 400)
