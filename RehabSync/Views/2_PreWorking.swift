@@ -133,7 +133,11 @@ struct PreWorking2: View {
                             .buttonStyle(.plain)
                             .disabled(btVM.isCollectingBaseline)
 
-                            if didAttemptCalibration && !btVM.isCollectingBaseline {
+                            if thighAndCalfPeripherals == nil {
+                                Text("裝置未連線")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(.red)
+                            } else if didAttemptCalibration && !btVM.isCollectingBaseline {
                                 Text("校正失敗，請重試！")
                                     .font(.system(size: 16, weight: .semibold))
                                     .foregroundStyle(.red)
