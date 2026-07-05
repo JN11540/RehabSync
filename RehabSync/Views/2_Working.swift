@@ -5,9 +5,34 @@ import SwiftUI
 struct Working2: View {
     let content: TreatmentContent
     let exercise: Exercise?
+    @Environment(BluetoothViewModel.self) private var btVM
 
     var body: some View {
-        Color.black.ignoresSafeArea()
+        ZStack(alignment: .bottomLeading) {
+            Color.black.ignoresSafeArea()
+
+            ZStack {
+                Circle()
+                    .fill(Color(white: 0.35))
+                Circle()
+                    .fill(Color.white)
+                    .padding(8)
+                Circle()
+                    .strokeBorder(Color.black, lineWidth: 1.5)
+                    .padding(8)
+
+                if let angle = btVM.currentEstimatedRealAngle {
+                    Text(String(format: "%.0f", angle))
+                        .font(.system(size: 100, weight: .bold))
+                        .foregroundStyle(.black)
+                        .minimumScaleFactor(0.3)
+                        .lineLimit(1)
+                        .padding(24)
+                }
+            }
+            .frame(width: 260, height: 260)
+            .padding(24)
+        }
     }
 }
 

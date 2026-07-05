@@ -263,7 +263,6 @@ struct PreWorking2: View {
                     .padding(.trailing, 0)
                 } else if step == 3 {
                     Button(action: {
-                        stopLiveTestIfNeeded()
                         navigateToWorking2 = true
                     }) {
                         Image("ArrowIcon")
