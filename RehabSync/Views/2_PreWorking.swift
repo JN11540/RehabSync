@@ -63,23 +63,23 @@ struct PreWorking2: View {
                 if step == 0 {
                     HStack(spacing: 24) {
                         VStack(spacing: 0) {
-                            Image("Assure1Icon")
+                            Image("KneeThighConnectedIcon")
                                 .resizable()
                                 .scaledToFit()
                                 .frame(maxWidth: .infinity)
                                 .padding(4)
-                            AssureLabel(text: "裝置連線")
+                            AssureLabel(text: "裝置連線了嗎？")
                                 .padding(.horizontal, 4)
                         }
                         .frame(maxWidth: .infinity)
 
                         VStack(spacing: 0) {
-                            Image("Assure2Icon")
+                            Image("WearPadAndGearsIcon")
                                 .resizable()
                                 .scaledToFit()
                                 .frame(maxWidth: .infinity)
                                 .padding(4)
-                            AssureLabel(text: "護膝穿戴")
+                            AssureLabel(text: "護膝穿戴了嗎？")
                                 .padding(.horizontal, 4)
                         }
                         .frame(maxWidth: .infinity)
