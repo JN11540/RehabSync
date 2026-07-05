@@ -28,55 +28,23 @@ struct PreWorking2: View {
                 RoundedRectangle(cornerRadius: 10)
                     .fill(Color(red: 0.70, green: 0.80, blue: 0.86))
                     .overlay(
-                        VStack(spacing: 16) {
-                            Image("WearPadAndGearsIcon")
-                                .resizable()
-                                .scaledToFit()
-                                .padding(24)
-
-                            HStack(spacing: 16) {
-                                Text("裝置連線")
-                                    .font(.system(size: 24, weight: .medium))
-                                    .foregroundStyle(.black)
-                                    .padding(.horizontal, 20)
-                                    .padding(.vertical, 10)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 18)
-                                            .fill(Color(white: 0.35))
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 14)
-                                                    .fill(Color(red: 0.70, green: 0.80, blue: 0.86))
-                                                    .padding(4)
-                                                    .overlay(
-                                                        RoundedRectangle(cornerRadius: 10)
-                                                            .fill(Color.white)
-                                                            .padding(8)
-                                                    )
-                                            )
-                                    )
-
-                                Text("護膝穿戴")
-                                    .font(.system(size: 24, weight: .medium))
-                                    .foregroundStyle(.black)
-                                    .padding(.horizontal, 20)
-                                    .padding(.vertical, 10)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 18)
-                                            .fill(Color(white: 0.35))
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 14)
-                                                    .fill(Color(red: 0.70, green: 0.80, blue: 0.86))
-                                                    .padding(4)
-                                                    .overlay(
-                                                        RoundedRectangle(cornerRadius: 10)
-                                                            .fill(Color.white)
-                                                            .padding(8)
-                                                    )
-                                            )
-                                    )
+                        HStack(spacing: 40) {
+                            VStack(spacing: 16) {
+                                Image("Assure1Icon")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .padding(24)
+                                AssureLabel(text: "裝置連線")
                             }
-                            .padding(.bottom, 24)
+                            VStack(spacing: 16) {
+                                Image("Assure2Icon")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .padding(24)
+                                AssureLabel(text: "護膝穿戴")
+                            }
                         }
+                        .padding(.bottom, 24)
                     )
                     .padding(.top, 80)
                     .padding(.horizontal, 24)
@@ -105,6 +73,34 @@ struct PreWorking2: View {
             .padding(.leading, 60)
             .padding(.trailing, 400)
         }
+    }
+}
+
+// MARK: - Assure Label
+
+private struct AssureLabel: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 24, weight: .medium))
+            .foregroundStyle(.black)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(Color(white: 0.35))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(Color(red: 0.70, green: 0.80, blue: 0.86))
+                            .padding(4)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(Color.white)
+                                    .padding(8)
+                            )
+                    )
+            )
     }
 }
 
