@@ -176,16 +176,18 @@ struct PreWorking2: View {
                         .padding(.trailing, 40)
                     }
                 } else if step == 3 {
-                    HStack(spacing: 24) {
+                    HStack(spacing: -80) {
                         Image("OnlyLegIcon")
                             .resizable()
                             .scaledToFit()
                             .frame(width: 500, height: 500)
+                            .offset(x: 60)
 
                         Image("StopNoMoveIcon")
                             .resizable()
                             .scaledToFit()
                             .frame(width: 500, height: 500)
+                            .offset(x: -60)
                     }
                     .padding(.horizontal, 24)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -226,7 +228,7 @@ struct PreWorking2: View {
 
                 if step > 0 {
                     Button(action: {
-                        if step == 2 { resetCalibration() }
+                        if step == 2 || step == 3 { resetCalibration() }
                         step -= 1
                     }) {
                         Image("ArrowIcon")
