@@ -32,14 +32,27 @@ struct PreWorking2: View {
                             .scaledToFit()
                             .padding(4)
                         AssureLabel(text: "裝置連線")
+                            .padding(.horizontal, 4)
                     }
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color(white: 0.35), lineWidth: 1.5)
+                    )
+
                     VStack(spacing: 0) {
                         Image("Assure2Icon")
                             .resizable()
                             .scaledToFit()
                             .padding(4)
                         AssureLabel(text: "護膝穿戴")
+                            .padding(.horizontal, 4)
                     }
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color(white: 0.35), lineWidth: 1.5)
+                    )
                 }
                 .padding(.top, 80)
                 .padding(.horizontal, 24)
