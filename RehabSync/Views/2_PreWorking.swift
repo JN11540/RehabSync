@@ -50,9 +50,9 @@ struct PreWorking2: View {
                         }
                         .frame(maxWidth: .infinity)
                     }
-                    .padding(.top, 80)
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 24)
+                    .padding(.leading, 24)
+                    .padding(.trailing, 174)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     VStack(spacing: 12) {
                         Image("ChairIcon")
