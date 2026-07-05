@@ -189,7 +189,7 @@ struct PreWorking2: View {
                             .scaledToFit()
                             .frame(width: 500, height: 500)
                             .rotationEffect(.degrees(legRotation))
-                            .offset(x: 170, y: 20)
+                            .offset(x: 170, y: 40)
                             .onAppear {
                                 legRotation = 0
                                 withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
