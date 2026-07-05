@@ -187,7 +187,7 @@ struct PreWorking2: View {
                             .resizable()
                             .scaledToFit()
                             .frame(width: 500, height: 500)
-                            .offset(x: 185, y: 5)
+                            .offset(x: 190, y: 10)
 
                         Image("StopNoMoveIcon")
                             .resizable()
