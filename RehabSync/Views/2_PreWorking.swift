@@ -53,6 +53,19 @@ struct PreWorking2: View {
                     .padding(.top, 80)
                     .padding(.horizontal, 24)
                     .padding(.bottom, 24)
+                } else {
+                    VStack(spacing: 12) {
+                        Image("ChairIcon")
+                            .resizable()
+                            .scaledToFit()
+
+                        Text("請先找一張高度剛好到您膝蓋的椅子")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundStyle(.black)
+                    }
+                    .padding(.top, 80)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 24)
                 }
 
                 Button(action: { dismiss() }) {
