@@ -36,23 +36,33 @@ struct PreWorking2: View {
 
                             HStack(spacing: 16) {
                                 Text("裝置連線")
-                                    .font(.system(size: 16, weight: .medium))
+                                    .font(.system(size: 24, weight: .medium))
                                     .foregroundStyle(.black)
                                     .padding(.horizontal, 20)
                                     .padding(.vertical, 10)
                                     .background(
                                         RoundedRectangle(cornerRadius: 8)
-                                            .fill(Color.white)
+                                            .fill(Color(white: 0.35))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 6)
+                                                    .fill(Color(red: 0.70, green: 0.80, blue: 0.86))
+                                                    .padding(4)
+                                            )
                                     )
 
                                 Text("護膝穿戴")
-                                    .font(.system(size: 16, weight: .medium))
+                                    .font(.system(size: 24, weight: .medium))
                                     .foregroundStyle(.black)
                                     .padding(.horizontal, 20)
                                     .padding(.vertical, 10)
                                     .background(
                                         RoundedRectangle(cornerRadius: 8)
-                                            .fill(Color.white)
+                                            .fill(Color(white: 0.35))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 6)
+                                                    .fill(Color(red: 0.70, green: 0.80, blue: 0.86))
+                                                    .padding(4)
+                                            )
                                     )
                             }
                             .padding(.bottom, 24)
