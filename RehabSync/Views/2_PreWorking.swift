@@ -26,14 +26,14 @@ struct PreWorking2: View {
                     }
 
                 VStack(spacing: 12) {
-                    VStack(spacing: 12) {
+                    VStack(spacing: 0) {
                         Image("Assure1Icon")
                             .resizable()
                             .scaledToFit()
                             .padding(4)
                         AssureLabel(text: "裝置連線")
                     }
-                    VStack(spacing: 12) {
+                    VStack(spacing: 0) {
                         Image("Assure2Icon")
                             .resizable()
                             .scaledToFit()
@@ -80,22 +80,9 @@ private struct AssureLabel: View {
         Text(text)
             .font(.system(size: 24, weight: .medium))
             .foregroundStyle(.black)
-            .padding(.horizontal, 20)
             .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 18)
-                    .fill(Color(white: 0.35))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .fill(Color(red: 0.70, green: 0.80, blue: 0.86))
-                            .padding(4)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .fill(Color.white)
-                                    .padding(8)
-                            )
-                    )
-            )
+            .frame(maxWidth: .infinity)
+            .background(Color.white)
     }
 }
 
