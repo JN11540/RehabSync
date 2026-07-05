@@ -85,19 +85,19 @@ struct Working2: View {
                         Image("BigFishIcon")
                             .resizable()
                             .scaledToFit()
-                            .frame(width: 32, height: 32)
+                            .frame(width: 64, height: 64)
                             .position(x: 40 + 30, y: 0)
 
                         Image("MiddleFishIcon")
                             .resizable()
                             .scaledToFit()
-                            .frame(width: 32, height: 32)
+                            .frame(width: 64, height: 64)
                             .position(x: 40 + 30, y: h * 2 / 5)
 
                         Image("SmallFishIcon")
                             .resizable()
                             .scaledToFit()
-                            .frame(width: 32, height: 32)
+                            .frame(width: 64, height: 64)
                             .position(x: 40 + 30, y: h * 4 / 5)
                     }
                 }
