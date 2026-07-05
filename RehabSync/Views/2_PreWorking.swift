@@ -28,10 +28,22 @@ struct PreWorking2: View {
                 RoundedRectangle(cornerRadius: 10)
                     .fill(Color(red: 0.70, green: 0.80, blue: 0.86))
                     .overlay(
-                        Image("WearPadAndGearsIcon")
-                            .resizable()
-                            .scaledToFit()
-                            .padding(24)
+                        VStack(spacing: 16) {
+                            Image("WearPadAndGearsIcon")
+                                .resizable()
+                                .scaledToFit()
+                                .padding(24)
+
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("裝置連線：感測器已成功透過藍牙與 App 綁定。")
+                                Text("護膝配戴：長版護膝已完整覆蓋左膝，膝蓋上下方均維持均等包覆。")
+                                Text("感測器固定：綁定完成後，感測器已確實扣入護膝專屬固定座。")
+                            }
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, 24)
+                            .padding(.bottom, 24)
+                        }
                     )
                     .padding(.top, 80)
                     .padding(.horizontal, 24)
