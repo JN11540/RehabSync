@@ -11,26 +11,46 @@ struct Working2: View {
         ZStack(alignment: .bottomLeading) {
             Color.black.ignoresSafeArea()
 
-            ZStack {
-                Circle()
-                    .fill(Color(white: 0.35))
-                Circle()
-                    .fill(Color.white)
-                    .padding(6)
-                Circle()
-                    .strokeBorder(Color.black, lineWidth: 1.5)
-                    .padding(6)
-
-                if let angle = btVM.currentEstimatedRealAngle {
-                    Text(String(format: "%.0f", angle))
-                        .font(.system(size: 75, weight: .bold))
-                        .foregroundStyle(.black)
-                        .minimumScaleFactor(0.3)
-                        .lineLimit(1)
-                        .padding(18)
+            VStack(spacing: 12) {
+                ZStack {
+                    Capsule()
+                        .fill(Color(white: 0.35))
+                    Capsule()
+                        .fill(Color.white)
+                        .padding(3)
+                    Capsule()
+                        .strokeBorder(Color.black, lineWidth: 1.5)
+                        .padding(3)
+                    Capsule()
+                        .fill(Color.blue)
+                        .padding(6)
+                    Capsule()
+                        .strokeBorder(Color.black, lineWidth: 1.5)
+                        .padding(6)
                 }
+                .frame(width: 40, height: 110)
+
+                ZStack {
+                    Circle()
+                        .fill(Color(white: 0.35))
+                    Circle()
+                        .fill(Color.white)
+                        .padding(6)
+                    Circle()
+                        .strokeBorder(Color.black, lineWidth: 1.5)
+                        .padding(6)
+
+                    if let angle = btVM.currentEstimatedRealAngle {
+                        Text(String(format: "%.0f", angle))
+                            .font(.system(size: 75, weight: .bold))
+                            .foregroundStyle(.black)
+                            .minimumScaleFactor(0.3)
+                            .lineLimit(1)
+                            .padding(18)
+                    }
+                }
+                .frame(width: 195, height: 195)
             }
-            .frame(width: 195, height: 195)
             .padding(24)
         }
     }
