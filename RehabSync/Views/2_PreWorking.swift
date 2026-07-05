@@ -69,6 +69,22 @@ struct PreWorking2: View {
                     .padding(16)
                 }
                 .buttonStyle(.plain)
+
+                Button(action: {}) {
+                    Text("下一步")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundStyle(.black)
+                        .frame(width: 160, height: 72)
+                        .background(Color(red: 0.25, green: 0.85, blue: 0.75))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(Color.black, lineWidth: 4)
+                        )
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                .padding(.trailing, 24)
             }
             .padding(.top, 40)
             .padding(.bottom, 40)
