@@ -44,13 +44,12 @@ struct PreWorking2: View {
         return (thighPeripheral, calfPeripheral)
     }
 
-    private func toggleLiveTest() {
-        guard let pair = thighAndCalfPeripherals else { return }
-        if btVM.isLiveEstimating {
-            btVM.stopLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
-        } else if let baseline = btVM.baselineResult {
-            btVM.startLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf, baseline: baseline)
-        }
+    private func startLiveTestIfNeeded() {
+        guard !btVM.isLiveEstimating,
+              let pair = thighAndCalfPeripherals,
+              let baseline = btVM.baselineResult
+        else { return }
+        btVM.startLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf, baseline: baseline)
     }
 
     private func stopLiveTestIfNeeded() {
@@ -214,22 +213,15 @@ struct PreWorking2: View {
                     .padding(.horizontal, 24)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                    VStack(spacing: 12) {
-                        Button(action: toggleLiveTest) {
-                            Text(btVM.isLiveEstimating ? "停止測試" : "測試")
-                                .font(.system(size: 20, weight: .bold))
-                                .foregroundStyle(.white)
-                                .frame(width: 160, height: 56)
-                                .background(btVM.isLiveEstimating ? Color.red.opacity(0.85) : Color.teal.opacity(0.85))
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(!btVM.isLiveEstimating && (thighAndCalfPeripherals == nil || btVM.baselineResult == nil))
-
+                    Group {
                         if let angle = btVM.currentEstimatedRealAngle {
                             Text(String(format: "%.1f°", angle))
-                                .font(.system(size: 24, weight: .bold, design: .monospaced))
+                                .font(.system(size: 32, weight: .bold, design: .monospaced))
                                 .foregroundStyle(.black)
+                        } else {
+                            Text("等待資料…")
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundStyle(.secondary)
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
@@ -311,6 +303,7 @@ struct PreWorking2: View {
             }
             if newValue == 3 {
                 legRotation = -90
+                startLiveTestIfNeeded()
             }
         }
         .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
