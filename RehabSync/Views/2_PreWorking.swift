@@ -76,40 +76,38 @@ struct PreWorking2: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if step == 2 {
                     VStack(spacing: 16) {
-                        HStack(spacing: 24) {
-                            Image("StopNoMoveIcon")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 500, height: 500)
-
-                            Spacer()
-
-                            Button(action: {}) {
-                                ZStack {
-                                    Circle()
-                                        .fill(Color(red: 0.99, green: 0.88, blue: 0.49))
-                                    Circle()
-                                        .strokeBorder(Color.black, lineWidth: 6)
-                                    Text("校正")
-                                        .font(.system(size: 28, weight: .bold))
-                                        .foregroundStyle(.black)
-                                }
-                                .frame(width: 200, height: 200)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        .padding(.leading, 8)
-                        .padding(.trailing, 130)
+                        Image("StopNoMoveIcon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 500, height: 500)
+                            .padding(.leading, 20)
 
                         Text("請坐在椅子上，將膝蓋保持 90 度彎曲。點擊『校正』按鈕後，請維持身體靜止不動 5 秒鐘喔！")
                             .font(.system(size: 20, weight: .medium))
                             .foregroundStyle(.black)
                             .multilineTextAlignment(.center)
+                            .padding(.leading, 40)
                             .frame(maxWidth: .infinity, alignment: .center)
                     }
                     .padding(.leading, 24)
                     .padding(.trailing, 100)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                    Button(action: {}) {
+                        ZStack {
+                            Circle()
+                                .fill(Color(red: 0.99, green: 0.88, blue: 0.49))
+                            Circle()
+                                .strokeBorder(Color.black, lineWidth: 6)
+                            Text("校正")
+                                .font(.system(size: 28, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+                        .frame(width: 200, height: 200)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                    .padding(.trailing, 40)
                 }
 
                 Button(action: { dismiss() }) {
@@ -130,7 +128,7 @@ struct PreWorking2: View {
                 }
                 .buttonStyle(.plain)
 
-                if step < 3 {
+                if step < 2 {
                     Button(action: { step += 1 }) {
                         Image("ArrowIcon")
                             .resizable()
