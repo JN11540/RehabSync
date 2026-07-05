@@ -191,9 +191,9 @@ struct PreWorking2: View {
                             .rotationEffect(.degrees(legRotation))
                             .offset(x: 190, y: 10)
                             .onAppear {
-                                legRotation = -90
+                                legRotation = 0
                                 withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
-                                    legRotation = 90
+                                    legRotation = -90
                                 }
                             }
 
