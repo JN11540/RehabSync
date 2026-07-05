@@ -187,13 +187,13 @@ struct PreWorking2: View {
                             .resizable()
                             .scaledToFit()
                             .frame(width: 500, height: 500)
-                            .offset(x: 170)
+                            .offset(x: 185, y: 5)
 
                         Image("StopNoMoveIcon")
                             .resizable()
                             .scaledToFit()
                             .frame(width: 500, height: 500)
-                            .offset(x: -170)
+                            .offset(x: -185)
                     }
                     .padding(.horizontal, 24)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
