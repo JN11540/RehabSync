@@ -41,12 +41,17 @@ struct PreWorking2: View {
                                     .padding(.horizontal, 20)
                                     .padding(.vertical, 10)
                                     .background(
-                                        RoundedRectangle(cornerRadius: 8)
+                                        RoundedRectangle(cornerRadius: 18)
                                             .fill(Color(white: 0.35))
                                             .overlay(
-                                                RoundedRectangle(cornerRadius: 6)
+                                                RoundedRectangle(cornerRadius: 14)
                                                     .fill(Color(red: 0.70, green: 0.80, blue: 0.86))
                                                     .padding(4)
+                                                    .overlay(
+                                                        RoundedRectangle(cornerRadius: 10)
+                                                            .fill(Color.white)
+                                                            .padding(8)
+                                                    )
                                             )
                                     )
 
@@ -56,12 +61,17 @@ struct PreWorking2: View {
                                     .padding(.horizontal, 20)
                                     .padding(.vertical, 10)
                                     .background(
-                                        RoundedRectangle(cornerRadius: 8)
+                                        RoundedRectangle(cornerRadius: 18)
                                             .fill(Color(white: 0.35))
                                             .overlay(
-                                                RoundedRectangle(cornerRadius: 6)
+                                                RoundedRectangle(cornerRadius: 14)
                                                     .fill(Color(red: 0.70, green: 0.80, blue: 0.86))
                                                     .padding(4)
+                                                    .overlay(
+                                                        RoundedRectangle(cornerRadius: 10)
+                                                            .fill(Color.white)
+                                                            .padding(8)
+                                                    )
                                             )
                                     )
                             }
