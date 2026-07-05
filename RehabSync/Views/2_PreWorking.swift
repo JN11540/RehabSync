@@ -27,7 +27,7 @@ struct PreWorking2: View {
                     }
 
                 if showAssureStep {
-                    VStack(spacing: 12) {
+                    HStack(spacing: 24) {
                         VStack(spacing: 0) {
                             Image("Assure1Icon")
                                 .resizable()
@@ -64,9 +64,7 @@ struct PreWorking2: View {
                             .font(.system(size: 20, weight: .medium))
                             .foregroundStyle(.black)
                     }
-                    .padding(.top, 80)
                     .padding(.horizontal, 24)
-                    .padding(.bottom, 24)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
 
@@ -114,7 +112,7 @@ struct PreWorking2: View {
             .padding(.top, 40)
             .padding(.bottom, 40)
             .padding(.leading, 60)
-            .padding(.trailing, 400)
+            .padding(.trailing, 60)
         }
     }
 }
