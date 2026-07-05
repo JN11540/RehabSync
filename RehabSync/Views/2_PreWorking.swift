@@ -58,6 +58,7 @@ struct PreWorking2: View {
                         Image("ChairIcon")
                             .resizable()
                             .scaledToFit()
+                            .frame(width: 200, height: 200)
 
                         Text("請先找一張高度剛好到您膝蓋的椅子")
                             .font(.system(size: 20, weight: .medium))
@@ -66,6 +67,7 @@ struct PreWorking2: View {
                     .padding(.top, 80)
                     .padding(.horizontal, 24)
                     .padding(.bottom, 24)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
 
                 Button(action: { dismiss() }) {
