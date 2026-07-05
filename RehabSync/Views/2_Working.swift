@@ -38,11 +38,16 @@ struct Working2: View {
                                 .position(x: 20, y: h * CGFloat(i) / 5)
                         }
 
-                        ForEach(0..<5) { i in
+                        Text("5")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .position(x: 40 + 20, y: 0)
+
+                        ForEach(1..<5) { i in
                             Text("\(5 - i)")
                                 .font(.system(size: 20, weight: .semibold))
                                 .foregroundStyle(.white)
-                                .position(x: 40 + 20, y: h * (CGFloat(i) + 0.5) / 5)
+                                .position(x: 40 + 20, y: h * CGFloat(i) / 5)
                         }
                     }
                 }
