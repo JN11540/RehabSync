@@ -303,7 +303,7 @@ struct PreWorking2: View {
             }
         }
         .onChange(of: step) { oldValue, newValue in
-            if oldValue == 2 && newValue != 2 {
+            if oldValue == 2 && newValue < oldValue {
                 resetCalibration()
             }
             if oldValue == 3 && newValue != 3 {
