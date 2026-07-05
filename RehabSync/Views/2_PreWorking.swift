@@ -14,6 +14,7 @@ struct PreWorking2: View {
     @State private var countdownTimer: Timer?
     @State private var showSuccessArrow = false
     @State private var legRotation: Double = 0
+    @State private var navigateToWorking2 = false
 
     private var stepTitle: String {
         switch step {
@@ -260,6 +261,19 @@ struct PreWorking2: View {
                     .buttonStyle(.plain)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
                     .padding(.trailing, 0)
+                } else if step == 3 {
+                    Button(action: {
+                        stopLiveTestIfNeeded()
+                        navigateToWorking2 = true
+                    }) {
+                        Image("ArrowIcon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 150, height: 150)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                    .padding(.trailing, 0)
                 }
 
                 if step > 0 {
@@ -310,6 +324,9 @@ struct PreWorking2: View {
             withAnimation(.easeInOut(duration: 0.2)) {
                 legRotation = -(newValue ?? 90)
             }
+        }
+        .fullScreenCover(isPresented: $navigateToWorking2) {
+            Working2(content: content, exercise: exercise)
         }
     }
 }
