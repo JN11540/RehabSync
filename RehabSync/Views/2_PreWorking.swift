@@ -176,12 +176,19 @@ struct PreWorking2: View {
                         .padding(.trailing, 40)
                     }
                 } else if step == 3 {
-                    Image("OnlyLegIcon")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 500, height: 500)
-                        .padding(.horizontal, 24)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    HStack(spacing: 24) {
+                        Image("OnlyLegIcon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 500, height: 500)
+
+                        Image("StopNoMoveIcon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 500, height: 500)
+                    }
+                    .padding(.horizontal, 24)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
 
                 Button(action: {
