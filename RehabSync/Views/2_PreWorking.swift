@@ -58,7 +58,7 @@ struct PreWorking2: View {
                         Image("ChairIcon")
                             .resizable()
                             .scaledToFit()
-                            .frame(width: 200, height: 200)
+                            .frame(width: 500, height: 500)
 
                         Text("請先找一張高度剛好到您膝蓋的椅子")
                             .font(.system(size: 20, weight: .medium))
