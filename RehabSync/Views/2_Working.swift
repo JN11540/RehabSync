@@ -16,21 +16,21 @@ struct Working2: View {
                     .fill(Color(white: 0.35))
                 Circle()
                     .fill(Color.white)
-                    .padding(8)
+                    .padding(6)
                 Circle()
                     .strokeBorder(Color.black, lineWidth: 1.5)
-                    .padding(8)
+                    .padding(6)
 
                 if let angle = btVM.currentEstimatedRealAngle {
                     Text(String(format: "%.0f", angle))
-                        .font(.system(size: 100, weight: .bold))
+                        .font(.system(size: 75, weight: .bold))
                         .foregroundStyle(.black)
                         .minimumScaleFactor(0.3)
                         .lineLimit(1)
-                        .padding(24)
+                        .padding(18)
                 }
             }
-            .frame(width: 260, height: 260)
+            .frame(width: 195, height: 195)
             .padding(24)
         }
     }
