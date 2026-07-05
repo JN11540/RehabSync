@@ -80,9 +80,9 @@ struct PreWorking2: View {
                             .resizable()
                             .scaledToFit()
                             .frame(width: 500, height: 500)
-                            .padding(.leading, 20)
+                            .padding(.leading, 8)
 
-                        Text("請坐在椅子上，將膝蓋保持 90 度彎曲。點擊『校正』按鈕後，請維持身體靜止不動 5 秒鐘喔！")
+                        Text("請坐在椅子上，將膝蓋保持 90 度彎曲。\n點擊『校正』按鈕後，請維持身體靜止不動 5 秒鐘喔！")
                             .font(.system(size: 20, weight: .medium))
                             .foregroundStyle(.black)
                             .multilineTextAlignment(.center)
