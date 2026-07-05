@@ -6,6 +6,29 @@ struct Working2: View {
     let content: TreatmentContent
     let exercise: Exercise?
     @Environment(BluetoothViewModel.self) private var btVM
+    @State private var holdElapsed: Double = 0
+    @State private var holdTimer: Timer?
+
+    private static let holdThreshold: Double = 20
+    private static let holdDuration: Double = 5
+
+    private func startHoldTimer() {
+        guard holdTimer == nil else { return }
+        holdTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+            guard holdElapsed < Self.holdDuration else { return }
+            withAnimation(.linear(duration: 0.1)) {
+                holdElapsed = min(holdElapsed + 0.1, Self.holdDuration)
+            }
+        }
+    }
+
+    private func stopHoldTimer() {
+        holdTimer?.invalidate()
+        holdTimer = nil
+        withAnimation(.easeOut(duration: 0.2)) {
+            holdElapsed = 0
+        }
+    }
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -24,9 +47,15 @@ struct Working2: View {
                         Capsule()
                             .strokeBorder(Color.black, lineWidth: 1.5)
                             .padding(3)
-                        Capsule()
-                            .fill(Color.blue)
-                            .padding(6)
+                        ZStack(alignment: .bottom) {
+                            Capsule()
+                                .fill(Color.blue)
+                            Rectangle()
+                                .fill(Color.yellow)
+                                .frame(height: max(0, h - 12) * CGFloat(holdElapsed / Self.holdDuration))
+                        }
+                        .padding(6)
+                        .clipShape(Capsule())
                         Capsule()
                             .strokeBorder(Color.black, lineWidth: 1.5)
                             .padding(6)
@@ -66,7 +95,7 @@ struct Working2: View {
                     if let angle = btVM.currentEstimatedRealAngle {
                         Text(String(format: "%.0f", angle))
                             .font(.system(size: 50, weight: .bold))
-                            .foregroundStyle(.black)
+                            .foregroundStyle(angle <= Self.holdThreshold ? .red : .black)
                             .minimumScaleFactor(0.3)
                             .lineLimit(1)
                             .padding(12)
@@ -76,6 +105,14 @@ struct Working2: View {
             }
             .padding(24)
         }
+        .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
+            if let angle = newValue, angle <= Self.holdThreshold {
+                startHoldTimer()
+            } else {
+                stopHoldTimer()
+            }
+        }
+        .onDisappear { holdTimer?.invalidate() }
     }
 }
 
