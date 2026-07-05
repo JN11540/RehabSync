@@ -6,6 +6,7 @@ struct PreWorking2: View {
     let content: TreatmentContent
     let exercise: Exercise?
     @Environment(\.dismiss) private var dismiss
+    @State private var showAssureStep = true
 
     var body: some View {
         ZStack {
@@ -19,38 +20,40 @@ struct PreWorking2: View {
                             .stroke(Color(white: 0.6), lineWidth: 5)
                     )
                     .overlay(alignment: .top) {
-                        Text("確認裝備齊全")
+                        Text(showAssureStep ? "確認裝備齊全" : "準備椅子")
                             .font(.system(size: 28, weight: .bold))
                             .foregroundStyle(.black)
                             .padding(.top, 24)
                     }
 
-                VStack(spacing: 12) {
-                    VStack(spacing: 0) {
-                        Image("Assure1Icon")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxWidth: .infinity)
-                            .padding(4)
-                        AssureLabel(text: "裝置連線")
-                            .padding(.horizontal, 4)
-                    }
-                    .frame(maxWidth: .infinity)
+                if showAssureStep {
+                    VStack(spacing: 12) {
+                        VStack(spacing: 0) {
+                            Image("Assure1Icon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxWidth: .infinity)
+                                .padding(4)
+                            AssureLabel(text: "裝置連線")
+                                .padding(.horizontal, 4)
+                        }
+                        .frame(maxWidth: .infinity)
 
-                    VStack(spacing: 0) {
-                        Image("Assure2Icon")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxWidth: .infinity)
-                            .padding(4)
-                        AssureLabel(text: "護膝穿戴")
-                            .padding(.horizontal, 4)
+                        VStack(spacing: 0) {
+                            Image("Assure2Icon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxWidth: .infinity)
+                                .padding(4)
+                            AssureLabel(text: "護膝穿戴")
+                                .padding(.horizontal, 4)
+                        }
+                        .frame(maxWidth: .infinity)
                     }
-                    .frame(maxWidth: .infinity)
+                    .padding(.top, 80)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 24)
                 }
-                .padding(.top, 80)
-                .padding(.horizontal, 24)
-                .padding(.bottom, 24)
 
                 Button(action: { dismiss() }) {
                     ZStack {
@@ -70,11 +73,11 @@ struct PreWorking2: View {
                 }
                 .buttonStyle(.plain)
 
-                Button(action: {}) {
+                Button(action: { showAssureStep = false }) {
                     Image("ArrowIcon")
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 60, height: 60)
+                        .frame(width: 150, height: 150)
                 }
                 .buttonStyle(.plain)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
