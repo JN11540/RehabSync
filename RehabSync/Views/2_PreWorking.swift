@@ -149,9 +149,15 @@ struct PreWorking2: View {
                                         .fill(Color(red: 0.99, green: 0.88, blue: 0.49))
                                     Circle()
                                         .strokeBorder(Color.black, lineWidth: 6)
-                                    Text(btVM.isCollectingBaseline ? "\(calibrationCountdown)" : "校正")
-                                        .font(.system(size: 28, weight: .bold))
-                                        .foregroundStyle(.black)
+                                    if btVM.isCollectingBaseline {
+                                        Text("\(calibrationCountdown)")
+                                            .font(.system(size: 100, weight: .bold))
+                                            .foregroundStyle(.black)
+                                    } else {
+                                        Text("校正")
+                                            .font(.system(size: 28, weight: .bold))
+                                            .foregroundStyle(.black)
+                                    }
                                 }
                                 .frame(width: 200, height: 200)
                             }
@@ -181,13 +187,13 @@ struct PreWorking2: View {
                             .resizable()
                             .scaledToFit()
                             .frame(width: 500, height: 500)
-                            .offset(x: 60)
+                            .offset(x: 120)
 
                         Image("StopNoMoveIcon")
                             .resizable()
                             .scaledToFit()
                             .frame(width: 500, height: 500)
-                            .offset(x: -60)
+                            .offset(x: -120)
                     }
                     .padding(.horizontal, 24)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
