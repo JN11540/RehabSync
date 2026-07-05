@@ -36,11 +36,6 @@ struct PreWorking2: View {
                             .padding(.horizontal, 4)
                     }
                     .frame(maxWidth: .infinity)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color(white: 0.35), lineWidth: 1.5)
-                    )
 
                     VStack(spacing: 0) {
                         Image("Assure2Icon")
@@ -52,11 +47,6 @@ struct PreWorking2: View {
                             .padding(.horizontal, 4)
                     }
                     .frame(maxWidth: .infinity)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color(white: 0.35), lineWidth: 1.5)
-                    )
                 }
                 .padding(.top, 80)
                 .padding(.horizontal, 24)
@@ -99,7 +89,6 @@ private struct AssureLabel: View {
             .foregroundStyle(.black)
             .padding(.vertical, 10)
             .frame(maxWidth: .infinity)
-            .background(Color.white)
     }
 }
 
