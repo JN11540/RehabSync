@@ -66,7 +66,7 @@ struct PreWorking2: View {
                             Image("KneeThighConnectedIcon")
                                 .resizable()
                                 .scaledToFit()
-                                .frame(maxWidth: .infinity)
+                                .frame(maxWidth: .infinity, maxHeight: 380)
                                 .padding(4)
                             AssureLabel(text: "裝置連線了嗎？")
                                 .padding(.horizontal, 4)
