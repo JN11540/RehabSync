@@ -13,6 +13,7 @@ struct PreWorking2: View {
     @State private var calibrationCountdown = 5
     @State private var countdownTimer: Timer?
     @State private var showSuccessArrow = false
+    @State private var legRotation: Double = 0
 
     private var stepTitle: String {
         switch step {
@@ -187,7 +188,14 @@ struct PreWorking2: View {
                             .resizable()
                             .scaledToFit()
                             .frame(width: 500, height: 500)
+                            .rotationEffect(.degrees(legRotation))
                             .offset(x: 190, y: 10)
+                            .onAppear {
+                                legRotation = -90
+                                withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
+                                    legRotation = 90
+                                }
+                            }
 
                         Image("StopNoMoveIcon")
                             .resizable()
@@ -261,6 +269,11 @@ struct PreWorking2: View {
                 }
             } else {
                 showSuccessArrow = false
+            }
+        }
+        .onChange(of: step) { oldValue, newValue in
+            if oldValue == 2 && newValue != 2 {
+                resetCalibration()
             }
         }
     }
