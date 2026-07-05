@@ -28,28 +28,28 @@ struct Working2: View {
                         .strokeBorder(Color.black, lineWidth: 1.5)
                         .padding(6)
                 }
-                .frame(width: 40, height: 500)
+                .frame(width: 40, height: 400)
 
                 ZStack {
                     Circle()
                         .fill(Color(white: 0.35))
                     Circle()
                         .fill(Color.white)
-                        .padding(6)
+                        .padding(4)
                     Circle()
                         .strokeBorder(Color.black, lineWidth: 1.5)
-                        .padding(6)
+                        .padding(4)
 
                     if let angle = btVM.currentEstimatedRealAngle {
                         Text(String(format: "%.0f", angle))
-                            .font(.system(size: 75, weight: .bold))
+                            .font(.system(size: 50, weight: .bold))
                             .foregroundStyle(.black)
                             .minimumScaleFactor(0.3)
                             .lineLimit(1)
-                            .padding(18)
+                            .padding(12)
                     }
                 }
-                .frame(width: 195, height: 195)
+                .frame(width: 130, height: 130)
             }
             .padding(24)
         }
