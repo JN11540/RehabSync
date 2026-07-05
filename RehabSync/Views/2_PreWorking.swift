@@ -71,8 +71,8 @@ struct PreWorking2: View {
                 .buttonStyle(.plain)
 
                 Button(action: {}) {
-                    Text("下一步")
-                        .font(.system(size: 24, weight: .bold))
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 28, weight: .bold))
                         .foregroundStyle(.black)
                         .frame(width: 160, height: 72)
                         .background(Color(red: 0.25, green: 0.85, blue: 0.75))
