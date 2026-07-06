@@ -10,6 +10,7 @@ struct Working2: View {
     @State private var holdTimer: Timer?
     @State private var showCatchAnimation = false
     @State private var caughtFishSize: CaughtFishSize = .small
+    @State private var catchProgress: Double = 0
 
     private static let holdThreshold: Double = 20
     private static let holdDuration: Double = 5
@@ -21,7 +22,7 @@ struct Working2: View {
     private static let overlayCanvasSize = CGSize(width: 1232, height: 864)
     private static let splashFraction = CGPoint(x: 0.7476, y: 0.6644)
 
-    private static func splashOverlayPosition(in size: CGSize, padding: CGFloat = 48) -> CGPoint {
+    private static func overlayPosition(for fraction: CGPoint, in size: CGSize, padding: CGFloat = 48) -> CGPoint {
         let frameW = size.width - padding * 2
         let frameH = size.height - padding * 2
         guard frameW > 0, frameH > 0 else { return CGPoint(x: size.width / 2, y: size.height / 2) }
@@ -30,8 +31,8 @@ struct Working2: View {
         let visibleH = frameH / scale
         let cropX = (overlayCanvasSize.width - visibleW) / 2
         let cropY = (overlayCanvasSize.height - visibleH) / 2
-        let relX = (splashFraction.x * overlayCanvasSize.width - cropX) / visibleW
-        let relY = (splashFraction.y * overlayCanvasSize.height - cropY) / visibleH
+        let relX = (fraction.x * overlayCanvasSize.width - cropX) / visibleW
+        let relY = (fraction.y * overlayCanvasSize.height - cropY) / visibleH
         return CGPoint(x: padding + relX * frameW, y: padding + relY * frameH)
     }
 
@@ -52,6 +53,36 @@ struct Working2: View {
             case .middle: return 100
             case .big:    return 200
             }
+        }
+
+        // 各水桶內容物在 canvas 中的相對中心位置（同一份 1232x864 canvas）
+        var bucketFraction: CGPoint {
+            switch self {
+            case .small:  return CGPoint(x: 0.7821, y: 0.9115)
+            case .middle: return CGPoint(x: 0.5308, y: 0.8501)
+            case .big:    return CGPoint(x: 0.6615, y: 0.8576)
+            }
+        }
+    }
+
+    // 讓魚沿拋物線路徑從水花飛到水桶：progress 是唯一會被 SwiftUI 動畫插值的值，
+    // x/y 在每個插值後的 progress 當下重新計算，才能畫出真正的曲線而非直線位移。
+    private struct ParabolicPosition: Animatable, ViewModifier {
+        var progress: Double
+        let start: CGPoint
+        let end: CGPoint
+        let arcHeight: CGFloat
+
+        var animatableData: Double {
+            get { progress }
+            set { progress = newValue }
+        }
+
+        func body(content: Content) -> some View {
+            let t = CGFloat(progress)
+            let x = start.x + (end.x - start.x) * t
+            let y = start.y + (end.y - start.y) * t - arcHeight * 4 * t * (1 - t)
+            return content.position(x: x, y: y)
         }
     }
 
@@ -79,6 +110,10 @@ struct Working2: View {
     private func triggerCatchAnimation() {
         caughtFishSize = holdElapsed >= 5 ? .big : (holdElapsed >= 3 ? .middle : .small)
         showCatchAnimation = true
+        catchProgress = 0
+        withAnimation(.easeInOut(duration: Self.catchAnimationDuration)) {
+            catchProgress = 1
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.catchAnimationDuration) {
             showCatchAnimation = false
         }
@@ -111,7 +146,12 @@ struct Working2: View {
                         .resizable()
                         .scaledToFit()
                         .frame(width: caughtFishSize.size, height: caughtFishSize.size)
-                        .position(Self.splashOverlayPosition(in: geo.size))
+                        .modifier(ParabolicPosition(
+                            progress: catchProgress,
+                            start: Self.overlayPosition(for: Self.splashFraction, in: geo.size),
+                            end: Self.overlayPosition(for: caughtFishSize.bucketFraction, in: geo.size),
+                            arcHeight: 150
+                        ))
                 }
             } else if let angle = btVM.currentEstimatedRealAngle, angle <= Self.holdThreshold {
                 Image("NoGetFishIcon")
