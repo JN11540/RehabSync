@@ -138,40 +138,44 @@ struct Working2: View {
                     Rectangle()
                         .fill(Color(red: 0.72, green: 0.82, blue: 0.82))
 
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color(red: 1.0, green: 0.85, blue: 0.35))
-                        .overlay(
-                            HStack(spacing: 10) {
-                                Rectangle()
-                                    .fill(Color.white.opacity(0.5))
-                                    .frame(width: 10, height: 80)
-                                    .rotationEffect(.degrees(20))
-                                    .offset(x: 6)
-                                Rectangle()
-                                    .fill(Color.white.opacity(0.5))
-                                    .frame(width: 5, height: 80)
-                                    .rotationEffect(.degrees(20))
-                            }
-                        )
-                        .frame(width: 110, height: 40)
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 4)
-                                .stroke(Color(red: 0.70, green: 0.52, blue: 0.10), lineWidth: 3)
-                        )
-                        .offset(x: 40)
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color(red: 1.0, green: 0.85, blue: 0.35))
+                            .overlay(
+                                HStack(spacing: 10) {
+                                    Rectangle()
+                                        .fill(Color.white.opacity(0.5))
+                                        .frame(width: 10, height: 80)
+                                        .rotationEffect(.degrees(20))
+                                        .offset(x: 6)
+                                    Rectangle()
+                                        .fill(Color.white.opacity(0.5))
+                                        .frame(width: 5, height: 80)
+                                        .rotationEffect(.degrees(20))
+                                }
+                            )
+                            .frame(width: 110, height: 40)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .stroke(Color(red: 0.70, green: 0.52, blue: 0.10), lineWidth: 3)
+                            )
+                            .offset(x: 40)
 
-                    HStack(spacing: 6) {
-                        Image("CoinIcon")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 48, height: 48)
+                        HStack(spacing: 6) {
+                            Image("CoinIcon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 48, height: 48)
 
-                        Text("0")
-                            .font(.system(size: 24, weight: .bold))
-                            .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
-                            .offset(x: 20)
+                            Text("0")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
+                                .offset(x: 20)
+                        }
                     }
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.trailing, 16)
 
                     HStack(spacing: 20) {
                         HStack(spacing: 4) {
