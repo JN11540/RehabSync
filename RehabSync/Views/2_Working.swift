@@ -134,12 +134,19 @@ struct Working2: View {
                 .opacity(0.4)
 
             VStack(spacing: 0) {
-                Rectangle()
-                    .fill(Color(red: 0.72, green: 0.82, blue: 0.82))
-                    .frame(height: 60)
+                ZStack {
+                    Rectangle()
+                        .fill(Color(red: 0.72, green: 0.82, blue: 0.82))
+
+                    Image("CoinIcon")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 48, height: 48)
+                }
+                .frame(height: 60)
                 Rectangle()
                     .fill(Color(white: 0.35))
-                    .frame(height: 8)
+                    .frame(height: 4)
                     .offset(y: -5)
             }
             .padding(.horizontal, 48)
