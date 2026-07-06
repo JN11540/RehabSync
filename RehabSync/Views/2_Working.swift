@@ -38,21 +38,23 @@ struct Working2: View {
                 .ignoresSafeArea()
                 .clipped()
 
-            HStack(spacing: 40) {
-                Image("BigBucketOnlyIcon")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 120, height: 120)
-                Image("MiddleBucketOnlyIcon")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 120, height: 120)
-                Image("SmallBucketOnlyIcon")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 120, height: 120)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            Image("BigBucketOnlyIcon")
+                .resizable()
+                .scaledToFill()
+                .ignoresSafeArea()
+                .clipped()
+
+            Image("MiddleBucketOnlyIcon")
+                .resizable()
+                .scaledToFill()
+                .ignoresSafeArea()
+                .clipped()
+
+            Image("SmallBucketOnlyIcon")
+                .resizable()
+                .scaledToFill()
+                .ignoresSafeArea()
+                .clipped()
 
             VStack(spacing: 12) {
                 GeometryReader { geo in
