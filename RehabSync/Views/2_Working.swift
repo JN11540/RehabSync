@@ -45,6 +45,14 @@ struct Working2: View {
             case .big:    return "BigFishIcon"
             }
         }
+
+        var size: CGFloat {
+            switch self {
+            case .small:  return 75
+            case .middle: return 100
+            case .big:    return 200
+            }
+        }
     }
 
     private func startHoldTimer() {
@@ -102,7 +110,7 @@ struct Working2: View {
                     Image(caughtFishSize.imageName)
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 120, height: 120)
+                        .frame(width: caughtFishSize.size, height: caughtFishSize.size)
                         .position(Self.splashOverlayPosition(in: geo.size))
                 }
             } else if let angle = btVM.currentEstimatedRealAngle, angle <= Self.holdThreshold {
