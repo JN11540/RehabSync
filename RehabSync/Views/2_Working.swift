@@ -14,7 +14,26 @@ struct Working2: View {
     private static let holdThreshold: Double = 20
     private static let holdDuration: Double = 5
     private static let catchQualifyDuration: Double = 1
-    private static let catchAnimationDuration: Double = 1
+    private static let catchAnimationDuration: Double = 1.5
+
+    // 這些滿版圖（背景/水桶/水花）都用同樣的 canvas 尺寸與 padding(48) + scaledToFill 處理，
+    // 所以水花在原始圖片中的相對位置，套用同一個裁切公式，換算到任何裝置畫面都會對齊。
+    private static let overlayCanvasSize = CGSize(width: 1232, height: 864)
+    private static let splashFraction = CGPoint(x: 0.7476, y: 0.6644)
+
+    private static func splashOverlayPosition(in size: CGSize, padding: CGFloat = 48) -> CGPoint {
+        let frameW = size.width - padding * 2
+        let frameH = size.height - padding * 2
+        guard frameW > 0, frameH > 0 else { return CGPoint(x: size.width / 2, y: size.height / 2) }
+        let scale = max(frameW / overlayCanvasSize.width, frameH / overlayCanvasSize.height)
+        let visibleW = frameW / scale
+        let visibleH = frameH / scale
+        let cropX = (overlayCanvasSize.width - visibleW) / 2
+        let cropY = (overlayCanvasSize.height - visibleH) / 2
+        let relX = (splashFraction.x * overlayCanvasSize.width - cropX) / visibleW
+        let relY = (splashFraction.y * overlayCanvasSize.height - cropY) / visibleH
+        return CGPoint(x: padding + relX * frameW, y: padding + relY * frameH)
+    }
 
     private enum CaughtFishSize {
         case small, middle, big
@@ -79,10 +98,13 @@ struct Working2: View {
                     .clipped()
                     .padding(48)
 
-                Image(caughtFishSize.imageName)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 120, height: 120)
+                GeometryReader { geo in
+                    Image(caughtFishSize.imageName)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 120, height: 120)
+                        .position(Self.splashOverlayPosition(in: geo.size))
+                }
             } else if let angle = btVM.currentEstimatedRealAngle, angle <= Self.holdThreshold {
                 Image("NoGetFishIcon")
                     .resizable()
@@ -153,13 +175,13 @@ struct Working2: View {
 
                         Text("5")
                             .font(.system(size: 20, weight: .semibold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.black)
                             .position(x: -20, y: 0)
 
                         ForEach(1..<5) { i in
                             Text("\(5 - i)")
                                 .font(.system(size: 20, weight: .semibold))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.black)
                                 .position(x: -20, y: h * CGFloat(i) / 5)
                         }
 
