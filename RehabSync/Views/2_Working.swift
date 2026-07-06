@@ -175,6 +175,26 @@ struct Working2: View {
 
                     HStack(spacing: 20) {
                         HStack(spacing: 4) {
+                            Image("TargetIcon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 48, height: 48)
+                            Text("0 組 × 0 次")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+
+                        HStack(spacing: 4) {
+                            Image("WeightliftingIcon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 48, height: 48)
+                            Text("0 組 × 0 次")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+
+                        HStack(spacing: 4) {
                             Image("BigFishIcon")
                                 .resizable()
                                 .scaledToFit()
