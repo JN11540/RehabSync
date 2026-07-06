@@ -139,8 +139,8 @@ struct Working2: View {
                     .frame(height: 60)
                 Rectangle()
                     .fill(Color(white: 0.35))
-                    .frame(height: 3)
-                    .offset(y: -3)
+                    .frame(height: 8)
+                    .offset(y: -5)
             }
             .padding(.horizontal, 48)
             .padding(.top, 48)
