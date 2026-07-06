@@ -72,6 +72,8 @@ struct Working2: View {
         let start: CGPoint
         let end: CGPoint
         let arcHeight: CGFloat
+        let startSize: CGFloat
+        let endSize: CGFloat
 
         var animatableData: Double {
             get { progress }
@@ -82,7 +84,10 @@ struct Working2: View {
             let t = CGFloat(progress)
             let x = start.x + (end.x - start.x) * t
             let y = start.y + (end.y - start.y) * t - arcHeight * 4 * t * (1 - t)
-            return content.position(x: x, y: y)
+            let size = startSize + (endSize - startSize) * t
+            return content
+                .frame(width: size, height: size)
+                .position(x: x, y: y)
         }
     }
 
@@ -145,12 +150,13 @@ struct Working2: View {
                     Image(caughtFishSize.imageName)
                         .resizable()
                         .scaledToFit()
-                        .frame(width: caughtFishSize.size, height: caughtFishSize.size)
                         .modifier(ParabolicPosition(
                             progress: catchProgress,
                             start: Self.overlayPosition(for: Self.splashFraction, in: geo.size),
                             end: Self.overlayPosition(for: caughtFishSize.bucketFraction, in: geo.size),
-                            arcHeight: 150
+                            arcHeight: 150,
+                            startSize: caughtFishSize.size,
+                            endSize: 50
                         ))
                 }
             } else if let angle = btVM.currentEstimatedRealAngle, angle <= Self.holdThreshold {
