@@ -37,7 +37,13 @@ struct Working2: View {
                 .scaledToFill()
                 .clipped()
                 .padding(24)
-                .opacity(0.8)
+                .opacity(0.6)
+
+            Image("NoGetFishIcon")
+                .resizable()
+                .scaledToFill()
+                .clipped()
+                .padding(24)
 
             Image("BigBucketOnlyIcon")
                 .resizable()
