@@ -159,7 +159,7 @@ struct Working2: View {
                             RoundedRectangle(cornerRadius: 4)
                                 .stroke(Color(red: 0.70, green: 0.52, blue: 0.10), lineWidth: 3)
                         )
-                        .offset(x: 30)
+                        .offset(x: 40)
 
                     HStack(spacing: 6) {
                         Image("CoinIcon")
@@ -172,6 +172,40 @@ struct Working2: View {
                             .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
                             .offset(x: 20)
                     }
+
+                    HStack(spacing: 20) {
+                        HStack(spacing: 4) {
+                            Image("BigFishIcon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 32, height: 32)
+                            Text("0")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+
+                        HStack(spacing: 4) {
+                            Image("MiddleFishIcon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 32, height: 32)
+                            Text("0")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+
+                        HStack(spacing: 4) {
+                            Image("SmallFishIcon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 32, height: 32)
+                            Text("0")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 16)
                 }
                 .frame(height: 60)
                 Rectangle()
