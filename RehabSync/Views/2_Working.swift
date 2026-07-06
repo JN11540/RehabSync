@@ -35,26 +35,26 @@ struct Working2: View {
             Image("Working2BackgroundIcon")
                 .resizable()
                 .scaledToFill()
-                .ignoresSafeArea()
                 .clipped()
+                .padding(24)
 
             Image("BigBucketOnlyIcon")
                 .resizable()
                 .scaledToFill()
-                .ignoresSafeArea()
                 .clipped()
+                .padding(24)
 
             Image("MiddleBucketOnlyIcon")
                 .resizable()
                 .scaledToFill()
-                .ignoresSafeArea()
                 .clipped()
+                .padding(24)
 
             Image("SmallBucketOnlyIcon")
                 .resizable()
                 .scaledToFill()
-                .ignoresSafeArea()
                 .clipped()
+                .padding(24)
 
             VStack(spacing: 12) {
                 GeometryReader { geo in
