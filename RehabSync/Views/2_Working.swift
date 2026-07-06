@@ -8,9 +8,12 @@ struct Working2: View {
     @Environment(BluetoothViewModel.self) private var btVM
     @State private var holdElapsed: Double = 0
     @State private var holdTimer: Timer?
+    @State private var showCatchAnimation = false
 
     private static let holdThreshold: Double = 20
     private static let holdDuration: Double = 5
+    private static let catchQualifyDuration: Double = 1
+    private static let catchAnimationDuration: Double = 0.5
 
     private func startHoldTimer() {
         guard holdTimer == nil else { return }
@@ -23,10 +26,20 @@ struct Working2: View {
     }
 
     private func stopHoldTimer() {
+        if holdElapsed > Self.catchQualifyDuration {
+            triggerCatchAnimation()
+        }
         holdTimer?.invalidate()
         holdTimer = nil
         withAnimation(.easeOut(duration: 0.2)) {
             holdElapsed = 0
+        }
+    }
+
+    private func triggerCatchAnimation() {
+        showCatchAnimation = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.catchAnimationDuration) {
+            showCatchAnimation = false
         }
     }
 
@@ -39,7 +52,7 @@ struct Working2: View {
                 .padding(48)
                 .opacity(0.4)
 
-            if let angle = btVM.currentEstimatedRealAngle, angle <= Self.holdThreshold {
+            if showCatchAnimation {
                 Image("GetFishIcon")
                     .resizable()
                     .scaledToFill()
@@ -51,8 +64,14 @@ struct Working2: View {
                     .scaledToFill()
                     .clipped()
                     .padding(48)
-            } else {
+            } else if let angle = btVM.currentEstimatedRealAngle, angle <= Self.holdThreshold {
                 Image("NoGetFishIcon")
+                    .resizable()
+                    .scaledToFill()
+                    .clipped()
+                    .padding(48)
+            } else {
+                Image("IdleFishingIcon")
                     .resizable()
                     .scaledToFill()
                     .clipped()
