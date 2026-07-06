@@ -178,9 +178,9 @@ struct Working2: View {
                             Image("BigFishIcon")
                                 .resizable()
                                 .scaledToFit()
-                                .frame(width: 32, height: 32)
+                                .frame(width: 48, height: 48)
                             Text("0")
-                                .font(.system(size: 20, weight: .bold))
+                                .font(.system(size: 24, weight: .bold))
                                 .foregroundStyle(.black)
                         }
 
@@ -188,9 +188,9 @@ struct Working2: View {
                             Image("MiddleFishIcon")
                                 .resizable()
                                 .scaledToFit()
-                                .frame(width: 32, height: 32)
+                                .frame(width: 48, height: 48)
                             Text("0")
-                                .font(.system(size: 20, weight: .bold))
+                                .font(.system(size: 24, weight: .bold))
                                 .foregroundStyle(.black)
                         }
 
@@ -198,9 +198,9 @@ struct Working2: View {
                             Image("SmallFishIcon")
                                 .resizable()
                                 .scaledToFit()
-                                .frame(width: 32, height: 32)
+                                .frame(width: 48, height: 48)
                             Text("0")
-                                .font(.system(size: 20, weight: .bold))
+                                .font(.system(size: 24, weight: .bold))
                                 .foregroundStyle(.black)
                         }
                     }
