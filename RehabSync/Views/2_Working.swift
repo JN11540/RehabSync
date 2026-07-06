@@ -138,7 +138,7 @@ struct Working2: View {
                     Rectangle()
                         .fill(Color(red: 0.72, green: 0.82, blue: 0.82))
 
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: 4)
                         .fill(Color(red: 0.93, green: 0.75, blue: 0.22))
                         .overlay(
                             HStack(spacing: 10) {
@@ -154,9 +154,9 @@ struct Working2: View {
                             }
                         )
                         .frame(width: 90, height: 40)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 8)
+                            RoundedRectangle(cornerRadius: 4)
                                 .stroke(Color(red: 0.70, green: 0.52, blue: 0.10), lineWidth: 3)
                         )
                         .offset(x: 30)
@@ -170,6 +170,7 @@ struct Working2: View {
                         Text("0")
                             .font(.system(size: 24, weight: .bold))
                             .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
+                            .offset(x: 20)
                     }
                 }
                 .frame(height: 60)
