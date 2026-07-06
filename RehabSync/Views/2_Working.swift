@@ -138,13 +138,14 @@ struct Working2: View {
                     Rectangle()
                         .fill(Color(red: 0.72, green: 0.82, blue: 0.82))
 
-                    RoundedRectangle(cornerRadius: 20)
+                    RoundedRectangle(cornerRadius: 8)
                         .fill(Color(red: 0.93, green: 0.75, blue: 0.22))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 20)
+                            RoundedRectangle(cornerRadius: 8)
                                 .stroke(Color(red: 0.70, green: 0.52, blue: 0.10), lineWidth: 3)
                         )
                         .frame(width: 90, height: 40)
+                        .offset(x: 20)
 
                     Image("CoinIcon")
                         .resizable()
