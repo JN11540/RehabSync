@@ -5,6 +5,7 @@ import SwiftUI
 struct Working2: View {
     let content: TreatmentContent
     let exercise: Exercise?
+    @Environment(\.dismiss) private var dismiss
     @Environment(BluetoothViewModel.self) private var btVM
     @State private var holdElapsed: Double = 0
     @State private var holdTimer: Timer?
@@ -166,6 +167,7 @@ struct Working2: View {
                                 .resizable()
                                 .scaledToFit()
                                 .frame(width: 48, height: 48)
+                                .offset(x: -20)
 
                             Text("0")
                                 .font(.system(size: 24, weight: .bold))
@@ -176,13 +178,32 @@ struct Working2: View {
                     .frame(maxWidth: .infinity, alignment: .trailing)
                     .padding(.trailing, 16)
 
+                    Button(action: { dismiss() }) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.white)
+                            Circle()
+                                .strokeBorder(Color.black, lineWidth: 1.5)
+                            Circle()
+                                .strokeBorder(Color.black, lineWidth: 1.5)
+                                .padding(4)
+                            Image(systemName: "xmark")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+                        .frame(width: 40, height: 40)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 16)
+
                     HStack(spacing: 20) {
                         HStack(spacing: 4) {
                             Image("TargetIcon")
                                 .resizable()
                                 .scaledToFit()
                                 .frame(width: 48, height: 48)
-                            Text("0 組 × 0 次")
+                            Text("\(content.sets) 組 × \(content.reps) 次")
                                 .font(.system(size: 24, weight: .bold))
                                 .foregroundStyle(.black)
                         }
