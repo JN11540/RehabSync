@@ -146,6 +146,7 @@ struct Working2: View {
                                     .fill(Color.white.opacity(0.5))
                                     .frame(width: 10, height: 80)
                                     .rotationEffect(.degrees(20))
+                                    .offset(x: 6)
                                 Rectangle()
                                     .fill(Color.white.opacity(0.5))
                                     .frame(width: 5, height: 80)
@@ -160,10 +161,16 @@ struct Working2: View {
                         )
                         .offset(x: 40)
 
-                    Image("CoinIcon")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 48, height: 48)
+                    HStack(spacing: 6) {
+                        Image("CoinIcon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 48, height: 48)
+
+                        Text("0")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
+                    }
                 }
                 .frame(height: 60)
                 Rectangle()
