@@ -160,7 +160,6 @@ struct Working2: View {
                                 RoundedRectangle(cornerRadius: 4)
                                     .stroke(Color(red: 0.70, green: 0.52, blue: 0.10), lineWidth: 3)
                             )
-                            .offset(x: 40)
 
                         HStack(spacing: 6) {
                             Image("CoinIcon")
@@ -171,9 +170,9 @@ struct Working2: View {
                             Text("0")
                                 .font(.system(size: 24, weight: .bold))
                                 .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
-                                .offset(x: 20)
                         }
                     }
+                    .frame(width: 110, height: 48)
                     .frame(maxWidth: .infinity, alignment: .trailing)
                     .padding(.trailing, 16)
 
@@ -236,9 +235,7 @@ struct Working2: View {
                                 .foregroundStyle(.black)
                         }
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.leading, 16)
-                    .offset(x: -200)
+                    .frame(maxWidth: .infinity, alignment: .center)
                 }
                 .frame(height: 60)
                 Rectangle()
