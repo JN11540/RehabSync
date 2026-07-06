@@ -139,7 +139,7 @@ struct Working2: View {
                         .fill(Color(red: 0.72, green: 0.82, blue: 0.82))
 
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(Color(red: 0.93, green: 0.75, blue: 0.22))
+                        .fill(Color(red: 1.0, green: 0.85, blue: 0.35))
                         .overlay(
                             HStack(spacing: 10) {
                                 Rectangle()
@@ -153,7 +153,7 @@ struct Working2: View {
                                     .rotationEffect(.degrees(20))
                             }
                         )
-                        .frame(width: 90, height: 40)
+                        .frame(width: 110, height: 40)
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                         .overlay(
                             RoundedRectangle(cornerRadius: 4)
