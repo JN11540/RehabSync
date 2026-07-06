@@ -12,6 +12,9 @@ struct Working2: View {
     @State private var showCatchAnimation = false
     @State private var caughtFishSize: CaughtFishSize = .small
     @State private var catchProgress: Double = 0
+    @State private var bigFishCaught = 0
+    @State private var middleFishCaught = 0
+    @State private var smallFishCaught = 0
 
     private static let holdThreshold: Double = 20
     private static let holdDuration: Double = 5
@@ -115,6 +118,11 @@ struct Working2: View {
 
     private func triggerCatchAnimation() {
         caughtFishSize = holdElapsed >= 5 ? .big : (holdElapsed >= 3 ? .middle : .small)
+        switch caughtFishSize {
+        case .big:    bigFishCaught += 1
+        case .middle: middleFishCaught += 1
+        case .small:  smallFishCaught += 1
+        }
         showCatchAnimation = true
         catchProgress = 0
         withAnimation(.easeInOut(duration: Self.catchAnimationDuration)) {
@@ -231,7 +239,7 @@ struct Working2: View {
                                 .resizable()
                                 .scaledToFit()
                                 .frame(width: 48, height: 48)
-                            Text("0")
+                            Text("\(bigFishCaught)")
                                 .font(.system(size: 24, weight: .bold))
                                 .foregroundStyle(.black)
                         }
@@ -241,7 +249,7 @@ struct Working2: View {
                                 .resizable()
                                 .scaledToFit()
                                 .frame(width: 48, height: 48)
-                            Text("0")
+                            Text("\(middleFishCaught)")
                                 .font(.system(size: 24, weight: .bold))
                                 .foregroundStyle(.black)
                         }
@@ -251,7 +259,7 @@ struct Working2: View {
                                 .resizable()
                                 .scaledToFit()
                                 .frame(width: 48, height: 48)
-                            Text("0")
+                            Text("\(smallFishCaught)")
                                 .font(.system(size: 24, weight: .bold))
                                 .foregroundStyle(.black)
                         }
