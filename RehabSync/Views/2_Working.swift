@@ -32,7 +32,27 @@ struct Working2: View {
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            Color.black.ignoresSafeArea()
+            Image("Working2BackgroundIcon")
+                .resizable()
+                .scaledToFill()
+                .ignoresSafeArea()
+                .clipped()
+
+            HStack(spacing: 40) {
+                Image("BigBucketOnlyIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 120, height: 120)
+                Image("MiddleBucketOnlyIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 120, height: 120)
+                Image("SmallBucketOnlyIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 120, height: 120)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             VStack(spacing: 12) {
                 GeometryReader { geo in
