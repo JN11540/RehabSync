@@ -159,7 +159,7 @@ struct Working2: View {
                             RoundedRectangle(cornerRadius: 8)
                                 .stroke(Color(red: 0.70, green: 0.52, blue: 0.10), lineWidth: 3)
                         )
-                        .offset(x: 40)
+                        .offset(x: 30)
 
                     HStack(spacing: 6) {
                         Image("CoinIcon")
