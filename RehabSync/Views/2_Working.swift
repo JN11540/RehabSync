@@ -36,32 +36,46 @@ struct Working2: View {
                 .resizable()
                 .scaledToFill()
                 .clipped()
-                .padding(24)
-                .opacity(0.6)
+                .padding(48)
+                .opacity(0.4)
 
-            Image("NoGetFishIcon")
-                .resizable()
-                .scaledToFill()
-                .clipped()
-                .padding(24)
+            if let angle = btVM.currentEstimatedRealAngle, angle <= Self.holdThreshold {
+                Image("GetFishIcon")
+                    .resizable()
+                    .scaledToFill()
+                    .clipped()
+                    .padding(48)
+
+                Image("WaterSplashIcon")
+                    .resizable()
+                    .scaledToFill()
+                    .clipped()
+                    .padding(48)
+            } else {
+                Image("NoGetFishIcon")
+                    .resizable()
+                    .scaledToFill()
+                    .clipped()
+                    .padding(48)
+            }
 
             Image("BigBucketOnlyIcon")
                 .resizable()
                 .scaledToFill()
                 .clipped()
-                .padding(24)
+                .padding(48)
 
             Image("MiddleBucketOnlyIcon")
                 .resizable()
                 .scaledToFill()
                 .clipped()
-                .padding(24)
+                .padding(48)
 
             Image("SmallBucketOnlyIcon")
                 .resizable()
                 .scaledToFill()
                 .clipped()
-                .padding(24)
+                .padding(48)
 
             VStack(spacing: 12) {
                 GeometryReader { geo in
