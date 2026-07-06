@@ -141,11 +141,24 @@ struct Working2: View {
                     RoundedRectangle(cornerRadius: 8)
                         .fill(Color(red: 0.93, green: 0.75, blue: 0.22))
                         .overlay(
+                            HStack(spacing: 10) {
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.5))
+                                    .frame(width: 10, height: 80)
+                                    .rotationEffect(.degrees(20))
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.5))
+                                    .frame(width: 5, height: 80)
+                                    .rotationEffect(.degrees(20))
+                            }
+                        )
+                        .frame(width: 90, height: 40)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(
                             RoundedRectangle(cornerRadius: 8)
                                 .stroke(Color(red: 0.70, green: 0.52, blue: 0.10), lineWidth: 3)
                         )
-                        .frame(width: 90, height: 40)
-                        .offset(x: 20)
+                        .offset(x: 40)
 
                     Image("CoinIcon")
                         .resizable()
