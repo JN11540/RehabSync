@@ -9,11 +9,24 @@ struct Working2: View {
     @State private var holdElapsed: Double = 0
     @State private var holdTimer: Timer?
     @State private var showCatchAnimation = false
+    @State private var caughtFishSize: CaughtFishSize = .small
 
     private static let holdThreshold: Double = 20
     private static let holdDuration: Double = 5
     private static let catchQualifyDuration: Double = 1
-    private static let catchAnimationDuration: Double = 0.5
+    private static let catchAnimationDuration: Double = 1
+
+    private enum CaughtFishSize {
+        case small, middle, big
+
+        var imageName: String {
+            switch self {
+            case .small:  return "SmallFishIcon"
+            case .middle: return "MiddleFishIcon"
+            case .big:    return "BigFishIcon"
+            }
+        }
+    }
 
     private func startHoldTimer() {
         guard holdTimer == nil else { return }
@@ -37,6 +50,7 @@ struct Working2: View {
     }
 
     private func triggerCatchAnimation() {
+        caughtFishSize = holdElapsed >= 5 ? .big : (holdElapsed >= 3 ? .middle : .small)
         showCatchAnimation = true
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.catchAnimationDuration) {
             showCatchAnimation = false
@@ -64,6 +78,11 @@ struct Working2: View {
                     .scaledToFill()
                     .clipped()
                     .padding(48)
+
+                Image(caughtFishSize.imageName)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 120, height: 120)
             } else if let angle = btVM.currentEstimatedRealAngle, angle <= Self.holdThreshold {
                 Image("NoGetFishIcon")
                     .resizable()
