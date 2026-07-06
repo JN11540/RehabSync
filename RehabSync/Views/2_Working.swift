@@ -188,6 +188,10 @@ struct Working2: View {
                                 .foregroundStyle(.black)
                         }
 
+                        Rectangle()
+                            .fill(Color(white: 0.35))
+                            .frame(width: 2, height: 40)
+
                         HStack(spacing: 4) {
                             Image("WeightliftingIcon")
                                 .resizable()
@@ -197,6 +201,10 @@ struct Working2: View {
                                 .font(.system(size: 24, weight: .bold))
                                 .foregroundStyle(.black)
                         }
+
+                        Rectangle()
+                            .fill(Color(white: 0.35))
+                            .frame(width: 2, height: 40)
 
                         HStack(spacing: 4) {
                             Image("BigFishIcon")
@@ -230,6 +238,7 @@ struct Working2: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.leading, 16)
+                    .offset(x: -200)
                 }
                 .frame(height: 60)
                 Rectangle()
