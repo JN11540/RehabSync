@@ -133,6 +133,13 @@ struct Working2: View {
                 .padding(48)
                 .opacity(0.4)
 
+            Rectangle()
+                .fill(Color(red: 0.72, green: 0.82, blue: 0.82))
+                .frame(height: 60)
+                .padding(.horizontal, 48)
+                .padding(.top, 48)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+
             if showCatchAnimation {
                 Image("GetFishIcon")
                     .resizable()
