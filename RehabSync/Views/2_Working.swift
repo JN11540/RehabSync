@@ -498,6 +498,13 @@ struct Working2: View {
                         )
                         .frame(width: 320, height: 220)
 
+                    Text("您是否要直接跳過，進入組間休息？")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(.black)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                        .frame(width: 320, height: 220, alignment: .center)
+
                     Button(action: { showRestPopup = false }) {
                         ZStack {
                             Circle()
@@ -515,6 +522,25 @@ struct Working2: View {
                     }
                     .buttonStyle(.plain)
                     .padding(8)
+
+                    Button(action: { showRestPopup = false }) {
+                        Text("確定")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(Color.white)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .stroke(Color.black, lineWidth: 1.5)
+                                    )
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .frame(width: 320, height: 220, alignment: .bottomTrailing)
+                    .padding(12)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             }
