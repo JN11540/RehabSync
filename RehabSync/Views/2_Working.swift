@@ -539,8 +539,8 @@ struct Working2: View {
                             )
                     }
                     .buttonStyle(.plain)
-                    .frame(width: 320, height: 220, alignment: .bottomTrailing)
                     .padding(12)
+                    .frame(width: 320, height: 220, alignment: .bottomTrailing)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             }
