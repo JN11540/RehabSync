@@ -643,16 +643,24 @@ private struct CoinBurstView: View {
                     CGSize(width: -1, height: -1), CGSize(width: 1, height: -1),
                     CGSize(width: -1, height: 1), CGSize(width: 1, height: 1)
                 ]
+                // 每來一顆新硬幣就從 100pt 彈到 120pt 再彈回 100pt；用「距離最近一次硬幣
+                // 出生的時間」算出一個 0→1→0 的脈衝，不需要額外的 onChange 事件觸發。
+                let lastSpawnTime = Double(appearedCount - 1) * Self.stagger
+                let timeSincePulse = elapsed - lastSpawnTime
+                let pulseDuration = 0.15
+                let pulseProgress = min(max(timeSincePulse / pulseDuration, 0), 1)
+                let pulseFactor = sin(pulseProgress * .pi)
+                let fontSize: CGFloat = 100 + 20 * CGFloat(pulseFactor)
                 ZStack {
                     ForEach(0..<outlineOffsets.count, id: \.self) { i in
                         Text(label)
-                            .font(.system(size: 28, weight: .bold))
+                            .font(.system(size: fontSize, weight: .bold))
                             .foregroundStyle(Color(red: 0.93, green: 0.75, blue: 0.22))
                             .offset(outlineOffsets[i])
                     }
                     Text(label)
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundStyle(Color(red: 1.0, green: 0.85, blue: 0.35))
+                        .font(.system(size: fontSize, weight: .bold))
+                        .foregroundStyle(Color(red: 1.0, green: 0.92, blue: 0.55))
                 }
                 .position(x: centerPos.x, y: centerPos.y - 200)
             }
