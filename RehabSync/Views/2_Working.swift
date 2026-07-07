@@ -19,6 +19,7 @@ struct Working2: View {
     @State private var middleBucketScale: CGFloat = 1
     @State private var smallBucketScale: CGFloat = 1
     @State private var showRestPopup = false
+    @State private var showExitConfirmPopup = false
 
     private static let holdThreshold: Double = 20
     private static let holdDuration: Double = 5
@@ -222,7 +223,7 @@ struct Working2: View {
                     .padding(.trailing, 16)
 
                     HStack(spacing: 12) {
-                        Button(action: { dismiss() }) {
+                        Button(action: { showExitConfirmPopup = true }) {
                             ZStack {
                                 Circle()
                                     .fill(Color.white)
@@ -489,58 +490,22 @@ struct Working2: View {
                 Color.black.opacity(0.3)
                     .ignoresSafeArea()
 
-                ZStack(alignment: .topLeading) {
-                    Color.white
+                ConfirmPopup(
+                    message: "您是否要直接跳過，進入組間休息？",
+                    onCancel: { showRestPopup = false },
+                    onConfirm: { showRestPopup = false }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            }
 
-                    Text("您是否要直接跳過，進入組間休息？")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(.black)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 24)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            if showExitConfirmPopup {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
 
-                    Button(action: { showRestPopup = false }) {
-                        ZStack {
-                            Circle()
-                                .fill(Color.white)
-                            Circle()
-                                .strokeBorder(Color.black, lineWidth: 1.5)
-                            Circle()
-                                .strokeBorder(Color.black, lineWidth: 1.5)
-                                .padding(4)
-                            Image(systemName: "xmark")
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundStyle(.black)
-                        }
-                        .frame(width: 36, height: 36)
-                    }
-                    .buttonStyle(.plain)
-                    .padding(8)
-
-                    Button(action: { showRestPopup = false }) {
-                        Text("確定")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.black)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 10)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(Color.white)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 6)
-                                            .stroke(Color.black, lineWidth: 1.5)
-                                    )
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .padding(12)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                }
-                .frame(width: 320, height: 220)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.black, lineWidth: 1.5)
+                ConfirmPopup(
+                    message: "您確定要結束遊戲嗎？",
+                    onCancel: { showExitConfirmPopup = false },
+                    onConfirm: { dismiss() }
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             }
@@ -553,6 +518,70 @@ struct Working2: View {
             }
         }
         .onDisappear { holdTimer?.invalidate() }
+    }
+}
+
+// MARK: - ConfirmPopup
+
+private struct ConfirmPopup: View {
+    let message: String
+    let onCancel: () -> Void
+    let onConfirm: () -> Void
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            Color.white
+
+            Text(message)
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(.black)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+
+            Button(action: onCancel) {
+                ZStack {
+                    Circle()
+                        .fill(Color.white)
+                    Circle()
+                        .strokeBorder(Color.black, lineWidth: 1.5)
+                    Circle()
+                        .strokeBorder(Color.black, lineWidth: 1.5)
+                        .padding(4)
+                    Image(systemName: "xmark")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(.black)
+                }
+                .frame(width: 36, height: 36)
+            }
+            .buttonStyle(.plain)
+            .padding(8)
+
+            Button(action: onConfirm) {
+                Text("確定")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color.white)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(Color.black, lineWidth: 1.5)
+                            )
+                    )
+            }
+            .buttonStyle(.plain)
+            .padding(12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+        }
+        .frame(width: 320, height: 220)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.black, lineWidth: 1.5)
+        )
     }
 }
 
