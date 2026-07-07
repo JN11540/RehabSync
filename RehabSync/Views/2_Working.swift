@@ -20,12 +20,12 @@ struct Working2: View {
     @State private var smallBucketScale: CGFloat = 1
     @State private var showRestPopup = false
     @State private var showExitConfirmPopup = false
-    @State private var bigCoinAppeared = 0
-    @State private var bigCoinDisappeared = 0
-    @State private var middleCoinAppeared = 0
-    @State private var middleCoinDisappeared = 0
-    @State private var smallCoinAppeared = 0
-    @State private var smallCoinDisappeared = 0
+    @State private var bigCoinElapsed: Double = -1
+    @State private var bigCoinTimer: Timer?
+    @State private var middleCoinElapsed: Double = -1
+    @State private var middleCoinTimer: Timer?
+    @State private var smallCoinElapsed: Double = -1
+    @State private var smallCoinTimer: Timer?
 
     private static let holdThreshold: Double = 20
     private static let holdDuration: Double = 5
@@ -171,34 +171,28 @@ struct Working2: View {
         }
 
         switch size {
-        case .big:    playCoinBurst(count: size.coinCount, appeared: $bigCoinAppeared, disappeared: $bigCoinDisappeared)
-        case .middle: playCoinBurst(count: size.coinCount, appeared: $middleCoinAppeared, disappeared: $middleCoinDisappeared)
-        case .small:  playCoinBurst(count: size.coinCount, appeared: $smallCoinAppeared, disappeared: $smallCoinDisappeared)
+        case .big:    playCoinBurst(count: size.coinCount, elapsed: $bigCoinElapsed, timer: $bigCoinTimer)
+        case .middle: playCoinBurst(count: size.coinCount, elapsed: $middleCoinElapsed, timer: $middleCoinTimer)
+        case .small:  playCoinBurst(count: size.coinCount, elapsed: $smallCoinElapsed, timer: $smallCoinTimer)
         }
     }
 
-    // 金幣一顆接一顆出現，全部出現後再一顆接一顆消失；appeared/disappeared 各自代表
-    // 目前已出現/已消失的顆數，視圖用「index < appeared && index >= disappeared」判斷可見範圍。
-    private func playCoinBurst(count: Int, appeared: Binding<Int>, disappeared: Binding<Int>) {
-        let stagger = 0.1
-        let holdAfterAppear = 0.5
-        appeared.wrappedValue = 0
-        disappeared.wrappedValue = 0
+    // 硬幣不是瞬移到固定槽位，而是從 bucket 中心冒出來後持續往 2 點鐘方向等速飄移；
+    // elapsed 是這個 burst 從觸發起算的時間（60fps 更新），每顆硬幣的位置都即時由
+    // (elapsed - 自己的出生時間) * 速度 算出，所以尚未消失的硬幣會一直繼續往前飛，
+    // 不受其他硬幣依序消失影響。消失時機與淡出效果則交給 CoinBurstView 依 elapsed 計算。
+    private func playCoinBurst(count: Int, elapsed: Binding<Double>, timer: Binding<Timer?>) {
+        timer.wrappedValue?.invalidate()
+        let start = Date()
+        elapsed.wrappedValue = 0
+        let appearEnd = Double(count) * CoinBurstView.stagger
+        let totalDuration = appearEnd + CoinBurstView.holdAfterAppear + Double(count) * CoinBurstView.stagger + CoinBurstView.fadeOutDuration + 0.1
 
-        for i in 0..<count {
-            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * stagger) {
-                withAnimation(.easeOut(duration: 0.15)) {
-                    appeared.wrappedValue = i + 1
-                }
-            }
-        }
-
-        let appearEnd = Double(count) * stagger
-        for i in 0..<count {
-            DispatchQueue.main.asyncAfter(deadline: .now() + appearEnd + holdAfterAppear + Double(i) * stagger) {
-                withAnimation(.easeIn(duration: 0.15)) {
-                    disappeared.wrappedValue = i + 1
-                }
+        timer.wrappedValue = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { t in
+            let e = Date().timeIntervalSince(start)
+            elapsed.wrappedValue = e
+            if e >= totalDuration {
+                t.invalidate()
             }
         }
     }
@@ -439,9 +433,9 @@ struct Working2: View {
             }
             .allowsHitTesting(false)
 
-            CoinBurstView(bucketFraction: CaughtFishSize.big.bucketFraction, count: CaughtFishSize.big.coinCount, appeared: bigCoinAppeared, disappeared: bigCoinDisappeared)
-            CoinBurstView(bucketFraction: CaughtFishSize.middle.bucketFraction, count: CaughtFishSize.middle.coinCount, appeared: middleCoinAppeared, disappeared: middleCoinDisappeared)
-            CoinBurstView(bucketFraction: CaughtFishSize.small.bucketFraction, count: CaughtFishSize.small.coinCount, appeared: smallCoinAppeared, disappeared: smallCoinDisappeared)
+            CoinBurstView(bucketFraction: CaughtFishSize.big.bucketFraction, count: CaughtFishSize.big.coinCount, elapsed: bigCoinElapsed)
+            CoinBurstView(bucketFraction: CaughtFishSize.middle.bucketFraction, count: CaughtFishSize.middle.coinCount, elapsed: middleCoinElapsed)
+            CoinBurstView(bucketFraction: CaughtFishSize.small.bucketFraction, count: CaughtFishSize.small.coinCount, elapsed: smallCoinElapsed)
 
             VStack(spacing: 12) {
                 GeometryReader { geo in
@@ -567,21 +561,33 @@ struct Working2: View {
                 stopHoldTimer()
             }
         }
-        .onDisappear { holdTimer?.invalidate() }
+        .onDisappear {
+            holdTimer?.invalidate()
+            bigCoinTimer?.invalidate()
+            middleCoinTimer?.invalidate()
+            smallCoinTimer?.invalidate()
+        }
     }
 }
 
 // MARK: - CoinBurstView
 
-// 從水桶中心沿 2 點鐘方向（順時針從 12 點量起 60 度）依序噴出一排金幣，
-// 全部出現後再依相同順序一顆顆消失；appeared/disappeared 由 Working2 的計時序列驅動。
+// 從水桶中心沿 2 點鐘方向（順時針從 12 點量起 60 度）持續等速冒出一連串硬幣：
+// 每顆硬幣的位置都是「(elapsed - 自己的出生時間) * 速度」即時算出，因此還沒被
+// 消除的硬幣會一直往前飄移，不會因為前面的硬幣依序消失而停下來。elapsed 由
+// Working2 的 60fps 計時器驅動；stagger/holdAfterAppear/fadeOutDuration 也給
+// Working2 用來計算整段 burst 要跑多久（timer 何時可以停下來）。
 private struct CoinBurstView: View {
     let bucketFraction: CGPoint
     let count: Int
-    let appeared: Int
-    let disappeared: Int
+    let elapsed: Double
 
+    fileprivate static let stagger = 0.1
+    fileprivate static let holdAfterAppear = 0.5
+    fileprivate static let fadeOutDuration = 0.15
     private static let spacing: CGFloat = 20
+    private static let secondsPerSpacing: Double = 0.175
+    private static let speed = spacing / CGFloat(secondsPerSpacing)
     private static let coinSize: CGFloat = 28
     private static let directionAngleDegrees: Double = 60
 
@@ -589,20 +595,26 @@ private struct CoinBurstView: View {
         GeometryReader { geo in
             let center = Working2.overlayPosition(for: bucketFraction, in: geo.size)
             let radians = Self.directionAngleDegrees * .pi / 180
-            let dx = sin(radians)
-            let dy = -cos(radians)
+            let dx = CGFloat(sin(radians))
+            let dy = CGFloat(-cos(radians))
+            let appearEnd = Double(count) * Self.stagger
 
             ForEach(0..<count, id: \.self) { i in
-                if i < appeared && i >= disappeared {
+                let spawnTime = Double(i) * Self.stagger
+                let disappearTime = appearEnd + Self.holdAfterAppear + Double(i) * Self.stagger
+                let timeSinceDisappear = elapsed - disappearTime
+
+                if elapsed >= spawnTime && timeSinceDisappear < Self.fadeOutDuration {
+                    let traveled = CGFloat(elapsed - spawnTime) * Self.speed
+                    let opacity = timeSinceDisappear > 0
+                        ? max(0, 1 - timeSinceDisappear / Self.fadeOutDuration)
+                        : 1
                     Image("CoinIcon")
                         .resizable()
                         .scaledToFit()
                         .frame(width: Self.coinSize, height: Self.coinSize)
-                        .position(
-                            x: center.x + CGFloat(dx) * Self.spacing * CGFloat(i + 1),
-                            y: center.y + CGFloat(dy) * Self.spacing * CGFloat(i + 1)
-                        )
-                        .transition(.scale.combined(with: .opacity))
+                        .opacity(opacity)
+                        .position(x: center.x + dx * traveled, y: center.y + dy * traveled)
                 }
             }
         }
