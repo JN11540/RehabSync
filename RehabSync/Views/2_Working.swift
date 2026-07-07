@@ -85,6 +85,15 @@ struct Working2: View {
             }
         }
 
+        // 各水桶內容物頂部邊緣的相對位置（x 與 bucketFraction 相同，y 取 bbox 頂端）
+        var bucketTopFraction: CGPoint {
+            switch self {
+            case .small:  return CGPoint(x: 0.7821, y: 0.8333)
+            case .middle: return CGPoint(x: 0.5308, y: 0.7662)
+            case .big:    return CGPoint(x: 0.6615, y: 0.7431)
+            }
+        }
+
         var coinCount: Int {
             switch self {
             case .small:  return 3
@@ -433,9 +442,9 @@ struct Working2: View {
             }
             .allowsHitTesting(false)
 
-            CoinBurstView(bucketFraction: CaughtFishSize.big.bucketFraction, count: CaughtFishSize.big.coinCount, elapsed: bigCoinElapsed)
-            CoinBurstView(bucketFraction: CaughtFishSize.middle.bucketFraction, count: CaughtFishSize.middle.coinCount, elapsed: middleCoinElapsed)
-            CoinBurstView(bucketFraction: CaughtFishSize.small.bucketFraction, count: CaughtFishSize.small.coinCount, elapsed: smallCoinElapsed)
+            CoinBurstView(bucketFraction: CaughtFishSize.big.bucketTopFraction, count: CaughtFishSize.big.coinCount, elapsed: bigCoinElapsed)
+            CoinBurstView(bucketFraction: CaughtFishSize.middle.bucketTopFraction, count: CaughtFishSize.middle.coinCount, elapsed: middleCoinElapsed)
+            CoinBurstView(bucketFraction: CaughtFishSize.small.bucketTopFraction, count: CaughtFishSize.small.coinCount, elapsed: smallCoinElapsed)
 
             VStack(spacing: 12) {
                 GeometryReader { geo in
@@ -588,7 +597,7 @@ private struct CoinBurstView: View {
     private static let spacing: CGFloat = 20
     private static let secondsPerSpacing: Double = 0.175
     private static let speed = spacing / CGFloat(secondsPerSpacing)
-    private static let coinSize: CGFloat = 28
+    private static let coinSize: CGFloat = 50
     private static let directionAngleDegrees: Double = 60
 
     var body: some View {
