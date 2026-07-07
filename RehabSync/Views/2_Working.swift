@@ -425,7 +425,7 @@ struct Working2: View {
                 .frame(width: 130, height: 130)
             }
             .padding(24)
-            .offset(x: 40, y: -100)
+            .offset(x: 25, y: -100)
         }
         .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
             if let angle = newValue, angle <= Self.holdThreshold {
