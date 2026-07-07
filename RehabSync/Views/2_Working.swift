@@ -15,6 +15,9 @@ struct Working2: View {
     @State private var bigFishCaught = 0
     @State private var middleFishCaught = 0
     @State private var smallFishCaught = 0
+    @State private var bigBucketScale: CGFloat = 1
+    @State private var middleBucketScale: CGFloat = 1
+    @State private var smallBucketScale: CGFloat = 1
 
     private static let holdThreshold: Double = 20
     private static let holdDuration: Double = 5
@@ -38,6 +41,12 @@ struct Working2: View {
         let relX = (fraction.x * overlayCanvasSize.width - cropX) / visibleW
         let relY = (fraction.y * overlayCanvasSize.height - cropY) / visibleH
         return CGPoint(x: padding + relX * frameW, y: padding + relY * frameH)
+    }
+
+    private static func overlayAnchor(for fraction: CGPoint, in size: CGSize, padding: CGFloat = 48) -> UnitPoint {
+        guard size.width > 0, size.height > 0 else { return .center }
+        let point = overlayPosition(for: fraction, in: size, padding: padding)
+        return UnitPoint(x: point.x / size.width, y: point.y / size.height)
     }
 
     private enum CaughtFishSize {
@@ -128,8 +137,29 @@ struct Working2: View {
         withAnimation(.easeInOut(duration: Self.catchAnimationDuration)) {
             catchProgress = 1
         }
+        let landedSize = caughtFishSize
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.catchAnimationDuration) {
             showCatchAnimation = false
+            bounceBucket(for: landedSize)
+        }
+    }
+
+    private func bounceBucket(for size: CaughtFishSize) {
+        withAnimation(.easeOut(duration: 0.15)) {
+            setBucketScale(1.3, for: size)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            withAnimation(.easeIn(duration: 0.15)) {
+                setBucketScale(1.0, for: size)
+            }
+        }
+    }
+
+    private func setBucketScale(_ scale: CGFloat, for size: CaughtFishSize) {
+        switch size {
+        case .big:    bigBucketScale = scale
+        case .middle: middleBucketScale = scale
+        case .small:  smallBucketScale = scale
         }
     }
 
@@ -321,23 +351,32 @@ struct Working2: View {
                     .padding(48)
             }
 
-            Image("BigBucketOnlyIcon")
-                .resizable()
-                .scaledToFill()
-                .clipped()
-                .padding(48)
+            GeometryReader { geo in
+                Image("BigBucketOnlyIcon")
+                    .resizable()
+                    .scaledToFill()
+                    .clipped()
+                    .padding(48)
+                    .scaleEffect(bigBucketScale, anchor: Self.overlayAnchor(for: CaughtFishSize.big.bucketFraction, in: geo.size))
+            }
 
-            Image("MiddleBucketOnlyIcon")
-                .resizable()
-                .scaledToFill()
-                .clipped()
-                .padding(48)
+            GeometryReader { geo in
+                Image("MiddleBucketOnlyIcon")
+                    .resizable()
+                    .scaledToFill()
+                    .clipped()
+                    .padding(48)
+                    .scaleEffect(middleBucketScale, anchor: Self.overlayAnchor(for: CaughtFishSize.middle.bucketFraction, in: geo.size))
+            }
 
-            Image("SmallBucketOnlyIcon")
-                .resizable()
-                .scaledToFill()
-                .clipped()
-                .padding(48)
+            GeometryReader { geo in
+                Image("SmallBucketOnlyIcon")
+                    .resizable()
+                    .scaledToFill()
+                    .clipped()
+                    .padding(48)
+                    .scaleEffect(smallBucketScale, anchor: Self.overlayAnchor(for: CaughtFishSize.small.bucketFraction, in: geo.size))
+            }
 
             VStack(spacing: 12) {
                 GeometryReader { geo in
