@@ -26,6 +26,7 @@ struct Working2: View {
     @State private var middleCoinTimer: Timer?
     @State private var smallCoinElapsed: Double = -1
     @State private var smallCoinTimer: Timer?
+    @State private var totalCoins = 0
 
     private static let holdThreshold: Double = 20
     private static let holdDuration: Double = 5
@@ -170,6 +171,8 @@ struct Working2: View {
     }
 
     private func bounceBucket(for size: CaughtFishSize) {
+        totalCoins += size.coinCount * 100
+
         withAnimation(.easeOut(duration: 0.15)) {
             setBucketScale(1.3, for: size)
         }
@@ -262,7 +265,7 @@ struct Working2: View {
                                 .frame(width: 48, height: 48)
                                 .offset(x: -32)
 
-                            Text("0")
+                            Text("\(totalCoins)")
                                 .font(.system(size: 24, weight: .bold))
                                 .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
                         }
@@ -660,7 +663,7 @@ private struct CoinBurstView: View {
                     }
                     Text(label)
                         .font(.system(size: fontSize, weight: .bold))
-                        .foregroundStyle(Color(red: 1.0, green: 0.843, blue: 0.0))
+                        .foregroundStyle(Color(red: 0.937, green: 0.749, blue: 0.016))
                 }
                 .position(x: centerPos.x, y: centerPos.y - 200)
             }
