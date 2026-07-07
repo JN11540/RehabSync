@@ -18,6 +18,7 @@ struct Working2: View {
     @State private var bigBucketScale: CGFloat = 1
     @State private var middleBucketScale: CGFloat = 1
     @State private var smallBucketScale: CGFloat = 1
+    @State private var showRestPopup = false
 
     private static let holdThreshold: Double = 20
     private static let holdDuration: Double = 5
@@ -238,10 +239,13 @@ struct Working2: View {
                         }
                         .buttonStyle(.plain)
 
-                        Image("RestIcon")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 40, height: 40)
+                        Button(action: { showRestPopup = true }) {
+                            Image("RestIcon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 40, height: 40)
+                        }
+                        .buttonStyle(.plain)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.leading, 16)
@@ -477,6 +481,40 @@ struct Working2: View {
             }
             .padding(24)
             .offset(x: 25, y: -100)
+
+            if showRestPopup {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+
+                ZStack(alignment: .topLeading) {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.white)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.black, lineWidth: 1.5)
+                        )
+                        .frame(width: 320, height: 220)
+
+                    Button(action: { showRestPopup = false }) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.white)
+                            Circle()
+                                .strokeBorder(Color.black, lineWidth: 1.5)
+                            Circle()
+                                .strokeBorder(Color.black, lineWidth: 1.5)
+                                .padding(4)
+                            Image(systemName: "xmark")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+                        .frame(width: 36, height: 36)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(8)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            }
         }
         .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
             if let angle = newValue, angle <= Self.holdThreshold {
