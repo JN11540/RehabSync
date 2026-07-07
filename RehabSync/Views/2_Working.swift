@@ -141,7 +141,7 @@ struct Working2: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.black, lineWidth: 1)
+                        .stroke(Color.black, lineWidth: 2)
                 )
                 .padding(48)
                 .opacity(0.4)
@@ -276,6 +276,7 @@ struct Working2: View {
                     .frame(height: 4)
                     .offset(y: -5)
             }
+            .clipShape(RoundedRectangle(cornerRadius: 12))
             .padding(.horizontal, 48)
             .padding(.top, 48)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
