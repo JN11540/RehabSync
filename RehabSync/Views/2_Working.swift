@@ -638,10 +638,23 @@ private struct CoinBurstView: View {
 
             if appearedCount > 0 && elapsed <= totalDuration {
                 let centerPos = Working2.overlayPosition(for: centerFraction, in: geo.size)
-                Text("+\(appearedCount * 100)")
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundStyle(Color(red: 0.93, green: 0.75, blue: 0.22))
-                    .position(x: centerPos.x, y: centerPos.y - 100)
+                let label = "+\(appearedCount * 100)"
+                let outlineOffsets: [CGSize] = [
+                    CGSize(width: -1, height: -1), CGSize(width: 1, height: -1),
+                    CGSize(width: -1, height: 1), CGSize(width: 1, height: 1)
+                ]
+                ZStack {
+                    ForEach(0..<outlineOffsets.count, id: \.self) { i in
+                        Text(label)
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundStyle(Color(red: 0.93, green: 0.75, blue: 0.22))
+                            .offset(outlineOffsets[i])
+                    }
+                    Text(label)
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundStyle(Color(red: 1.0, green: 0.85, blue: 0.35))
+                }
+                .position(x: centerPos.x, y: centerPos.y - 200)
             }
         }
         .allowsHitTesting(false)
