@@ -171,8 +171,6 @@ struct Working2: View {
     }
 
     private func bounceBucket(for size: CaughtFishSize) {
-        totalCoins += size.coinCount * 100
-
         withAnimation(.easeOut(duration: 0.15)) {
             setBucketScale(1.3, for: size)
         }
@@ -199,10 +197,19 @@ struct Working2: View {
         elapsed.wrappedValue = 0
         let appearEnd = Double(count) * CoinBurstView.stagger
         let totalDuration = appearEnd + CoinBurstView.holdAfterAppear + Double(count) * CoinBurstView.stagger + CoinBurstView.fadeOutDuration + 0.1
+        var lastAppeared = 0
 
         timer.wrappedValue = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { t in
             let e = Date().timeIntervalSince(start)
             elapsed.wrappedValue = e
+
+            // 不預先把整批金額算好，而是跟每顆硬幣實際冒出來的當下同步 +100。
+            let currentAppeared = e >= 0 ? min(count, Int(e / CoinBurstView.stagger) + 1) : 0
+            if currentAppeared > lastAppeared {
+                totalCoins += (currentAppeared - lastAppeared) * 100
+                lastAppeared = currentAppeared
+            }
+
             if e >= totalDuration {
                 t.invalidate()
             }
@@ -665,7 +672,7 @@ private struct CoinBurstView: View {
                     }
                     Text(label)
                         .font(.system(size: fontSize, weight: .bold))
-                        .foregroundStyle(Color(red: 1.0, green: 0.8, blue: 0.0))
+                        .foregroundStyle(Color(red: 0.933, green: 0.933, blue: 0.0))
                 }
                 .position(x: centerPos.x, y: centerPos.y - 200)
             }
