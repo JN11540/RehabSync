@@ -138,7 +138,11 @@ struct Working2: View {
             Image("Working2BackgroundIcon")
                 .resizable()
                 .scaledToFill()
-                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.black, lineWidth: 1)
+                )
                 .padding(48)
                 .opacity(0.4)
 
