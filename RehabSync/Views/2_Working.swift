@@ -490,20 +490,14 @@ struct Working2: View {
                     .ignoresSafeArea()
 
                 ZStack(alignment: .topLeading) {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.white)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.black, lineWidth: 1.5)
-                        )
-                        .frame(width: 320, height: 220)
+                    Color.white
 
                     Text("您是否要直接跳過，進入組間休息？")
                         .font(.system(size: 18, weight: .medium))
                         .foregroundStyle(.black)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 24)
-                        .frame(width: 320, height: 220, alignment: .center)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
 
                     Button(action: { showRestPopup = false }) {
                         ZStack {
@@ -540,8 +534,14 @@ struct Working2: View {
                     }
                     .buttonStyle(.plain)
                     .padding(12)
-                    .frame(width: 320, height: 220, alignment: .bottomTrailing)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                 }
+                .frame(width: 320, height: 220)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.black, lineWidth: 1.5)
+                )
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             }
         }
