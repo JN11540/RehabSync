@@ -640,8 +640,8 @@ private struct CoinBurstView: View {
                 let centerPos = Working2.overlayPosition(for: centerFraction, in: geo.size)
                 let label = "+\(appearedCount * 100)"
                 let outlineOffsets: [CGSize] = [
-                    CGSize(width: -1, height: -1), CGSize(width: 1, height: -1),
-                    CGSize(width: -1, height: 1), CGSize(width: 1, height: 1)
+                    CGSize(width: -2, height: -2), CGSize(width: 2, height: -2),
+                    CGSize(width: -2, height: 2), CGSize(width: 2, height: 2)
                 ]
                 // 每來一顆新硬幣就從 100pt 彈到 120pt 再彈回 100pt；用「距離最近一次硬幣
                 // 出生的時間」算出一個 0→1→0 的脈衝，不需要額外的 onChange 事件觸發。
@@ -660,7 +660,7 @@ private struct CoinBurstView: View {
                     }
                     Text(label)
                         .font(.system(size: fontSize, weight: .bold))
-                        .foregroundStyle(Color(red: 1.0, green: 0.92, blue: 0.55))
+                        .foregroundStyle(Color(red: 1.0, green: 0.843, blue: 0.0))
                 }
                 .position(x: centerPos.x, y: centerPos.y - 200)
             }
