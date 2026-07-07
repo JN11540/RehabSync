@@ -442,9 +442,9 @@ struct Working2: View {
             }
             .allowsHitTesting(false)
 
-            CoinBurstView(bucketFraction: CaughtFishSize.big.bucketTopFraction, count: CaughtFishSize.big.coinCount, elapsed: bigCoinElapsed)
-            CoinBurstView(bucketFraction: CaughtFishSize.middle.bucketTopFraction, count: CaughtFishSize.middle.coinCount, elapsed: middleCoinElapsed)
-            CoinBurstView(bucketFraction: CaughtFishSize.small.bucketTopFraction, count: CaughtFishSize.small.coinCount, elapsed: smallCoinElapsed)
+            CoinBurstView(bucketFraction: CaughtFishSize.big.bucketTopFraction, centerFraction: CaughtFishSize.big.bucketFraction, count: CaughtFishSize.big.coinCount, elapsed: bigCoinElapsed)
+            CoinBurstView(bucketFraction: CaughtFishSize.middle.bucketTopFraction, centerFraction: CaughtFishSize.middle.bucketFraction, count: CaughtFishSize.middle.coinCount, elapsed: middleCoinElapsed)
+            CoinBurstView(bucketFraction: CaughtFishSize.small.bucketTopFraction, centerFraction: CaughtFishSize.small.bucketFraction, count: CaughtFishSize.small.coinCount, elapsed: smallCoinElapsed)
 
             VStack(spacing: 12) {
                 GeometryReader { geo in
@@ -588,6 +588,7 @@ struct Working2: View {
 // Working2 用來計算整段 burst 要跑多久（timer 何時可以停下來）。
 private struct CoinBurstView: View {
     let bucketFraction: CGPoint
+    let centerFraction: CGPoint
     let count: Int
     let elapsed: Double
 
@@ -607,6 +608,8 @@ private struct CoinBurstView: View {
             let dx = CGFloat(sin(radians))
             let dy = CGFloat(-cos(radians))
             let appearEnd = Double(count) * Self.stagger
+            let totalDuration = appearEnd + Self.holdAfterAppear + Double(count) * Self.stagger + Self.fadeOutDuration
+            let appearedCount = elapsed >= 0 ? min(count, Int(elapsed / Self.stagger) + 1) : 0
 
             ForEach(0..<count, id: \.self) { i in
                 let spawnTime = Double(i) * Self.stagger
@@ -625,6 +628,14 @@ private struct CoinBurstView: View {
                         .opacity(opacity)
                         .position(x: center.x + dx * traveled, y: center.y + dy * traveled)
                 }
+            }
+
+            if appearedCount > 0 && elapsed <= totalDuration {
+                let centerPos = Working2.overlayPosition(for: centerFraction, in: geo.size)
+                Text("+\(appearedCount * 100)")
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundStyle(Color(red: 0.93, green: 0.75, blue: 0.22))
+                    .position(x: centerPos.x, y: centerPos.y - 300)
             }
         }
         .allowsHitTesting(false)
