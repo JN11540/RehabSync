@@ -624,7 +624,13 @@ private struct CoinBurstView: View {
                     Image("CoinIcon")
                         .resizable()
                         .scaledToFit()
+                        .brightness(0.2)
+                        .saturation(1.3)
                         .frame(width: Self.coinSize, height: Self.coinSize)
+                        .overlay(
+                            Circle()
+                                .stroke(Color(red: 0.93, green: 0.75, blue: 0.22), lineWidth: 2)
+                        )
                         .opacity(opacity)
                         .position(x: center.x + dx * traveled, y: center.y + dy * traveled)
                 }
@@ -635,7 +641,7 @@ private struct CoinBurstView: View {
                 Text("+\(appearedCount * 100)")
                     .font(.system(size: 28, weight: .bold))
                     .foregroundStyle(Color(red: 0.93, green: 0.75, blue: 0.22))
-                    .position(x: centerPos.x, y: centerPos.y - 300)
+                    .position(x: centerPos.x, y: centerPos.y - 100)
             }
         }
         .allowsHitTesting(false)
