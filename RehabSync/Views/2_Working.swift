@@ -175,7 +175,7 @@ struct Working2: View {
                                 .resizable()
                                 .scaledToFit()
                                 .frame(width: 48, height: 48)
-                                .offset(x: -28)
+                                .offset(x: -32)
 
                             Text("0")
                                 .font(.system(size: 24, weight: .bold))
