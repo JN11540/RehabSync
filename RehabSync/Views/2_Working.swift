@@ -220,22 +220,29 @@ struct Working2: View {
                     .frame(maxWidth: .infinity, alignment: .trailing)
                     .padding(.trailing, 16)
 
-                    Button(action: { dismiss() }) {
-                        ZStack {
-                            Circle()
-                                .fill(Color.white)
-                            Circle()
-                                .strokeBorder(Color.black, lineWidth: 1.5)
-                            Circle()
-                                .strokeBorder(Color.black, lineWidth: 1.5)
-                                .padding(4)
-                            Image(systemName: "xmark")
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundStyle(.black)
+                    HStack(spacing: 12) {
+                        Button(action: { dismiss() }) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.white)
+                                Circle()
+                                    .strokeBorder(Color.black, lineWidth: 1.5)
+                                Circle()
+                                    .strokeBorder(Color.black, lineWidth: 1.5)
+                                    .padding(4)
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundStyle(.black)
+                            }
+                            .frame(width: 40, height: 40)
                         }
-                        .frame(width: 40, height: 40)
+                        .buttonStyle(.plain)
+
+                        Image("RestIcon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 40, height: 40)
                     }
-                    .buttonStyle(.plain)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.leading, 16)
 
