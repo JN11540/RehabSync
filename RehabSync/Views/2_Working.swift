@@ -20,6 +20,12 @@ struct Working2: View {
     @State private var smallBucketScale: CGFloat = 1
     @State private var showRestPopup = false
     @State private var showExitConfirmPopup = false
+    @State private var bigCoinAppeared = 0
+    @State private var bigCoinDisappeared = 0
+    @State private var middleCoinAppeared = 0
+    @State private var middleCoinDisappeared = 0
+    @State private var smallCoinAppeared = 0
+    @State private var smallCoinDisappeared = 0
 
     private static let holdThreshold: Double = 20
     private static let holdDuration: Double = 5
@@ -31,7 +37,7 @@ struct Working2: View {
     private static let overlayCanvasSize = CGSize(width: 1232, height: 864)
     private static let splashFraction = CGPoint(x: 0.7476, y: 0.6644)
 
-    private static func overlayPosition(for fraction: CGPoint, in size: CGSize, padding: CGFloat = 48) -> CGPoint {
+    fileprivate static func overlayPosition(for fraction: CGPoint, in size: CGSize, padding: CGFloat = 48) -> CGPoint {
         let frameW = size.width - padding * 2
         let frameH = size.height - padding * 2
         guard frameW > 0, frameH > 0 else { return CGPoint(x: size.width / 2, y: size.height / 2) }
@@ -76,6 +82,14 @@ struct Working2: View {
             case .small:  return CGPoint(x: 0.7821, y: 0.9115)
             case .middle: return CGPoint(x: 0.5308, y: 0.8501)
             case .big:    return CGPoint(x: 0.6615, y: 0.8576)
+            }
+        }
+
+        var coinCount: Int {
+            switch self {
+            case .small:  return 3
+            case .middle: return 9
+            case .big:    return 15
             }
         }
     }
@@ -153,6 +167,38 @@ struct Working2: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             withAnimation(.easeIn(duration: 0.15)) {
                 setBucketScale(1.0, for: size)
+            }
+        }
+
+        switch size {
+        case .big:    playCoinBurst(count: size.coinCount, appeared: $bigCoinAppeared, disappeared: $bigCoinDisappeared)
+        case .middle: playCoinBurst(count: size.coinCount, appeared: $middleCoinAppeared, disappeared: $middleCoinDisappeared)
+        case .small:  playCoinBurst(count: size.coinCount, appeared: $smallCoinAppeared, disappeared: $smallCoinDisappeared)
+        }
+    }
+
+    // 金幣一顆接一顆出現，全部出現後再一顆接一顆消失；appeared/disappeared 各自代表
+    // 目前已出現/已消失的顆數，視圖用「index < appeared && index >= disappeared」判斷可見範圍。
+    private func playCoinBurst(count: Int, appeared: Binding<Int>, disappeared: Binding<Int>) {
+        let stagger = 0.1
+        let holdAfterAppear = 0.5
+        appeared.wrappedValue = 0
+        disappeared.wrappedValue = 0
+
+        for i in 0..<count {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * stagger) {
+                withAnimation(.easeOut(duration: 0.15)) {
+                    appeared.wrappedValue = i + 1
+                }
+            }
+        }
+
+        let appearEnd = Double(count) * stagger
+        for i in 0..<count {
+            DispatchQueue.main.asyncAfter(deadline: .now() + appearEnd + holdAfterAppear + Double(i) * stagger) {
+                withAnimation(.easeIn(duration: 0.15)) {
+                    disappeared.wrappedValue = i + 1
+                }
             }
         }
     }
@@ -393,6 +439,10 @@ struct Working2: View {
             }
             .allowsHitTesting(false)
 
+            CoinBurstView(bucketFraction: CaughtFishSize.big.bucketFraction, count: CaughtFishSize.big.coinCount, appeared: bigCoinAppeared, disappeared: bigCoinDisappeared)
+            CoinBurstView(bucketFraction: CaughtFishSize.middle.bucketFraction, count: CaughtFishSize.middle.coinCount, appeared: middleCoinAppeared, disappeared: middleCoinDisappeared)
+            CoinBurstView(bucketFraction: CaughtFishSize.small.bucketFraction, count: CaughtFishSize.small.coinCount, appeared: smallCoinAppeared, disappeared: smallCoinDisappeared)
+
             VStack(spacing: 12) {
                 GeometryReader { geo in
                     let h = geo.size.height
@@ -518,6 +568,45 @@ struct Working2: View {
             }
         }
         .onDisappear { holdTimer?.invalidate() }
+    }
+}
+
+// MARK: - CoinBurstView
+
+// 從水桶中心沿 2 點鐘方向（順時針從 12 點量起 60 度）依序噴出一排金幣，
+// 全部出現後再依相同順序一顆顆消失；appeared/disappeared 由 Working2 的計時序列驅動。
+private struct CoinBurstView: View {
+    let bucketFraction: CGPoint
+    let count: Int
+    let appeared: Int
+    let disappeared: Int
+
+    private static let spacing: CGFloat = 20
+    private static let coinSize: CGFloat = 28
+    private static let directionAngleDegrees: Double = 60
+
+    var body: some View {
+        GeometryReader { geo in
+            let center = Working2.overlayPosition(for: bucketFraction, in: geo.size)
+            let radians = Self.directionAngleDegrees * .pi / 180
+            let dx = sin(radians)
+            let dy = -cos(radians)
+
+            ForEach(0..<count, id: \.self) { i in
+                if i < appeared && i >= disappeared {
+                    Image("CoinIcon")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: Self.coinSize, height: Self.coinSize)
+                        .position(
+                            x: center.x + CGFloat(dx) * Self.spacing * CGFloat(i + 1),
+                            y: center.y + CGFloat(dy) * Self.spacing * CGFloat(i + 1)
+                        )
+                        .transition(.scale.combined(with: .opacity))
+                }
+            }
+        }
+        .allowsHitTesting(false)
     }
 }
 
