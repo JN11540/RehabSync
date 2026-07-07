@@ -322,72 +322,75 @@ struct Working2: View {
             .padding(.top, 48)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
-            if showCatchAnimation {
-                Image("GetFishIcon")
-                    .resizable()
-                    .scaledToFill()
-                    .clipped()
-                    .padding(48)
+            Group {
+                if showCatchAnimation {
+                    Image("GetFishIcon")
+                        .resizable()
+                        .scaledToFill()
+                        .clipped()
+                        .padding(48)
 
-                Image("WaterSplashIcon")
-                    .resizable()
-                    .scaledToFill()
-                    .clipped()
-                    .padding(48)
+                    Image("WaterSplashIcon")
+                        .resizable()
+                        .scaledToFill()
+                        .clipped()
+                        .padding(48)
+
+                    GeometryReader { geo in
+                        Image(caughtFishSize.imageName)
+                            .resizable()
+                            .scaledToFit()
+                            .modifier(ParabolicPosition(
+                                progress: catchProgress,
+                                start: Self.overlayPosition(for: Self.splashFraction, in: geo.size),
+                                end: Self.overlayPosition(for: caughtFishSize.bucketFraction, in: geo.size),
+                                arcHeight: 150,
+                                startSize: caughtFishSize.size,
+                                endSize: 50
+                            ))
+                    }
+                } else if let angle = btVM.currentEstimatedRealAngle, angle <= Self.holdThreshold {
+                    Image("NoGetFishIcon")
+                        .resizable()
+                        .scaledToFill()
+                        .clipped()
+                        .padding(48)
+                } else {
+                    Image("IdleFishingIcon")
+                        .resizable()
+                        .scaledToFill()
+                        .clipped()
+                        .padding(48)
+                }
 
                 GeometryReader { geo in
-                    Image(caughtFishSize.imageName)
+                    Image("BigBucketOnlyIcon")
                         .resizable()
-                        .scaledToFit()
-                        .modifier(ParabolicPosition(
-                            progress: catchProgress,
-                            start: Self.overlayPosition(for: Self.splashFraction, in: geo.size),
-                            end: Self.overlayPosition(for: caughtFishSize.bucketFraction, in: geo.size),
-                            arcHeight: 150,
-                            startSize: caughtFishSize.size,
-                            endSize: 50
-                        ))
+                        .scaledToFill()
+                        .clipped()
+                        .padding(48)
+                        .scaleEffect(bigBucketScale, anchor: Self.overlayAnchor(for: CaughtFishSize.big.bucketFraction, in: geo.size))
                 }
-            } else if let angle = btVM.currentEstimatedRealAngle, angle <= Self.holdThreshold {
-                Image("NoGetFishIcon")
-                    .resizable()
-                    .scaledToFill()
-                    .clipped()
-                    .padding(48)
-            } else {
-                Image("IdleFishingIcon")
-                    .resizable()
-                    .scaledToFill()
-                    .clipped()
-                    .padding(48)
-            }
 
-            GeometryReader { geo in
-                Image("BigBucketOnlyIcon")
-                    .resizable()
-                    .scaledToFill()
-                    .clipped()
-                    .padding(48)
-                    .scaleEffect(bigBucketScale, anchor: Self.overlayAnchor(for: CaughtFishSize.big.bucketFraction, in: geo.size))
-            }
+                GeometryReader { geo in
+                    Image("MiddleBucketOnlyIcon")
+                        .resizable()
+                        .scaledToFill()
+                        .clipped()
+                        .padding(48)
+                        .scaleEffect(middleBucketScale, anchor: Self.overlayAnchor(for: CaughtFishSize.middle.bucketFraction, in: geo.size))
+                }
 
-            GeometryReader { geo in
-                Image("MiddleBucketOnlyIcon")
-                    .resizable()
-                    .scaledToFill()
-                    .clipped()
-                    .padding(48)
-                    .scaleEffect(middleBucketScale, anchor: Self.overlayAnchor(for: CaughtFishSize.middle.bucketFraction, in: geo.size))
+                GeometryReader { geo in
+                    Image("SmallBucketOnlyIcon")
+                        .resizable()
+                        .scaledToFill()
+                        .clipped()
+                        .padding(48)
+                        .scaleEffect(smallBucketScale, anchor: Self.overlayAnchor(for: CaughtFishSize.small.bucketFraction, in: geo.size))
+                }
             }
-
-            GeometryReader { geo in
-                Image("SmallBucketOnlyIcon")
-                    .resizable()
-                    .scaledToFill()
-                    .clipped()
-                    .padding(48)
-                    .scaleEffect(smallBucketScale, anchor: Self.overlayAnchor(for: CaughtFishSize.small.bucketFraction, in: geo.size))
-            }
+            .allowsHitTesting(false)
 
             VStack(spacing: 12) {
                 GeometryReader { geo in
