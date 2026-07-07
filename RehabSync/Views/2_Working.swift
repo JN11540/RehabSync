@@ -27,6 +27,8 @@ struct Working2: View {
     @State private var smallCoinElapsed: Double = -1
     @State private var smallCoinTimer: Timer?
     @State private var totalCoins = 0
+    @State private var currentSet = 1
+    @State private var currentRep = 0
 
     private static let holdThreshold: Double = 20
     private static let holdDuration: Double = 5
@@ -158,6 +160,7 @@ struct Working2: View {
         case .middle: middleFishCaught += 1
         case .small:  smallFishCaught += 1
         }
+        advanceWeightliftingProgress()
         showCatchAnimation = true
         catchProgress = 0
         withAnimation(.easeInOut(duration: Self.catchAnimationDuration)) {
@@ -167,6 +170,14 @@ struct Working2: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.catchAnimationDuration) {
             showCatchAnimation = false
             bounceBucket(for: landedSize)
+        }
+    }
+
+    private func advanceWeightliftingProgress() {
+        currentRep += 1
+        if currentRep >= content.reps && currentSet < content.sets {
+            currentRep = 0
+            currentSet += 1
         }
     }
 
@@ -332,7 +343,7 @@ struct Working2: View {
                                 .resizable()
                                 .scaledToFit()
                                 .frame(width: 48, height: 48)
-                            Text("0 組 × 0 次")
+                            Text("第 \(currentSet) 組．第 \(currentRep) 次")
                                 .font(.system(size: 24, weight: .bold))
                                 .foregroundStyle(.black)
                         }
