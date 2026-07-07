@@ -251,7 +251,7 @@ struct Working2: View {
                                         .rotationEffect(.degrees(20))
                                 }
                             )
-                            .frame(width: 110, height: 40)
+                            .frame(width: 140, height: 40)
                             .clipShape(RoundedRectangle(cornerRadius: 4))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 4)
@@ -268,9 +268,11 @@ struct Working2: View {
                             Text("\(totalCoins)")
                                 .font(.system(size: 24, weight: .bold))
                                 .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.5)
                         }
                     }
-                    .frame(width: 110, height: 48)
+                    .frame(width: 140, height: 48)
                     .frame(maxWidth: .infinity, alignment: .trailing)
                     .padding(.trailing, 16)
 
@@ -663,7 +665,7 @@ private struct CoinBurstView: View {
                     }
                     Text(label)
                         .font(.system(size: fontSize, weight: .bold))
-                        .foregroundStyle(Color(red: 0.937, green: 0.749, blue: 0.016))
+                        .foregroundStyle(Color(red: 1.0, green: 0.8, blue: 0.0))
                 }
                 .position(x: centerPos.x, y: centerPos.y - 200)
             }
