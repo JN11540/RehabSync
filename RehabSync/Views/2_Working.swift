@@ -175,7 +175,7 @@ struct Working2: View {
                                 .resizable()
                                 .scaledToFit()
                                 .frame(width: 48, height: 48)
-                                .offset(x: -20)
+                                .offset(x: -28)
 
                             Text("0")
                                 .font(.system(size: 24, weight: .bold))
@@ -425,7 +425,7 @@ struct Working2: View {
                 .frame(width: 130, height: 130)
             }
             .padding(24)
-            .offset(y: -100)
+            .offset(x: 40, y: -100)
         }
         .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
             if let angle = newValue, angle <= Self.holdThreshold {
