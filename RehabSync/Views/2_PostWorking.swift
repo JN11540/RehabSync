@@ -53,7 +53,7 @@ struct PostWorking2: View {
                     RoundedRectangle(cornerRadius: 8)
                         .fill(Color.white)
                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 1.5))
-                        .frame(height: 70)
+                        .frame(height: 100)
 
                     HStack(spacing: 16) {
                         RoundedRectangle(cornerRadius: 8)
@@ -63,7 +63,7 @@ struct PostWorking2: View {
                             .fill(Color.white)
                             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 1.5))
                     }
-                    .frame(height: 100)
+                    .frame(height: 250)
 
                     HStack(spacing: 16) {
                         RoundedRectangle(cornerRadius: 8)
@@ -73,7 +73,7 @@ struct PostWorking2: View {
                             .fill(Color.white)
                             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 1.5))
                     }
-                    .frame(height: 100)
+                    .frame(height: 250)
                 }
                 .padding(.horizontal, 32)
                 .padding(.top, 4)
