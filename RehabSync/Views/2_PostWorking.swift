@@ -35,7 +35,7 @@ struct PostWorking2: View {
 
                     VStack(spacing: 16) {
                         HStack(spacing: 16) {
-                            ZStack(alignment: .topLeading) {
+                            ZStack {
                                 RoundedRectangle(cornerRadius: 8)
                                     .fill(Color(red: 1.0, green: 0.85, blue: 0.35))
                                     .overlay(
@@ -45,7 +45,13 @@ struct PostWorking2: View {
                                 Image("CoinIcon")
                                     .resizable()
                                     .scaledToFit()
-                                    .frame(width: 28, height: 28)
+                                    .frame(width: 40, height: 40)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                                    .padding(8)
+                                Text("金幣")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                                     .padding(8)
                             }
 
