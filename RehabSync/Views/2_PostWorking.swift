@@ -194,41 +194,46 @@ struct PostWorking2: View {
                                             .stroke(Color(red: 0.70, green: 0.52, blue: 0.10), lineWidth: 3)
                                     )
 
-                                VStack(spacing: 0) {
-                                    Spacer()
-                                    HStack(alignment: .bottom, spacing: 16) {
-                                        VStack(spacing: 4) {
-                                            Text("0")
-                                                .font(.system(size: 30, weight: .semibold))
-                                                .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
-                                            Rectangle()
-                                                .fill(Color(red: 1.0, green: 0.85, blue: 0.60))
-                                                .frame(width: 200, height: 60)
+                                GeometryReader { geo in
+                                    let barWidth = max((geo.size.width - 32 - 16) / 2, 0)
+
+                                    VStack(spacing: 0) {
+                                        Spacer()
+                                        HStack(alignment: .bottom, spacing: 16) {
+                                            VStack(spacing: 4) {
+                                                Text("0")
+                                                    .font(.system(size: 30, weight: .semibold))
+                                                    .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
+                                                Rectangle()
+                                                    .fill(Color(red: 1.0, green: 0.85, blue: 0.60))
+                                                    .frame(width: barWidth, height: 60)
+                                            }
+                                            VStack(spacing: 4) {
+                                                Text("1000")
+                                                    .font(.system(size: 30, weight: .semibold))
+                                                    .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
+                                                Rectangle()
+                                                    .fill(Color(red: 1.0, green: 0.70, blue: 0.25))
+                                                    .frame(width: barWidth, height: 110)
+                                            }
                                         }
-                                        VStack(spacing: 4) {
-                                            Text("1000")
-                                                .font(.system(size: 30, weight: .semibold))
+                                        Rectangle()
+                                            .fill(Color(red: 0.70, green: 0.52, blue: 0.10))
+                                            .frame(height: 2)
+                                        HStack(spacing: 16) {
+                                            Text("2026/07/07 15:00")
+                                                .font(.system(size: 20, weight: .semibold))
                                                 .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
-                                            Rectangle()
-                                                .fill(Color(red: 1.0, green: 0.70, blue: 0.25))
-                                                .frame(width: 200, height: 110)
+                                                .frame(width: barWidth)
+                                            Text("2026/07/07 17:00")
+                                                .font(.system(size: 20, weight: .semibold))
+                                                .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
+                                                .frame(width: barWidth)
                                         }
                                     }
-                                    Rectangle()
-                                        .fill(Color(red: 0.70, green: 0.52, blue: 0.10))
-                                        .frame(height: 2)
-                                    HStack(spacing: 16) {
-                                        Text("2026/07/07 15:00")
-                                            .font(.system(size: 20, weight: .semibold))
-                                            .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
-                                            .frame(width: 200)
-                                        Text("2026/07/07 17:00")
-                                            .font(.system(size: 20, weight: .semibold))
-                                            .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
-                                            .frame(width: 200)
-                                    }
+                                    .padding(16)
+                                    .frame(width: geo.size.width, height: geo.size.height)
                                 }
-                                .padding(16)
 
                                 Image("CoinIcon")
                                     .resizable()
