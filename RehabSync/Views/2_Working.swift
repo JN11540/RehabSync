@@ -177,14 +177,9 @@ struct Working2: View {
     }
 
     private func advanceWeightliftingProgress() {
+        currentRep += 1
         if currentRep >= content.reps && currentSet < content.sets {
-            currentRep = 1
-            currentSet += 1
-        } else {
-            currentRep += 1
-            if currentRep >= content.reps && currentSet < content.sets {
-                startSetRestCountdown()
-            }
+            startSetRestCountdown()
         }
     }
 
@@ -204,6 +199,10 @@ struct Working2: View {
         setRestTimer?.invalidate()
         setRestTimer = nil
         showSetRestPopup = false
+        if currentSet < content.sets {
+            currentSet += 1
+        }
+        currentRep = 0
     }
 
     private func bounceBucket(for size: CaughtFishSize) {
