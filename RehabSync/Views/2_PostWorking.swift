@@ -83,7 +83,31 @@ struct PostWorking2: View {
                                 .padding(8)
                             }
 
-                            ForEach(0..<4, id: \.self) { _ in
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color(red: 0.85, green: 0.96, blue: 0.99))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(Color(red: 0.490, green: 0.824, blue: 0.937), lineWidth: 3)
+                                    )
+                                Image("TotalTimeIcon")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 60, height: 60)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                                    .padding(8)
+                                VStack(spacing: 2) {
+                                    Text("0")
+                                        .font(.system(size: 30, weight: .bold))
+                                    Text("總時長")
+                                        .font(.system(size: 20, weight: .semibold))
+                                }
+                                .foregroundStyle(Color(red: 0.490, green: 0.824, blue: 0.937))
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                                .padding(8)
+                            }
+
+                            ForEach(0..<3, id: \.self) { _ in
                                 RoundedRectangle(cornerRadius: 8)
                                     .fill(Color.white)
                                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(white: 0.6), lineWidth: 1.5))
