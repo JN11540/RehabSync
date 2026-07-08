@@ -598,7 +598,10 @@ struct Working2: View {
                 ConfirmPopup(
                     message: "您是否要直接跳過，進入組間休息？",
                     onCancel: { showRestPopup = false },
-                    onConfirm: { showRestPopup = false }
+                    onConfirm: {
+                        showRestPopup = false
+                        startSetRestCountdown()
+                    }
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             }
