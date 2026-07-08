@@ -29,13 +29,11 @@ struct PostWorking2: View {
                 .ignoresSafeArea()
 
             VStack {
-                HStack {
+                HStack(spacing: 12) {
                     Image("FinishGameLeftIcon")
                         .resizable()
                         .scaledToFit()
                         .frame(width: 150, height: 150)
-
-                    Spacer()
 
                     HStack(spacing: 6) {
                         ForEach(0..<Self.congratsText.count, id: \.self) { i in
@@ -43,15 +41,42 @@ struct PostWorking2: View {
                         }
                     }
 
-                    Spacer()
-
                     Image("FinishGameRightIcon")
                         .resizable()
                         .scaledToFit()
                         .frame(width: 150, height: 150)
                 }
-                .padding(.horizontal, 32)
+                .frame(maxWidth: .infinity)
                 .padding(.top, 32)
+
+                VStack(spacing: 16) {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.white)
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 1.5))
+                        .frame(height: 70)
+
+                    HStack(spacing: 16) {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.white)
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 1.5))
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.white)
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 1.5))
+                    }
+                    .frame(height: 100)
+
+                    HStack(spacing: 16) {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.white)
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 1.5))
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.white)
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 1.5))
+                    }
+                    .frame(height: 100)
+                }
+                .padding(.horizontal, 32)
+                .padding(.top, 24)
 
                 Spacer()
             }
