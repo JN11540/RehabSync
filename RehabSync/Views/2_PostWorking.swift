@@ -48,6 +48,7 @@ struct PostWorking2: View {
                                     .frame(width: 60, height: 60)
                                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                                     .padding(8)
+                                    .offset(x: -20, y: -30)
                                 Text("金幣")
                                     .font(.system(size: 20, weight: .semibold))
                                     .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
