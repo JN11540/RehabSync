@@ -48,14 +48,14 @@ struct PostWorking2: View {
                                     .frame(width: 60, height: 60)
                                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                                     .padding(8)
-                                    .offset(x: -10, y: -25)
+                                    .offset(x: -10, y: -40)
                                 VStack(spacing: 2) {
                                     Text("0")
                                         .font(.system(size: 30, weight: .bold))
                                     Text("金幣")
                                         .font(.system(size: 20, weight: .semibold))
                                 }
-                                .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
+                                .foregroundStyle(Color.black)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                                 .padding(8)
                             }
@@ -78,7 +78,7 @@ struct PostWorking2: View {
                                     Text("總次數")
                                         .font(.system(size: 20, weight: .semibold))
                                 }
-                                .foregroundStyle(Color(red: 0.314, green: 0.647, blue: 0.863))
+                                .foregroundStyle(Color.black)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                                 .padding(8)
                             }
@@ -103,7 +103,7 @@ struct PostWorking2: View {
                                     Text("總時長")
                                         .font(.system(size: 20, weight: .semibold))
                                 }
-                                .foregroundStyle(Color(red: 0.490, green: 0.824, blue: 0.937))
+                                .foregroundStyle(Color.black)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                                 .padding(8)
                             }
@@ -121,12 +121,16 @@ struct PostWorking2: View {
                                     .frame(width: 60, height: 60)
                                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                                     .padding(8)
-                                    .offset(y: -10)
-                                Text("個")
-                                    .font(.system(size: 20, weight: .semibold))
-                                    .foregroundStyle(Color(red: 0.678, green: 0.776, blue: 0.804))
-                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                                    .padding(8)
+                                    .offset(y: -20)
+                                VStack(spacing: 2) {
+                                    Text("0")
+                                        .font(.system(size: 30, weight: .bold))
+                                    Text("個")
+                                        .font(.system(size: 20, weight: .semibold))
+                                }
+                                .foregroundStyle(Color.black)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                                .padding(8)
                             }
 
                             ZStack {
@@ -142,12 +146,16 @@ struct PostWorking2: View {
                                     .frame(width: 60, height: 60)
                                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                                     .padding(8)
-                                    .offset(y: -10)
-                                Text("個")
-                                    .font(.system(size: 20, weight: .semibold))
-                                    .foregroundStyle(Color(red: 0.992, green: 0.827, blue: 0.427))
-                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                                    .padding(8)
+                                    .offset(y: -20)
+                                VStack(spacing: 2) {
+                                    Text("0")
+                                        .font(.system(size: 30, weight: .bold))
+                                    Text("個")
+                                        .font(.system(size: 20, weight: .semibold))
+                                }
+                                .foregroundStyle(Color.black)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                                .padding(8)
                             }
 
                             ZStack {
@@ -163,10 +171,14 @@ struct PostWorking2: View {
                                     .frame(width: 60, height: 60)
                                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                                     .padding(8)
-                                    .offset(y: -10)
-                                Text("個")
-                                    .font(.system(size: 20, weight: .semibold))
-                                    .foregroundStyle(Color(red: 0.949, green: 0.773, blue: 0.800))
+                                    .offset(y: -20)
+                                VStack(spacing: 2) {
+                                    Text("0")
+                                        .font(.system(size: 30, weight: .bold))
+                                    Text("個")
+                                        .font(.system(size: 20, weight: .semibold))
+                                }
+                                .foregroundStyle(Color.black)
                                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                                     .padding(8)
                             }
