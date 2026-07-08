@@ -269,7 +269,7 @@ struct Working2: View {
                                         .rotationEffect(.degrees(20))
                                 }
                             )
-                            .frame(width: 140, height: 40)
+                            .frame(width: 115, height: 40)
                             .clipShape(RoundedRectangle(cornerRadius: 4))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 4)
@@ -290,7 +290,7 @@ struct Working2: View {
                                 .minimumScaleFactor(0.5)
                         }
                     }
-                    .frame(width: 140, height: 48)
+                    .frame(width: 115, height: 48)
                     .frame(maxWidth: .infinity, alignment: .trailing)
                     .padding(.trailing, 16)
 
