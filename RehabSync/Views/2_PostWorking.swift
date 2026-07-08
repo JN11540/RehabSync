@@ -33,14 +33,14 @@ struct PostWorking2: View {
                     Image("FinishGameLeftIcon")
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 80, height: 80)
+                        .frame(width: 150, height: 150)
 
                     Spacer()
 
                     HStack(spacing: 6) {
                         ForEach(0..<Self.congratsText.count, id: \.self) { i in
                             Text(Self.congratsText[i])
-                                .font(.system(size: 34, weight: .bold))
+                                .font(.system(size: 50, weight: .bold))
                                 .foregroundStyle(Self.congratsColors[i])
                         }
                     }
@@ -50,7 +50,7 @@ struct PostWorking2: View {
                     Image("FinishGameRightIcon")
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 80, height: 80)
+                        .frame(width: 150, height: 150)
                 }
                 .padding(.horizontal, 32)
                 .padding(.top, 32)
