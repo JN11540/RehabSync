@@ -637,7 +637,7 @@ struct Working2: View {
                 Color.black.opacity(0.3)
                     .ignoresSafeArea()
 
-                CompletionPopup()
+                CompletionPopup(onComplete: { showCompletionPopup = false })
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             }
         }
@@ -870,22 +870,44 @@ private struct SetRestPopup: View {
 // MARK: - CompletionPopup
 
 private struct CompletionPopup: View {
+    let onComplete: () -> Void
+
     var body: some View {
-        VStack(spacing: 0) {
-            ZStack {
-                Color.white
-                Image("FishingEndIcon")
-                    .resizable()
-                    .scaledToFit()
-                    .padding(12)
+        ZStack(alignment: .bottomTrailing) {
+            VStack(spacing: 0) {
+                ZStack {
+                    Color.white
+                    Image("FishingEndIcon")
+                        .resizable()
+                        .scaledToFit()
+                        .padding(12)
+                }
+
+                Text("恭喜完成！")
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(.black)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+                    .background(Color(red: 0.86, green: 0.90, blue: 0.94))
             }
 
-            Text("恭喜完成！")
-                .font(.system(size: 22, weight: .bold))
-                .foregroundStyle(.black)
-                .frame(maxWidth: .infinity)
-                .frame(height: 56)
-                .background(Color(red: 0.86, green: 0.90, blue: 0.94))
+            Button(action: onComplete) {
+                Text("完成")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color.white)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(Color.black, lineWidth: 1.5)
+                            )
+                    )
+            }
+            .buttonStyle(.plain)
+            .padding(12)
         }
         .frame(width: 520, height: 400)
         .clipShape(RoundedRectangle(cornerRadius: 8))
