@@ -20,6 +20,9 @@ struct Working2: View {
     @State private var smallBucketScale: CGFloat = 1
     @State private var showRestPopup = false
     @State private var showExitConfirmPopup = false
+    @State private var showSetRestPopup = false
+    @State private var setRestCountdown: Int = 0
+    @State private var setRestTimer: Timer?
     @State private var bigCoinElapsed: Double = -1
     @State private var bigCoinTimer: Timer?
     @State private var middleCoinElapsed: Double = -1
@@ -179,7 +182,28 @@ struct Working2: View {
             currentSet += 1
         } else {
             currentRep += 1
+            if currentRep >= content.reps && currentSet < content.sets {
+                startSetRestCountdown()
+            }
         }
+    }
+
+    private func startSetRestCountdown() {
+        setRestTimer?.invalidate()
+        setRestCountdown = content.set_rest_time
+        showSetRestPopup = true
+        setRestTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            setRestCountdown -= 1
+            if setRestCountdown <= 0 {
+                closeSetRestPopup()
+            }
+        }
+    }
+
+    private func closeSetRestPopup() {
+        setRestTimer?.invalidate()
+        setRestTimer = nil
+        showSetRestPopup = false
     }
 
     private func bounceBucket(for size: CaughtFishSize) {
@@ -590,6 +614,17 @@ struct Working2: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             }
+
+            if showSetRestPopup {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+
+                SetRestPopup(
+                    secondsRemaining: setRestCountdown,
+                    onSkip: { closeSetRestPopup() }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            }
         }
         .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
             if let angle = newValue, angle <= Self.holdThreshold {
@@ -603,6 +638,7 @@ struct Working2: View {
             bigCoinTimer?.invalidate()
             middleCoinTimer?.invalidate()
             smallCoinTimer?.invalidate()
+            setRestTimer?.invalidate()
         }
     }
 }
@@ -751,6 +787,61 @@ private struct ConfirmPopup: View {
             .buttonStyle(.plain)
             .padding(12)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+        }
+        .frame(width: 320, height: 220)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.black, lineWidth: 1.5)
+        )
+    }
+}
+
+// MARK: - SetRestPopup
+
+private struct SetRestPopup: View {
+    let secondsRemaining: Int
+    let onSkip: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.white
+
+            VStack(spacing: 24) {
+                Text("組間休息時間")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(.black)
+
+                HStack(spacing: 32) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.white)
+                        Circle()
+                            .strokeBorder(Color.black, lineWidth: 1.5)
+                        Text("\(max(secondsRemaining, 0))")
+                            .font(.system(size: 32, weight: .bold))
+                            .foregroundStyle(.black)
+                            .minimumScaleFactor(0.5)
+                            .lineLimit(1)
+                            .padding(8)
+                    }
+                    .frame(width: 90, height: 90)
+
+                    Button(action: onSkip) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.white)
+                            Circle()
+                                .strokeBorder(Color.black, lineWidth: 1.5)
+                            Text("跳過")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(.black)
+                        }
+                        .frame(width: 90, height: 90)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
         }
         .frame(width: 320, height: 220)
         .clipShape(RoundedRectangle(cornerRadius: 8))
