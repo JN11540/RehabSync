@@ -60,7 +60,29 @@ struct PostWorking2: View {
                                 .padding(8)
                             }
 
-                            ForEach(0..<5, id: \.self) { _ in
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color(red: 0.75, green: 0.90, blue: 0.98))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(Color(red: 0.314, green: 0.647, blue: 0.863), lineWidth: 3)
+                                    )
+                                Image("RepsIcon")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 60, height: 60)
+                                VStack(spacing: 2) {
+                                    Text("0")
+                                        .font(.system(size: 30, weight: .bold))
+                                    Text("總次數")
+                                        .font(.system(size: 20, weight: .semibold))
+                                }
+                                .foregroundStyle(Color(red: 0.314, green: 0.647, blue: 0.863))
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                                .padding(8)
+                            }
+
+                            ForEach(0..<4, id: \.self) { _ in
                                 RoundedRectangle(cornerRadius: 8)
                                     .fill(Color.white)
                                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(white: 0.6), lineWidth: 1.5))
