@@ -48,7 +48,7 @@ struct PostWorking2: View {
                                     .frame(width: 60, height: 60)
                                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                                     .padding(8)
-                                    .offset(x: -10, y: -10)
+                                    .offset(x: -10, y: -15)
                                 VStack(spacing: 2) {
                                     Text("0")
                                         .font(.system(size: 30, weight: .bold))
@@ -108,10 +108,64 @@ struct PostWorking2: View {
                                 .padding(8)
                             }
 
-                            ForEach(0..<3, id: \.self) { _ in
+                            ZStack {
                                 RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color.white)
-                                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(white: 0.6), lineWidth: 1.5))
+                                    .fill(Color(red: 0.88, green: 0.93, blue: 0.95))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(Color(red: 0.678, green: 0.776, blue: 0.804), lineWidth: 3)
+                                    )
+                                Image("BigFishIcon")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 60, height: 60)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                                    .padding(8)
+                                Text("個")
+                                    .font(.system(size: 20, weight: .semibold))
+                                    .foregroundStyle(Color(red: 0.678, green: 0.776, blue: 0.804))
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                                    .padding(8)
+                            }
+
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color(red: 0.99, green: 0.93, blue: 0.75))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(Color(red: 0.992, green: 0.827, blue: 0.427), lineWidth: 3)
+                                    )
+                                Image("MiddleFishIcon")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 60, height: 60)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                                    .padding(8)
+                                Text("個")
+                                    .font(.system(size: 20, weight: .semibold))
+                                    .foregroundStyle(Color(red: 0.992, green: 0.827, blue: 0.427))
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                                    .padding(8)
+                            }
+
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color(red: 0.98, green: 0.90, blue: 0.92))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(Color(red: 0.949, green: 0.773, blue: 0.800), lineWidth: 3)
+                                    )
+                                Image("SmallFishIcon")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 60, height: 60)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                                    .padding(8)
+                                Text("個")
+                                    .font(.system(size: 20, weight: .semibold))
+                                    .foregroundStyle(Color(red: 0.949, green: 0.773, blue: 0.800))
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                                    .padding(8)
                             }
                         }
                         .frame(height: 100)
