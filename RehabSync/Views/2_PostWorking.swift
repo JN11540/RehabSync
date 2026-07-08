@@ -31,11 +31,25 @@ struct PostWorking2: View {
                             .frame(width: 150, height: 150)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.top, 32)
+                    .padding(.top, 16)
 
                     VStack(spacing: 16) {
                         HStack(spacing: 16) {
-                            ForEach(0..<6, id: \.self) { _ in
+                            ZStack(alignment: .topLeading) {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color(red: 1.0, green: 0.85, blue: 0.35))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(Color(red: 0.70, green: 0.52, blue: 0.10), lineWidth: 3)
+                                    )
+                                Image("CoinIcon")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 28, height: 28)
+                                    .padding(8)
+                            }
+
+                            ForEach(0..<5, id: \.self) { _ in
                                 RoundedRectangle(cornerRadius: 8)
                                     .fill(Color.white)
                                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(white: 0.6), lineWidth: 1.5))
