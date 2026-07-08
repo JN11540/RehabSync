@@ -48,7 +48,7 @@ struct PostWorking2: View {
                                     .frame(width: 60, height: 60)
                                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                                     .padding(8)
-                                    .offset(x: -10, y: -40)
+                                    .offset(x: -10, y: -30)
                                 VStack(spacing: 2) {
                                     Text("0")
                                         .font(.system(size: 30, weight: .bold))
@@ -186,9 +186,29 @@ struct PostWorking2: View {
                         .frame(height: 100)
 
                         HStack(spacing: 16) {
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.white)
-                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(white: 0.6), lineWidth: 1.5))
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.white)
+                                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(white: 0.6), lineWidth: 1.5))
+
+                                VStack(spacing: 0) {
+                                    Spacer()
+                                    HStack(alignment: .bottom, spacing: 16) {
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .fill(Color(red: 1.0, green: 0.80, blue: 0.60))
+                                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.black, lineWidth: 4))
+                                            .frame(width: 40, height: 60)
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .fill(Color(red: 1.0, green: 0.60, blue: 0.20))
+                                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.black, lineWidth: 4))
+                                            .frame(width: 40, height: 110)
+                                    }
+                                    Rectangle()
+                                        .fill(Color.black)
+                                        .frame(height: 6)
+                                }
+                                .padding(16)
+                            }
                             RoundedRectangle(cornerRadius: 8)
                                 .fill(Color.white)
                                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(white: 0.6), lineWidth: 1.5))
