@@ -604,7 +604,11 @@ struct Working2: View {
                     onCancel: { showRestPopup = false },
                     onConfirm: {
                         showRestPopup = false
-                        startSetRestCountdown()
+                        if currentSet < content.sets {
+                            startSetRestCountdown()
+                        } else {
+                            showCompletionPopup = true
+                        }
                     }
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
