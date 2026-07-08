@@ -5,7 +5,6 @@ import SwiftUI
 struct Working2: View {
     let content: TreatmentContent
     let exercise: Exercise?
-    @Environment(\.dismiss) private var dismiss
     @Environment(BluetoothViewModel.self) private var btVM
     @State private var holdElapsed: Double = 0
     @State private var holdTimer: Timer?
@@ -24,6 +23,7 @@ struct Working2: View {
     @State private var setRestCountdown: Int = 0
     @State private var setRestTimer: Timer?
     @State private var showCompletionPopup = false
+    @State private var navigateToPostWorking2 = false
     @State private var bigCoinElapsed: Double = -1
     @State private var bigCoinTimer: Timer?
     @State private var middleCoinElapsed: Double = -1
@@ -621,7 +621,10 @@ struct Working2: View {
                 ConfirmPopup(
                     message: "您確定要結束遊戲嗎？",
                     onCancel: { showExitConfirmPopup = false },
-                    onConfirm: { dismiss() }
+                    onConfirm: {
+                        showExitConfirmPopup = false
+                        navigateToPostWorking2 = true
+                    }
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             }
@@ -641,9 +644,15 @@ struct Working2: View {
                 Color.black.opacity(0.3)
                     .ignoresSafeArea()
 
-                CompletionPopup(onComplete: { showCompletionPopup = false })
+                CompletionPopup(onComplete: {
+                    showCompletionPopup = false
+                    navigateToPostWorking2 = true
+                })
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             }
+        }
+        .fullScreenCover(isPresented: $navigateToPostWorking2) {
+            PostWorking2(content: content, exercise: exercise)
         }
         .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
             if let angle = newValue, angle <= Self.holdThreshold {
