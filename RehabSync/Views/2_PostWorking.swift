@@ -76,7 +76,7 @@ struct PostWorking2: View {
                     .frame(height: 100)
                 }
                 .padding(.horizontal, 32)
-                .padding(.top, 24)
+                .padding(.top, 4)
 
                 Spacer()
             }
