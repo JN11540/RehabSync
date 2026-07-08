@@ -71,6 +71,7 @@ struct PostWorking2: View {
                                     .resizable()
                                     .scaledToFit()
                                     .frame(width: 60, height: 60)
+                                    .offset(x: -25, y: -20)
                                 VStack(spacing: 2) {
                                     Text("0")
                                         .font(.system(size: 30, weight: .bold))
