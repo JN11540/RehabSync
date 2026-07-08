@@ -29,7 +29,7 @@ struct PostWorking2: View {
                 .ignoresSafeArea()
 
             VStack {
-                HStack(spacing: 12) {
+                HStack(alignment: .bottom, spacing: 12) {
                     Image("FinishGameLeftIcon")
                         .resizable()
                         .scaledToFit()
@@ -76,7 +76,7 @@ struct PostWorking2: View {
                     .frame(height: 250)
                 }
                 .padding(.horizontal, 32)
-                .padding(.top, 4)
+                .padding(.top, 0)
 
                 Spacer()
             }
