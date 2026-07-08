@@ -23,6 +23,7 @@ struct Working2: View {
     @State private var showSetRestPopup = false
     @State private var setRestCountdown: Int = 0
     @State private var setRestTimer: Timer?
+    @State private var showCompletionPopup = false
     @State private var bigCoinElapsed: Double = -1
     @State private var bigCoinTimer: Timer?
     @State private var middleCoinElapsed: Double = -1
@@ -178,8 +179,12 @@ struct Working2: View {
 
     private func advanceWeightliftingProgress() {
         currentRep += 1
-        if currentRep >= content.reps && currentSet < content.sets {
-            startSetRestCountdown()
+        if currentRep >= content.reps {
+            if currentSet < content.sets {
+                startSetRestCountdown()
+            } else {
+                showCompletionPopup = true
+            }
         }
     }
 
@@ -627,6 +632,14 @@ struct Working2: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             }
+
+            if showCompletionPopup {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+
+                CompletionPopup()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            }
         }
         .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
             if let angle = newValue, angle <= Self.holdThreshold {
@@ -844,6 +857,29 @@ private struct SetRestPopup: View {
                     .buttonStyle(.plain)
                 }
             }
+        }
+        .frame(width: 320, height: 220)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.black, lineWidth: 1.5)
+        )
+    }
+}
+
+// MARK: - CompletionPopup
+
+private struct CompletionPopup: View {
+    var body: some View {
+        VStack(spacing: 0) {
+            Color.white
+
+            Text("恭喜完成！")
+                .font(.system(size: 22, weight: .bold))
+                .foregroundStyle(.black)
+                .frame(maxWidth: .infinity)
+                .frame(height: 56)
+                .background(Color(red: 0.86, green: 0.90, blue: 0.94))
         }
         .frame(width: 320, height: 220)
         .clipShape(RoundedRectangle(cornerRadius: 8))
