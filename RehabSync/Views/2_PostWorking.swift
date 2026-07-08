@@ -77,6 +77,7 @@ struct PostWorking2: View {
                 }
                 .padding(.horizontal, 32)
                 .padding(.top, 0)
+                .offset(y: -50)
 
                 Spacer()
             }
