@@ -49,11 +49,15 @@ struct PostWorking2: View {
                                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                                     .padding(8)
                                     .offset(x: -20, y: -30)
-                                Text("金幣")
-                                    .font(.system(size: 20, weight: .semibold))
-                                    .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
-                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                                    .padding(8)
+                                VStack(spacing: 2) {
+                                    Text("0")
+                                        .font(.system(size: 30, weight: .bold))
+                                    Text("金幣")
+                                        .font(.system(size: 20, weight: .semibold))
+                                }
+                                .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                                .padding(8)
                             }
 
                             ForEach(0..<5, id: \.self) { _ in
