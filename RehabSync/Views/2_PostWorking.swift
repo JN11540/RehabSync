@@ -188,8 +188,11 @@ struct PostWorking2: View {
                         HStack(spacing: 16) {
                             ZStack {
                                 RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color.white)
-                                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(white: 0.6), lineWidth: 1.5))
+                                    .fill(Color(red: 1.0, green: 0.96, blue: 0.85))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(Color(red: 0.70, green: 0.52, blue: 0.10), lineWidth: 3)
+                                    )
 
                                 VStack(spacing: 0) {
                                     Spacer()
@@ -197,35 +200,42 @@ struct PostWorking2: View {
                                         VStack(spacing: 4) {
                                             Text("0")
                                                 .font(.system(size: 30, weight: .semibold))
-                                                .foregroundStyle(.black)
+                                                .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
                                             Rectangle()
-                                                .fill(Color(red: 1.0, green: 0.80, blue: 0.60))
+                                                .fill(Color(red: 1.0, green: 0.85, blue: 0.60))
                                                 .frame(width: 200, height: 60)
                                         }
                                         VStack(spacing: 4) {
                                             Text("1000")
                                                 .font(.system(size: 30, weight: .semibold))
-                                                .foregroundStyle(.black)
+                                                .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
                                             Rectangle()
-                                                .fill(Color(red: 1.0, green: 0.60, blue: 0.20))
+                                                .fill(Color(red: 1.0, green: 0.70, blue: 0.25))
                                                 .frame(width: 200, height: 110)
                                         }
                                     }
                                     Rectangle()
-                                        .fill(Color.black)
+                                        .fill(Color(red: 0.70, green: 0.52, blue: 0.10))
                                         .frame(height: 2)
                                     HStack(spacing: 16) {
                                         Text("2026/07/07 15:00")
-                                            .font(.system(size: 14, weight: .semibold))
-                                            .foregroundStyle(.black)
+                                            .font(.system(size: 20, weight: .semibold))
+                                            .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
                                             .frame(width: 200)
                                         Text("2026/07/07 17:00")
-                                            .font(.system(size: 14, weight: .semibold))
-                                            .foregroundStyle(.black)
+                                            .font(.system(size: 20, weight: .semibold))
+                                            .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
                                             .frame(width: 200)
                                     }
                                 }
                                 .padding(16)
+
+                                Image("CoinIcon")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 40, height: 40)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                                    .padding(8)
                             }
                             RoundedRectangle(cornerRadius: 8)
                                 .fill(Color.white)
