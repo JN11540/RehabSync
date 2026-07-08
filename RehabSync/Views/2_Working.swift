@@ -292,7 +292,7 @@ struct Working2: View {
                                 .offset(x: 38)
                         }
                         .frame(width: 115, height: 48)
-                        .offset(x: -16)
+                        .offset(x: -24)
                     }
                     .frame(width: 115, height: 48)
                     .frame(maxWidth: .infinity, alignment: .trailing)
