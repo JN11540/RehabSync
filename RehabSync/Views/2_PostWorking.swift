@@ -194,14 +194,12 @@ struct PostWorking2: View {
                                 VStack(spacing: 0) {
                                     Spacer()
                                     HStack(alignment: .bottom, spacing: 16) {
-                                        RoundedRectangle(cornerRadius: 6)
+                                        Rectangle()
                                             .fill(Color(red: 1.0, green: 0.80, blue: 0.60))
-                                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.black, lineWidth: 2))
-                                            .frame(width: 300, height: 60)
-                                        RoundedRectangle(cornerRadius: 6)
+                                            .frame(width: 200, height: 60)
+                                        Rectangle()
                                             .fill(Color(red: 1.0, green: 0.60, blue: 0.20))
-                                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.black, lineWidth: 2))
-                                            .frame(width: 300, height: 110)
+                                            .frame(width: 200, height: 110)
                                     }
                                     Rectangle()
                                         .fill(Color.black)
