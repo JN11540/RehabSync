@@ -276,19 +276,22 @@ struct Working2: View {
                                     .stroke(Color(red: 0.70, green: 0.52, blue: 0.10), lineWidth: 3)
                             )
 
-                        HStack(spacing: 6) {
+                        ZStack(alignment: .leading) {
                             Image("CoinIcon")
                                 .resizable()
                                 .scaledToFit()
                                 .frame(width: 48, height: 48)
-                                .offset(x: -32)
+                                .offset(x: -16)
 
                             Text("\(totalCoins)")
                                 .font(.system(size: 24, weight: .bold))
                                 .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.5)
+                                .frame(width: 115 - 38, height: 48)
+                                .offset(x: 38)
                         }
+                        .frame(width: 115, height: 48)
                     }
                     .frame(width: 115, height: 48)
                     .frame(maxWidth: .infinity, alignment: .trailing)
