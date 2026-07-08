@@ -194,16 +194,36 @@ struct PostWorking2: View {
                                 VStack(spacing: 0) {
                                     Spacer()
                                     HStack(alignment: .bottom, spacing: 16) {
-                                        Rectangle()
-                                            .fill(Color(red: 1.0, green: 0.80, blue: 0.60))
-                                            .frame(width: 200, height: 60)
-                                        Rectangle()
-                                            .fill(Color(red: 1.0, green: 0.60, blue: 0.20))
-                                            .frame(width: 200, height: 110)
+                                        VStack(spacing: 4) {
+                                            Text("0 金幣")
+                                                .font(.system(size: 14, weight: .semibold))
+                                                .foregroundStyle(.black)
+                                            Rectangle()
+                                                .fill(Color(red: 1.0, green: 0.80, blue: 0.60))
+                                                .frame(width: 200, height: 60)
+                                                .overlay(
+                                                    Text("2026/07/07 15:00")
+                                                        .font(.system(size: 14, weight: .semibold))
+                                                        .foregroundStyle(.black)
+                                                )
+                                        }
+                                        VStack(spacing: 4) {
+                                            Text("1000 金幣")
+                                                .font(.system(size: 14, weight: .semibold))
+                                                .foregroundStyle(.black)
+                                            Rectangle()
+                                                .fill(Color(red: 1.0, green: 0.60, blue: 0.20))
+                                                .frame(width: 200, height: 110)
+                                                .overlay(
+                                                    Text("2026/07/07 17:00")
+                                                        .font(.system(size: 14, weight: .semibold))
+                                                        .foregroundStyle(.black)
+                                                )
+                                        }
                                     }
                                     Rectangle()
                                         .fill(Color.black)
-                                        .frame(height: 4)
+                                        .frame(height: 2)
                                 }
                                 .padding(16)
                             }
