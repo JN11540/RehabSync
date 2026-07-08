@@ -39,9 +39,7 @@ struct PostWorking2: View {
 
                     HStack(spacing: 6) {
                         ForEach(0..<Self.congratsText.count, id: \.self) { i in
-                            Text(Self.congratsText[i])
-                                .font(.system(size: 50, weight: .bold))
-                                .foregroundStyle(Self.congratsColors[i])
+                            OutlinedCongratsChar(text: Self.congratsText[i], color: Self.congratsColors[i])
                         }
                     }
 
@@ -57,6 +55,32 @@ struct PostWorking2: View {
 
                 Spacer()
             }
+        }
+    }
+}
+
+// MARK: - OutlinedCongratsChar
+
+private struct OutlinedCongratsChar: View {
+    let text: String
+    let color: Color
+
+    private static let outlineOffsets: [CGSize] = [
+        CGSize(width: -2, height: -2), CGSize(width: 2, height: -2),
+        CGSize(width: -2, height: 2), CGSize(width: 2, height: 2)
+    ]
+
+    var body: some View {
+        ZStack {
+            ForEach(0..<Self.outlineOffsets.count, id: \.self) { i in
+                Text(text)
+                    .font(.system(size: 100, weight: .bold))
+                    .foregroundStyle(Color.black)
+                    .offset(Self.outlineOffsets[i])
+            }
+            Text(text)
+                .font(.system(size: 100, weight: .bold))
+                .foregroundStyle(color)
         }
     }
 }
