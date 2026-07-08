@@ -196,16 +196,16 @@ struct PostWorking2: View {
                                     HStack(alignment: .bottom, spacing: 16) {
                                         RoundedRectangle(cornerRadius: 6)
                                             .fill(Color(red: 1.0, green: 0.80, blue: 0.60))
-                                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.black, lineWidth: 4))
-                                            .frame(width: 40, height: 60)
+                                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.black, lineWidth: 2))
+                                            .frame(width: 300, height: 60)
                                         RoundedRectangle(cornerRadius: 6)
                                             .fill(Color(red: 1.0, green: 0.60, blue: 0.20))
-                                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.black, lineWidth: 4))
-                                            .frame(width: 40, height: 110)
+                                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.black, lineWidth: 2))
+                                            .frame(width: 300, height: 110)
                                     }
                                     Rectangle()
                                         .fill(Color.black)
-                                        .frame(height: 6)
+                                        .frame(height: 4)
                                 }
                                 .padding(16)
                             }
