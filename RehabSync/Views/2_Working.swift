@@ -872,7 +872,13 @@ private struct SetRestPopup: View {
 private struct CompletionPopup: View {
     var body: some View {
         VStack(spacing: 0) {
-            Color.white
+            ZStack {
+                Color.white
+                Image("FishingEndIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .padding(12)
+            }
 
             Text("恭喜完成！")
                 .font(.system(size: 22, weight: .bold))
@@ -881,7 +887,7 @@ private struct CompletionPopup: View {
                 .frame(height: 56)
                 .background(Color(red: 0.86, green: 0.90, blue: 0.94))
         }
-        .frame(width: 320, height: 220)
+        .frame(width: 520, height: 400)
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
