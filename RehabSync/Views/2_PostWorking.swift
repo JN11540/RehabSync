@@ -195,35 +195,35 @@ struct PostWorking2: View {
                                     Spacer()
                                     HStack(alignment: .bottom, spacing: 16) {
                                         VStack(spacing: 4) {
-                                            Text("0 金幣")
-                                                .font(.system(size: 14, weight: .semibold))
+                                            Text("0")
+                                                .font(.system(size: 30, weight: .semibold))
                                                 .foregroundStyle(.black)
                                             Rectangle()
                                                 .fill(Color(red: 1.0, green: 0.80, blue: 0.60))
                                                 .frame(width: 200, height: 60)
-                                                .overlay(
-                                                    Text("2026/07/07 15:00")
-                                                        .font(.system(size: 14, weight: .semibold))
-                                                        .foregroundStyle(.black)
-                                                )
                                         }
                                         VStack(spacing: 4) {
-                                            Text("1000 金幣")
-                                                .font(.system(size: 14, weight: .semibold))
+                                            Text("1000")
+                                                .font(.system(size: 30, weight: .semibold))
                                                 .foregroundStyle(.black)
                                             Rectangle()
                                                 .fill(Color(red: 1.0, green: 0.60, blue: 0.20))
                                                 .frame(width: 200, height: 110)
-                                                .overlay(
-                                                    Text("2026/07/07 17:00")
-                                                        .font(.system(size: 14, weight: .semibold))
-                                                        .foregroundStyle(.black)
-                                                )
                                         }
                                     }
                                     Rectangle()
                                         .fill(Color.black)
                                         .frame(height: 2)
+                                    HStack(spacing: 16) {
+                                        Text("2026/07/07 15:00")
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundStyle(.black)
+                                            .frame(width: 200)
+                                        Text("2026/07/07 17:00")
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundStyle(.black)
+                                            .frame(width: 200)
+                                    }
                                 }
                                 .padding(16)
                             }
