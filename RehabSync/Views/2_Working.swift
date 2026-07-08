@@ -174,10 +174,11 @@ struct Working2: View {
     }
 
     private func advanceWeightliftingProgress() {
-        currentRep += 1
         if currentRep >= content.reps && currentSet < content.sets {
-            currentRep = 0
+            currentRep = 1
             currentSet += 1
+        } else {
+            currentRep += 1
         }
     }
 
