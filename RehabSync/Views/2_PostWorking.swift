@@ -48,7 +48,7 @@ struct PostWorking2: View {
                                     .frame(width: 60, height: 60)
                                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                                     .padding(8)
-                                    .offset(x: -20, y: -30)
+                                    .offset(x: -10, y: -10)
                                 VStack(spacing: 2) {
                                     Text("0")
                                         .font(.system(size: 30, weight: .bold))
@@ -71,7 +71,7 @@ struct PostWorking2: View {
                                     .resizable()
                                     .scaledToFit()
                                     .frame(width: 60, height: 60)
-                                    .offset(x: -25, y: -20)
+                                    .offset(x: -45, y: -20)
                                 VStack(spacing: 2) {
                                     Text("0")
                                         .font(.system(size: 30, weight: .bold))
@@ -96,6 +96,7 @@ struct PostWorking2: View {
                                     .frame(width: 60, height: 60)
                                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                                     .padding(8)
+                                    .offset(x: -10, y: -10)
                                 VStack(spacing: 2) {
                                     Text("0")
                                         .font(.system(size: 30, weight: .bold))
