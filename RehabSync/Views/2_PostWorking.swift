@@ -50,10 +50,14 @@ struct PostWorking2: View {
                     .padding(.top, 32)
 
                     VStack(spacing: 16) {
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.white)
-                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 1.5))
-                            .frame(height: 100)
+                        HStack(spacing: 16) {
+                            ForEach(0..<7, id: \.self) { _ in
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.white)
+                                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 1.5))
+                            }
+                        }
+                        .frame(height: 100)
 
                         HStack(spacing: 16) {
                             RoundedRectangle(cornerRadius: 8)
@@ -96,23 +100,10 @@ private struct OutlinedCongratsChar: View {
     let text: String
     let color: Color
 
-    private static let outlineOffsets: [CGSize] = [
-        CGSize(width: -2, height: -2), CGSize(width: 2, height: -2),
-        CGSize(width: -2, height: 2), CGSize(width: 2, height: 2)
-    ]
-
     var body: some View {
-        ZStack {
-            ForEach(0..<Self.outlineOffsets.count, id: \.self) { i in
-                Text(text)
-                    .font(.system(size: 100, weight: .bold))
-                    .foregroundStyle(Color.black)
-                    .offset(Self.outlineOffsets[i])
-            }
-            Text(text)
-                .font(.system(size: 100, weight: .bold))
-                .foregroundStyle(color)
-        }
+        Text(text)
+            .font(.system(size: 100, weight: .bold))
+            .foregroundStyle(color)
     }
 }
 
