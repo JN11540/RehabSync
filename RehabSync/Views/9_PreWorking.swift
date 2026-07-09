@@ -14,7 +14,7 @@ struct PreWorking9: View {
     @State private var countdownTimer: Timer?
     @State private var showSuccessArrow = false
     @State private var legRotation: Double = 0
-    @State private var navigateToWorking2 = false
+    @State private var navigateToWorking9 = false
 
     private var stepTitle: String {
         switch step {
@@ -287,7 +287,7 @@ struct PreWorking9: View {
                     .padding(.trailing, 0)
                 } else if step == 3 {
                     Button(action: {
-                        navigateToWorking2 = true
+                        navigateToWorking9 = true
                     }) {
                         Image("ArrowIcon")
                             .resizable()
@@ -348,8 +348,8 @@ struct PreWorking9: View {
                 legRotation = newValue ?? 0
             }
         }
-        .fullScreenCover(isPresented: $navigateToWorking2) {
-            Working2(content: content, exercise: exercise)
+        .fullScreenCover(isPresented: $navigateToWorking9) {
+            Working9(content: content, exercise: exercise)
         }
     }
 }
