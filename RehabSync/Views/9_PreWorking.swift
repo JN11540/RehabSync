@@ -50,7 +50,7 @@ struct PreWorking9: View {
               let pair = thighAndCalfPeripherals,
               let baseline = btVM.baselineResult
         else { return }
-        btVM.startLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf, baseline: baseline)
+        btVM.startLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf, baseline: baseline, posture: .standing)
     }
 
     private func stopLiveTestIfNeeded() {
