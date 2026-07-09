@@ -118,12 +118,12 @@ struct PreWorking9: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if step == 2 {
                     VStack(spacing: 16) {
-                        Image("StopNoMoveIcon")
+                        Image("Exercise9")
                             .resizable()
                             .scaledToFit()
                             .frame(width: 500, height: 500)
 
-                        Text("請坐在椅子上，將膝蓋保持 90 度彎曲。\n點擊『校正』按鈕後，請維持身體靜止不動 5 秒鐘喔！")
+                        Text("請站直，膝關節伸直，前方手扶穩定的椅背支撐\n點擊『校正』按鈕後，請維持身體靜止不動 5 秒鐘喔！")
                             .font(.system(size: 20, weight: .medium))
                             .foregroundStyle(.black)
                             .multilineTextAlignment(.center)
