@@ -587,6 +587,7 @@ private struct Test1PreviewFrame: View {
         .fullScreenCover(isPresented: $showPreWorking) {
             if let preWorkingContent, let build = Self.preWorkingBuilders[preWorkingContent.exercise_id] {
                 build(preWorkingContent, exercise(for: preWorkingContent))
+                    .environment(\.goHome, { showPreWorking = false })
             }
         }
     }

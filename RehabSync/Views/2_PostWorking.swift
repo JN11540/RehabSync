@@ -11,6 +11,7 @@ struct PostWorking2: View {
     let bigFishCaught: Int
     let middleFishCaught: Int
     let smallFishCaught: Int
+    @Environment(\.goHome) private var goHome
     @State private var barGrowProgress: Double = 0
 
     var body: some View {
@@ -52,13 +53,13 @@ struct PostWorking2: View {
                                                 BarValueText(value: 0 * barGrowProgress, suffix: " 金幣", color: Color(red: 0.70, green: 0.52, blue: 0.10))
                                                     Rectangle()
                                                         .fill(Color(red: 1.0, green: 0.85, blue: 0.60))
-                                                        .frame(width: barWidth, height: 60 * barGrowProgress)
+                                                        .frame(width: barWidth, height: (0 > totalCoins ? 110 : 60) * barGrowProgress)
                                             }
                                             VStack(spacing: 4) {
                                                 BarValueText(value: Double(totalCoins) * barGrowProgress, suffix: " 金幣", color: Color(red: 0.70, green: 0.52, blue: 0.10))
                                                     Rectangle()
                                                         .fill(Color(red: 1.0, green: 0.70, blue: 0.25))
-                                                        .frame(width: barWidth, height: 110 * barGrowProgress)
+                                                        .frame(width: barWidth, height: (0 >= totalCoins ? 60 : 110) * barGrowProgress)
                                             }
                                         }
                                         Rectangle()
@@ -104,13 +105,13 @@ struct PostWorking2: View {
                                                 BarValueText(value: 0 * barGrowProgress, suffix: " 次", color: Color(red: 0.098, green: 0.353, blue: 0.549))
                                                     Rectangle()
                                                         .fill(Color(red: 0.65, green: 0.85, blue: 0.98))
-                                                        .frame(width: barWidth, height: 60 * barGrowProgress)
+                                                        .frame(width: barWidth, height: (0 > totalReps ? 110 : 60) * barGrowProgress)
                                             }
                                             VStack(spacing: 4) {
                                                 BarValueText(value: Double(totalReps) * barGrowProgress, suffix: " 次", color: Color(red: 0.098, green: 0.353, blue: 0.549))
                                                     Rectangle()
                                                         .fill(Color(red: 0.20, green: 0.55, blue: 0.80))
-                                                        .frame(width: barWidth, height: 110 * barGrowProgress)
+                                                        .frame(width: barWidth, height: (0 >= totalReps ? 60 : 110) * barGrowProgress)
                                             }
                                         }
                                         Rectangle()
@@ -160,13 +161,13 @@ struct PostWorking2: View {
                                                 BarValueText(value: 0 * barGrowProgress, suffix: " 秒", color: Color(red: 0.106, green: 0.373, blue: 0.451))
                                                     Rectangle()
                                                         .fill(Color(red: 0.70, green: 0.92, blue: 0.98))
-                                                        .frame(width: barWidth, height: 60 * barGrowProgress)
+                                                        .frame(width: barWidth, height: (0 > totalElapsedSeconds ? 110 : 60) * barGrowProgress)
                                             }
                                             VStack(spacing: 4) {
                                                 BarValueText(value: Double(totalElapsedSeconds) * barGrowProgress, suffix: " 秒", color: Color(red: 0.106, green: 0.373, blue: 0.451))
                                                     Rectangle()
                                                         .fill(Color(red: 0.275, green: 0.706, blue: 0.831))
-                                                        .frame(width: barWidth, height: 110 * barGrowProgress)
+                                                        .frame(width: barWidth, height: (0 >= totalElapsedSeconds ? 60 : 110) * barGrowProgress)
                                             }
                                         }
                                         Rectangle()
@@ -212,13 +213,13 @@ struct PostWorking2: View {
                                                 BarValueText(value: 0 * barGrowProgress, suffix: " 個", color: Color(red: 0.322, green: 0.416, blue: 0.451))
                                                     Rectangle()
                                                         .fill(Color(red: 0.80, green: 0.87, blue: 0.90))
-                                                        .frame(width: barWidth, height: 60 * barGrowProgress)
+                                                        .frame(width: barWidth, height: (0 > bigFishCaught ? 110 : 60) * barGrowProgress)
                                             }
                                             VStack(spacing: 4) {
                                                 BarValueText(value: Double(bigFishCaught) * barGrowProgress, suffix: " 個", color: Color(red: 0.322, green: 0.416, blue: 0.451))
                                                     Rectangle()
                                                         .fill(Color(red: 0.678, green: 0.776, blue: 0.804))
-                                                        .frame(width: barWidth, height: 110 * barGrowProgress)
+                                                        .frame(width: barWidth, height: (0 >= bigFishCaught ? 60 : 110) * barGrowProgress)
                                             }
                                         }
                                         Rectangle()
@@ -268,13 +269,13 @@ struct PostWorking2: View {
                                                 BarValueText(value: 0 * barGrowProgress, suffix: " 個", color: Color(red: 0.612, green: 0.451, blue: 0.031))
                                                     Rectangle()
                                                         .fill(Color(red: 0.99, green: 0.88, blue: 0.55))
-                                                        .frame(width: barWidth, height: 60 * barGrowProgress)
+                                                        .frame(width: barWidth, height: (0 > middleFishCaught ? 110 : 60) * barGrowProgress)
                                             }
                                             VStack(spacing: 4) {
                                                 BarValueText(value: Double(middleFishCaught) * barGrowProgress, suffix: " 個", color: Color(red: 0.612, green: 0.451, blue: 0.031))
                                                     Rectangle()
                                                         .fill(Color(red: 0.992, green: 0.827, blue: 0.427))
-                                                        .frame(width: barWidth, height: 110 * barGrowProgress)
+                                                        .frame(width: barWidth, height: (0 >= middleFishCaught ? 60 : 110) * barGrowProgress)
                                             }
                                         }
                                         Rectangle()
@@ -320,13 +321,13 @@ struct PostWorking2: View {
                                                 BarValueText(value: 0 * barGrowProgress, suffix: " 個", color: Color(red: 0.647, green: 0.298, blue: 0.376))
                                                     Rectangle()
                                                         .fill(Color(red: 0.99, green: 0.85, blue: 0.88))
-                                                        .frame(width: barWidth, height: 60 * barGrowProgress)
+                                                        .frame(width: barWidth, height: (0 > smallFishCaught ? 110 : 60) * barGrowProgress)
                                             }
                                             VStack(spacing: 4) {
                                                 BarValueText(value: Double(smallFishCaught) * barGrowProgress, suffix: " 個", color: Color(red: 0.647, green: 0.298, blue: 0.376))
                                                     Rectangle()
                                                         .fill(Color(red: 0.949, green: 0.773, blue: 0.800))
-                                                        .frame(width: barWidth, height: 110 * barGrowProgress)
+                                                        .frame(width: barWidth, height: (0 >= smallFishCaught ? 60 : 110) * barGrowProgress)
                                             }
                                         }
                                         Rectangle()
@@ -367,6 +368,16 @@ struct PostWorking2: View {
             .padding(.bottom, 40)
             .padding(.leading, 60)
             .padding(.trailing, 60)
+
+            Button(action: { goHome() }) {
+                Image("ArrowIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 60, height: 60)
+            }
+            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            .padding(24)
         }
         .onAppear {
             withAnimation(.easeOut(duration: 1.5)) {
