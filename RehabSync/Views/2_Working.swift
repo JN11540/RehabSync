@@ -330,7 +330,10 @@ struct Working2: View {
                     .padding(.trailing, 16)
 
                     HStack(spacing: 12) {
-                        Button(action: { showExitConfirmPopup = true }) {
+                        Button(action: {
+                            showExitConfirmPopup = true
+                            pauseSession()
+                        }) {
                             ZStack {
                                 Circle()
                                     .fill(Color.white)
@@ -622,7 +625,10 @@ struct Working2: View {
 
                 ConfirmPopup(
                     message: "您確定要結束遊戲嗎？",
-                    onCancel: { showExitConfirmPopup = false },
+                    onCancel: {
+                        showExitConfirmPopup = false
+                        resumeSession()
+                    },
                     onConfirm: {
                         showExitConfirmPopup = false
                         navigateToPostWorking2 = true
@@ -691,6 +697,10 @@ struct Working2: View {
         middleCoinTimer?.invalidate()
         smallCoinTimer?.invalidate()
         setRestTimer?.invalidate()
+    }
+
+    private func resumeSession() {
+        isSessionPaused = false
     }
 }
 
