@@ -14,6 +14,16 @@ struct PostWorking2: View {
     @Environment(\.goHome) private var goHome
     @State private var barGrowProgress: Double = 0
 
+    private func comparisonMessage(_ value: Int) -> String {
+        if 0 > value {
+            return "😆 今天是不是還沒睡醒？"
+        } else if 0 == value {
+            return "😎 穩啦，一樣厲害！"
+        } else {
+            return "🔥 有喔！這次比較猛！"
+        }
+    }
+
     var body: some View {
         ZStack {
             Color.black.opacity(0.8).ignoresSafeArea()
@@ -47,6 +57,9 @@ struct PostWorking2: View {
                                     let barWidth = max((geo.size.width - 32 - 16) / 2, 0)
 
                                     VStack(spacing: 0) {
+                                        Text(comparisonMessage(totalCoins))
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
                                         Spacer()
                                         HStack(alignment: .bottom, spacing: 16) {
                                             VStack(spacing: 4) {
@@ -99,6 +112,9 @@ struct PostWorking2: View {
                                     let barWidth = max((geo.size.width - 32 - 16) / 2, 0)
 
                                     VStack(spacing: 0) {
+                                        Text(comparisonMessage(totalReps))
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundStyle(Color(red: 0.098, green: 0.353, blue: 0.549))
                                         Spacer()
                                         HStack(alignment: .bottom, spacing: 16) {
                                             VStack(spacing: 4) {
@@ -155,6 +171,9 @@ struct PostWorking2: View {
                                     let barWidth = max((geo.size.width - 32 - 16) / 2, 0)
 
                                     VStack(spacing: 0) {
+                                        Text(comparisonMessage(totalElapsedSeconds))
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundStyle(Color(red: 0.106, green: 0.373, blue: 0.451))
                                         Spacer()
                                         HStack(alignment: .bottom, spacing: 16) {
                                             VStack(spacing: 4) {
@@ -207,6 +226,9 @@ struct PostWorking2: View {
                                     let barWidth = max((geo.size.width - 32 - 16) / 2, 0)
 
                                     VStack(spacing: 0) {
+                                        Text(comparisonMessage(bigFishCaught))
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundStyle(Color(red: 0.322, green: 0.416, blue: 0.451))
                                         Spacer()
                                         HStack(alignment: .bottom, spacing: 16) {
                                             VStack(spacing: 4) {
@@ -263,6 +285,9 @@ struct PostWorking2: View {
                                     let barWidth = max((geo.size.width - 32 - 16) / 2, 0)
 
                                     VStack(spacing: 0) {
+                                        Text(comparisonMessage(middleFishCaught))
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundStyle(Color(red: 0.612, green: 0.451, blue: 0.031))
                                         Spacer()
                                         HStack(alignment: .bottom, spacing: 16) {
                                             VStack(spacing: 4) {
@@ -315,6 +340,9 @@ struct PostWorking2: View {
                                     let barWidth = max((geo.size.width - 32 - 16) / 2, 0)
 
                                     VStack(spacing: 0) {
+                                        Text(comparisonMessage(smallFishCaught))
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundStyle(Color(red: 0.647, green: 0.298, blue: 0.376))
                                         Spacer()
                                         HStack(alignment: .bottom, spacing: 16) {
                                             VStack(spacing: 4) {
