@@ -21,7 +21,7 @@ struct PreWorking9: View {
         case 0: return "確認裝備齊全"
         case 1: return "準備椅子"
         case 2: return "校正"
-        default: return "膝關節終端伸展測試"
+        default: return "部分蹲測試"
         }
     }
 
