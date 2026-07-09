@@ -118,7 +118,7 @@ struct PreWorking9: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if step == 2 {
                     VStack(spacing: 16) {
-                        Image("Exercise9")
+                        Image("PartialSquatStopMoveIcon")
                             .resizable()
                             .scaledToFit()
                             .frame(width: 500, height: 500)
