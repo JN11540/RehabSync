@@ -401,7 +401,8 @@ private struct Test1PreviewFrame: View {
     /// exercise id -> {id}_PreWorking.swift 對應表。之後每新增一個 {id}_PreWorking.swift，
     /// 就在這裡加一個 case，是否跳轉、跳轉到哪個畫面都只看這張表，不需要改別的地方。
     private static let preWorkingBuilders: [Int: (TreatmentContent, Exercise?) -> AnyView] = [
-        2: { content, exercise in AnyView(PreWorking2(content: content, exercise: exercise)) }
+        2: { content, exercise in AnyView(PreWorking2(content: content, exercise: exercise)) },
+        9: { content, exercise in AnyView(PreWorking9(content: content, exercise: exercise)) }
     ]
 
     private var isToday: Bool {
