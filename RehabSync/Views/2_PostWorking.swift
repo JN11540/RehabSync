@@ -373,12 +373,12 @@ struct PostWorking2: View {
                 Image("ArrowIcon")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 100, height: 100)
+                    .frame(width: 120, height: 120)
             }
             .buttonStyle(.plain)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
             .padding(24)
-            .offset(y: 200)
+            .offset(y: 50)
         }
         .onAppear {
             withAnimation(.easeOut(duration: 1.5)) {
