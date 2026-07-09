@@ -93,7 +93,7 @@ struct TestPage: View {
                             .foregroundStyle(.primary)
                     }
 
-                    Button(btVM.isLiveEstimating ? "停止即時預估" : "開始即時預估") {
+                    Button(btVM.isLiveEstimating ? "停止坐姿即時預估" : "開始坐姿即時預估") {
                         guard let pair = thighAndCalfPeripherals else { return }
                         if btVM.isLiveEstimating {
                             btVM.stopLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
