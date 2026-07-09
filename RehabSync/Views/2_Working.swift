@@ -33,6 +33,7 @@ struct Working2: View {
     @State private var totalCoins = 0
     @State private var currentSet = 1
     @State private var currentRep = 0
+    @State private var sessionStartDate = Date()
 
     private static let holdThreshold: Double = 20
     private static let holdDuration: Double = 5
@@ -652,7 +653,16 @@ struct Working2: View {
             }
         }
         .fullScreenCover(isPresented: $navigateToPostWorking2) {
-            PostWorking2(content: content, exercise: exercise)
+            PostWorking2(
+                content: content,
+                exercise: exercise,
+                totalCoins: totalCoins,
+                totalReps: bigFishCaught + middleFishCaught + smallFishCaught,
+                totalElapsedSeconds: Int(Date().timeIntervalSince(sessionStartDate)),
+                bigFishCaught: bigFishCaught,
+                middleFishCaught: middleFishCaught,
+                smallFishCaught: smallFishCaught
+            )
         }
         .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
             if let angle = newValue, angle <= Self.holdThreshold {

@@ -5,6 +5,12 @@ import SwiftUI
 struct PostWorking2: View {
     let content: TreatmentContent
     let exercise: Exercise?
+    let totalCoins: Int
+    let totalReps: Int
+    let totalElapsedSeconds: Int
+    let bigFishCaught: Int
+    let middleFishCaught: Int
+    let smallFishCaught: Int
     @State private var barGrowProgress: Double = 0
 
     var body: some View {
@@ -49,7 +55,7 @@ struct PostWorking2: View {
                                                         .frame(width: barWidth, height: 60 * barGrowProgress)
                                             }
                                             VStack(spacing: 4) {
-                                                BarValueText(value: 1000 * barGrowProgress, suffix: " 金幣", color: Color(red: 0.70, green: 0.52, blue: 0.10))
+                                                BarValueText(value: Double(totalCoins) * barGrowProgress, suffix: " 金幣", color: Color(red: 0.70, green: 0.52, blue: 0.10))
                                                     Rectangle()
                                                         .fill(Color(red: 1.0, green: 0.70, blue: 0.25))
                                                         .frame(width: barWidth, height: 110 * barGrowProgress)
@@ -59,7 +65,7 @@ struct PostWorking2: View {
                                             .fill(Color(red: 0.70, green: 0.52, blue: 0.10))
                                             .frame(height: 2)
                                         HStack(spacing: 16) {
-                                            Text("2026/07/07 15:00")
+                                            Text("--")
                                                 .font(.system(size: 20, weight: .semibold))
                                                 .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
                                                 .frame(width: barWidth)
@@ -101,7 +107,7 @@ struct PostWorking2: View {
                                                         .frame(width: barWidth, height: 60 * barGrowProgress)
                                             }
                                             VStack(spacing: 4) {
-                                                BarValueText(value: 1000 * barGrowProgress, suffix: " 次", color: Color(red: 0.098, green: 0.353, blue: 0.549))
+                                                BarValueText(value: Double(totalReps) * barGrowProgress, suffix: " 次", color: Color(red: 0.098, green: 0.353, blue: 0.549))
                                                     Rectangle()
                                                         .fill(Color(red: 0.20, green: 0.55, blue: 0.80))
                                                         .frame(width: barWidth, height: 110 * barGrowProgress)
@@ -111,7 +117,7 @@ struct PostWorking2: View {
                                             .fill(Color(red: 0.098, green: 0.353, blue: 0.549))
                                             .frame(height: 2)
                                         HStack(spacing: 16) {
-                                            Text("2026/07/07 15:00")
+                                            Text("--")
                                                 .font(.system(size: 20, weight: .semibold))
                                                 .foregroundStyle(Color(red: 0.098, green: 0.353, blue: 0.549))
                                                 .frame(width: barWidth)
@@ -151,13 +157,13 @@ struct PostWorking2: View {
                                         Spacer()
                                         HStack(alignment: .bottom, spacing: 16) {
                                             VStack(spacing: 4) {
-                                                BarValueText(value: 0 * barGrowProgress, suffix: " 分", color: Color(red: 0.106, green: 0.373, blue: 0.451))
+                                                BarValueText(value: 0 * barGrowProgress, suffix: " 秒", color: Color(red: 0.106, green: 0.373, blue: 0.451))
                                                     Rectangle()
                                                         .fill(Color(red: 0.70, green: 0.92, blue: 0.98))
                                                         .frame(width: barWidth, height: 60 * barGrowProgress)
                                             }
                                             VStack(spacing: 4) {
-                                                BarValueText(value: 1000 * barGrowProgress, suffix: " 分", color: Color(red: 0.106, green: 0.373, blue: 0.451))
+                                                BarValueText(value: Double(totalElapsedSeconds) * barGrowProgress, suffix: " 秒", color: Color(red: 0.106, green: 0.373, blue: 0.451))
                                                     Rectangle()
                                                         .fill(Color(red: 0.275, green: 0.706, blue: 0.831))
                                                         .frame(width: barWidth, height: 110 * barGrowProgress)
@@ -167,7 +173,7 @@ struct PostWorking2: View {
                                             .fill(Color(red: 0.106, green: 0.373, blue: 0.451))
                                             .frame(height: 2)
                                         HStack(spacing: 16) {
-                                            Text("2026/07/07 15:00")
+                                            Text("--")
                                                 .font(.system(size: 20, weight: .semibold))
                                                 .foregroundStyle(Color(red: 0.106, green: 0.373, blue: 0.451))
                                                 .frame(width: barWidth)
@@ -209,7 +215,7 @@ struct PostWorking2: View {
                                                         .frame(width: barWidth, height: 60 * barGrowProgress)
                                             }
                                             VStack(spacing: 4) {
-                                                BarValueText(value: 1000 * barGrowProgress, suffix: " 個", color: Color(red: 0.322, green: 0.416, blue: 0.451))
+                                                BarValueText(value: Double(bigFishCaught) * barGrowProgress, suffix: " 個", color: Color(red: 0.322, green: 0.416, blue: 0.451))
                                                     Rectangle()
                                                         .fill(Color(red: 0.678, green: 0.776, blue: 0.804))
                                                         .frame(width: barWidth, height: 110 * barGrowProgress)
@@ -219,7 +225,7 @@ struct PostWorking2: View {
                                             .fill(Color(red: 0.322, green: 0.416, blue: 0.451))
                                             .frame(height: 2)
                                         HStack(spacing: 16) {
-                                            Text("2026/07/07 15:00")
+                                            Text("--")
                                                 .font(.system(size: 20, weight: .semibold))
                                                 .foregroundStyle(Color(red: 0.322, green: 0.416, blue: 0.451))
                                                 .frame(width: barWidth)
@@ -265,7 +271,7 @@ struct PostWorking2: View {
                                                         .frame(width: barWidth, height: 60 * barGrowProgress)
                                             }
                                             VStack(spacing: 4) {
-                                                BarValueText(value: 1000 * barGrowProgress, suffix: " 個", color: Color(red: 0.612, green: 0.451, blue: 0.031))
+                                                BarValueText(value: Double(middleFishCaught) * barGrowProgress, suffix: " 個", color: Color(red: 0.612, green: 0.451, blue: 0.031))
                                                     Rectangle()
                                                         .fill(Color(red: 0.992, green: 0.827, blue: 0.427))
                                                         .frame(width: barWidth, height: 110 * barGrowProgress)
@@ -275,7 +281,7 @@ struct PostWorking2: View {
                                             .fill(Color(red: 0.612, green: 0.451, blue: 0.031))
                                             .frame(height: 2)
                                         HStack(spacing: 16) {
-                                            Text("2026/07/07 15:00")
+                                            Text("--")
                                                 .font(.system(size: 20, weight: .semibold))
                                                 .foregroundStyle(Color(red: 0.612, green: 0.451, blue: 0.031))
                                                 .frame(width: barWidth)
@@ -317,7 +323,7 @@ struct PostWorking2: View {
                                                         .frame(width: barWidth, height: 60 * barGrowProgress)
                                             }
                                             VStack(spacing: 4) {
-                                                BarValueText(value: 1000 * barGrowProgress, suffix: " 個", color: Color(red: 0.647, green: 0.298, blue: 0.376))
+                                                BarValueText(value: Double(smallFishCaught) * barGrowProgress, suffix: " 個", color: Color(red: 0.647, green: 0.298, blue: 0.376))
                                                     Rectangle()
                                                         .fill(Color(red: 0.949, green: 0.773, blue: 0.800))
                                                         .frame(width: barWidth, height: 110 * barGrowProgress)
@@ -327,7 +333,7 @@ struct PostWorking2: View {
                                             .fill(Color(red: 0.647, green: 0.298, blue: 0.376))
                                             .frame(height: 2)
                                         HStack(spacing: 16) {
-                                            Text("2026/07/07 15:00")
+                                            Text("--")
                                                 .font(.system(size: 20, weight: .semibold))
                                                 .foregroundStyle(Color(red: 0.647, green: 0.298, blue: 0.376))
                                                 .frame(width: barWidth)
@@ -363,7 +369,7 @@ struct PostWorking2: View {
             .padding(.trailing, 60)
         }
         .onAppear {
-            withAnimation(.easeOut(duration: 0.5)) {
+            withAnimation(.easeOut(duration: 3)) {
                 barGrowProgress = 1
             }
         }
@@ -399,6 +405,12 @@ private struct BarValueText: View, Animatable {
             reps: 2,
             date: Int(Date().timeIntervalSince1970)
         ),
-        exercise: nil
+        exercise: nil,
+        totalCoins: 1500,
+        totalReps: 12,
+        totalElapsedSeconds: 245,
+        bigFishCaught: 3,
+        middleFishCaught: 5,
+        smallFishCaught: 4
     )
 }
