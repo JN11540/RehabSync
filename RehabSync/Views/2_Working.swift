@@ -35,6 +35,7 @@ struct Working2: View {
     @State private var currentRep = 0
     @State private var sessionStartDate = Date()
     @State private var isSessionPaused = false
+    @State private var finalElapsedSeconds = 0
 
     private static let holdThreshold: Double = 20
     private static let holdDuration: Double = 5
@@ -631,6 +632,7 @@ struct Working2: View {
                     },
                     onConfirm: {
                         showExitConfirmPopup = false
+                        finalElapsedSeconds = Int(Date().timeIntervalSince(sessionStartDate))
                         navigateToPostWorking2 = true
                     }
                 )
@@ -654,6 +656,7 @@ struct Working2: View {
 
                 CompletionPopup(onComplete: {
                     showCompletionPopup = false
+                    finalElapsedSeconds = Int(Date().timeIntervalSince(sessionStartDate))
                     navigateToPostWorking2 = true
                 })
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
@@ -665,7 +668,7 @@ struct Working2: View {
                 exercise: exercise,
                 totalCoins: totalCoins,
                 totalReps: bigFishCaught + middleFishCaught + smallFishCaught,
-                totalElapsedSeconds: Int(Date().timeIntervalSince(sessionStartDate)),
+                totalElapsedSeconds: finalElapsedSeconds,
                 bigFishCaught: bigFishCaught,
                 middleFishCaught: middleFishCaught,
                 smallFishCaught: smallFishCaught
