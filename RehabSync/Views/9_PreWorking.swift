@@ -58,6 +58,21 @@ struct PreWorking9: View {
         btVM.stopLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
     }
 
+    // divide_4（上半身）本身不會旋轉，但它底部藍綠色端（肩頸下緣）要跟著 divide_2
+    // （大腿＋小腿）頂部的藍綠色端一起移動，才不會讓上半身跟腿部脫節。
+    // divide_2 頂部藍綠色端在 divide_2 自己的旋轉軸心（腳踝，skin 中心）為圓心，
+    // 隨 legRotation 做圓弧運動，這裡直接算出該點相對於角度 0 時位移了多少，
+    // 再把同樣的位移套用到 divide_4 上，兩端點就會隨時保持疊合（而不只是首尾對齊）。
+    private var divide4Offset: CGSize {
+        let theta = legRotation * Double.pi / 180
+        let dx0 = 124.0
+        let dy0 = -522.0
+        let rotatedX = dx0 * cos(theta) - dy0 * sin(theta)
+        let rotatedY = dx0 * sin(theta) + dy0 * cos(theta)
+        let scale = 500.0 / 2048.0
+        return CGSize(width: (rotatedX - dx0) * scale, height: (rotatedY - dy0) * scale)
+    }
+
     var body: some View {
         ZStack {
             Color.black.opacity(0.8).ignoresSafeArea()
@@ -213,6 +228,7 @@ struct PreWorking9: View {
                             .resizable()
                             .scaledToFit()
                             .frame(width: 500, height: 500)
+                            .offset(divide4Offset)
 
                         Image("PartialSquatDivide3Icon")
                             .resizable()
