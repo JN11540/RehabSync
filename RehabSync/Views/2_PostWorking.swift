@@ -259,12 +259,118 @@ struct PostWorking2: View {
                         .frame(height: 200)
 
                         HStack(spacing: 16) {
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.white)
-                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(white: 0.6), lineWidth: 1.5))
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.white)
-                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(white: 0.6), lineWidth: 1.5))
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color(red: 0.99, green: 0.93, blue: 0.75))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(Color(red: 0.992, green: 0.827, blue: 0.427), lineWidth: 3)
+                                    )
+
+                                GeometryReader { geo in
+                                    let barWidth = max((geo.size.width - 32 - 16) / 2, 0)
+
+                                    VStack(spacing: 0) {
+                                        Spacer()
+                                        HStack(alignment: .bottom, spacing: 16) {
+                                            VStack(spacing: 4) {
+                                                Text("0 個")
+                                                    .font(.system(size: 30, weight: .semibold))
+                                                    .foregroundStyle(Color(red: 0.612, green: 0.451, blue: 0.031))
+                                                Rectangle()
+                                                    .fill(Color(red: 0.99, green: 0.88, blue: 0.55))
+                                                    .frame(width: barWidth, height: 60)
+                                            }
+                                            VStack(spacing: 4) {
+                                                Text("1000 個")
+                                                    .font(.system(size: 30, weight: .semibold))
+                                                    .foregroundStyle(Color(red: 0.612, green: 0.451, blue: 0.031))
+                                                Rectangle()
+                                                    .fill(Color(red: 0.992, green: 0.827, blue: 0.427))
+                                                    .frame(width: barWidth, height: 110)
+                                            }
+                                        }
+                                        Rectangle()
+                                            .fill(Color(red: 0.612, green: 0.451, blue: 0.031))
+                                            .frame(height: 2)
+                                        HStack(spacing: 16) {
+                                            Text("2026/07/07 15:00")
+                                                .font(.system(size: 20, weight: .semibold))
+                                                .foregroundStyle(Color(red: 0.612, green: 0.451, blue: 0.031))
+                                                .frame(width: barWidth)
+                                            Text("本次")
+                                                .font(.system(size: 20, weight: .semibold))
+                                                .foregroundStyle(Color(red: 0.612, green: 0.451, blue: 0.031))
+                                                .frame(width: barWidth)
+                                        }
+                                    }
+                                    .padding(16)
+                                    .frame(width: geo.size.width, height: geo.size.height)
+                                }
+
+                                Image("MiddleFishIcon")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 60, height: 60)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                                    .padding(8)
+                            }
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color(red: 0.98, green: 0.90, blue: 0.92))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(Color(red: 0.949, green: 0.773, blue: 0.800), lineWidth: 3)
+                                    )
+
+                                GeometryReader { geo in
+                                    let barWidth = max((geo.size.width - 32 - 16) / 2, 0)
+
+                                    VStack(spacing: 0) {
+                                        Spacer()
+                                        HStack(alignment: .bottom, spacing: 16) {
+                                            VStack(spacing: 4) {
+                                                Text("0 個")
+                                                    .font(.system(size: 30, weight: .semibold))
+                                                    .foregroundStyle(Color(red: 0.647, green: 0.298, blue: 0.376))
+                                                Rectangle()
+                                                    .fill(Color(red: 0.99, green: 0.85, blue: 0.88))
+                                                    .frame(width: barWidth, height: 60)
+                                            }
+                                            VStack(spacing: 4) {
+                                                Text("1000 個")
+                                                    .font(.system(size: 30, weight: .semibold))
+                                                    .foregroundStyle(Color(red: 0.647, green: 0.298, blue: 0.376))
+                                                Rectangle()
+                                                    .fill(Color(red: 0.949, green: 0.773, blue: 0.800))
+                                                    .frame(width: barWidth, height: 110)
+                                            }
+                                        }
+                                        Rectangle()
+                                            .fill(Color(red: 0.647, green: 0.298, blue: 0.376))
+                                            .frame(height: 2)
+                                        HStack(spacing: 16) {
+                                            Text("2026/07/07 15:00")
+                                                .font(.system(size: 20, weight: .semibold))
+                                                .foregroundStyle(Color(red: 0.647, green: 0.298, blue: 0.376))
+                                                .frame(width: barWidth)
+                                            Text("本次")
+                                                .font(.system(size: 20, weight: .semibold))
+                                                .foregroundStyle(Color(red: 0.647, green: 0.298, blue: 0.376))
+                                                .frame(width: barWidth)
+                                        }
+                                    }
+                                    .padding(16)
+                                    .frame(width: geo.size.width, height: geo.size.height)
+                                }
+
+                                Image("SmallFishIcon")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 60, height: 60)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                                    .padding(8)
+                            }
                         }
                         .frame(height: 200)
                     }
