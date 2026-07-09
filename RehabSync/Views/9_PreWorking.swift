@@ -197,21 +197,17 @@ struct PreWorking9: View {
                         .padding(.trailing, 40)
                     }
                 } else if step == 3 {
-                    HStack(spacing: -80) {
-                        Image("OnlyLegIcon")
+                    ZStack {
+                        Image("PartialSquatDivide1Icon")
                             .resizable()
                             .scaledToFit()
                             .frame(width: 500, height: 500)
-                            .rotationEffect(.degrees(legRotation))
-                            .offset(x: 170, y: 50)
 
-                        Image("StopNoMoveIcon")
+                        Image("PartialSquatDivide2Icon")
                             .resizable()
                             .scaledToFit()
                             .frame(width: 500, height: 500)
-                            .offset(x: -185)
                     }
-                    .padding(.horizontal, 24)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                     Group {
