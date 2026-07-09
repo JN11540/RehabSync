@@ -234,7 +234,7 @@ struct PreWorking9: View {
                             .resizable()
                             .scaledToFit()
                             .frame(width: 500, height: 500)
-                            .rotationEffect(.degrees(legRotation * 0.5), anchor: UnitPoint(x: 0.410, y: 0.481))
+                            .rotationEffect(.degrees(legRotation), anchor: UnitPoint(x: 0.410, y: 0.481))
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
