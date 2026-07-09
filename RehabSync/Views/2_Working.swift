@@ -34,6 +34,7 @@ struct Working2: View {
     @State private var currentSet = 1
     @State private var currentRep = 0
     @State private var sessionStartDate = Date()
+    @State private var isSessionPaused = false
 
     private static let holdThreshold: Double = 20
     private static let holdDuration: Double = 5
@@ -665,19 +666,31 @@ struct Working2: View {
             )
         }
         .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
+            guard !isSessionPaused else { return }
             if let angle = newValue, angle <= Self.holdThreshold {
                 startHoldTimer()
             } else {
                 stopHoldTimer()
             }
         }
-        .onDisappear {
-            holdTimer?.invalidate()
-            bigCoinTimer?.invalidate()
-            middleCoinTimer?.invalidate()
-            smallCoinTimer?.invalidate()
-            setRestTimer?.invalidate()
+        .onChange(of: navigateToPostWorking2) { _, newValue in
+            if newValue {
+                pauseSession()
+            }
         }
+        .onDisappear {
+            pauseSession()
+        }
+    }
+
+    private func pauseSession() {
+        isSessionPaused = true
+        holdTimer?.invalidate()
+        holdTimer = nil
+        bigCoinTimer?.invalidate()
+        middleCoinTimer?.invalidate()
+        smallCoinTimer?.invalidate()
+        setRestTimer?.invalidate()
     }
 }
 

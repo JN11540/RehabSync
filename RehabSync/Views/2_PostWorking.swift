@@ -58,8 +58,11 @@ struct PostWorking2: View {
 
                                     VStack(spacing: 0) {
                                         Text(comparisonMessage(totalCoins))
-                                            .font(.system(size: 16, weight: .semibold))
+                                            .font(.system(size: 20, weight: .semibold))
                                             .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
+                                            .lineLimit(1)
+                                            .minimumScaleFactor(0.5)
+                                            .frame(height: 24)
                                         Spacer()
                                         HStack(alignment: .bottom, spacing: 16) {
                                             VStack(spacing: 4) {
@@ -113,8 +116,11 @@ struct PostWorking2: View {
 
                                     VStack(spacing: 0) {
                                         Text(comparisonMessage(totalReps))
-                                            .font(.system(size: 16, weight: .semibold))
+                                            .font(.system(size: 20, weight: .semibold))
                                             .foregroundStyle(Color(red: 0.098, green: 0.353, blue: 0.549))
+                                            .lineLimit(1)
+                                            .minimumScaleFactor(0.5)
+                                            .frame(height: 24)
                                         Spacer()
                                         HStack(alignment: .bottom, spacing: 16) {
                                             VStack(spacing: 4) {
@@ -172,8 +178,11 @@ struct PostWorking2: View {
 
                                     VStack(spacing: 0) {
                                         Text(comparisonMessage(totalElapsedSeconds))
-                                            .font(.system(size: 16, weight: .semibold))
+                                            .font(.system(size: 20, weight: .semibold))
                                             .foregroundStyle(Color(red: 0.106, green: 0.373, blue: 0.451))
+                                            .lineLimit(1)
+                                            .minimumScaleFactor(0.5)
+                                            .frame(height: 24)
                                         Spacer()
                                         HStack(alignment: .bottom, spacing: 16) {
                                             VStack(spacing: 4) {
@@ -227,8 +236,11 @@ struct PostWorking2: View {
 
                                     VStack(spacing: 0) {
                                         Text(comparisonMessage(bigFishCaught))
-                                            .font(.system(size: 16, weight: .semibold))
+                                            .font(.system(size: 20, weight: .semibold))
                                             .foregroundStyle(Color(red: 0.322, green: 0.416, blue: 0.451))
+                                            .lineLimit(1)
+                                            .minimumScaleFactor(0.5)
+                                            .frame(height: 24)
                                         Spacer()
                                         HStack(alignment: .bottom, spacing: 16) {
                                             VStack(spacing: 4) {
@@ -286,8 +298,11 @@ struct PostWorking2: View {
 
                                     VStack(spacing: 0) {
                                         Text(comparisonMessage(middleFishCaught))
-                                            .font(.system(size: 16, weight: .semibold))
+                                            .font(.system(size: 20, weight: .semibold))
                                             .foregroundStyle(Color(red: 0.612, green: 0.451, blue: 0.031))
+                                            .lineLimit(1)
+                                            .minimumScaleFactor(0.5)
+                                            .frame(height: 24)
                                         Spacer()
                                         HStack(alignment: .bottom, spacing: 16) {
                                             VStack(spacing: 4) {
@@ -341,8 +356,11 @@ struct PostWorking2: View {
 
                                     VStack(spacing: 0) {
                                         Text(comparisonMessage(smallFishCaught))
-                                            .font(.system(size: 16, weight: .semibold))
+                                            .font(.system(size: 20, weight: .semibold))
                                             .foregroundStyle(Color(red: 0.647, green: 0.298, blue: 0.376))
+                                            .lineLimit(1)
+                                            .minimumScaleFactor(0.5)
+                                            .frame(height: 24)
                                         Spacer()
                                         HStack(alignment: .bottom, spacing: 16) {
                                             VStack(spacing: 4) {
