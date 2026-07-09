@@ -208,6 +208,11 @@ struct PreWorking9: View {
                             .scaledToFit()
                             .frame(width: 500, height: 500)
                             .rotationEffect(.degrees(legRotation), anchor: UnitPoint(x: 0.542, y: 0.685))
+
+                        Image("PartialSquatDivide3Icon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 500, height: 500)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
