@@ -418,12 +418,30 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     /// 對應 build_baseline_mapping_table：以 baseline 為起點建立 (量測角度 -> 預估真實角度) 對應表，依量測角度排序。
     /// 呼叫端必須確保傳進來的 `baseline` 已經是非負值（例如原本是負的就先平移過），這裡不再對 baseline + step 取絕對值，
     /// 避免 baseline 到 baseline+maxStep 之間跨過 0 時，同一個量測值對應到兩個不同 step 的歧義。
+    /// 坐姿版：量測角度越大，預估真實角度越小（step=0 對應 90 度，step=maxStep 對應 0 度）。
     private static func baselineMappingTable(
         baseline: Double, maxStep: Int, maxRealAngleDeg: Double
     ) -> [(measured: Double, realAngle: Double)] {
         (0...maxStep).map { step in
             let measured = baseline + Double(step)
             let realAngle = maxRealAngleDeg - Double(step) * (maxRealAngleDeg / Double(maxStep))
+            return (measured, realAngle)
+        }.sorted { $0.measured < $1.measured }
+    }
+
+    /// 對應 realtime_angle_mapping.py 的 build_realtime_mapping_table（站姿版）：跟坐姿版方向相反，
+    /// 量測角度越大，預估真實角度越大（step=0 對應 0 度，step=maxStep 對應 90 度）。
+    /// 呼叫端一樣要先確保傳進來的 `baseline` 是非負值（原本是負的就先平移過），理由同坐姿版。
+    ///
+    /// Python 版對負 baseline 的處理是把對應表端點固定在 10／10+span_deg，再把「量測到的膝角」
+    /// 平移 |baseline|+10 去查表；這裡改用跟坐姿版一致的手法（呼叫端先把 baseline 本身平移成
+    /// 非負值），兩者數學上等價，但不需要另外硬編碼 10 這個端點常數，也跟坐姿版共用同一套機制。
+    private static func standingMappingTable(
+        baseline: Double, maxStep: Int, maxRealAngleDeg: Double
+    ) -> [(measured: Double, realAngle: Double)] {
+        (0...maxStep).map { step in
+            let measured = baseline + Double(step)
+            let realAngle = Double(step) * (maxRealAngleDeg / Double(maxStep))
             return (measured, realAngle)
         }.sorted { $0.measured < $1.measured }
     }
@@ -450,10 +468,20 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
 
     // MARK: - Live Estimated Real Angle（即時預估真實角度）
 
+    /// 坐姿版量測角度越大、預估真實角度越小；站姿版（對應 realtime_angle_mapping.py）方向相反，
+    /// 量測角度越大、預估真實角度也越大，且對應的角度範圍（span）也不同（55° 而非 70°）。
+    enum KneePosture {
+        case sitting
+        case standing
+    }
+
     /// 開始持續錄製大腿與小腿加速度計，收集期間不寫入資料庫。跟批次版「預估真實角度」不同，
     /// 這裡不是錄固定秒數後一次計算，而是持續追蹤兩側「最新一筆」傾角，
     /// 由 `liveTickTimer` 每 0.2 秒（5Hz）讀一次最新值換算成預估真實角度並更新到畫面。
-    func startLiveEstimateRealAngle(thighPeripheral: CBPeripheral, calfPeripheral: CBPeripheral, baseline: Double) {
+    func startLiveEstimateRealAngle(
+        thighPeripheral: CBPeripheral, calfPeripheral: CBPeripheral, baseline: Double,
+        posture: KneePosture = .sitting
+    ) {
         let thighId = thighPeripheral.identifier
         let calfId  = calfPeripheral.identifier
 
@@ -474,10 +502,16 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             liveCalfId  = calfId
             liveThighIncline = nil
             liveCalfIncline  = nil
-            // baseline 若為負值，整體平移到 15（正值），量測到的膝角也要平移同樣的量，
+            // baseline 若為負值，整體平移到正值，量測到的膝角也要平移同樣的量，
             // 兩邊平移量一致，相對關係不變，藉此避免 baseline ~ baseline+maxStep 跨過 0 的歧義。
-            liveShift = baseline < 0 ? (abs(baseline) + 15) : 0
-            liveBaselineTable = Self.baselineMappingTable(baseline: baseline + liveShift, maxStep: 70, maxRealAngleDeg: 90)
+            switch posture {
+            case .sitting:
+                liveShift = baseline < 0 ? (abs(baseline) + 15) : 0
+                liveBaselineTable = Self.baselineMappingTable(baseline: baseline + liveShift, maxStep: 70, maxRealAngleDeg: 90)
+            case .standing:
+                liveShift = baseline < 0 ? (abs(baseline) + 10) : 0
+                liveBaselineTable = Self.standingMappingTable(baseline: baseline + liveShift, maxStep: 55, maxRealAngleDeg: 90)
+            }
             liveEstimating = [thighId, calfId]
 
             for peripheral in [thighPeripheral, calfPeripheral] {

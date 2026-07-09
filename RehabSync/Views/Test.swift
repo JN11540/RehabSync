@@ -110,6 +110,23 @@ struct TestPage: View {
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .disabled(!btVM.isLiveEstimating && (!canEstimateRealAngle || btVM.isCollectingBaseline))
 
+                    Button(btVM.isLiveEstimating ? "停止站立即時預估" : "開始站立即時預估") {
+                        guard let pair = thighAndCalfPeripherals else { return }
+                        if btVM.isLiveEstimating {
+                            btVM.stopLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+                        } else if let baseline = btVM.baselineResult {
+                            btVM.startLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf, baseline: baseline, posture: .standing)
+                        }
+                    }
+                    .font(.system(size: 15, weight: .medium))
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(btVM.isLiveEstimating ? Color.red.opacity(0.85)
+                        : (canEstimateRealAngle ? Color.teal.opacity(0.85) : Color.gray.opacity(0.3)))
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .disabled(!btVM.isLiveEstimating && (!canEstimateRealAngle || btVM.isCollectingBaseline))
+
                     if let angle = btVM.currentEstimatedRealAngle {
                         Text(String(format: "%.1f°", angle))
                             .font(.system(size: 20, weight: .bold, design: .monospaced))
