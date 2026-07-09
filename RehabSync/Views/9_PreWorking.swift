@@ -207,6 +207,7 @@ struct PreWorking9: View {
                             .resizable()
                             .scaledToFit()
                             .frame(width: 500, height: 500)
+                            .rotationEffect(.degrees(legRotation), anchor: UnitPoint(x: 0.603, y: 0.429))
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
@@ -311,13 +312,13 @@ struct PreWorking9: View {
                 stopLiveTestIfNeeded()
             }
             if newValue == 3 {
-                legRotation = -90
+                legRotation = 0
                 startLiveTestIfNeeded()
             }
         }
         .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
             withAnimation(.easeInOut(duration: 0.2)) {
-                legRotation = -(newValue ?? 90)
+                legRotation = newValue ?? 0
             }
         }
         .fullScreenCover(isPresented: $navigateToWorking2) {
