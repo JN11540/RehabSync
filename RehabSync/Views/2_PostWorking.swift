@@ -257,6 +257,16 @@ struct PostWorking2: View {
                             }
                         }
                         .frame(height: 200)
+
+                        HStack(spacing: 16) {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.white)
+                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(white: 0.6), lineWidth: 1.5))
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.white)
+                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(white: 0.6), lineWidth: 1.5))
+                        }
+                        .frame(height: 200)
                     }
                     .padding(.horizontal, 32)
                     .padding(.top, 0)
