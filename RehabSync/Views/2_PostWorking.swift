@@ -5,6 +5,7 @@ import SwiftUI
 struct PostWorking2: View {
     let content: TreatmentContent
     let exercise: Exercise?
+    @State private var barGrowProgress: Double = 0
 
     var body: some View {
         ZStack {
@@ -42,20 +43,16 @@ struct PostWorking2: View {
                                         Spacer()
                                         HStack(alignment: .bottom, spacing: 16) {
                                             VStack(spacing: 4) {
-                                                Text("0 金幣")
-                                                    .font(.system(size: 30, weight: .semibold))
-                                                    .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
-                                                Rectangle()
-                                                    .fill(Color(red: 1.0, green: 0.85, blue: 0.60))
-                                                    .frame(width: barWidth, height: 60)
+                                                BarValueText(value: 0 * barGrowProgress, suffix: " 金幣", color: Color(red: 0.70, green: 0.52, blue: 0.10))
+                                                    Rectangle()
+                                                        .fill(Color(red: 1.0, green: 0.85, blue: 0.60))
+                                                        .frame(width: barWidth, height: 60 * barGrowProgress)
                                             }
                                             VStack(spacing: 4) {
-                                                Text("1000 金幣")
-                                                    .font(.system(size: 30, weight: .semibold))
-                                                    .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
-                                                Rectangle()
-                                                    .fill(Color(red: 1.0, green: 0.70, blue: 0.25))
-                                                    .frame(width: barWidth, height: 110)
+                                                BarValueText(value: 1000 * barGrowProgress, suffix: " 金幣", color: Color(red: 0.70, green: 0.52, blue: 0.10))
+                                                    Rectangle()
+                                                        .fill(Color(red: 1.0, green: 0.70, blue: 0.25))
+                                                        .frame(width: barWidth, height: 110 * barGrowProgress)
                                             }
                                         }
                                         Rectangle()
@@ -98,20 +95,16 @@ struct PostWorking2: View {
                                         Spacer()
                                         HStack(alignment: .bottom, spacing: 16) {
                                             VStack(spacing: 4) {
-                                                Text("0 次")
-                                                    .font(.system(size: 30, weight: .semibold))
-                                                    .foregroundStyle(Color(red: 0.098, green: 0.353, blue: 0.549))
-                                                Rectangle()
-                                                    .fill(Color(red: 0.65, green: 0.85, blue: 0.98))
-                                                    .frame(width: barWidth, height: 60)
+                                                BarValueText(value: 0 * barGrowProgress, suffix: " 次", color: Color(red: 0.098, green: 0.353, blue: 0.549))
+                                                    Rectangle()
+                                                        .fill(Color(red: 0.65, green: 0.85, blue: 0.98))
+                                                        .frame(width: barWidth, height: 60 * barGrowProgress)
                                             }
                                             VStack(spacing: 4) {
-                                                Text("1000 次")
-                                                    .font(.system(size: 30, weight: .semibold))
-                                                    .foregroundStyle(Color(red: 0.098, green: 0.353, blue: 0.549))
-                                                Rectangle()
-                                                    .fill(Color(red: 0.20, green: 0.55, blue: 0.80))
-                                                    .frame(width: barWidth, height: 110)
+                                                BarValueText(value: 1000 * barGrowProgress, suffix: " 次", color: Color(red: 0.098, green: 0.353, blue: 0.549))
+                                                    Rectangle()
+                                                        .fill(Color(red: 0.20, green: 0.55, blue: 0.80))
+                                                        .frame(width: barWidth, height: 110 * barGrowProgress)
                                             }
                                         }
                                         Rectangle()
@@ -158,20 +151,16 @@ struct PostWorking2: View {
                                         Spacer()
                                         HStack(alignment: .bottom, spacing: 16) {
                                             VStack(spacing: 4) {
-                                                Text("0 分")
-                                                    .font(.system(size: 30, weight: .semibold))
-                                                    .foregroundStyle(Color(red: 0.106, green: 0.373, blue: 0.451))
-                                                Rectangle()
-                                                    .fill(Color(red: 0.70, green: 0.92, blue: 0.98))
-                                                    .frame(width: barWidth, height: 60)
+                                                BarValueText(value: 0 * barGrowProgress, suffix: " 分", color: Color(red: 0.106, green: 0.373, blue: 0.451))
+                                                    Rectangle()
+                                                        .fill(Color(red: 0.70, green: 0.92, blue: 0.98))
+                                                        .frame(width: barWidth, height: 60 * barGrowProgress)
                                             }
                                             VStack(spacing: 4) {
-                                                Text("1000 分")
-                                                    .font(.system(size: 30, weight: .semibold))
-                                                    .foregroundStyle(Color(red: 0.106, green: 0.373, blue: 0.451))
-                                                Rectangle()
-                                                    .fill(Color(red: 0.275, green: 0.706, blue: 0.831))
-                                                    .frame(width: barWidth, height: 110)
+                                                BarValueText(value: 1000 * barGrowProgress, suffix: " 分", color: Color(red: 0.106, green: 0.373, blue: 0.451))
+                                                    Rectangle()
+                                                        .fill(Color(red: 0.275, green: 0.706, blue: 0.831))
+                                                        .frame(width: barWidth, height: 110 * barGrowProgress)
                                             }
                                         }
                                         Rectangle()
@@ -214,20 +203,16 @@ struct PostWorking2: View {
                                         Spacer()
                                         HStack(alignment: .bottom, spacing: 16) {
                                             VStack(spacing: 4) {
-                                                Text("0 個")
-                                                    .font(.system(size: 30, weight: .semibold))
-                                                    .foregroundStyle(Color(red: 0.322, green: 0.416, blue: 0.451))
-                                                Rectangle()
-                                                    .fill(Color(red: 0.80, green: 0.87, blue: 0.90))
-                                                    .frame(width: barWidth, height: 60)
+                                                BarValueText(value: 0 * barGrowProgress, suffix: " 個", color: Color(red: 0.322, green: 0.416, blue: 0.451))
+                                                    Rectangle()
+                                                        .fill(Color(red: 0.80, green: 0.87, blue: 0.90))
+                                                        .frame(width: barWidth, height: 60 * barGrowProgress)
                                             }
                                             VStack(spacing: 4) {
-                                                Text("1000 個")
-                                                    .font(.system(size: 30, weight: .semibold))
-                                                    .foregroundStyle(Color(red: 0.322, green: 0.416, blue: 0.451))
-                                                Rectangle()
-                                                    .fill(Color(red: 0.678, green: 0.776, blue: 0.804))
-                                                    .frame(width: barWidth, height: 110)
+                                                BarValueText(value: 1000 * barGrowProgress, suffix: " 個", color: Color(red: 0.322, green: 0.416, blue: 0.451))
+                                                    Rectangle()
+                                                        .fill(Color(red: 0.678, green: 0.776, blue: 0.804))
+                                                        .frame(width: barWidth, height: 110 * barGrowProgress)
                                             }
                                         }
                                         Rectangle()
@@ -274,20 +259,16 @@ struct PostWorking2: View {
                                         Spacer()
                                         HStack(alignment: .bottom, spacing: 16) {
                                             VStack(spacing: 4) {
-                                                Text("0 個")
-                                                    .font(.system(size: 30, weight: .semibold))
-                                                    .foregroundStyle(Color(red: 0.612, green: 0.451, blue: 0.031))
-                                                Rectangle()
-                                                    .fill(Color(red: 0.99, green: 0.88, blue: 0.55))
-                                                    .frame(width: barWidth, height: 60)
+                                                BarValueText(value: 0 * barGrowProgress, suffix: " 個", color: Color(red: 0.612, green: 0.451, blue: 0.031))
+                                                    Rectangle()
+                                                        .fill(Color(red: 0.99, green: 0.88, blue: 0.55))
+                                                        .frame(width: barWidth, height: 60 * barGrowProgress)
                                             }
                                             VStack(spacing: 4) {
-                                                Text("1000 個")
-                                                    .font(.system(size: 30, weight: .semibold))
-                                                    .foregroundStyle(Color(red: 0.612, green: 0.451, blue: 0.031))
-                                                Rectangle()
-                                                    .fill(Color(red: 0.992, green: 0.827, blue: 0.427))
-                                                    .frame(width: barWidth, height: 110)
+                                                BarValueText(value: 1000 * barGrowProgress, suffix: " 個", color: Color(red: 0.612, green: 0.451, blue: 0.031))
+                                                    Rectangle()
+                                                        .fill(Color(red: 0.992, green: 0.827, blue: 0.427))
+                                                        .frame(width: barWidth, height: 110 * barGrowProgress)
                                             }
                                         }
                                         Rectangle()
@@ -330,20 +311,16 @@ struct PostWorking2: View {
                                         Spacer()
                                         HStack(alignment: .bottom, spacing: 16) {
                                             VStack(spacing: 4) {
-                                                Text("0 個")
-                                                    .font(.system(size: 30, weight: .semibold))
-                                                    .foregroundStyle(Color(red: 0.647, green: 0.298, blue: 0.376))
-                                                Rectangle()
-                                                    .fill(Color(red: 0.99, green: 0.85, blue: 0.88))
-                                                    .frame(width: barWidth, height: 60)
+                                                BarValueText(value: 0 * barGrowProgress, suffix: " 個", color: Color(red: 0.647, green: 0.298, blue: 0.376))
+                                                    Rectangle()
+                                                        .fill(Color(red: 0.99, green: 0.85, blue: 0.88))
+                                                        .frame(width: barWidth, height: 60 * barGrowProgress)
                                             }
                                             VStack(spacing: 4) {
-                                                Text("1000 個")
-                                                    .font(.system(size: 30, weight: .semibold))
-                                                    .foregroundStyle(Color(red: 0.647, green: 0.298, blue: 0.376))
-                                                Rectangle()
-                                                    .fill(Color(red: 0.949, green: 0.773, blue: 0.800))
-                                                    .frame(width: barWidth, height: 110)
+                                                BarValueText(value: 1000 * barGrowProgress, suffix: " 個", color: Color(red: 0.647, green: 0.298, blue: 0.376))
+                                                    Rectangle()
+                                                        .fill(Color(red: 0.949, green: 0.773, blue: 0.800))
+                                                        .frame(width: barWidth, height: 110 * barGrowProgress)
                                             }
                                         }
                                         Rectangle()
@@ -385,6 +362,32 @@ struct PostWorking2: View {
             .padding(.leading, 60)
             .padding(.trailing, 60)
         }
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.5)) {
+                barGrowProgress = 1
+            }
+        }
+    }
+}
+
+// MARK: - BarValueText
+
+// 讓長條圖上方的數字隨著直方長高的動畫同步從 0 數到目標值：Animatable 讓 SwiftUI
+// 在 withAnimation 期間對 value 做插值，body 每一幀都會用當下插值後的 value 重新渲染。
+private struct BarValueText: View, Animatable {
+    var value: Double
+    let suffix: String
+    let color: Color
+
+    var animatableData: Double {
+        get { value }
+        set { value = newValue }
+    }
+
+    var body: some View {
+        Text("\(Int(value.rounded()))\(suffix)")
+            .font(.system(size: 30, weight: .semibold))
+            .foregroundStyle(color)
     }
 }
 
