@@ -242,9 +242,62 @@ struct PostWorking2: View {
                                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                                     .padding(8)
                             }
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.white)
-                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(white: 0.6), lineWidth: 1.5))
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color(red: 0.75, green: 0.90, blue: 0.98))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(Color(red: 0.314, green: 0.647, blue: 0.863), lineWidth: 3)
+                                    )
+
+                                GeometryReader { geo in
+                                    let barWidth = max((geo.size.width - 32 - 16) / 2, 0)
+
+                                    VStack(spacing: 0) {
+                                        Spacer()
+                                        HStack(alignment: .bottom, spacing: 16) {
+                                            VStack(spacing: 4) {
+                                                Text("0 次")
+                                                    .font(.system(size: 30, weight: .semibold))
+                                                    .foregroundStyle(Color(red: 0.098, green: 0.353, blue: 0.549))
+                                                Rectangle()
+                                                    .fill(Color(red: 0.65, green: 0.85, blue: 0.98))
+                                                    .frame(width: barWidth, height: 60)
+                                            }
+                                            VStack(spacing: 4) {
+                                                Text("1000 次")
+                                                    .font(.system(size: 30, weight: .semibold))
+                                                    .foregroundStyle(Color(red: 0.098, green: 0.353, blue: 0.549))
+                                                Rectangle()
+                                                    .fill(Color(red: 0.20, green: 0.55, blue: 0.80))
+                                                    .frame(width: barWidth, height: 110)
+                                            }
+                                        }
+                                        Rectangle()
+                                            .fill(Color(red: 0.098, green: 0.353, blue: 0.549))
+                                            .frame(height: 2)
+                                        HStack(spacing: 16) {
+                                            Text("2026/07/07 15:00")
+                                                .font(.system(size: 20, weight: .semibold))
+                                                .foregroundStyle(Color(red: 0.098, green: 0.353, blue: 0.549))
+                                                .frame(width: barWidth)
+                                            Text("本次")
+                                                .font(.system(size: 20, weight: .semibold))
+                                                .foregroundStyle(Color(red: 0.098, green: 0.353, blue: 0.549))
+                                                .frame(width: barWidth)
+                                        }
+                                    }
+                                    .padding(16)
+                                    .frame(width: geo.size.width, height: geo.size.height)
+                                }
+
+                                Image("RepsIcon")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 60, height: 60)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                                    .padding(8)
+                            }
                         }
                         .frame(height: 200)
 
