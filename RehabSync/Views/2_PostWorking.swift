@@ -10,15 +10,7 @@ struct PostWorking2: View {
         ZStack {
             Color.black.opacity(0.8).ignoresSafeArea()
 
-            ZStack {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color(red: 0.85, green: 0.93, blue: 0.98))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(Color(white: 0.6), lineWidth: 5)
-                    )
-
-                VStack {
+            VStack {
                     HStack(alignment: .bottom, spacing: 60) {
                         Image("FinishGameLeftIcon")
                             .resizable()
@@ -272,7 +264,6 @@ struct PostWorking2: View {
 
                     Spacer()
                 }
-            }
             .padding(.top, 40)
             .padding(.bottom, 40)
             .padding(.leading, 60)
