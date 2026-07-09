@@ -369,7 +369,7 @@ struct PostWorking2: View {
             .padding(.trailing, 60)
         }
         .onAppear {
-            withAnimation(.easeOut(duration: 3)) {
+            withAnimation(.easeOut(duration: 1.5)) {
                 barGrowProgress = 1
             }
         }
