@@ -68,7 +68,7 @@ struct Working9: View {
             if heldSeconds >= 5 {
                 targetPixel = CGPoint(x: 1050, y: 229)
             } else if heldSeconds >= 3 {
-                targetPixel = CGPoint(x: 971, y: 228)
+                targetPixel = CGPoint(x: 945, y: 228)
             } else if heldSeconds >= 1 {
                 targetPixel = CGPoint(x: 911, y: 228)
             }
