@@ -8,9 +8,11 @@ struct Working9: View {
     @Environment(BluetoothViewModel.self) private var btVM
     @State private var holdElapsed: Double = 0
     @State private var holdTimer: Timer?
+    @State private var showOutIcon = false
 
     private static let holdThreshold: Double = 45
     private static let holdDuration: Double = 5
+    private static let outIconDuration: Double = 1.5
 
     private func startHoldTimer() {
         guard holdTimer == nil else { return }
@@ -23,10 +25,17 @@ struct Working9: View {
     }
 
     private func stopHoldTimer() {
+        let wasHolding = holdTimer != nil
         holdTimer?.invalidate()
         holdTimer = nil
         withAnimation(.easeOut(duration: 0.2)) {
             holdElapsed = 0
+        }
+        if wasHolding {
+            showOutIcon = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.outIconDuration) {
+                showOutIcon = false
+            }
         }
     }
 
@@ -46,11 +55,21 @@ struct Working9: View {
                 .padding(48)
                 .opacity(0.4)
 
-            Image("ArcheryReadyIcon")
-                .resizable()
-                .scaledToFill()
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .padding(48)
+            Group {
+                if showOutIcon {
+                    Image("ArcheryOutIcon")
+                        .resizable()
+                } else if let angle = btVM.currentEstimatedRealAngle, angle >= Self.holdThreshold {
+                    Image("ArcheryFocusIcon")
+                        .resizable()
+                } else {
+                    Image("ArcheryReadyIcon")
+                        .resizable()
+                }
+            }
+            .scaledToFill()
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding(48)
 
             Image("ArrowTargetIcon")
                 .resizable()
