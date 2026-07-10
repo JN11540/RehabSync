@@ -86,7 +86,19 @@ struct Working9: View {
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .padding(48)
 
-            Image("ArrowTargetIcon")
+            Image("ArrowBlueTargetIcon")
+                .resizable()
+                .scaledToFill()
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(48)
+
+            Image("ArrowRedTargetIcon")
+                .resizable()
+                .scaledToFill()
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(48)
+
+            Image("ArrowYellowTargetIcon")
                 .resizable()
                 .scaledToFill()
                 .clipShape(RoundedRectangle(cornerRadius: 12))
