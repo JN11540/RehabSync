@@ -23,6 +23,8 @@ struct Working9: View {
     @State private var showCoinBurst = false
     @State private var coinBurstProgress: Double = 0
     @State private var coinBurstCount = 0
+    @State private var scoreElapsed: Double = -1
+    @State private var scoreTimer: Timer?
 
     private static let holdThreshold: Double = 45
     private static let holdDuration: Double = 5
@@ -32,6 +34,7 @@ struct Working9: View {
     private static let pulseBrightness: Double = 0.3
     private static let coinBurstDuration: Double = 1.0
     private static let backpackTargetPixel = CGPoint(x: 712, y: 599)
+    private static let scoreHoldAfterLast: Double = 0.6
 
     // archery_background.png（跟其他滿版疊圖共用同一份 1232x864 畫布 + padding(48) + scaledToFill），
     // 座標換算公式跟 2_Working.swift 的 overlayPosition 完全相同。
@@ -73,6 +76,23 @@ struct Working9: View {
                     scale.wrappedValue = 1
                     brightness.wrappedValue = 0
                 }
+            }
+        }
+    }
+
+    // 數字累加跟硬幣飛行動畫脫鉤，用自己的 Timer 依固定節奏（scoreStagger）逐一往上跳，
+    // 確保無論硬幣數量多少，一定會完整跑完第一個數字到最後一個數字，不受 1 秒飛行時間限制。
+    private func startScoreSequence(count: Int) {
+        scoreTimer?.invalidate()
+        let start = Date()
+        scoreElapsed = 0
+        let totalDuration = Double(count) * CoinBurstScoreLabel.stagger + Self.scoreHoldAfterLast
+        scoreTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { t in
+            let e = Date().timeIntervalSince(start)
+            scoreElapsed = e
+            if e >= totalDuration {
+                t.invalidate()
+                scoreElapsed = -1
             }
         }
     }
@@ -164,6 +184,7 @@ struct Working9: View {
                     DispatchQueue.main.asyncAfter(deadline: .now() + Self.coinBurstDuration) {
                         showCoinBurst = false
                     }
+                    startScoreSequence(count: coinCount)
                 }
             }
         }
@@ -257,10 +278,12 @@ struct Working9: View {
                     )
                 }
                 .allowsHitTesting(false)
+            }
 
+            if scoreElapsed >= 0 {
                 GeometryReader { geo in
                     CoinBurstScoreLabel(
-                        progress: coinBurstProgress,
+                        elapsed: scoreElapsed,
                         count: coinBurstCount,
                         position: Self.overlayPosition(for: Self.canvasFraction(x: 950, y: 600), in: geo.size)
                     )
@@ -366,6 +389,7 @@ struct Working9: View {
         }
         .onDisappear {
             holdTimer?.invalidate()
+            scoreTimer?.invalidate()
         }
     }
 }
@@ -447,40 +471,23 @@ private struct CoinConvergeBurst: View, Animatable {
 // MARK: - CoinBurstScoreLabel
 
 // 累計金額顯示完全參考 2_Working.swift 的 CoinBurstView：黑色描邊 + 金黃色文字，
-// 每來一顆新硬幣（跟 CoinConvergeBurst 用同一套 stagger/flightFraction 判斷「已抵達」的數量）
-// 就從基準字級彈大一點再彈回，用「離最近一次抵達的時間」算出 0→1→0 的脈衝。
-private struct CoinBurstScoreLabel: View, Animatable {
-    var progress: Double
+// 用自己的 elapsed（由 Timer 驅動，見 Working9.startScoreSequence）逐一往上跳，
+// 跟硬幣飛行動畫的 1 秒視覺效果脫鉤，確保無論硬幣數量多少都能完整跑完全部數字。
+private struct CoinBurstScoreLabel: View {
+    let elapsed: Double
     let count: Int
     let position: CGPoint
 
-    var animatableData: Double {
-        get { progress }
-        set { progress = newValue }
-    }
-
-    private static let flightFraction = 0.5
+    fileprivate static let stagger = 0.2
     private static let pulseDuration = 0.15
     private static let baseFontSize: CGFloat = 100
 
-    private var staggerFraction: Double {
-        count > 1 ? (1 - Self.flightFraction) / Double(count - 1) : 0
-    }
-
-    private var appearedCount: Int {
-        guard count > 0 else { return 0 }
-        if staggerFraction == 0 {
-            return progress >= Self.flightFraction ? count : 0
-        }
-        let maxI = Int(floor((progress - Self.flightFraction) / staggerFraction))
-        return min(count, max(0, maxI + 1))
-    }
-
     var body: some View {
+        let appearedCount = elapsed >= 0 ? min(count, Int(elapsed / Self.stagger) + 1) : 0
         if appearedCount > 0 {
             let label = "+\(appearedCount * 100)"
-            let lastArriveTime = Double(appearedCount - 1) * staggerFraction + Self.flightFraction
-            let timeSincePulse = progress - lastArriveTime
+            let lastSpawnTime = Double(appearedCount - 1) * Self.stagger
+            let timeSincePulse = elapsed - lastSpawnTime
             let pulseProgress = min(max(timeSincePulse / Self.pulseDuration, 0), 1)
             let pulseFactor = sin(pulseProgress * .pi)
             let fontSize = Self.baseFontSize + 20 * CGFloat(pulseFactor)
