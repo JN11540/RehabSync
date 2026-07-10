@@ -46,6 +46,11 @@ struct Working9: View {
             } else if heldSeconds >= 1 {
                 hitBowIconName = "BowBlueIcon"
             }
+            if hitBowIconName != nil {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Self.outIconDuration) {
+                    hitBowIconName = nil
+                }
+            }
         }
     }
 
