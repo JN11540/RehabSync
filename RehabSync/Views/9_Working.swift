@@ -20,6 +20,9 @@ struct Working9: View {
     @State private var redTargetBrightness: Double = 0
     @State private var yellowTargetScale: CGFloat = 1
     @State private var yellowTargetBrightness: Double = 0
+    @State private var showCoinBurst = false
+    @State private var coinBurstProgress: Double = 0
+    @State private var coinBurstCount = 0
 
     private static let holdThreshold: Double = 45
     private static let holdDuration: Double = 5
@@ -27,6 +30,8 @@ struct Working9: View {
     private static let pulseStepDuration: Double = 0.3
     private static let pulseScale: CGFloat = 1.15
     private static let pulseBrightness: Double = 0.3
+    private static let coinBurstDuration: Double = 1.0
+    private static let backpackTargetPixel = CGPoint(x: 712, y: 599)
 
     // archery_background.png（跟其他滿版疊圖共用同一份 1232x864 畫布 + padding(48) + scaledToFill），
     // 座標換算公式跟 2_Working.swift 的 overlayPosition 完全相同。
@@ -138,6 +143,28 @@ struct Working9: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + Self.outIconDuration + pulseTotalDuration) {
                     showHappyMoment = false
                 }
+
+                var coinCount = 0
+                if heldSeconds >= 5 {
+                    coinCount = 15
+                } else if heldSeconds >= 3 {
+                    coinCount = 9
+                } else if heldSeconds >= 1 {
+                    coinCount = 3
+                }
+
+                let coinBurstDelay = Self.outIconDuration + pulseTotalDuration
+                DispatchQueue.main.asyncAfter(deadline: .now() + coinBurstDelay) {
+                    coinBurstCount = coinCount
+                    coinBurstProgress = 0
+                    showCoinBurst = true
+                    withAnimation(.linear(duration: Self.coinBurstDuration)) {
+                        coinBurstProgress = 1
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + Self.coinBurstDuration) {
+                        showCoinBurst = false
+                    }
+                }
             }
         }
     }
@@ -213,6 +240,20 @@ struct Working9: View {
                         progress: arrowProgress,
                         start: Self.overlayPosition(for: arrowStartFraction, in: geo.size),
                         end: Self.overlayPosition(for: arrowEndFraction, in: geo.size)
+                    )
+                }
+                .allowsHitTesting(false)
+            }
+
+            if showCoinBurst {
+                GeometryReader { geo in
+                    CoinConvergeBurst(
+                        progress: coinBurstProgress,
+                        count: coinBurstCount,
+                        target: Self.overlayPosition(
+                            for: Self.canvasFraction(x: Self.backpackTargetPixel.x, y: Self.backpackTargetPixel.y),
+                            in: geo.size
+                        )
                     )
                 }
                 .allowsHitTesting(false)
@@ -342,6 +383,55 @@ private struct MovingArrow: View, Animatable {
             .scaledToFit()
             .frame(width: 200, height: 200)
             .position(x: x, y: y)
+    }
+}
+
+// MARK: - CoinConvergeBurst
+
+// count 個 coin.png 分別從 target 右上角錯開的起點，依序（stagger）沿拋物線飛向 target 並消失，
+// 全部動作共用同一個 0→1 的 progress（由外部 withAnimation 在 1 秒內跑完），每顆硬幣依自己的
+// 出發時間換算出區間內的 localT，這樣可以用同一個 Animatable 驅動全部硬幣，不需要各自的 Timer。
+private struct CoinConvergeBurst: View, Animatable {
+    var progress: Double
+    let count: Int
+    let target: CGPoint
+
+    var animatableData: Double {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    private static let flightFraction = 0.5
+    private static let arcHeight: CGFloat = 30
+    private static let coinSize: CGFloat = 36
+
+    var body: some View {
+        let staggerFraction = count > 1 ? (1 - Self.flightFraction) / Double(count - 1) : 0
+
+        ZStack {
+            ForEach(0..<count, id: \.self) { i in
+                let startFraction = Double(i) * staggerFraction
+                let localT = min(max((progress - startFraction) / Self.flightFraction, 0), 1)
+
+                if progress >= startFraction && localT < 1 {
+                    let angle = Double(30 + (i % 5) * 12) * .pi / 180
+                    let distance: CGFloat = 100 + CGFloat(i % 3) * 40
+                    let start = CGPoint(
+                        x: target.x + cos(angle) * distance,
+                        y: target.y - sin(angle) * distance
+                    )
+                    let t = CGFloat(localT)
+                    let x = start.x + (target.x - start.x) * t
+                    let y = start.y + (target.y - start.y) * t - Self.arcHeight * 4 * t * (1 - t)
+
+                    Image("CoinIcon")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: Self.coinSize, height: Self.coinSize)
+                        .position(x: x, y: y)
+                }
+            }
+        }
     }
 }
 
