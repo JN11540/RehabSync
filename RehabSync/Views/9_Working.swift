@@ -158,6 +158,12 @@ struct Working9: View {
                 .padding(48)
                 .opacity(0.4)
 
+            Image("BackpackDreamIcon")
+                .resizable()
+                .scaledToFill()
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(48)
+
             Group {
                 if showOutIcon {
                     Image("ArcheryOutIcon")
