@@ -9,10 +9,36 @@ struct Working9: View {
     @State private var holdElapsed: Double = 0
     @State private var holdTimer: Timer?
     @State private var showOutIcon = false
+    @State private var showArrow = false
+    @State private var arrowProgress: Double = 0
+    @State private var arrowStartFraction: CGPoint = .zero
+    @State private var arrowEndFraction: CGPoint = .zero
 
     private static let holdThreshold: Double = 45
     private static let holdDuration: Double = 5
     private static let outIconDuration: Double = 1.5
+
+    // archery_background.png（跟其他滿版疊圖共用同一份 1232x864 畫布 + padding(48) + scaledToFill），
+    // 座標換算公式跟 2_Working.swift 的 overlayPosition 完全相同。
+    private static let overlayCanvasSize = CGSize(width: 1232, height: 864)
+
+    private static func overlayPosition(for fraction: CGPoint, in size: CGSize, padding: CGFloat = 48) -> CGPoint {
+        let frameW = size.width - padding * 2
+        let frameH = size.height - padding * 2
+        guard frameW > 0, frameH > 0 else { return CGPoint(x: size.width / 2, y: size.height / 2) }
+        let scale = max(frameW / overlayCanvasSize.width, frameH / overlayCanvasSize.height)
+        let visibleW = frameW / scale
+        let visibleH = frameH / scale
+        let cropX = (overlayCanvasSize.width - visibleW) / 2
+        let cropY = (overlayCanvasSize.height - visibleH) / 2
+        let relX = (fraction.x * overlayCanvasSize.width - cropX) / visibleW
+        let relY = (fraction.y * overlayCanvasSize.height - cropY) / visibleH
+        return CGPoint(x: padding + relX * frameW, y: padding + relY * frameH)
+    }
+
+    private static func canvasFraction(x: CGFloat, y: CGFloat) -> CGPoint {
+        CGPoint(x: x / overlayCanvasSize.width, y: y / overlayCanvasSize.height)
+    }
 
     private func startHoldTimer() {
         guard holdTimer == nil else { return }
@@ -26,6 +52,7 @@ struct Working9: View {
 
     private func stopHoldTimer() {
         let wasHolding = holdTimer != nil
+        let heldSeconds = holdElapsed
         holdTimer?.invalidate()
         holdTimer = nil
         withAnimation(.easeOut(duration: 0.2)) {
@@ -35,6 +62,28 @@ struct Working9: View {
             showOutIcon = true
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.outIconDuration) {
                 showOutIcon = false
+            }
+
+            var targetPixel: CGPoint?
+            if heldSeconds >= 5 {
+                targetPixel = CGPoint(x: 1050, y: 229)
+            } else if heldSeconds >= 3 {
+                targetPixel = CGPoint(x: 1000, y: 200)
+            } else if heldSeconds >= 1 {
+                targetPixel = CGPoint(x: 911, y: 228)
+            }
+
+            if let targetPixel {
+                arrowStartFraction = Self.canvasFraction(x: 600, y: 297)
+                arrowEndFraction = Self.canvasFraction(x: targetPixel.x, y: targetPixel.y)
+                arrowProgress = 0
+                showArrow = true
+                withAnimation(.linear(duration: Self.outIconDuration)) {
+                    arrowProgress = 1
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + Self.outIconDuration) {
+                    showArrow = false
+                }
             }
         }
     }
@@ -88,6 +137,17 @@ struct Working9: View {
                 .scaledToFill()
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .padding(48)
+
+            if showArrow {
+                GeometryReader { geo in
+                    MovingArrow(
+                        progress: arrowProgress,
+                        start: Self.overlayPosition(for: arrowStartFraction, in: geo.size),
+                        end: Self.overlayPosition(for: arrowEndFraction, in: geo.size)
+                    )
+                }
+                .allowsHitTesting(false)
+            }
 
             VStack(spacing: 12) {
                 GeometryReader { geo in
@@ -188,6 +248,31 @@ struct Working9: View {
         .onDisappear {
             holdTimer?.invalidate()
         }
+    }
+}
+
+// MARK: - MovingArrow
+
+// 讓箭矢從起點直線飛向終點：progress 是唯一會被 SwiftUI 動畫插值的值，
+// x/y 在每個插值後的 progress 當下重新計算，才能跟著 withAnimation 平滑移動。
+private struct MovingArrow: View, Animatable {
+    var progress: Double
+    let start: CGPoint
+    let end: CGPoint
+
+    var animatableData: Double {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    var body: some View {
+        let x = start.x + (end.x - start.x) * progress
+        let y = start.y + (end.y - start.y) * progress
+        Image("ArrowOnlyIcon")
+            .resizable()
+            .scaledToFit()
+            .frame(width: 80, height: 80)
+            .position(x: x, y: y)
     }
 }
 
