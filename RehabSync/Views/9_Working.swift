@@ -21,6 +21,12 @@ struct Working9: View {
                 )
                 .padding(48)
                 .opacity(0.4)
+
+            Image("ArcheryReadyIcon")
+                .resizable()
+                .scaledToFill()
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(48)
         }
     }
 }
