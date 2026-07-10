@@ -9,7 +9,7 @@ struct Working9: View {
     @State private var holdElapsed: Double = 0
     @State private var holdTimer: Timer?
 
-    private static let holdThreshold: Double = 20
+    private static let holdThreshold: Double = 45
     private static let holdDuration: Double = 5
 
     private func startHoldTimer() {
@@ -122,7 +122,7 @@ struct Working9: View {
                     if let angle = btVM.currentEstimatedRealAngle {
                         Text(String(format: "%.0f°", angle))
                             .font(.system(size: 50, weight: .bold))
-                            .foregroundStyle(angle <= Self.holdThreshold ? .red : .black)
+                            .foregroundStyle(angle >= Self.holdThreshold ? .red : .black)
                             .minimumScaleFactor(0.3)
                             .lineLimit(1)
                             .padding(12)
@@ -134,7 +134,7 @@ struct Working9: View {
             .offset(x: 25, y: -100)
         }
         .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
-            if let angle = newValue, angle <= Self.holdThreshold {
+            if let angle = newValue, angle >= Self.holdThreshold {
                 startHoldTimer()
             } else {
                 stopHoldTimer()
