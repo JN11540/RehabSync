@@ -105,6 +105,20 @@ struct Working9: View {
                                 .foregroundStyle(.black)
                                 .position(x: -20, y: h * CGFloat(i) / 5)
                         }
+
+                        // 靶心配色（藍/紅/黃 對應 arrow_target.png 外圈到內圈），秒數越多越接近靶心
+                        Circle()
+                            .fill(Color(red: 0.369, green: 0.690, blue: 0.824))
+                            .frame(width: 24, height: 24)
+                            .position(x: 60, y: h * 4 / 5)
+                        Circle()
+                            .fill(Color(red: 0.910, green: 0.306, blue: 0.290))
+                            .frame(width: 24, height: 24)
+                            .position(x: 60, y: h * 2 / 5)
+                        Circle()
+                            .fill(Color(red: 0.957, green: 0.871, blue: 0.235))
+                            .frame(width: 24, height: 24)
+                            .position(x: 60, y: 0)
                     }
                 }
                 .frame(width: 40, height: 400)
