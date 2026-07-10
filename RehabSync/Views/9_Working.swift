@@ -13,10 +13,19 @@ struct Working9: View {
     @State private var arrowProgress: Double = 0
     @State private var arrowStartFraction: CGPoint = .zero
     @State private var arrowEndFraction: CGPoint = .zero
+    @State private var blueTargetScale: CGFloat = 1
+    @State private var blueTargetBrightness: Double = 0
+    @State private var redTargetScale: CGFloat = 1
+    @State private var redTargetBrightness: Double = 0
+    @State private var yellowTargetScale: CGFloat = 1
+    @State private var yellowTargetBrightness: Double = 0
 
     private static let holdThreshold: Double = 45
     private static let holdDuration: Double = 5
     private static let outIconDuration: Double = 1.5
+    private static let pulseStepDuration: Double = 0.3
+    private static let pulseScale: CGFloat = 1.15
+    private static let pulseBrightness: Double = 0.3
 
     // archery_background.png（跟其他滿版疊圖共用同一份 1232x864 畫布 + padding(48) + scaledToFill），
     // 座標換算公式跟 2_Working.swift 的 overlayPosition 完全相同。
@@ -38,6 +47,28 @@ struct Working9: View {
 
     private static func canvasFraction(x: CGFloat, y: CGFloat) -> CGPoint {
         CGPoint(x: x / overlayCanvasSize.width, y: y / overlayCanvasSize.height)
+    }
+
+    // 讓對應顏色的靶環在 archery_out.png 消失後（delay 之後）連續 pulse 幾次：
+    // 每次 pulse 都是「放大＋變亮」再「回到原狀」，用 asyncAfter 依序排時間，
+    // 確保每個 pulse 之間有明確的節奏，而不是單純無限循環動畫。
+    private func startPulse(times: Int, delay: Double, scale: Binding<CGFloat>, brightness: Binding<Double>) {
+        for i in 0..<times {
+            let upTime = delay + Double(i) * Self.pulseStepDuration * 2
+            let downTime = upTime + Self.pulseStepDuration
+            DispatchQueue.main.asyncAfter(deadline: .now() + upTime) {
+                withAnimation(.easeInOut(duration: Self.pulseStepDuration)) {
+                    scale.wrappedValue = Self.pulseScale
+                    brightness.wrappedValue = Self.pulseBrightness
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + downTime) {
+                withAnimation(.easeInOut(duration: Self.pulseStepDuration)) {
+                    scale.wrappedValue = 1
+                    brightness.wrappedValue = 0
+                }
+            }
+        }
     }
 
     private func startHoldTimer() {
@@ -85,6 +116,14 @@ struct Working9: View {
                     showArrow = false
                 }
             }
+
+            if heldSeconds >= 5 {
+                startPulse(times: 3, delay: Self.outIconDuration, scale: $yellowTargetScale, brightness: $yellowTargetBrightness)
+            } else if heldSeconds >= 3 {
+                startPulse(times: 3, delay: Self.outIconDuration, scale: $redTargetScale, brightness: $redTargetBrightness)
+            } else if heldSeconds >= 1 {
+                startPulse(times: 3, delay: Self.outIconDuration, scale: $blueTargetScale, brightness: $blueTargetBrightness)
+            }
         }
     }
 
@@ -124,18 +163,24 @@ struct Working9: View {
                 .resizable()
                 .scaledToFill()
                 .clipShape(RoundedRectangle(cornerRadius: 12))
+                .scaleEffect(blueTargetScale, anchor: UnitPoint(x: 0.853, y: 0.264))
+                .brightness(blueTargetBrightness)
                 .padding(48)
 
             Image("ArrowRedTargetIcon")
                 .resizable()
                 .scaledToFill()
                 .clipShape(RoundedRectangle(cornerRadius: 12))
+                .scaleEffect(redTargetScale, anchor: UnitPoint(x: 0.853, y: 0.264))
+                .brightness(redTargetBrightness)
                 .padding(48)
 
             Image("ArrowYellowTargetIcon")
                 .resizable()
                 .scaledToFill()
                 .clipShape(RoundedRectangle(cornerRadius: 12))
+                .scaleEffect(yellowTargetScale, anchor: UnitPoint(x: 0.853, y: 0.264))
+                .brightness(yellowTargetBrightness)
                 .padding(48)
 
             if showArrow {
