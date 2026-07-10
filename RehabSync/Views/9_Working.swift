@@ -9,6 +9,7 @@ struct Working9: View {
     @State private var holdElapsed: Double = 0
     @State private var holdTimer: Timer?
     @State private var showOutIcon = false
+    @State private var hitBowIconName: String? = nil
 
     private static let holdThreshold: Double = 45
     private static let holdDuration: Double = 5
@@ -26,6 +27,7 @@ struct Working9: View {
 
     private func stopHoldTimer() {
         let wasHolding = holdTimer != nil
+        let heldSeconds = holdElapsed
         holdTimer?.invalidate()
         holdTimer = nil
         withAnimation(.easeOut(duration: 0.2)) {
@@ -35,6 +37,14 @@ struct Working9: View {
             showOutIcon = true
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.outIconDuration) {
                 showOutIcon = false
+            }
+
+            if heldSeconds >= 5 {
+                hitBowIconName = "BowYellowIcon"
+            } else if heldSeconds >= 3 {
+                hitBowIconName = "BowRedIcon"
+            } else if heldSeconds >= 1 {
+                hitBowIconName = "BowBlueIcon"
             }
         }
     }
@@ -76,6 +86,14 @@ struct Working9: View {
                 .scaledToFill()
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .padding(48)
+
+            if let hitBowIconName {
+                Image(hitBowIconName)
+                    .resizable()
+                    .scaledToFill()
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .padding(48)
+            }
 
             VStack(spacing: 12) {
                 GeometryReader { geo in
