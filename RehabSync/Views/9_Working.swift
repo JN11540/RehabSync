@@ -9,6 +9,7 @@ struct Working9: View {
     @State private var holdElapsed: Double = 0
     @State private var holdTimer: Timer?
     @State private var showOutIcon = false
+    @State private var showHappyMoment = false
     @State private var showArrow = false
     @State private var arrowProgress: Double = 0
     @State private var arrowStartFraction: CGPoint = .zero
@@ -117,12 +118,26 @@ struct Working9: View {
                 }
             }
 
+            var pulseTimes: Int?
             if heldSeconds >= 5 {
+                pulseTimes = 3
                 startPulse(times: 3, delay: Self.outIconDuration, scale: $yellowTargetScale, brightness: $yellowTargetBrightness)
             } else if heldSeconds >= 3 {
+                pulseTimes = 3
                 startPulse(times: 3, delay: Self.outIconDuration, scale: $redTargetScale, brightness: $redTargetBrightness)
             } else if heldSeconds >= 1 {
+                pulseTimes = 3
                 startPulse(times: 3, delay: Self.outIconDuration, scale: $blueTargetScale, brightness: $blueTargetBrightness)
+            }
+
+            if let pulseTimes {
+                let pulseTotalDuration = Double(pulseTimes) * Self.pulseStepDuration * 2
+                DispatchQueue.main.asyncAfter(deadline: .now() + Self.outIconDuration) {
+                    showHappyMoment = true
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + Self.outIconDuration + pulseTotalDuration) {
+                    showHappyMoment = false
+                }
             }
         }
     }
@@ -146,6 +161,9 @@ struct Working9: View {
             Group {
                 if showOutIcon {
                     Image("ArcheryOutIcon")
+                        .resizable()
+                } else if showHappyMoment {
+                    Image("ArrowHappyMomentIcon")
                         .resizable()
                 } else if let angle = btVM.currentEstimatedRealAngle, angle >= Self.holdThreshold {
                     Image("ArcheryFocusIcon")
