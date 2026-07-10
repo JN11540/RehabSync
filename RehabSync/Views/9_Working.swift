@@ -27,6 +27,12 @@ struct Working9: View {
                 .scaledToFill()
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .padding(48)
+
+            Image("ArrowTargetIcon")
+                .resizable()
+                .scaledToFill()
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(48)
         }
     }
 }
