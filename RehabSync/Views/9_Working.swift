@@ -23,6 +23,7 @@ struct Working9: View {
     @State private var showCoinBurst = false
     @State private var coinBurstProgress: Double = 0
     @State private var coinBurstCount = 0
+    @State private var backgroundScale: CGFloat = 1
 
     private static let holdThreshold: Double = 45
     private static let holdDuration: Double = 5
@@ -161,8 +162,14 @@ struct Working9: View {
                     withAnimation(.linear(duration: Self.coinBurstDuration)) {
                         coinBurstProgress = 1
                     }
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        backgroundScale = 1.08
+                    }
                     DispatchQueue.main.asyncAfter(deadline: .now() + Self.coinBurstDuration) {
                         showCoinBurst = false
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            backgroundScale = 1
+                        }
                     }
                 }
             }
@@ -182,6 +189,7 @@ struct Working9: View {
                     RoundedRectangle(cornerRadius: 12)
                         .stroke(Color.black, lineWidth: 2)
                 )
+                .scaleEffect(backgroundScale)
                 .padding(48)
                 .opacity(0.4)
 
@@ -254,6 +262,15 @@ struct Working9: View {
                             for: Self.canvasFraction(x: Self.backpackTargetPixel.x, y: Self.backpackTargetPixel.y),
                             in: geo.size
                         )
+                    )
+                }
+                .allowsHitTesting(false)
+
+                GeometryReader { geo in
+                    CoinBurstScoreLabel(
+                        progress: coinBurstProgress,
+                        count: coinBurstCount,
+                        position: Self.overlayPosition(for: Self.canvasFraction(x: 1150, y: 400), in: geo.size)
                     )
                 }
                 .allowsHitTesting(false)
@@ -431,6 +448,66 @@ private struct CoinConvergeBurst: View, Animatable {
                         .position(x: x, y: y)
                 }
             }
+        }
+    }
+}
+
+// MARK: - CoinBurstScoreLabel
+
+// 累計金額顯示完全參考 2_Working.swift 的 CoinBurstView：黑色描邊 + 金黃色文字，
+// 每來一顆新硬幣（跟 CoinConvergeBurst 用同一套 stagger/flightFraction 判斷「已抵達」的數量）
+// 就從基準字級彈大一點再彈回，用「離最近一次抵達的時間」算出 0→1→0 的脈衝。
+private struct CoinBurstScoreLabel: View, Animatable {
+    var progress: Double
+    let count: Int
+    let position: CGPoint
+
+    var animatableData: Double {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    private static let flightFraction = 0.5
+    private static let pulseDuration = 0.15
+    private static let baseFontSize: CGFloat = 40
+
+    private var staggerFraction: Double {
+        count > 1 ? (1 - Self.flightFraction) / Double(count - 1) : 0
+    }
+
+    private var appearedCount: Int {
+        guard count > 0 else { return 0 }
+        if staggerFraction == 0 {
+            return progress >= Self.flightFraction ? count : 0
+        }
+        let maxI = Int(floor((progress - Self.flightFraction) / staggerFraction))
+        return min(count, max(0, maxI + 1))
+    }
+
+    var body: some View {
+        if appearedCount > 0 {
+            let label = "+\(appearedCount * 100)"
+            let lastArriveTime = Double(appearedCount - 1) * staggerFraction + Self.flightFraction
+            let timeSincePulse = progress - lastArriveTime
+            let pulseProgress = min(max(timeSincePulse / Self.pulseDuration, 0), 1)
+            let pulseFactor = sin(pulseProgress * .pi)
+            let fontSize = Self.baseFontSize + 8 * CGFloat(pulseFactor)
+            let outlineOffsets: [CGSize] = [
+                CGSize(width: -2, height: -2), CGSize(width: 2, height: -2),
+                CGSize(width: -2, height: 2), CGSize(width: 2, height: 2)
+            ]
+            ZStack {
+                ForEach(0..<outlineOffsets.count, id: \.self) { i in
+                    Text(label)
+                        .font(.system(size: fontSize, weight: .bold))
+                        .foregroundStyle(Color(red: 0.93, green: 0.75, blue: 0.22))
+                        .offset(outlineOffsets[i])
+                }
+                Text(label)
+                    .font(.system(size: fontSize, weight: .bold))
+                    .foregroundStyle(Color(red: 0.933, green: 0.933, blue: 0.0))
+            }
+            .position(position)
         }
     }
 }
