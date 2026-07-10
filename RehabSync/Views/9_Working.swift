@@ -23,7 +23,6 @@ struct Working9: View {
     @State private var showCoinBurst = false
     @State private var coinBurstProgress: Double = 0
     @State private var coinBurstCount = 0
-    @State private var backgroundScale: CGFloat = 1
 
     private static let holdThreshold: Double = 45
     private static let holdDuration: Double = 5
@@ -162,14 +161,8 @@ struct Working9: View {
                     withAnimation(.linear(duration: Self.coinBurstDuration)) {
                         coinBurstProgress = 1
                     }
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        backgroundScale = 1.08
-                    }
                     DispatchQueue.main.asyncAfter(deadline: .now() + Self.coinBurstDuration) {
                         showCoinBurst = false
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            backgroundScale = 1
-                        }
                     }
                 }
             }
@@ -189,7 +182,6 @@ struct Working9: View {
                     RoundedRectangle(cornerRadius: 12)
                         .stroke(Color.black, lineWidth: 2)
                 )
-                .scaleEffect(backgroundScale)
                 .padding(48)
                 .opacity(0.4)
 
@@ -270,7 +262,7 @@ struct Working9: View {
                     CoinBurstScoreLabel(
                         progress: coinBurstProgress,
                         count: coinBurstCount,
-                        position: Self.overlayPosition(for: Self.canvasFraction(x: 1150, y: 400), in: geo.size)
+                        position: Self.overlayPosition(for: Self.canvasFraction(x: 950, y: 600), in: geo.size)
                     )
                 }
                 .allowsHitTesting(false)
@@ -469,7 +461,7 @@ private struct CoinBurstScoreLabel: View, Animatable {
 
     private static let flightFraction = 0.5
     private static let pulseDuration = 0.15
-    private static let baseFontSize: CGFloat = 40
+    private static let baseFontSize: CGFloat = 100
 
     private var staggerFraction: Double {
         count > 1 ? (1 - Self.flightFraction) / Double(count - 1) : 0
@@ -491,7 +483,7 @@ private struct CoinBurstScoreLabel: View, Animatable {
             let timeSincePulse = progress - lastArriveTime
             let pulseProgress = min(max(timeSincePulse / Self.pulseDuration, 0), 1)
             let pulseFactor = sin(pulseProgress * .pi)
-            let fontSize = Self.baseFontSize + 8 * CGFloat(pulseFactor)
+            let fontSize = Self.baseFontSize + 20 * CGFloat(pulseFactor)
             let outlineOffsets: [CGSize] = [
                 CGSize(width: -2, height: -2), CGSize(width: 2, height: -2),
                 CGSize(width: -2, height: 2), CGSize(width: 2, height: 2)
