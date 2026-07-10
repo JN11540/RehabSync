@@ -7,8 +7,21 @@ struct Working9: View {
     let exercise: Exercise?
 
     var body: some View {
-        Color.white
-            .ignoresSafeArea()
+        ZStack(alignment: .bottomLeading) {
+            Color.white
+                .ignoresSafeArea()
+
+            Image("ArcheryBackgroundIcon")
+                .resizable()
+                .scaledToFill()
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.black, lineWidth: 2)
+                )
+                .padding(48)
+                .opacity(0.4)
+        }
     }
 }
 
