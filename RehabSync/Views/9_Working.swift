@@ -66,11 +66,11 @@ struct Working9: View {
 
             var targetPixel: CGPoint?
             if heldSeconds >= 5 {
-                targetPixel = CGPoint(x: 1050, y: 229)
+                targetPixel = CGPoint(x: 1000, y: 229)
             } else if heldSeconds >= 3 {
-                targetPixel = CGPoint(x: 945, y: 228)
+                targetPixel = CGPoint(x: 900, y: 228)
             } else if heldSeconds >= 1 {
-                targetPixel = CGPoint(x: 911, y: 228)
+                targetPixel = CGPoint(x: 850, y: 228)
             }
 
             if let targetPixel {
