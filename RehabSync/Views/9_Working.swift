@@ -424,54 +424,57 @@ struct Working9: View {
             .padding(.top, 48)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
-            Image("BackpackDreamIcon")
-                .resizable()
-                .scaledToFill()
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .padding(48)
-
             Group {
-                if showOutIcon {
-                    Image("ArcheryOutIcon")
-                        .resizable()
-                } else if showHappyMoment {
-                    Image("ArrowHappyMomentIcon")
-                        .resizable()
-                } else if let angle = btVM.currentEstimatedRealAngle, angle >= Self.holdThreshold {
-                    Image("ArcheryFocusIcon")
-                        .resizable()
-                } else {
-                    Image("ArcheryReadyIcon")
-                        .resizable()
+                Image("BackpackDreamIcon")
+                    .resizable()
+                    .scaledToFill()
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .padding(48)
+
+                Group {
+                    if showOutIcon {
+                        Image("ArcheryOutIcon")
+                            .resizable()
+                    } else if showHappyMoment {
+                        Image("ArrowHappyMomentIcon")
+                            .resizable()
+                    } else if let angle = btVM.currentEstimatedRealAngle, angle >= Self.holdThreshold {
+                        Image("ArcheryFocusIcon")
+                            .resizable()
+                    } else {
+                        Image("ArcheryReadyIcon")
+                            .resizable()
+                    }
                 }
+                .scaledToFill()
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(48)
+
+                Image("ArrowBlueTargetIcon")
+                    .resizable()
+                    .scaledToFill()
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .scaleEffect(blueTargetScale, anchor: UnitPoint(x: 0.853, y: 0.264))
+                    .brightness(blueTargetBrightness)
+                    .padding(48)
+
+                Image("ArrowRedTargetIcon")
+                    .resizable()
+                    .scaledToFill()
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .scaleEffect(redTargetScale, anchor: UnitPoint(x: 0.853, y: 0.264))
+                    .brightness(redTargetBrightness)
+                    .padding(48)
+
+                Image("ArrowYellowTargetIcon")
+                    .resizable()
+                    .scaledToFill()
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .scaleEffect(yellowTargetScale, anchor: UnitPoint(x: 0.853, y: 0.264))
+                    .brightness(yellowTargetBrightness)
+                    .padding(48)
             }
-            .scaledToFill()
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .padding(48)
-
-            Image("ArrowBlueTargetIcon")
-                .resizable()
-                .scaledToFill()
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .scaleEffect(blueTargetScale, anchor: UnitPoint(x: 0.853, y: 0.264))
-                .brightness(blueTargetBrightness)
-                .padding(48)
-
-            Image("ArrowRedTargetIcon")
-                .resizable()
-                .scaledToFill()
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .scaleEffect(redTargetScale, anchor: UnitPoint(x: 0.853, y: 0.264))
-                .brightness(redTargetBrightness)
-                .padding(48)
-
-            Image("ArrowYellowTargetIcon")
-                .resizable()
-                .scaledToFill()
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .scaleEffect(yellowTargetScale, anchor: UnitPoint(x: 0.853, y: 0.264))
-                .brightness(yellowTargetBrightness)
-                .padding(48)
+            .allowsHitTesting(false)
 
             if showArrow {
                 GeometryReader { geo in
