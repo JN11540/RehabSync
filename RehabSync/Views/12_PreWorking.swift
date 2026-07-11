@@ -18,7 +18,7 @@ struct PreWorking12: View {
     private var stepTitle: String {
         switch step {
         case 0: return "確認裝備齊全"
-        case 1: return "準備階梯"
+        case 1: return "準備踏板或凳子"
         case 2: return "校正"
         default: return "登階運動測試"
         }
@@ -128,7 +128,12 @@ struct PreWorking12: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if step == 1 {
                     VStack(spacing: 12) {
-                        Text("請先準備一階穩固、高度適中的階梯或踏板\n並確保踩踏處平整、不濕滑")
+                        Image("StoolIcon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 500, height: 500)
+
+                        Text("請先準備一階穩固、小腿一半高度的踏板或凳子\n並確保踩踏處平整、不濕滑")
                             .font(.system(size: 20, weight: .medium))
                             .foregroundStyle(.black)
                             .multilineTextAlignment(.center)
