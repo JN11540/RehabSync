@@ -615,6 +615,8 @@ struct Working9: View {
                         showRestPopup = false
                         if currentSet < content.sets {
                             startSetRestCountdown()
+                        } else {
+                            navigateToPostWorking9 = true
                         }
                     }
                 )
