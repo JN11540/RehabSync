@@ -32,6 +32,12 @@ struct Working9: View {
     @State private var coinBurstCount = 0
     @State private var scoreElapsed: Double = -1
     @State private var scoreTimer: Timer?
+    @State private var showExitConfirmPopup = false
+    @State private var showRestPopup = false
+    @State private var showSetRestPopup = false
+    @State private var setRestCountdown: Int = 0
+    @State private var setRestTimer: Timer?
+    @State private var navigateToPostWorking9 = false
 
     private static let holdThreshold: Double = 45
     private static let holdDuration: Double = 5
@@ -87,11 +93,41 @@ struct Working9: View {
         }
     }
 
+    private func pauseSession() {
+        holdTimer?.invalidate()
+        holdTimer = nil
+        scoreTimer?.invalidate()
+        scoreTimer = nil
+        setRestTimer?.invalidate()
+        setRestTimer = nil
+    }
+
+    private func startSetRestCountdown() {
+        setRestTimer?.invalidate()
+        setRestCountdown = content.set_rest_time
+        showSetRestPopup = true
+        setRestTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            setRestCountdown -= 1
+            if setRestCountdown <= 0 {
+                closeSetRestPopup()
+            }
+        }
+    }
+
+    private func closeSetRestPopup() {
+        setRestTimer?.invalidate()
+        setRestTimer = nil
+        showSetRestPopup = false
+        if currentSet < content.sets {
+            currentSet += 1
+        }
+        currentRep = 0
+    }
+
     private func advanceProgress() {
         currentRep += 1
         if currentRep >= content.reps && currentSet < content.sets {
-            currentRep = 0
-            currentSet += 1
+            startSetRestCountdown()
         }
     }
 
@@ -284,22 +320,35 @@ struct Working9: View {
                     .frame(maxWidth: .infinity, alignment: .trailing)
                     .padding(.trailing, 16)
 
-                    Button(action: { goHome() }) {
-                        ZStack {
-                            Circle()
-                                .fill(Color.white)
-                            Circle()
-                                .strokeBorder(Color.black, lineWidth: 1.5)
-                            Circle()
-                                .strokeBorder(Color.black, lineWidth: 1.5)
-                                .padding(4)
-                            Image(systemName: "xmark")
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundStyle(.black)
+                    HStack(spacing: 12) {
+                        Button(action: {
+                            showExitConfirmPopup = true
+                            pauseSession()
+                        }) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.white)
+                                Circle()
+                                    .strokeBorder(Color.black, lineWidth: 1.5)
+                                Circle()
+                                    .strokeBorder(Color.black, lineWidth: 1.5)
+                                    .padding(4)
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundStyle(.black)
+                            }
+                            .frame(width: 40, height: 40)
                         }
-                        .frame(width: 40, height: 40)
+                        .buttonStyle(.plain)
+
+                        Button(action: { showRestPopup = true }) {
+                            Image("RestIcon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 40, height: 40)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.leading, 16)
 
@@ -548,6 +597,58 @@ struct Working9: View {
             }
             .padding(24)
             .offset(x: 25, y: -100)
+
+            if showRestPopup {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+
+                ConfirmPopup(
+                    message: "您是否要直接跳過，進入組間休息？",
+                    onCancel: {
+                        showRestPopup = false
+                        startHoldTimer()
+                    },
+                    onConfirm: {
+                        showRestPopup = false
+                        if currentSet < content.sets {
+                            startSetRestCountdown()
+                        }
+                    }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            }
+
+            if showSetRestPopup {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+
+                SetRestPopup(
+                    secondsRemaining: setRestCountdown,
+                    onSkip: { closeSetRestPopup() }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            }
+
+            if showExitConfirmPopup {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+
+                ConfirmPopup(
+                    message: "您確定要結束遊戲嗎？",
+                    onCancel: {
+                        showExitConfirmPopup = false
+                        startHoldTimer()
+                    },
+                    onConfirm: {
+                        showExitConfirmPopup = false
+                        navigateToPostWorking9 = true
+                    }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            }
+        }
+        .fullScreenCover(isPresented: $navigateToPostWorking9) {
+            PostWorking9(content: content, exercise: exercise)
         }
         .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
             if let angle = newValue, angle >= Self.holdThreshold {
@@ -559,6 +660,7 @@ struct Working9: View {
         .onDisappear {
             holdTimer?.invalidate()
             scoreTimer?.invalidate()
+            setRestTimer?.invalidate()
         }
     }
 }
@@ -677,6 +779,96 @@ private struct CoinBurstScoreLabel: View {
             }
             .position(position)
         }
+    }
+}
+
+private struct ConfirmPopup: View {
+    let message: String
+    let onCancel: () -> Void
+    let onConfirm: () -> Void
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            Color.white
+            Text(message)
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(.black)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            Button(action: onCancel) {
+                ZStack {
+                    Circle().fill(Color.white)
+                    Circle().strokeBorder(Color.black, lineWidth: 1.5)
+                    Circle().strokeBorder(Color.black, lineWidth: 1.5).padding(4)
+                    Image(systemName: "xmark").font(.system(size: 16, weight: .bold)).foregroundStyle(.black)
+                }
+                .frame(width: 36, height: 36)
+            }
+            .buttonStyle(.plain)
+            .padding(8)
+            Button(action: onConfirm) {
+                Text("確定")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color.white)
+                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.black, lineWidth: 1.5))
+                    )
+            }
+            .buttonStyle(.plain)
+            .padding(12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+        }
+        .frame(width: 320, height: 220)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 1.5))
+    }
+}
+
+private struct SetRestPopup: View {
+    let secondsRemaining: Int
+    let onSkip: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.white
+            VStack(spacing: 24) {
+                Text("組間休息時間")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(.black)
+                HStack(spacing: 32) {
+                    ZStack {
+                        Circle().fill(Color.white)
+                        Circle().strokeBorder(Color.black, lineWidth: 1.5)
+                        Text("\(max(secondsRemaining, 0))")
+                            .font(.system(size: 32, weight: .bold))
+                            .foregroundStyle(.black)
+                            .minimumScaleFactor(0.5)
+                            .lineLimit(1)
+                            .padding(8)
+                    }
+                    .frame(width: 90, height: 90)
+                    Button(action: onSkip) {
+                        ZStack {
+                            Circle().fill(Color.white)
+                            Circle().strokeBorder(Color.black, lineWidth: 1.5)
+                            Text("跳過")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(.black)
+                        }
+                        .frame(width: 90, height: 90)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .frame(width: 320, height: 220)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 1.5))
     }
 }
 
