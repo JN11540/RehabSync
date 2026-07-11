@@ -135,6 +135,32 @@ struct TestPage: View {
                             .font(.system(size: 14))
                             .foregroundStyle(.secondary)
                     }
+
+                    Button(btVM.isEstimatingStepStatus ? "停止預估登階狀態" : "開始預估登階狀態") {
+                        guard let pair = thighAndCalfPeripherals else { return }
+                        if btVM.isEstimatingStepStatus {
+                            btVM.stopStepStatusEstimation(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+                        } else if let baseline = btVM.baselineResult {
+                            btVM.startStepStatusEstimation(thighPeripheral: pair.thigh, calfPeripheral: pair.calf, baseline: baseline)
+                        }
+                    }
+                    .font(.system(size: 15, weight: .medium))
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(btVM.isEstimatingStepStatus ? Color.red.opacity(0.85)
+                        : (canEstimateRealAngle ? Color.purple.opacity(0.85) : Color.gray.opacity(0.3)))
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .disabled(!btVM.isEstimatingStepStatus && (!canEstimateRealAngle || btVM.isCollectingBaseline))
+
+                    if let status = btVM.currentStepStatus {
+                        Text(stepStatusText(status))
+                            .font(.system(size: 20, weight: .bold))
+                    } else if btVM.isEstimatingStepStatus {
+                        Text("等待資料…")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 24)
@@ -150,6 +176,15 @@ struct TestPage: View {
                 }
             }
             .padding(.top, 20)
+        }
+    }
+
+    private func stepStatusText(_ status: Int) -> String {
+        switch status {
+        case 0: return "站立"
+        case 1: return "上階"
+        case 2: return "下階"
+        default: return ""
         }
     }
 

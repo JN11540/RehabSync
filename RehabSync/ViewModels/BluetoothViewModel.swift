@@ -70,6 +70,18 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     @ObservationIgnored private var liveShift: Double = 0
     @ObservationIgnored private var liveTickTimer: Timer?
 
+    // Step Status Estimation（登階狀態即時判斷，固定 5Hz 更新）— UI state (main thread)
+    var isEstimatingStepStatus = false
+    var currentStepStatus: Int? = nil
+    // internal (bleQueue)：只記住「最新一筆」傾角，實際判斷交給 stepTickTimer 每 0.2 秒統一處理
+    @ObservationIgnored private var stepEstimating: Set<UUID> = []
+    @ObservationIgnored private var stepThighId: UUID?
+    @ObservationIgnored private var stepCalfId: UUID?
+    @ObservationIgnored private var stepThighIncline: Double?
+    @ObservationIgnored private var stepCalfIncline: Double?
+    @ObservationIgnored private var stepBaseline: Double = 0
+    @ObservationIgnored private var stepTickTimer: Timer?
+
     override init() {
         super.init()
         central = CBCentralManager(delegate: self, queue: bleQueue)
@@ -577,6 +589,136 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         if id == liveCalfId  { liveCalfIncline  = incline }
     }
 
+    // MARK: - Step Detection（登階運動）
+
+    /// 登階運動狀態機：0=站立、1=上階、2=下階。
+    /// 用一個最多容納 1 筆記錄的 queue Q 追蹤「是否已經上階過」，每次收到新的膝角度 y 時呼叫一次：
+    /// - Q 為空：y >= x+40 視為上階（push 1 到 Q，status=1）；否則（含 x+40>y>x-15 與 y<=x-15）status=0。
+    /// - Q=|1|：y <= x-15 視為下階（push 2 到 Q，status=2），並持續 1 秒；否則（含 x+40>y>x-15 與 y>=x+40）status 維持 1。
+    /// - status=2 持續滿 1 秒後，Q pop all（清空），回到 Q 為空的判斷邏輯。
+    @ObservationIgnored private var stepQueue: [Int] = []
+    @ObservationIgnored private var stepDownHoldUntil: Date?
+
+    func detectStepStatus(kneeAngle y: Double, baseline x: Double) -> Int {
+        if let holdUntil = stepDownHoldUntil {
+            if Date() < holdUntil {
+                return 2
+            }
+            stepQueue.removeAll()
+            stepDownHoldUntil = nil
+        }
+
+        if stepQueue.isEmpty {
+            guard y >= x + 40 else { return 0 }
+            stepQueue.append(1)
+            return 1
+        }
+
+        // stepQueue == [1]
+        guard y <= x - 15 else { return 1 }
+        stepQueue.append(2)
+        stepDownHoldUntil = Date().addingTimeInterval(1.0)
+        return 2
+    }
+
+    /// 重置登階狀態機（例如重新開始一輪錄製時呼叫）
+    func resetStepStatus() {
+        stepQueue.removeAll()
+        stepDownHoldUntil = nil
+    }
+
+    /// 開始持續錄製大腿與小腿加速度計，收集期間不寫入資料庫。跟「即時預估真實角度」相同的收集機制，
+    /// 差別是這裡把最新的膝角度（大腿傾角 - 小腿傾角）丟給 `detectStepStatus` 判斷登階狀態，
+    /// 由 `stepTickTimer` 每 0.2 秒（5Hz）讀一次最新值並更新到畫面。
+    func startStepStatusEstimation(thighPeripheral: CBPeripheral, calfPeripheral: CBPeripheral, baseline: Double) {
+        let thighId = thighPeripheral.identifier
+        let calfId  = calfPeripheral.identifier
+
+        DispatchQueue.main.async {
+            self.currentStepStatus = nil
+            self.isEstimatingStepStatus = true
+            self.stepTickTimer?.invalidate()
+            self.stepTickTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+                self?.tickStepStatus()
+            }
+        }
+
+        bleQueue.async { [weak self] in
+            guard let self, let config = bluetoothConfig else { return }
+            let wasRecording = DispatchQueue.main.sync { self.isRecording }
+
+            stepThighId = thighId
+            stepCalfId  = calfId
+            stepThighIncline = nil
+            stepCalfIncline  = nil
+            stepBaseline = baseline
+            resetStepStatus()
+            stepEstimating = [thighId, calfId]
+
+            for peripheral in [thighPeripheral, calfPeripheral] {
+                guard let map = charMap[peripheral.identifier] else { continue }
+                if !wasRecording, let writeChar = map[CBUUID(string: config.write_uuid)] {
+                    peripheral.writeValue(config.cmd_a0, for: writeChar, type: .withResponse)
+                    peripheral.writeValue(config.cmd_a1, for: writeChar, type: .withResponse)
+                }
+                if let c = map[CBUUID(string: config.sub_acc_uuid)] { peripheral.setNotifyValue(true, for: c) }
+            }
+        }
+    }
+
+    /// 停止登階狀態預估：關掉 Timer、重置狀態機，並在沒有其他一般收集正在進行時把 ACC notify 關掉。
+    func stopStepStatusEstimation(thighPeripheral: CBPeripheral, calfPeripheral: CBPeripheral) {
+        DispatchQueue.main.async {
+            self.stepTickTimer?.invalidate()
+            self.stepTickTimer = nil
+            self.isEstimatingStepStatus = false
+            self.currentStepStatus = nil
+        }
+        bleQueue.async { [weak self] in
+            guard let self else { return }
+            let wasRecording = DispatchQueue.main.sync { self.isRecording }
+            stepEstimating = []
+            resetStepStatus()
+            if !wasRecording, let config = bluetoothConfig {
+                for peripheral in [thighPeripheral, calfPeripheral] {
+                    if let map = charMap[peripheral.identifier],
+                       let c = map[CBUUID(string: config.sub_acc_uuid)] {
+                        peripheral.setNotifyValue(false, for: c)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Timer callback（main thread 觸發），跳回 bleQueue 讀最新值判斷，算完再寫回主執行緒的 UI 屬性。
+    private func tickStepStatus() {
+        bleQueue.async { [weak self] in
+            guard let self,
+                  let thigh = stepThighIncline,
+                  let calf  = stepCalfIncline else { return }
+            let kneeAngle = thigh - calf
+            let status = detectStepStatus(kneeAngle: kneeAngle, baseline: stepBaseline)
+            DispatchQueue.main.async { self.currentStepStatus = status }
+        }
+    }
+
+    /// 只把這一包 20 筆瞬間取樣平均成一個傾角並覆蓋成「最新值」，不計算狀態、不發布到畫面。
+    private func handleStepAccPacket(_ data: Data, id: UUID, config: Bluetooth) {
+        guard data.count >= 123 else { return }
+        var sumIncline = 0.0
+        for i in 0..<20 {
+            let o = 3 + i * 6
+            let x = Double(data.int16BE(at: o))     * config.acc_sensitivity
+            let y = Double(data.int16BE(at: o + 2)) * config.acc_sensitivity
+            let z = Double(data.int16BE(at: o + 4)) * config.acc_sensitivity
+            sumIncline += Self.inclinationDeg(x, y, z)
+        }
+        let incline = sumIncline / 20.0
+
+        if id == stepThighId { stepThighIncline = incline }
+        if id == stepCalfId  { stepCalfIncline  = incline }
+    }
+
     func startRecordingAll() {
         recordingStartTime = Int64(Date().timeIntervalSince1970 * 1000)
         recordingEndTime   = nil
@@ -727,6 +869,14 @@ extension BluetoothViewModel: CBPeripheralDelegate {
         if liveEstimating.contains(peripheral.identifier) {
             if uuid == CBUUID(string: config.sub_acc_uuid) {
                 handleLiveAccPacket(data, id: peripheral.identifier, config: config)
+            }
+            return
+        }
+
+        // 即時預估登階狀態：只更新最新值，不寫 DB
+        if stepEstimating.contains(peripheral.identifier) {
+            if uuid == CBUUID(string: config.sub_acc_uuid) {
+                handleStepAccPacket(data, id: peripheral.identifier, config: config)
             }
             return
         }
