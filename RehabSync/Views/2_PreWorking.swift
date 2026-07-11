@@ -45,12 +45,21 @@ struct PreWorking2: View {
         return (thighPeripheral, calfPeripheral)
     }
 
+    // 校正結果對應到「量測角度 → 預估真實角度」的公式是坐姿/站姿各一套，
+    // 進入測試頁前先依 content.exercise_id 確認目前是哪個動作，避免套錯公式導致角度算錯。
+    private var posture: BluetoothViewModel.KneePosture {
+        switch content.exercise_id {
+        case 9: return .standing
+        default: return .sitting
+        }
+    }
+
     private func startLiveTestIfNeeded() {
         guard !btVM.isLiveEstimating,
               let pair = thighAndCalfPeripherals,
               let baseline = btVM.baselineResult
         else { return }
-        btVM.startLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf, baseline: baseline)
+        btVM.startLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf, baseline: baseline, posture: posture)
     }
 
     private func stopLiveTestIfNeeded() {
