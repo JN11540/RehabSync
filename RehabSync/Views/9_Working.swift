@@ -38,6 +38,8 @@ struct Working9: View {
     @State private var setRestCountdown: Int = 0
     @State private var setRestTimer: Timer?
     @State private var navigateToPostWorking9 = false
+    @State private var sessionStartDate = Date()
+    @State private var finalElapsedSeconds = 0
 
     private static let holdThreshold: Double = 45
     private static let holdDuration: Double = 5
@@ -130,6 +132,7 @@ struct Working9: View {
             if currentSet < content.sets {
                 startSetRestCountdown()
             } else {
+                finalElapsedSeconds = Int(Date().timeIntervalSince(sessionStartDate))
                 navigateToPostWorking9 = true
             }
         }
@@ -620,6 +623,7 @@ struct Working9: View {
                         if currentSet < content.sets {
                             startSetRestCountdown()
                         } else {
+                            finalElapsedSeconds = Int(Date().timeIntervalSince(sessionStartDate))
                             navigateToPostWorking9 = true
                         }
                     }
@@ -650,6 +654,7 @@ struct Working9: View {
                     },
                     onConfirm: {
                         showExitConfirmPopup = false
+                        finalElapsedSeconds = Int(Date().timeIntervalSince(sessionStartDate))
                         navigateToPostWorking9 = true
                     }
                 )
@@ -657,7 +662,16 @@ struct Working9: View {
             }
         }
         .fullScreenCover(isPresented: $navigateToPostWorking9) {
-            PostWorking9(content: content, exercise: exercise)
+            PostWorking9(
+                content: content,
+                exercise: exercise,
+                totalCoins: totalCoins,
+                totalReps: blueHitCount + redHitCount + yellowHitCount,
+                totalElapsedSeconds: finalElapsedSeconds,
+                blueHitCount: blueHitCount,
+                redHitCount: redHitCount,
+                yellowHitCount: yellowHitCount
+            )
         }
         .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
             if let angle = newValue, angle >= Self.holdThreshold {
