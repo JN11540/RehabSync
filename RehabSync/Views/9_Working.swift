@@ -126,8 +126,12 @@ struct Working9: View {
 
     private func advanceProgress() {
         currentRep += 1
-        if currentRep >= content.reps && currentSet < content.sets {
-            startSetRestCountdown()
+        if currentRep >= content.reps {
+            if currentSet < content.sets {
+                startSetRestCountdown()
+            } else {
+                navigateToPostWorking9 = true
+            }
         }
     }
 
