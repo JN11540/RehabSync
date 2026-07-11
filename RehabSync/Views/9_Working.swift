@@ -6,6 +6,13 @@ struct Working9: View {
     let content: TreatmentContent
     let exercise: Exercise?
     @Environment(BluetoothViewModel.self) private var btVM
+    @Environment(\.goHome) private var goHome
+    @State private var totalCoins = 0
+    @State private var currentSet = 1
+    @State private var currentRep = 0
+    @State private var blueHitCount = 0
+    @State private var redHitCount = 0
+    @State private var yellowHitCount = 0
     @State private var holdElapsed: Double = 0
     @State private var holdTimer: Timer?
     @State private var showOutIcon = false
@@ -80,16 +87,30 @@ struct Working9: View {
         }
     }
 
+    private func advanceProgress() {
+        currentRep += 1
+        if currentRep >= content.reps && currentSet < content.sets {
+            currentRep = 0
+            currentSet += 1
+        }
+    }
+
     // 數字累加跟硬幣飛行動畫脫鉤，用自己的 Timer 依固定節奏（scoreStagger）逐一往上跳，
     // 確保無論硬幣數量多少，一定會完整跑完第一個數字到最後一個數字，不受 1 秒飛行時間限制。
     private func startScoreSequence(count: Int) {
         scoreTimer?.invalidate()
         let start = Date()
         scoreElapsed = 0
+        var lastAppeared = 0
         let totalDuration = Double(count) * CoinBurstScoreLabel.stagger + Self.scoreHoldAfterLast
         scoreTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { t in
             let e = Date().timeIntervalSince(start)
             scoreElapsed = e
+            let currentAppeared = e >= 0 ? min(count, Int(e / CoinBurstScoreLabel.stagger) + 1) : 0
+            if currentAppeared > lastAppeared {
+                totalCoins += (currentAppeared - lastAppeared) * 100
+                lastAppeared = currentAppeared
+            }
             if e >= totalDuration {
                 t.invalidate()
                 scoreElapsed = -1
@@ -146,13 +167,20 @@ struct Working9: View {
             var pulseTimes: Int?
             if heldSeconds >= 5 {
                 pulseTimes = 3
+                yellowHitCount += 1
                 startPulse(times: 3, delay: Self.outIconDuration, scale: $yellowTargetScale, brightness: $yellowTargetBrightness)
             } else if heldSeconds >= 3 {
                 pulseTimes = 3
+                redHitCount += 1
                 startPulse(times: 3, delay: Self.outIconDuration, scale: $redTargetScale, brightness: $redTargetBrightness)
             } else if heldSeconds >= 1 {
                 pulseTimes = 3
+                blueHitCount += 1
                 startPulse(times: 3, delay: Self.outIconDuration, scale: $blueTargetScale, brightness: $blueTargetBrightness)
+            }
+
+            if pulseTimes != nil {
+                advanceProgress()
             }
 
             if let pulseTimes {
@@ -205,6 +233,147 @@ struct Working9: View {
                 )
                 .padding(48)
                 .opacity(0.4)
+
+            VStack(spacing: 0) {
+                ZStack {
+                    Rectangle()
+                        .fill(Color(red: 0.72, green: 0.82, blue: 0.82))
+
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color(red: 1.0, green: 0.85, blue: 0.35))
+                            .overlay(
+                                HStack(spacing: 10) {
+                                    Rectangle()
+                                        .fill(Color.white.opacity(0.5))
+                                        .frame(width: 10, height: 80)
+                                        .rotationEffect(.degrees(20))
+                                        .offset(x: 6)
+                                    Rectangle()
+                                        .fill(Color.white.opacity(0.5))
+                                        .frame(width: 5, height: 80)
+                                        .rotationEffect(.degrees(20))
+                                }
+                            )
+                            .frame(width: 115, height: 40)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .stroke(Color(red: 0.70, green: 0.52, blue: 0.10), lineWidth: 3)
+                            )
+
+                        ZStack(alignment: .leading) {
+                            Image("CoinIcon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 48, height: 48)
+                                .offset(x: -16)
+
+                            Text("\(totalCoins)")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.5)
+                                .frame(width: 115 - 38, height: 48)
+                                .offset(x: 38)
+                        }
+                        .frame(width: 115, height: 48)
+                        .offset(x: -24)
+                    }
+                    .frame(width: 115, height: 48)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.trailing, 16)
+
+                    Button(action: { goHome() }) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.white)
+                            Circle()
+                                .strokeBorder(Color.black, lineWidth: 1.5)
+                            Circle()
+                                .strokeBorder(Color.black, lineWidth: 1.5)
+                                .padding(4)
+                            Image(systemName: "xmark")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+                        .frame(width: 40, height: 40)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 16)
+
+                    HStack(spacing: 20) {
+                        HStack(spacing: 4) {
+                            Image("TargetIcon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 48, height: 48)
+                            Text("\(content.sets) 組 × \(content.reps) 次")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+
+                        Rectangle()
+                            .fill(Color(white: 0.35))
+                            .frame(width: 2, height: 40)
+
+                        HStack(spacing: 4) {
+                            Image("WeightliftingIcon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 48, height: 48)
+                            Text("第 \(currentSet) 組．第 \(currentRep) 次")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+
+                        Rectangle()
+                            .fill(Color(white: 0.35))
+                            .frame(width: 2, height: 40)
+
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color(red: 0.369, green: 0.690, blue: 0.824))
+                                .overlay(Circle().stroke(Color.black, lineWidth: 1.5))
+                                .frame(width: 40, height: 40)
+                            Text("\(blueHitCount)")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color(red: 0.910, green: 0.306, blue: 0.290))
+                                .overlay(Circle().stroke(Color.black, lineWidth: 1.5))
+                                .frame(width: 40, height: 40)
+                            Text("\(redHitCount)")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color(red: 0.957, green: 0.871, blue: 0.235))
+                                .overlay(Circle().stroke(Color.black, lineWidth: 1.5))
+                                .frame(width: 40, height: 40)
+                            Text("\(yellowHitCount)")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                }
+                .frame(height: 60)
+                Rectangle()
+                    .fill(Color(white: 0.35))
+                    .frame(height: 4)
+                    .offset(y: -5)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding(.horizontal, 48)
+            .padding(.top, 48)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
             Image("BackpackDreamIcon")
                 .resizable()
