@@ -594,8 +594,8 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     /// 登階運動狀態機：0=站立、1=上階、2=下階。
     /// 用一個最多容納 1 筆記錄的 queue Q 追蹤「是否已經上階過」，每次收到新的膝角度 y 時呼叫一次：
     /// - Q 為空：y >= x+40 視為上階（push 1 到 Q，status=1）；否則（含 x+40>y>x-15 與 y<=x-15）status=0。
-    /// - Q=|1|：y <= x-15 視為下階（push 2 到 Q，status=2），並持續 1 秒；否則（含 x+40>y>x-15 與 y>=x+40）status 維持 1。
-    /// - status=2 持續滿 1 秒後，Q pop all（清空），回到 Q 為空的判斷邏輯。
+    /// - Q=|1|：y <= x-15 視為下階（push 2 到 Q，status=2），並持續 1.5 秒；否則（含 x+40>y>x-15 與 y>=x+40）status 維持 1。
+    /// - status=2 持續滿 1.5 秒後，Q pop all（清空），回到 Q 為空的判斷邏輯。
     @ObservationIgnored private var stepQueue: [Int] = []
     @ObservationIgnored private var stepDownHoldUntil: Date?
 
@@ -617,7 +617,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         // stepQueue == [1]
         guard y <= x - 15 else { return 1 }
         stepQueue.append(2)
-        stepDownHoldUntil = Date().addingTimeInterval(1.0)
+        stepDownHoldUntil = Date().addingTimeInterval(1.5)
         return 2
     }
 
