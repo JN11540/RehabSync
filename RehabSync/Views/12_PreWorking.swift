@@ -147,7 +147,7 @@ struct PreWorking12: View {
                             .scaledToFit()
                             .frame(width: 500, height: 500)
 
-                        Text("請站直，膝關節伸直，前方可手扶穩定支撐物\n點擊『校正』按鈕後，請維持身體靜止不動 5 秒鐘喔！")
+                        Text("請站直，膝關節伸直\n點擊『校正』按鈕後，請維持身體靜止不動 5 秒鐘喔！")
                             .font(.system(size: 20, weight: .medium))
                             .foregroundStyle(.black)
                             .multilineTextAlignment(.center)
