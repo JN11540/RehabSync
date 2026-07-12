@@ -15,9 +15,14 @@ struct Working12: View {
     @State private var coinRainElapsed: Double = 0
     @State private var coinRainCount = 0
     @State private var coinRainTimer: Timer?
+    @State private var foodScale: CGFloat = 1
+    @State private var foodBrightness: Double = 0
 
     private static let holdDuration: Double = 9
     private static let giveFoodDuration: Double = 1.5
+    private static let foodPulseStepDuration: Double = 0.25
+    private static let foodPulseScale: CGFloat = 1.15
+    private static let foodPulseBrightness: Double = 0.3
     private static let coinLanternPixel = CGPoint(x: 836, y: 190)
     private static let coinFanPixel = CGPoint(x: 630, y: 430)
     private static let overlayCanvasSize = CGSize(width: 1232, height: 864)
@@ -85,6 +90,29 @@ struct Working12: View {
         holdElapsed = 0
     }
 
+    // takoyaki_food.png 只在 showReceive 的 1.5 秒視窗內出現，期間「放大＋變亮」再「回到原狀」共 3 次，
+    // 3 次剛好填滿 1.5 秒（3 * 2 * 0.25s），跟 9_Working.swift 的 startPulse 是同一種節奏排法。
+    private func startFoodPulse() {
+        foodScale = 1
+        foodBrightness = 0
+        for i in 0..<3 {
+            let upTime = Double(i) * Self.foodPulseStepDuration * 2
+            let downTime = upTime + Self.foodPulseStepDuration
+            DispatchQueue.main.asyncAfter(deadline: .now() + upTime) {
+                withAnimation(.easeInOut(duration: Self.foodPulseStepDuration)) {
+                    foodScale = Self.foodPulseScale
+                    foodBrightness = Self.foodPulseBrightness
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + downTime) {
+                withAnimation(.easeInOut(duration: Self.foodPulseStepDuration)) {
+                    foodScale = 1
+                    foodBrightness = 0
+                }
+            }
+        }
+    }
+
     // 硬幣用自己的 Timer 依 elapsed 時間驅動（而非固定總長的 withAnimation），
     // 確保不論這次是 3 顆、9 顆還是 15 顆，每一顆都會依序完整跑完拋物線。
     private func startCoinRain(count: Int) {
@@ -119,11 +147,15 @@ struct Working12: View {
                 .padding(48)
                 .opacity(0.4)
 
-            Image("TakoyakiFoodIcon")
-                .resizable()
-                .scaledToFill()
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .padding(48)
+            if showReceive {
+                Image("TakoyakiFoodIcon")
+                    .resizable()
+                    .scaledToFill()
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .scaleEffect(foodScale)
+                    .brightness(foodBrightness)
+                    .padding(48)
+            }
 
             Image(characterImageName)
                 .resizable()
@@ -242,6 +274,7 @@ struct Working12: View {
                 stopHoldTimer()
                 showGiveFood = true
                 showReceive = true
+                startFoodPulse()
                 DispatchQueue.main.asyncAfter(deadline: .now() + Self.giveFoodDuration) {
                     showGiveFood = false
                     showReceive = false
