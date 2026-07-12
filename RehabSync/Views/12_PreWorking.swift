@@ -13,7 +13,15 @@ struct PreWorking12: View {
     @State private var calibrationCountdown = 5
     @State private var countdownTimer: Timer?
     @State private var showSuccessArrow = false
-    @State private var legRotation: Double = 0
+    @State private var stepDisplayStage: StepDisplayStage = .standing
+    @State private var stepUpGeneration = 0
+
+    private enum StepDisplayStage {
+        case standing
+        case steppingUp
+        case standingOnStep
+        case steppingDown
+    }
 
     private var stepTitle: String {
         switch step {
@@ -44,41 +52,55 @@ struct PreWorking12: View {
         return (thighPeripheral, calfPeripheral)
     }
 
-    // 校正結果對應到「量測角度 → 預估真實角度」的公式是坐姿/站姿各一套，
-    // 進入測試頁前先依 content.exercise_id 確認目前是哪個動作，避免套錯公式導致角度算錯。
-    private var posture: BluetoothViewModel.KneePosture {
-        switch content.exercise_id {
-        case 12: return .standing
-        default: return .sitting
+    private var stepDisplayImageName: String {
+        switch stepDisplayStage {
+        case .standing:       return "Exercise12Stage1"
+        case .steppingUp:     return "Exercise12Stage2"
+        case .standingOnStep: return "Exercise12Stage3"
+        case .steppingDown:   return "Exercise12Stage2"
+        }
+    }
+
+    private var stepDisplayLabel: String {
+        switch stepDisplayStage {
+        case .standing:                     return "站立"
+        case .steppingUp, .standingOnStep:  return "上階"
+        case .steppingDown:                 return "下階"
+        }
+    }
+
+    // 上階（status 1）本身沒有時間上限，先顯示「移動中」的 stool_step_up.png，
+    // 滿 1.5 秒後才換成「已站上階梯」的 stool_standing_person.png；用 generation 計數器
+    // 避免使用者提早下階（status 2）之後，這個延遲排程還套用到舊的上階狀態上。
+    private func handleStepStatusChange(_ newValue: Int?) {
+        switch newValue {
+        case 1:
+            stepDisplayStage = .steppingUp
+            stepUpGeneration += 1
+            let generation = stepUpGeneration
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                if generation == stepUpGeneration, btVM.currentStepStatus == 1 {
+                    stepDisplayStage = .standingOnStep
+                }
+            }
+        case 2:
+            stepDisplayStage = .steppingDown
+        default:
+            stepDisplayStage = .standing
         }
     }
 
     private func startLiveTestIfNeeded() {
-        guard !btVM.isLiveEstimating,
+        guard !btVM.isEstimatingStepStatus,
               let pair = thighAndCalfPeripherals,
               let baseline = btVM.baselineResult
         else { return }
-        btVM.startLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf, baseline: baseline, posture: posture)
+        btVM.startStepStatusEstimation(thighPeripheral: pair.thigh, calfPeripheral: pair.calf, baseline: baseline)
     }
 
     private func stopLiveTestIfNeeded() {
-        guard btVM.isLiveEstimating, let pair = thighAndCalfPeripherals else { return }
-        btVM.stopLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
-    }
-
-    // divide_4（上半身）本身不會旋轉，但它底部藍綠色端（肩頸下緣）要跟著 divide_2
-    // （大腿＋小腿）頂部的藍綠色端一起移動，才不會讓上半身跟腿部脫節。
-    // divide_2 頂部藍綠色端在 divide_2 自己的旋轉軸心（腳踝，skin 中心）為圓心，
-    // 隨 legRotation 做圓弧運動，這裡直接算出該點相對於角度 0 時位移了多少，
-    // 再把同樣的位移套用到 divide_4 上，兩端點就會隨時保持疊合（而不只是首尾對齊）。
-    private var divide4Offset: CGSize {
-        let theta = legRotation * Double.pi / 180
-        let dx0 = 124.0
-        let dy0 = -522.0
-        let rotatedX = dx0 * cos(theta) - dy0 * sin(theta)
-        let rotatedY = dx0 * sin(theta) + dy0 * cos(theta)
-        let scale = 500.0 / 2048.0
-        return CGSize(width: (rotatedX - dx0) * scale, height: (rotatedY - dy0) * scale)
+        guard btVM.isEstimatingStepStatus, let pair = thighAndCalfPeripherals else { return }
+        btVM.stopStepStatusEstimation(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
     }
 
     var body: some View {
@@ -221,36 +243,16 @@ struct PreWorking12: View {
                         .padding(.trailing, 40)
                     }
                 } else if step == 3 {
-                    ZStack {
-                        Image("PartialSquatDivide1Icon")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 500, height: 500)
-
-                        Image("PartialSquatDivide2Icon")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 500, height: 500)
-                            .rotationEffect(.degrees(legRotation), anchor: UnitPoint(x: 0.542, y: 0.685))
-
-                        Image("PartialSquatDivide4Icon")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 500, height: 500)
-                            .offset(divide4Offset)
-
-                        Image("PartialSquatDivide3Icon")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 500, height: 500)
-                            .rotationEffect(.degrees(legRotation / 1.5), anchor: UnitPoint(x: 0.410, y: 0.481))
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    Image(stepDisplayImageName)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 500, height: 500)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                     Group {
-                        if let angle = btVM.currentEstimatedRealAngle {
-                            Text(String(format: "%.1f°", angle))
-                                .font(.system(size: 32, weight: .bold, design: .monospaced))
+                        if btVM.currentStepStatus != nil {
+                            Text(stepDisplayLabel)
+                                .font(.system(size: 32, weight: .bold))
                                 .foregroundStyle(.black)
                         } else {
                             Text("等待資料…")
@@ -336,14 +338,12 @@ struct PreWorking12: View {
                 stopLiveTestIfNeeded()
             }
             if newValue == 3 {
-                legRotation = 0
+                stepDisplayStage = .standing
                 startLiveTestIfNeeded()
             }
         }
-        .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
-            withAnimation(.easeInOut(duration: 0.2)) {
-                legRotation = newValue ?? 0
-            }
+        .onChange(of: btVM.currentStepStatus) { _, newValue in
+            handleStepStatusChange(newValue)
         }
     }
 }
