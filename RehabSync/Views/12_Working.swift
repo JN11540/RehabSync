@@ -27,7 +27,7 @@ struct Working12: View {
     private static let foodPulseBrightness: Double = 0.3
     private static let coinLanternPixel = CGPoint(x: 836, y: 190)
     private static let coinFanPixel = CGPoint(x: 630, y: 430)
-    private static let scoreLabelPixel = CGPoint(x: 660, y: 250)
+    private static let scoreLabelPixel = CGPoint(x: 960, y: 250)
     private static let scoreHoldAfterLast: Double = 0.6
     private static let overlayCanvasSize = CGSize(width: 1232, height: 864)
 
