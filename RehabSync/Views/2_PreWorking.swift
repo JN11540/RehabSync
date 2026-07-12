@@ -12,6 +12,8 @@ struct PreWorking2: View {
     @State private var calibrationPhase: CalibrationPhase = .preparingPosture
     @State private var postureCountdown = 10
     @State private var postureTimer: Timer?
+    @State private var aboutToCalibrateCountdown = 2
+    @State private var aboutToCalibrateTimer: Timer?
     @State private var calibrationCountdown = 5
     @State private var countdownTimer: Timer?
     @State private var legRotation: Double = 0
@@ -36,10 +38,13 @@ struct PreWorking2: View {
     private func resetCalibration() {
         postureTimer?.invalidate()
         postureTimer = nil
+        aboutToCalibrateTimer?.invalidate()
+        aboutToCalibrateTimer = nil
         countdownTimer?.invalidate()
         countdownTimer = nil
         calibrationPhase = .preparingPosture
         postureCountdown = 10
+        aboutToCalibrateCountdown = 2
         calibrationCountdown = 5
         btVM.baselineResult = nil
         btVM.isCollectingBaseline = false
@@ -69,8 +74,15 @@ struct PreWorking2: View {
 
     private func scheduleCalibrationAttempt() {
         calibrationPhase = .aboutToCalibrate
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            startCalibrationAttempt()
+        aboutToCalibrateCountdown = 2
+        aboutToCalibrateTimer?.invalidate()
+        aboutToCalibrateTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
+            if aboutToCalibrateCountdown > 1 {
+                aboutToCalibrateCountdown -= 1
+            } else {
+                timer.invalidate()
+                startCalibrationAttempt()
+            }
         }
     }
 
@@ -105,14 +117,14 @@ struct PreWorking2: View {
         switch calibrationPhase {
         case .preparingPosture: return "準備姿勢"
         case .aboutToCalibrate: return "準備校正\n不要動喔"
-        case .calibrating:      return nil
+        case .calibrating:      return "校正"
         }
     }
 
     private var calibrationPhaseNumber: String? {
         switch calibrationPhase {
         case .preparingPosture: return "\(postureCountdown)"
-        case .aboutToCalibrate: return nil
+        case .aboutToCalibrate: return "\(aboutToCalibrateCountdown)"
         case .calibrating:      return "\(calibrationCountdown)"
         }
     }
