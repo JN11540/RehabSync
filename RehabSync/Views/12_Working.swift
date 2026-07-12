@@ -19,6 +19,7 @@ struct Working12: View {
     @State private var foodBrightness: Double = 0
     @State private var scoreElapsed: Double = -1
     @State private var scoreTimer: Timer?
+    @State private var totalCoins = 0
 
     private static let holdDuration: Double = 9
     private static let giveFoodDuration: Double = 1.5
@@ -142,10 +143,16 @@ struct Working12: View {
         scoreTimer?.invalidate()
         let start = Date()
         scoreElapsed = 0
+        var lastAppeared = 0
         let totalDuration = Double(count) * CoinBurstScoreLabel.stagger + Self.scoreHoldAfterLast
         scoreTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { t in
             let e = Date().timeIntervalSince(start)
             scoreElapsed = e
+            let currentAppeared = e >= 0 ? min(count, Int(e / CoinBurstScoreLabel.stagger) + 1) : 0
+            if currentAppeared > lastAppeared {
+                totalCoins += (currentAppeared - lastAppeared) * 100
+                lastAppeared = currentAppeared
+            }
             if e >= totalDuration {
                 t.invalidate()
                 scoreElapsed = -1
@@ -167,6 +174,67 @@ struct Working12: View {
                 )
                 .padding(48)
                 .opacity(0.4)
+
+            VStack(spacing: 0) {
+                ZStack {
+                    Rectangle()
+                        .fill(Color(red: 0.72, green: 0.82, blue: 0.82))
+
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color(red: 1.0, green: 0.85, blue: 0.35))
+                            .overlay(
+                                HStack(spacing: 10) {
+                                    Rectangle()
+                                        .fill(Color.white.opacity(0.5))
+                                        .frame(width: 10, height: 80)
+                                        .rotationEffect(.degrees(20))
+                                        .offset(x: 6)
+                                    Rectangle()
+                                        .fill(Color.white.opacity(0.5))
+                                        .frame(width: 5, height: 80)
+                                        .rotationEffect(.degrees(20))
+                                }
+                            )
+                            .frame(width: 115, height: 40)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .stroke(Color(red: 0.70, green: 0.52, blue: 0.10), lineWidth: 3)
+                            )
+
+                        ZStack(alignment: .leading) {
+                            Image("CoinIcon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 48, height: 48)
+                                .offset(x: -16)
+
+                            Text("\(totalCoins)")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.5)
+                                .frame(width: 115 - 38, height: 48)
+                                .offset(x: 38)
+                        }
+                        .frame(width: 115, height: 48)
+                        .offset(x: -24)
+                    }
+                    .frame(width: 115, height: 48)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.trailing, 16)
+                }
+                .frame(height: 60)
+                Rectangle()
+                    .fill(Color(white: 0.35))
+                    .frame(height: 4)
+                    .offset(y: -5)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding(.horizontal, 48)
+            .padding(.top, 48)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
             Image(characterImageName)
                 .resizable()
