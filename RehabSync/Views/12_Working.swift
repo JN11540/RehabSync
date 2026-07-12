@@ -8,8 +8,10 @@ struct Working12: View {
     @Environment(BluetoothViewModel.self) private var btVM
     @Environment(\.goHome) private var goHome
     @State private var holdElapsed: Double = 0
+    @State private var showGiveFood = false
 
     private static let holdDuration: Double = 9
+    private static let giveFoodDuration: Double = 1.5
 
     private var stepStatusLabel: String {
         switch btVM.currentStepStatus {
@@ -17,6 +19,14 @@ struct Working12: View {
         case 1: return "上階"
         case 2: return "下階"
         default: return "—"
+        }
+    }
+
+    private var characterImageName: String {
+        if showGiveFood { return "TakoyakiGiveFoodIcon" }
+        switch btVM.currentStepStatus {
+        case 1, 2: return "TakoyakiMakeFoodIcon"
+        default: return "TakoyakiHelloIcon"
         }
     }
 
@@ -35,7 +45,7 @@ struct Working12: View {
                 .padding(48)
                 .opacity(0.4)
 
-            Image("TakoyakiHelloIcon")
+            Image(characterImageName)
                 .resizable()
                 .scaledToFill()
                 .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -135,6 +145,14 @@ struct Working12: View {
             }
             .padding(24)
             .offset(x: 25, y: -100)
+        }
+        .onChange(of: btVM.currentStepStatus) { oldValue, newValue in
+            if oldValue == 2 && newValue == 0 {
+                showGiveFood = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + Self.giveFoodDuration) {
+                    showGiveFood = false
+                }
+            }
         }
     }
 }
