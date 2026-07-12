@@ -16,6 +16,8 @@ struct PreWorking12: View {
     @State private var aboutToCalibrateTimer: Timer?
     @State private var calibrationCountdown = 5
     @State private var countdownTimer: Timer?
+    @State private var testCountdown = 30
+    @State private var testCountdownTimer: Timer?
     @State private var stepDisplayStage: StepDisplayStage = .standing
     @State private var stepUpGeneration = 0
     @State private var navigateToWorking12 = false
@@ -198,6 +200,23 @@ struct PreWorking12: View {
         btVM.stopStepStatusEstimation(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
     }
 
+    private func startTestCountdown() {
+        testCountdown = 30
+        testCountdownTimer?.invalidate()
+        testCountdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
+            if testCountdown > 1 {
+                testCountdown -= 1
+            } else {
+                timer.invalidate()
+            }
+        }
+    }
+
+    private func stopTestCountdown() {
+        testCountdownTimer?.invalidate()
+        testCountdownTimer = nil
+    }
+
     var body: some View {
         ZStack {
             Color.black.opacity(0.8).ignoresSafeArea()
@@ -276,7 +295,7 @@ struct PreWorking12: View {
                         Image("Exercise12Stage1")
                             .resizable()
                             .scaledToFit()
-                            .frame(width: 400, height: 400)
+                            .frame(width: 500, height: 500)
 
                         VStack(spacing: 16) {
                             Text(calibrationPhaseLabel ?? "")
@@ -328,11 +347,33 @@ struct PreWorking12: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                     .padding(.bottom, 40)
+
+                    VStack(spacing: 16) {
+                        Text("測試")
+                            .font(.system(size: 32, weight: .bold))
+                            .foregroundStyle(.black)
+
+                        ZStack {
+                            Circle()
+                                .fill(Color(red: 0.99, green: 0.88, blue: 0.49))
+                            Circle()
+                                .strokeBorder(Color.black, lineWidth: 6)
+                            Text("\(testCountdown)")
+                                .font(.system(size: 100, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+                        .frame(width: 200, height: 200)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                    .padding(.trailing, 40)
                 }
 
                 Button(action: {
                     if step == 3 { resetCalibration() }
-                    if step == 4 { stopLiveTestIfNeeded() }
+                    if step == 4 {
+                        stopLiveTestIfNeeded()
+                        stopTestCountdown()
+                    }
                     dismiss()
                 }) {
                     ZStack {
@@ -378,21 +419,9 @@ struct PreWorking12: View {
                     .buttonStyle(.plain)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
                     .padding(.trailing, 40)
-                } else if step == 4 {
-                    Button(action: {
-                        navigateToWorking12 = true
-                    }) {
-                        Image("ArrowIcon")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 150, height: 150)
-                    }
-                    .buttonStyle(.plain)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-                    .padding(.trailing, 0)
                 }
 
-                if step > 0 && step != 3 {
+                if step > 0 && step != 3 && step != 4 {
                     Button(action: {
                         if step == 4 {
                             resetCalibration()
@@ -419,6 +448,7 @@ struct PreWorking12: View {
         .onChange(of: step) { oldValue, newValue in
             if oldValue == 4 && newValue != 4 {
                 stopLiveTestIfNeeded()
+                stopTestCountdown()
             }
             if newValue == 3 {
                 startCalibrationFlow()
@@ -426,6 +456,7 @@ struct PreWorking12: View {
             if newValue == 4 {
                 stepDisplayStage = .standing
                 startLiveTestIfNeeded()
+                startTestCountdown()
             }
         }
         .onChange(of: btVM.currentStepStatus) { _, newValue in
