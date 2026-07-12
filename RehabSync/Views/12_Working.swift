@@ -21,6 +21,7 @@ struct Working12: View {
     @State private var scoreTimer: Timer?
     @State private var totalCoins = 0
     @State private var currentSet = 1
+    @State private var currentRep = 0
     @State private var comingMoodCount = 0
     @State private var badMoodCount = 0
     @State private var angryMoodCount = 0
@@ -202,21 +203,25 @@ struct Working12: View {
         if currentSet < content.sets {
             currentSet += 1
         }
+        currentRep = 0
     }
 
-    // 每完成一次完整的上階→下階週期即視為完成一「組」：依這次讀秒落在哪個檔位累計對應的心情次數，
-    // 再判斷是否還有下一組（進組間休息）或已經是最後一組（直接前往 PostWorking12）。
+    // 每完成一次完整的上階→下階週期即視為完成一「次」：依這次讀秒落在哪個檔位累計對應的心情次數，
+    // 次數集滿 content.reps 才算完成一組，這時再判斷是否還有下一組（進組間休息）或已經是最後一組（直接前往 PostWorking12）。
     private func advanceProgress(coinCount: Int) {
         switch coinCount {
         case 15: comingMoodCount += 1
         case 9: badMoodCount += 1
         default: angryMoodCount += 1
         }
-        if currentSet < content.sets {
-            startSetRestCountdown()
-        } else {
-            finalElapsedSeconds = Int(Date().timeIntervalSince(sessionStartDate))
-            navigateToPostWorking12 = true
+        currentRep += 1
+        if currentRep >= content.reps {
+            if currentSet < content.sets {
+                startSetRestCountdown()
+            } else {
+                finalElapsedSeconds = Int(Date().timeIntervalSince(sessionStartDate))
+                navigateToPostWorking12 = true
+            }
         }
     }
 
@@ -326,7 +331,7 @@ struct Working12: View {
                                 .resizable()
                                 .scaledToFit()
                                 .frame(width: 48, height: 48)
-                            Text("\(content.sets) 組")
+                            Text("\(content.sets) 組 × \(content.reps) 次")
                                 .font(.system(size: 24, weight: .bold))
                                 .foregroundStyle(.black)
                         }
@@ -340,7 +345,7 @@ struct Working12: View {
                                 .resizable()
                                 .scaledToFit()
                                 .frame(width: 48, height: 48)
-                            Text("第 \(currentSet) 組")
+                            Text("第 \(currentSet) 組．第 \(currentRep) 次")
                                 .font(.system(size: 24, weight: .bold))
                                 .foregroundStyle(.black)
                         }
