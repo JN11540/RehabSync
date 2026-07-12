@@ -119,6 +119,12 @@ struct Working12: View {
                 .padding(48)
                 .opacity(0.4)
 
+            Image("TakoyakiFoodIcon")
+                .resizable()
+                .scaledToFill()
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(48)
+
             Image(characterImageName)
                 .resizable()
                 .scaledToFill()
