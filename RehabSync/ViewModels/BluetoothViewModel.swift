@@ -763,7 +763,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         let id = peripheral.identifier
         let name = peripheral.name
             ?? advertisementData[CBAdvertisementDataLocalNameKey] as? String
-        guard let name else { return }
+        guard let name, name.hasPrefix("ZE1") else { return }
 
         DispatchQueue.main.async {
             self.peripheralMap[id] = peripheral

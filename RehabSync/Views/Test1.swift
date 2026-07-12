@@ -886,7 +886,6 @@ private struct DeviceScanColumn: View {
                         .frame(height: itemHeight)
                 } else {
                     ForEach(devices) { device in
-                        let isSupported = device.name.hasPrefix("ZE1")
                         Button {
                             onSelect(device)
                         } label: {
@@ -920,10 +919,8 @@ private struct DeviceScanColumn: View {
                                 }
                             }
                             .frame(height: itemHeight)
-                            .opacity(isSupported ? 1 : 0.4)
                         }
                         .buttonStyle(.plain)
-                        .disabled(!isSupported)
                     }
                 }
             }
