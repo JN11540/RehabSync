@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreBluetooth
 
 // MARK: - Working12
 
@@ -7,6 +8,24 @@ struct Working12: View {
     let exercise: Exercise?
     @Environment(BluetoothViewModel.self) private var btVM
     @Environment(\.goHome) private var goHome
+
+    // 校正/測試階段在 PreWorking 啟動的登階狀態估計，離開這裡時必須主動停止，
+    // 否則 btVM.isEstimatingStepStatus 會卡在 true，導致下次進測試頁時
+    // guard 擋住重啟，currentStepStatus 永遠是 nil、畫面卡在「等待資料…」。
+    private var thighAndCalfPeripherals: (thigh: CBPeripheral, calf: CBPeripheral)? {
+        let dvm = DeviceViewModel()
+        guard let thigh = dvm.fetch(limb: 0), let thighUUID = UUID(uuidString: thigh.device_uuid),
+              let calf  = dvm.fetch(limb: 1), let calfUUID  = UUID(uuidString: calf.device_uuid),
+              let thighPeripheral = btVM.connectedPeripherals[thighUUID],
+              let calfPeripheral  = btVM.connectedPeripherals[calfUUID]
+        else { return nil }
+        return (thighPeripheral, calfPeripheral)
+    }
+
+    private func stopStepStatusIfNeeded() {
+        guard btVM.isEstimatingStepStatus, let pair = thighAndCalfPeripherals else { return }
+        btVM.stopStepStatusEstimation(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+    }
     @State private var holdElapsed: Double = 0
     @State private var holdTimer: Timer?
     @State private var showGiveFood = false
@@ -627,6 +646,7 @@ struct Working12: View {
             coinRainTimer?.invalidate()
             scoreTimer?.invalidate()
             setRestTimer?.invalidate()
+            stopStepStatusIfNeeded()
         }
     }
 }

@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreBluetooth
 
 // MARK: - Working2
 
@@ -6,6 +7,24 @@ struct Working2: View {
     let content: TreatmentContent
     let exercise: Exercise?
     @Environment(BluetoothViewModel.self) private var btVM
+
+    // 校正/測試階段在 PreWorking 啟動的即時角度預估，離開這裡時必須主動停止，
+    // 否則 btVM.isLiveEstimating 會卡在 true，導致下次（不管同動作或別的動作）
+    // 進測試頁時 guard 擋住重啟，畫面顯示殘留的舊角度或舊姿勢公式。
+    private var thighAndCalfPeripherals: (thigh: CBPeripheral, calf: CBPeripheral)? {
+        let dvm = DeviceViewModel()
+        guard let thigh = dvm.fetch(limb: 0), let thighUUID = UUID(uuidString: thigh.device_uuid),
+              let calf  = dvm.fetch(limb: 1), let calfUUID  = UUID(uuidString: calf.device_uuid),
+              let thighPeripheral = btVM.connectedPeripherals[thighUUID],
+              let calfPeripheral  = btVM.connectedPeripherals[calfUUID]
+        else { return nil }
+        return (thighPeripheral, calfPeripheral)
+    }
+
+    private func stopLiveTestIfNeeded() {
+        guard btVM.isLiveEstimating, let pair = thighAndCalfPeripherals else { return }
+        btVM.stopLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+    }
     @State private var holdElapsed: Double = 0
     @State private var holdTimer: Timer?
     @State private var showCatchAnimation = false
@@ -689,6 +708,7 @@ struct Working2: View {
         }
         .onDisappear {
             pauseSession()
+            stopLiveTestIfNeeded()
         }
     }
 
