@@ -21,6 +21,19 @@ struct Working12: View {
                         .stroke(Color.black, lineWidth: 2)
                 )
                 .padding(48)
+                .opacity(0.4)
+
+            Image("TakoyakiHelloIcon")
+                .resizable()
+                .scaledToFill()
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(48)
+
+            Image("TakoyakiCustomerComingIcon")
+                .resizable()
+                .scaledToFill()
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(48)
         }
     }
 }
