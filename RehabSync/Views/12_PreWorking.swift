@@ -368,6 +368,7 @@ struct PreWorking12: View {
                     }
                     .padding(.horizontal, 24)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .offset(x: -60)
                 }
 
                 Button(action: {
