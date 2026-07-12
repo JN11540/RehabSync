@@ -20,6 +20,18 @@ struct Working12: View {
     @State private var scoreElapsed: Double = -1
     @State private var scoreTimer: Timer?
     @State private var totalCoins = 0
+    @State private var currentSet = 1
+    @State private var comingMoodCount = 0
+    @State private var badMoodCount = 0
+    @State private var angryMoodCount = 0
+    @State private var showExitConfirmPopup = false
+    @State private var showRestPopup = false
+    @State private var showSetRestPopup = false
+    @State private var setRestCountdown: Int = 0
+    @State private var setRestTimer: Timer?
+    @State private var navigateToPostWorking12 = false
+    @State private var sessionStartDate = Date()
+    @State private var finalElapsedSeconds = 0
 
     private static let holdDuration: Double = 9
     private static let giveFoodDuration: Double = 1.5
@@ -160,6 +172,54 @@ struct Working12: View {
         }
     }
 
+    private func pauseSession() {
+        holdTimer?.invalidate()
+        holdTimer = nil
+        coinRainTimer?.invalidate()
+        coinRainTimer = nil
+        scoreTimer?.invalidate()
+        scoreTimer = nil
+        setRestTimer?.invalidate()
+        setRestTimer = nil
+    }
+
+    private func startSetRestCountdown() {
+        setRestTimer?.invalidate()
+        setRestCountdown = content.set_rest_time
+        showSetRestPopup = true
+        setRestTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            setRestCountdown -= 1
+            if setRestCountdown <= 0 {
+                closeSetRestPopup()
+            }
+        }
+    }
+
+    private func closeSetRestPopup() {
+        setRestTimer?.invalidate()
+        setRestTimer = nil
+        showSetRestPopup = false
+        if currentSet < content.sets {
+            currentSet += 1
+        }
+    }
+
+    // 每完成一次完整的上階→下階週期即視為完成一「組」：依這次讀秒落在哪個檔位累計對應的心情次數，
+    // 再判斷是否還有下一組（進組間休息）或已經是最後一組（直接前往 PostWorking12）。
+    private func advanceProgress(coinCount: Int) {
+        switch coinCount {
+        case 15: comingMoodCount += 1
+        case 9: badMoodCount += 1
+        default: angryMoodCount += 1
+        }
+        if currentSet < content.sets {
+            startSetRestCountdown()
+        } else {
+            finalElapsedSeconds = Int(Date().timeIntervalSince(sessionStartDate))
+            navigateToPostWorking12 = true
+        }
+    }
+
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             Color.white.ignoresSafeArea()
@@ -224,6 +284,102 @@ struct Working12: View {
                     .frame(width: 115, height: 48)
                     .frame(maxWidth: .infinity, alignment: .trailing)
                     .padding(.trailing, 16)
+
+                    HStack(spacing: 12) {
+                        Button(action: {
+                            showExitConfirmPopup = true
+                            pauseSession()
+                        }) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.white)
+                                Circle()
+                                    .strokeBorder(Color.black, lineWidth: 1.5)
+                                Circle()
+                                    .strokeBorder(Color.black, lineWidth: 1.5)
+                                    .padding(4)
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundStyle(.black)
+                            }
+                            .frame(width: 40, height: 40)
+                        }
+                        .buttonStyle(.plain)
+
+                        Button(action: {
+                            showRestPopup = true
+                            pauseSession()
+                        }) {
+                            Image("RestIcon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 40, height: 40)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 16)
+
+                    HStack(spacing: 20) {
+                        HStack(spacing: 4) {
+                            Image("TargetIcon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 48, height: 48)
+                            Text("\(content.sets) 組")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+
+                        Rectangle()
+                            .fill(Color(white: 0.35))
+                            .frame(width: 2, height: 40)
+
+                        HStack(spacing: 4) {
+                            Image("WeightliftingIcon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 48, height: 48)
+                            Text("第 \(currentSet) 組")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+
+                        Rectangle()
+                            .fill(Color(white: 0.35))
+                            .frame(width: 2, height: 40)
+
+                        HStack(spacing: 4) {
+                            Image("TakoyakiCustomerComingMoodIcon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 40, height: 40)
+                            Text("\(comingMoodCount)")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+
+                        HStack(spacing: 4) {
+                            Image("TakoyakiCustomerBadMoodIcon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 40, height: 40)
+                            Text("\(badMoodCount)")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+
+                        HStack(spacing: 4) {
+                            Image("TakoyakiCustomerAngryMoodIcon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 40, height: 40)
+                            Text("\(angryMoodCount)")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
                 }
                 .frame(height: 60)
                 Rectangle()
@@ -236,17 +392,20 @@ struct Working12: View {
             .padding(.top, 48)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
-            Image(characterImageName)
-                .resizable()
-                .scaledToFill()
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .padding(48)
+            Group {
+                Image(characterImageName)
+                    .resizable()
+                    .scaledToFill()
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .padding(48)
 
-            Image(customerImageName)
-                .resizable()
-                .scaledToFill()
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .padding(48)
+                Image(customerImageName)
+                    .resizable()
+                    .scaledToFill()
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .padding(48)
+            }
+            .allowsHitTesting(false)
 
             if showCoinRain {
                 GeometryReader { geo in
@@ -279,6 +438,7 @@ struct Working12: View {
                     .scaleEffect(foodScale)
                     .brightness(foodBrightness)
                     .padding(48)
+                    .allowsHitTesting(false)
             }
 
             VStack(spacing: 12) {
@@ -364,6 +524,71 @@ struct Working12: View {
             }
             .padding(24)
             .offset(x: 25, y: -100)
+
+            if showRestPopup {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+
+                ConfirmPopup(
+                    message: "您是否要直接跳過，進入組間休息？",
+                    onCancel: {
+                        showRestPopup = false
+                        startHoldTimer()
+                    },
+                    onConfirm: {
+                        showRestPopup = false
+                        if currentSet < content.sets {
+                            startSetRestCountdown()
+                        } else {
+                            finalElapsedSeconds = Int(Date().timeIntervalSince(sessionStartDate))
+                            navigateToPostWorking12 = true
+                        }
+                    }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            }
+
+            if showSetRestPopup {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+
+                SetRestPopup(
+                    secondsRemaining: setRestCountdown,
+                    onSkip: { closeSetRestPopup() }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            }
+
+            if showExitConfirmPopup {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+
+                ConfirmPopup(
+                    message: "您確定要結束遊戲嗎？",
+                    onCancel: {
+                        showExitConfirmPopup = false
+                        startHoldTimer()
+                    },
+                    onConfirm: {
+                        showExitConfirmPopup = false
+                        finalElapsedSeconds = Int(Date().timeIntervalSince(sessionStartDate))
+                        navigateToPostWorking12 = true
+                    }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            }
+        }
+        .fullScreenCover(isPresented: $navigateToPostWorking12) {
+            PostWorking12(
+                content: content,
+                exercise: exercise,
+                totalCoins: totalCoins,
+                totalSets: currentSet,
+                totalElapsedSeconds: finalElapsedSeconds,
+                comingMoodCount: comingMoodCount,
+                badMoodCount: badMoodCount,
+                angryMoodCount: angryMoodCount
+            )
         }
         .onChange(of: btVM.currentStepStatus) { oldValue, newValue in
             if oldValue == 0 && newValue == 1 {
@@ -388,6 +613,7 @@ struct Working12: View {
                     }
                     startCoinRain(count: coinCount)
                     startScoreSequence(count: coinCount)
+                    advanceProgress(coinCount: coinCount)
                 }
             }
         }
@@ -395,6 +621,7 @@ struct Working12: View {
             holdTimer?.invalidate()
             coinRainTimer?.invalidate()
             scoreTimer?.invalidate()
+            setRestTimer?.invalidate()
         }
     }
 }
@@ -476,6 +703,100 @@ private struct CoinBurstScoreLabel: View {
             }
             .position(position)
         }
+    }
+}
+
+// MARK: - ConfirmPopup
+
+private struct ConfirmPopup: View {
+    let message: String
+    let onCancel: () -> Void
+    let onConfirm: () -> Void
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            Color.white
+            Text(message)
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(.black)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            Button(action: onCancel) {
+                ZStack {
+                    Circle().fill(Color.white)
+                    Circle().strokeBorder(Color.black, lineWidth: 1.5)
+                    Circle().strokeBorder(Color.black, lineWidth: 1.5).padding(4)
+                    Image(systemName: "xmark").font(.system(size: 16, weight: .bold)).foregroundStyle(.black)
+                }
+                .frame(width: 36, height: 36)
+            }
+            .buttonStyle(.plain)
+            .padding(8)
+            Button(action: onConfirm) {
+                Text("確定")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color.white)
+                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.black, lineWidth: 1.5))
+                    )
+            }
+            .buttonStyle(.plain)
+            .padding(12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+        }
+        .frame(width: 320, height: 220)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 1.5))
+    }
+}
+
+// MARK: - SetRestPopup
+
+private struct SetRestPopup: View {
+    let secondsRemaining: Int
+    let onSkip: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.white
+            VStack(spacing: 24) {
+                Text("組間休息時間")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(.black)
+                HStack(spacing: 32) {
+                    ZStack {
+                        Circle().fill(Color.white)
+                        Circle().strokeBorder(Color.black, lineWidth: 1.5)
+                        Text("\(max(secondsRemaining, 0))")
+                            .font(.system(size: 32, weight: .bold))
+                            .foregroundStyle(.black)
+                            .minimumScaleFactor(0.5)
+                            .lineLimit(1)
+                            .padding(8)
+                    }
+                    .frame(width: 90, height: 90)
+                    Button(action: onSkip) {
+                        ZStack {
+                            Circle().fill(Color.white)
+                            Circle().strokeBorder(Color.black, lineWidth: 1.5)
+                            Text("跳過")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(.black)
+                        }
+                        .frame(width: 90, height: 90)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .frame(width: 320, height: 220)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 1.5))
     }
 }
 
