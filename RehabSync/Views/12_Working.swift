@@ -8,7 +8,9 @@ struct Working12: View {
     @Environment(BluetoothViewModel.self) private var btVM
     @Environment(\.goHome) private var goHome
     @State private var holdElapsed: Double = 0
+    @State private var holdTimer: Timer?
     @State private var showGiveFood = false
+    @State private var showReceive = false
 
     private static let holdDuration: Double = 9
     private static let giveFoodDuration: Double = 1.5
@@ -28,6 +30,28 @@ struct Working12: View {
         case 1, 2: return "TakoyakiMakeFoodIcon"
         default: return "TakoyakiHelloIcon"
         }
+    }
+
+    private var customerImageName: String {
+        if showReceive { return "TakoyakiCustomerReceiveIcon" }
+        if holdElapsed >= 7 { return "TakoyakiCustomerAngryIcon" }
+        if holdElapsed >= 5 { return "TakoyakiCustomerBadIcon" }
+        return "TakoyakiCustomerComingIcon"
+    }
+
+    private func startHoldTimer() {
+        guard holdTimer == nil else { return }
+        holdElapsed = 0
+        holdTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+            guard holdElapsed < Self.holdDuration else { return }
+            holdElapsed = min(holdElapsed + 0.1, Self.holdDuration)
+        }
+    }
+
+    private func stopHoldTimer() {
+        holdTimer?.invalidate()
+        holdTimer = nil
+        holdElapsed = 0
     }
 
     var body: some View {
@@ -51,7 +75,7 @@ struct Working12: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .padding(48)
 
-            Image("TakoyakiCustomerComingIcon")
+            Image(customerImageName)
                 .resizable()
                 .scaledToFill()
                 .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -147,12 +171,21 @@ struct Working12: View {
             .offset(x: 25, y: -100)
         }
         .onChange(of: btVM.currentStepStatus) { oldValue, newValue in
+            if oldValue == 0 && newValue == 1 {
+                startHoldTimer()
+            }
             if oldValue == 2 && newValue == 0 {
+                stopHoldTimer()
                 showGiveFood = true
+                showReceive = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + Self.giveFoodDuration) {
                     showGiveFood = false
+                    showReceive = false
                 }
             }
+        }
+        .onDisappear {
+            holdTimer?.invalidate()
         }
     }
 }
