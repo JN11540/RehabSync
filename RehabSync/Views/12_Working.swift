@@ -246,7 +246,7 @@ struct Working12: View {
                             Rectangle()
                                 .fill(Color.black)
                                 .frame(width: 28, height: 1.5)
-                                .position(x: 20, y: h * CGFloat(i) / 5)
+                                .position(x: 20, y: h * CGFloat(i) * 2 / 9)
                         }
 
                         Text("9")
@@ -258,19 +258,19 @@ struct Working12: View {
                             Text("\(9 - 2 * i)")
                                 .font(.system(size: 20, weight: .semibold))
                                 .foregroundStyle(.black)
-                                .position(x: -20, y: h * CGFloat(i) / 5)
+                                .position(x: -20, y: h * CGFloat(i) * 2 / 9)
                         }
 
                         Image("TakoyakiCustomerBadMoodIcon")
                             .resizable()
                             .scaledToFit()
                             .frame(width: 40, height: 40)
-                            .position(x: 60, y: h * 2 / 5)
+                            .position(x: 60, y: h * 4 / 9)
                         Image("TakoyakiCustomerAngryMoodIcon")
                             .resizable()
                             .scaledToFit()
                             .frame(width: 40, height: 40)
-                            .position(x: 60, y: h * 1 / 5)
+                            .position(x: 60, y: h * 2 / 9)
                     }
                 }
                 .frame(width: 40, height: 400)
