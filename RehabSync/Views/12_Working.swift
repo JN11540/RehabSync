@@ -21,7 +21,7 @@ struct Working12: View {
     private static let holdDuration: Double = 9
     private static let giveFoodDuration: Double = 1.5
     private static let foodPulseStepDuration: Double = 0.25
-    private static let foodPulseScale: CGFloat = 1.15
+    private static let foodPulseScale: CGFloat = 1.3
     private static let foodPulseBrightness: Double = 0.3
     private static let coinLanternPixel = CGPoint(x: 836, y: 190)
     private static let coinFanPixel = CGPoint(x: 630, y: 430)
@@ -147,16 +147,6 @@ struct Working12: View {
                 .padding(48)
                 .opacity(0.4)
 
-            if showReceive {
-                Image("TakoyakiFoodIcon")
-                    .resizable()
-                    .scaledToFill()
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .scaleEffect(foodScale)
-                    .brightness(foodBrightness)
-                    .padding(48)
-            }
-
             Image(characterImageName)
                 .resizable()
                 .scaledToFill()
@@ -179,6 +169,16 @@ struct Working12: View {
                     )
                 }
                 .allowsHitTesting(false)
+            }
+
+            if showReceive {
+                Image("TakoyakiFoodIcon")
+                    .resizable()
+                    .scaledToFill()
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .scaleEffect(foodScale)
+                    .brightness(foodBrightness)
+                    .padding(48)
             }
 
             VStack(spacing: 12) {
