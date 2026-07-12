@@ -11,9 +11,34 @@ struct Working12: View {
     @State private var holdTimer: Timer?
     @State private var showGiveFood = false
     @State private var showReceive = false
+    @State private var showCoinRain = false
+    @State private var coinRainElapsed: Double = 0
+    @State private var coinRainCount = 0
+    @State private var coinRainTimer: Timer?
 
     private static let holdDuration: Double = 9
     private static let giveFoodDuration: Double = 1.5
+    private static let coinLanternPixel = CGPoint(x: 836, y: 190)
+    private static let coinFanPixel = CGPoint(x: 630, y: 430)
+    private static let overlayCanvasSize = CGSize(width: 1232, height: 864)
+
+    private static func overlayPosition(for fraction: CGPoint, in size: CGSize, padding: CGFloat = 48) -> CGPoint {
+        let frameW = size.width - padding * 2
+        let frameH = size.height - padding * 2
+        guard frameW > 0, frameH > 0 else { return CGPoint(x: size.width / 2, y: size.height / 2) }
+        let scale = max(frameW / overlayCanvasSize.width, frameH / overlayCanvasSize.height)
+        let visibleW = frameW / scale
+        let visibleH = frameH / scale
+        let cropX = (overlayCanvasSize.width - visibleW) / 2
+        let cropY = (overlayCanvasSize.height - visibleH) / 2
+        let relX = (fraction.x * overlayCanvasSize.width - cropX) / visibleW
+        let relY = (fraction.y * overlayCanvasSize.height - cropY) / visibleH
+        return CGPoint(x: padding + relX * frameW, y: padding + relY * frameH)
+    }
+
+    private static func canvasFraction(x: CGFloat, y: CGFloat) -> CGPoint {
+        CGPoint(x: x / overlayCanvasSize.width, y: y / overlayCanvasSize.height)
+    }
 
     private var stepStatusLabel: String {
         switch btVM.currentStepStatus {
@@ -60,6 +85,25 @@ struct Working12: View {
         holdElapsed = 0
     }
 
+    // 硬幣用自己的 Timer 依 elapsed 時間驅動（而非固定總長的 withAnimation），
+    // 確保不論這次是 3 顆、9 顆還是 15 顆，每一顆都會依序完整跑完拋物線。
+    private func startCoinRain(count: Int) {
+        coinRainTimer?.invalidate()
+        coinRainCount = count
+        coinRainElapsed = 0
+        showCoinRain = true
+        let start = Date()
+        let totalDuration = Double(count - 1) * CoinRainBurst.stagger + CoinRainBurst.flightDuration
+        coinRainTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { t in
+            let e = Date().timeIntervalSince(start)
+            coinRainElapsed = e
+            if e >= totalDuration {
+                t.invalidate()
+                showCoinRain = false
+            }
+        }
+    }
+
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             Color.white.ignoresSafeArea()
@@ -86,6 +130,18 @@ struct Working12: View {
                 .scaledToFill()
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .padding(48)
+
+            if showCoinRain {
+                GeometryReader { geo in
+                    CoinRainBurst(
+                        elapsed: coinRainElapsed,
+                        count: coinRainCount,
+                        start: Self.overlayPosition(for: Self.canvasFraction(x: Self.coinLanternPixel.x, y: Self.coinLanternPixel.y), in: geo.size),
+                        end: Self.overlayPosition(for: Self.canvasFraction(x: Self.coinFanPixel.x, y: Self.coinFanPixel.y), in: geo.size)
+                    )
+                }
+                .allowsHitTesting(false)
+            }
 
             VStack(spacing: 12) {
                 GeometryReader { geo in
@@ -176,17 +232,65 @@ struct Working12: View {
                 startHoldTimer()
             }
             if oldValue == 2 && newValue == 0 {
+                let finishedHoldSeconds = holdElapsed
                 stopHoldTimer()
                 showGiveFood = true
                 showReceive = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + Self.giveFoodDuration) {
                     showGiveFood = false
                     showReceive = false
+                    let coinCount: Int
+                    if finishedHoldSeconds >= 7 {
+                        coinCount = 3
+                    } else if finishedHoldSeconds >= 5 {
+                        coinCount = 9
+                    } else {
+                        coinCount = 15
+                    }
+                    startCoinRain(count: coinCount)
                 }
             }
         }
         .onDisappear {
             holdTimer?.invalidate()
+            coinRainTimer?.invalidate()
+        }
+    }
+}
+
+// MARK: - CoinRainBurst
+
+// 硬幣一顆一顆從固定起點飛拋物線到固定終點：跟 9_Working.swift 的 CoinConvergeBurst
+// 不同的地方是這裡起點終點都固定（不是散開後收斂），純粹依 elapsed 算出每顆各自的發射時間與拋物線進度。
+private struct CoinRainBurst: View {
+    let elapsed: Double
+    let count: Int
+    let start: CGPoint
+    let end: CGPoint
+
+    fileprivate static let flightDuration = 0.6
+    fileprivate static let stagger = 0.15
+    private static let arcHeight: CGFloat = 60
+    private static let coinSize: CGFloat = 36
+
+    var body: some View {
+        ZStack {
+            ForEach(0..<count, id: \.self) { i in
+                let launchTime = Double(i) * Self.stagger
+                let localT = (elapsed - launchTime) / Self.flightDuration
+
+                if localT >= 0 && localT < 1 {
+                    let t = CGFloat(localT)
+                    let x = start.x + (end.x - start.x) * t
+                    let y = start.y + (end.y - start.y) * t - Self.arcHeight * 4 * t * (1 - t)
+
+                    Image("CoinIcon")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: Self.coinSize, height: Self.coinSize)
+                        .position(x: x, y: y)
+                }
+            }
         }
     }
 }
