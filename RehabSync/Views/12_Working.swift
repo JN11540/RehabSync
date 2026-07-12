@@ -17,6 +17,8 @@ struct Working12: View {
     @State private var coinRainTimer: Timer?
     @State private var foodScale: CGFloat = 1
     @State private var foodBrightness: Double = 0
+    @State private var scoreElapsed: Double = -1
+    @State private var scoreTimer: Timer?
 
     private static let holdDuration: Double = 9
     private static let giveFoodDuration: Double = 1.5
@@ -25,6 +27,8 @@ struct Working12: View {
     private static let foodPulseBrightness: Double = 0.3
     private static let coinLanternPixel = CGPoint(x: 836, y: 190)
     private static let coinFanPixel = CGPoint(x: 630, y: 430)
+    private static let scoreLabelPixel = CGPoint(x: 660, y: 250)
+    private static let scoreHoldAfterLast: Double = 0.6
     private static let overlayCanvasSize = CGSize(width: 1232, height: 864)
 
     private static func overlayPosition(for fraction: CGPoint, in size: CGSize, padding: CGFloat = 48) -> CGPoint {
@@ -132,6 +136,23 @@ struct Working12: View {
         }
     }
 
+    // 數字累加跟硬幣飛行動畫脫鉤，用自己的 Timer 依固定節奏（CoinBurstScoreLabel.stagger）逐一往上跳，
+    // 確保無論硬幣數量多少，一定會完整跑完第一個數字到最後一個數字，不受拋物線飛行時間影響。
+    private func startScoreSequence(count: Int) {
+        scoreTimer?.invalidate()
+        let start = Date()
+        scoreElapsed = 0
+        let totalDuration = Double(count) * CoinBurstScoreLabel.stagger + Self.scoreHoldAfterLast
+        scoreTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { t in
+            let e = Date().timeIntervalSince(start)
+            scoreElapsed = e
+            if e >= totalDuration {
+                t.invalidate()
+                scoreElapsed = -1
+            }
+        }
+    }
+
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             Color.white.ignoresSafeArea()
@@ -166,6 +187,17 @@ struct Working12: View {
                         count: coinRainCount,
                         start: Self.overlayPosition(for: Self.canvasFraction(x: Self.coinLanternPixel.x, y: Self.coinLanternPixel.y), in: geo.size),
                         end: Self.overlayPosition(for: Self.canvasFraction(x: Self.coinFanPixel.x, y: Self.coinFanPixel.y), in: geo.size)
+                    )
+                }
+                .allowsHitTesting(false)
+            }
+
+            if scoreElapsed >= 0 {
+                GeometryReader { geo in
+                    CoinBurstScoreLabel(
+                        elapsed: scoreElapsed,
+                        count: coinRainCount,
+                        position: Self.overlayPosition(for: Self.canvasFraction(x: Self.scoreLabelPixel.x, y: Self.scoreLabelPixel.y), in: geo.size)
                     )
                 }
                 .allowsHitTesting(false)
@@ -287,12 +319,14 @@ struct Working12: View {
                         coinCount = 15
                     }
                     startCoinRain(count: coinCount)
+                    startScoreSequence(count: coinCount)
                 }
             }
         }
         .onDisappear {
             holdTimer?.invalidate()
             coinRainTimer?.invalidate()
+            scoreTimer?.invalidate()
         }
     }
 }
@@ -330,6 +364,49 @@ private struct CoinRainBurst: View {
                         .position(x: x, y: y)
                 }
             }
+        }
+    }
+}
+
+// MARK: - CoinBurstScoreLabel
+
+// 累計金額顯示完全參考 9_Working.swift 的 CoinBurstScoreLabel：黑色描邊 + 金黃色文字，
+// 用自己的 elapsed（由 Timer 驅動，見 Working12.startScoreSequence）逐一往上跳，
+// 跟硬幣飛行動畫脫鉤，確保無論硬幣數量多少都能完整跑完全部數字。
+private struct CoinBurstScoreLabel: View {
+    let elapsed: Double
+    let count: Int
+    let position: CGPoint
+
+    fileprivate static let stagger = 0.2
+    private static let pulseDuration = 0.15
+    private static let baseFontSize: CGFloat = 100
+
+    var body: some View {
+        let appearedCount = elapsed >= 0 ? min(count, Int(elapsed / Self.stagger) + 1) : 0
+        if appearedCount > 0 {
+            let label = "+\(appearedCount * 100)"
+            let lastSpawnTime = Double(appearedCount - 1) * Self.stagger
+            let timeSincePulse = elapsed - lastSpawnTime
+            let pulseProgress = min(max(timeSincePulse / Self.pulseDuration, 0), 1)
+            let pulseFactor = sin(pulseProgress * .pi)
+            let fontSize = Self.baseFontSize + 20 * CGFloat(pulseFactor)
+            let outlineOffsets: [CGSize] = [
+                CGSize(width: -2, height: -2), CGSize(width: 2, height: -2),
+                CGSize(width: -2, height: 2), CGSize(width: 2, height: 2)
+            ]
+            ZStack {
+                ForEach(0..<outlineOffsets.count, id: \.self) { i in
+                    Text(label)
+                        .font(.system(size: fontSize, weight: .bold))
+                        .foregroundStyle(Color(red: 0.93, green: 0.75, blue: 0.22))
+                        .offset(outlineOffsets[i])
+                }
+                Text(label)
+                    .font(.system(size: fontSize, weight: .bold))
+                    .foregroundStyle(Color(red: 0.933, green: 0.933, blue: 0.0))
+            }
+            .position(position)
         }
     }
 }
