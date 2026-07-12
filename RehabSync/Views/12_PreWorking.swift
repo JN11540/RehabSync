@@ -28,7 +28,8 @@ struct PreWorking12: View {
         switch step {
         case 0: return "確認裝備齊全"
         case 1: return "準備踏板或凳子"
-        case 2: return "校正"
+        case 2: return "放置平板"
+        case 3: return "校正"
         default: return "登階運動測試"
         }
     }
@@ -164,6 +165,20 @@ struct PreWorking12: View {
                     .padding(.horizontal, 24)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if step == 2 {
+                    VStack(spacing: 12) {
+                        Image("TabletDeskIcon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 500, height: 500)
+
+                        Text("請將平板放置於桌面上\n準備就緒後點擊「開始」")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundStyle(.black)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.horizontal, 24)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if step == 3 {
                     VStack(spacing: 16) {
                         Image("Exercise12Stage1")
                             .resizable()
@@ -243,7 +258,7 @@ struct PreWorking12: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
                         .padding(.trailing, 40)
                     }
-                } else if step == 3 {
+                } else if step == 4 {
                     Image(stepDisplayImageName)
                         .resizable()
                         .scaledToFit()
@@ -266,8 +281,8 @@ struct PreWorking12: View {
                 }
 
                 Button(action: {
-                    if step == 2 { resetCalibration() }
-                    if step == 3 { stopLiveTestIfNeeded() }
+                    if step == 3 { resetCalibration() }
+                    if step == 4 { stopLiveTestIfNeeded() }
                     dismiss()
                 }) {
                     ZStack {
@@ -297,7 +312,23 @@ struct PreWorking12: View {
                     .buttonStyle(.plain)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
                     .padding(.trailing, 0)
-                } else if step == 3 {
+                } else if step == 2 {
+                    Button(action: { step += 1 }) {
+                        ZStack {
+                            Circle()
+                                .fill(Color(red: 0.99, green: 0.88, blue: 0.49))
+                            Circle()
+                                .strokeBorder(Color.black, lineWidth: 6)
+                            Text("開始")
+                                .font(.system(size: 28, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+                        .frame(width: 200, height: 200)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                    .padding(.trailing, 40)
+                } else if step == 4 {
                     Button(action: {
                         navigateToWorking12 = true
                     }) {
@@ -313,8 +344,8 @@ struct PreWorking12: View {
 
                 if step > 0 {
                     Button(action: {
-                        if step == 2 || step == 3 { resetCalibration() }
-                        if step == 3 { stopLiveTestIfNeeded() }
+                        if step == 3 || step == 4 { resetCalibration() }
+                        if step == 4 { stopLiveTestIfNeeded() }
                         step -= 1
                     }) {
                         Image("ArrowIcon")
@@ -344,13 +375,13 @@ struct PreWorking12: View {
             }
         }
         .onChange(of: step) { oldValue, newValue in
-            if oldValue == 2 && newValue < oldValue {
+            if oldValue == 3 && newValue < oldValue {
                 resetCalibration()
             }
-            if oldValue == 3 && newValue != 3 {
+            if oldValue == 4 && newValue != 4 {
                 stopLiveTestIfNeeded()
             }
-            if newValue == 3 {
+            if newValue == 4 {
                 stepDisplayStage = .standing
                 startLiveTestIfNeeded()
             }
