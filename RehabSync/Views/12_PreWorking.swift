@@ -15,6 +15,7 @@ struct PreWorking12: View {
     @State private var showSuccessArrow = false
     @State private var stepDisplayStage: StepDisplayStage = .standing
     @State private var stepUpGeneration = 0
+    @State private var navigateToWorking12 = false
 
     private enum StepDisplayStage {
         case standing
@@ -296,6 +297,18 @@ struct PreWorking12: View {
                     .buttonStyle(.plain)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
                     .padding(.trailing, 0)
+                } else if step == 3 {
+                    Button(action: {
+                        navigateToWorking12 = true
+                    }) {
+                        Image("ArrowIcon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 150, height: 150)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                    .padding(.trailing, 0)
                 }
 
                 if step > 0 {
@@ -344,6 +357,9 @@ struct PreWorking12: View {
         }
         .onChange(of: btVM.currentStepStatus) { _, newValue in
             handleStepStatusChange(newValue)
+        }
+        .fullScreenCover(isPresented: $navigateToWorking12) {
+            Working12(content: content, exercise: exercise)
         }
     }
 }
