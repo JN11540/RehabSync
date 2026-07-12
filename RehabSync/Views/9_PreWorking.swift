@@ -171,6 +171,7 @@ struct PreWorking9: View {
                 testCountdown -= 1
             } else {
                 timer.invalidate()
+                navigateToWorking9 = true
             }
         }
     }
@@ -305,64 +306,65 @@ struct PreWorking9: View {
                     .padding(.horizontal, 24)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if step == 4 {
-                    ZStack {
-                        Image("PartialSquatDivide1Icon")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 500, height: 500)
+                    HStack(spacing: 60) {
+                        VStack(spacing: 12) {
+                            ZStack {
+                                Image("PartialSquatDivide1Icon")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 500, height: 500)
 
-                        Image("PartialSquatDivide2Icon")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 500, height: 500)
-                            .rotationEffect(.degrees(legRotation), anchor: UnitPoint(x: 0.542, y: 0.685))
+                                Image("PartialSquatDivide2Icon")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 500, height: 500)
+                                    .rotationEffect(.degrees(legRotation), anchor: UnitPoint(x: 0.542, y: 0.685))
 
-                        Image("PartialSquatDivide4Icon")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 500, height: 500)
-                            .offset(divide4Offset)
+                                Image("PartialSquatDivide4Icon")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 500, height: 500)
+                                    .offset(divide4Offset)
 
-                        Image("PartialSquatDivide3Icon")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 500, height: 500)
-                            .rotationEffect(.degrees(legRotation / 1.5), anchor: UnitPoint(x: 0.410, y: 0.481))
+                                Image("PartialSquatDivide3Icon")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 500, height: 500)
+                                    .rotationEffect(.degrees(legRotation / 1.5), anchor: UnitPoint(x: 0.410, y: 0.481))
+                            }
+
+                            Group {
+                                if let angle = btVM.currentEstimatedRealAngle {
+                                    Text(String(format: "%.1f°", angle))
+                                        .font(.system(size: 32, weight: .bold, design: .monospaced))
+                                        .foregroundStyle(.black)
+                                } else {
+                                    Text("等待資料…")
+                                        .font(.system(size: 20, weight: .medium))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+
+                        VStack(spacing: 16) {
+                            Text("測試")
+                                .font(.system(size: 32, weight: .bold))
+                                .foregroundStyle(.black)
+
+                            ZStack {
+                                Circle()
+                                    .fill(Color(red: 0.99, green: 0.88, blue: 0.49))
+                                Circle()
+                                    .strokeBorder(Color.black, lineWidth: 6)
+                                Text("\(testCountdown)")
+                                    .font(.system(size: 100, weight: .bold))
+                                    .foregroundStyle(.black)
+                            }
+                            .frame(width: 200, height: 200)
+                        }
                     }
+                    .padding(.horizontal, 24)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                    Group {
-                        if let angle = btVM.currentEstimatedRealAngle {
-                            Text(String(format: "%.1f°", angle))
-                                .font(.system(size: 32, weight: .bold, design: .monospaced))
-                                .foregroundStyle(.black)
-                        } else {
-                            Text("等待資料…")
-                                .font(.system(size: 20, weight: .medium))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                    .padding(.bottom, 40)
-
-                    VStack(spacing: 16) {
-                        Text("測試")
-                            .font(.system(size: 32, weight: .bold))
-                            .foregroundStyle(.black)
-
-                        ZStack {
-                            Circle()
-                                .fill(Color(red: 0.99, green: 0.88, blue: 0.49))
-                            Circle()
-                                .strokeBorder(Color.black, lineWidth: 6)
-                            Text("\(testCountdown)")
-                                .font(.system(size: 100, weight: .bold))
-                                .foregroundStyle(.black)
-                        }
-                        .frame(width: 200, height: 200)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-                    .padding(.trailing, 40)
                 }
 
                 Button(action: {

@@ -208,6 +208,7 @@ struct PreWorking12: View {
                 testCountdown -= 1
             } else {
                 timer.invalidate()
+                navigateToWorking12 = true
             }
         }
     }
@@ -328,44 +329,45 @@ struct PreWorking12: View {
                     .padding(.horizontal, 24)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if step == 4 {
-                    Image(stepDisplayImageName)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 500, height: 500)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    HStack(spacing: 60) {
+                        VStack(spacing: 12) {
+                            Image(stepDisplayImageName)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 500, height: 500)
 
-                    Group {
-                        if btVM.currentStepStatus != nil {
-                            Text(stepDisplayLabel)
+                            Group {
+                                if btVM.currentStepStatus != nil {
+                                    Text(stepDisplayLabel)
+                                        .font(.system(size: 32, weight: .bold))
+                                        .foregroundStyle(.black)
+                                } else {
+                                    Text("等待資料…")
+                                        .font(.system(size: 20, weight: .medium))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+
+                        VStack(spacing: 16) {
+                            Text("測試")
                                 .font(.system(size: 32, weight: .bold))
                                 .foregroundStyle(.black)
-                        } else {
-                            Text("等待資料…")
-                                .font(.system(size: 20, weight: .medium))
-                                .foregroundStyle(.secondary)
+
+                            ZStack {
+                                Circle()
+                                    .fill(Color(red: 0.99, green: 0.88, blue: 0.49))
+                                Circle()
+                                    .strokeBorder(Color.black, lineWidth: 6)
+                                Text("\(testCountdown)")
+                                    .font(.system(size: 100, weight: .bold))
+                                    .foregroundStyle(.black)
+                            }
+                            .frame(width: 200, height: 200)
                         }
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                    .padding(.bottom, 40)
-
-                    VStack(spacing: 16) {
-                        Text("測試")
-                            .font(.system(size: 32, weight: .bold))
-                            .foregroundStyle(.black)
-
-                        ZStack {
-                            Circle()
-                                .fill(Color(red: 0.99, green: 0.88, blue: 0.49))
-                            Circle()
-                                .strokeBorder(Color.black, lineWidth: 6)
-                            Text("\(testCountdown)")
-                                .font(.system(size: 100, weight: .bold))
-                                .foregroundStyle(.black)
-                        }
-                        .frame(width: 200, height: 200)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-                    .padding(.trailing, 40)
+                    .padding(.horizontal, 24)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
 
                 Button(action: {
