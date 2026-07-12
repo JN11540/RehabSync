@@ -109,6 +109,22 @@ struct PreWorking12: View {
         }
     }
 
+    private var calibrationPhaseLabel: String? {
+        switch calibrationPhase {
+        case .preparingPosture: return "準備姿勢"
+        case .aboutToCalibrate: return "準備校正\n不要動喔"
+        case .calibrating:      return nil
+        }
+    }
+
+    private var calibrationPhaseNumber: String? {
+        switch calibrationPhase {
+        case .preparingPosture: return "\(postureCountdown)"
+        case .aboutToCalibrate: return nil
+        case .calibrating:      return "\(calibrationCountdown)"
+        }
+    }
+
     private var thighAndCalfPeripherals: (thigh: CBPeripheral, calf: CBPeripheral)? {
         let dvm = DeviceViewModel()
         guard let thigh = dvm.fetch(limb: 0), let thighUUID = UUID(uuidString: thigh.device_uuid),
@@ -244,51 +260,42 @@ struct PreWorking12: View {
                     .padding(.horizontal, 24)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if step == 3 {
-                    Image("Exercise12Stage1")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 500, height: 500)
-                        .padding(.horizontal, 24)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    HStack(spacing: 60) {
+                        Image("Exercise12Stage1")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 400, height: 400)
 
-                    VStack(spacing: 12) {
-                        ZStack {
-                            Circle()
-                                .fill(Color(red: 0.99, green: 0.88, blue: 0.49))
-                            Circle()
-                                .strokeBorder(Color.black, lineWidth: 6)
+                        VStack(spacing: 16) {
+                            Text(calibrationPhaseLabel ?? "")
+                                .font(.system(size: 32, weight: .bold))
+                                .foregroundStyle(.black)
+                                .multilineTextAlignment(.center)
+                                .frame(minHeight: 76)
 
-                            switch calibrationPhase {
-                            case .preparingPosture:
-                                VStack(spacing: 4) {
-                                    Text("準備姿勢")
-                                        .font(.system(size: 26, weight: .bold))
-                                        .foregroundStyle(.black)
-                                    Text("\(postureCountdown)")
-                                        .font(.system(size: 56, weight: .bold))
+                            ZStack {
+                                Circle()
+                                    .fill(Color(red: 0.99, green: 0.88, blue: 0.49))
+                                Circle()
+                                    .strokeBorder(Color.black, lineWidth: 6)
+
+                                if let number = calibrationPhaseNumber {
+                                    Text(number)
+                                        .font(.system(size: 100, weight: .bold))
                                         .foregroundStyle(.black)
                                 }
-                            case .aboutToCalibrate:
-                                Text("準備校正\n不要動喔")
-                                    .font(.system(size: 22, weight: .bold))
-                                    .foregroundStyle(.black)
-                                    .multilineTextAlignment(.center)
-                            case .calibrating:
-                                Text("\(calibrationCountdown)")
-                                    .font(.system(size: 100, weight: .bold))
-                                    .foregroundStyle(.black)
+                            }
+                            .frame(width: 200, height: 200)
+
+                            if thighAndCalfPeripherals == nil {
+                                Text("裝置未連線")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(.red)
                             }
                         }
-                        .frame(width: 200, height: 200)
-
-                        if thighAndCalfPeripherals == nil {
-                            Text("裝置未連線")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(.red)
-                        }
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-                    .padding(.trailing, 40)
+                    .padding(.horizontal, 24)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if step == 4 {
                     Image(stepDisplayImageName)
                         .resizable()
