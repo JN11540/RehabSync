@@ -32,6 +32,12 @@ struct Working12: View {
         }
     }
 
+    private var capsuleFillColor: Color {
+        if holdElapsed >= 7 { return .red }
+        if holdElapsed >= 5 { return .orange }
+        return .yellow
+    }
+
     private var customerImageName: String {
         if showReceive { return "TakoyakiCustomerReceiveIcon" }
         if holdElapsed >= 7 { return "TakoyakiCustomerAngryIcon" }
@@ -99,7 +105,7 @@ struct Working12: View {
                                 Capsule()
                                     .fill(Color.blue)
                                 Rectangle()
-                                    .fill(Color.yellow)
+                                    .fill(capsuleFillColor)
                                     .frame(height: fillGeo.size.height * CGFloat(holdElapsed / Self.holdDuration))
                             }
                             .clipShape(Capsule())
@@ -129,21 +135,16 @@ struct Working12: View {
                                 .position(x: -20, y: h * CGFloat(i) / 5)
                         }
 
-                        Image("TakoyakiCustomerComingMoodIcon")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 40, height: 40)
-                            .position(x: 60, y: h * 2 / 5)
                         Image("TakoyakiCustomerBadMoodIcon")
                             .resizable()
                             .scaledToFit()
                             .frame(width: 40, height: 40)
-                            .position(x: 60, y: h * 1 / 5)
+                            .position(x: 60, y: h * 2 / 5)
                         Image("TakoyakiCustomerAngryMoodIcon")
                             .resizable()
                             .scaledToFit()
                             .frame(width: 40, height: 40)
-                            .position(x: 60, y: 0)
+                            .position(x: 60, y: h * 1 / 5)
                     }
                 }
                 .frame(width: 40, height: 400)
@@ -160,7 +161,7 @@ struct Working12: View {
 
                     Text(stepStatusLabel)
                         .font(.system(size: 32, weight: .bold))
-                        .foregroundStyle(.black)
+                        .foregroundStyle(btVM.currentStepStatus == 1 || btVM.currentStepStatus == 2 ? .red : .black)
                         .minimumScaleFactor(0.3)
                         .lineLimit(1)
                         .padding(12)
