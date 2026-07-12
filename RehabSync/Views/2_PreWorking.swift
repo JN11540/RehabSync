@@ -9,12 +9,19 @@ struct PreWorking2: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(BluetoothViewModel.self) private var btVM
     @State private var step = 0
-    @State private var didAttemptCalibration = false
+    @State private var calibrationPhase: CalibrationPhase = .preparingPosture
+    @State private var postureCountdown = 10
+    @State private var postureTimer: Timer?
     @State private var calibrationCountdown = 5
     @State private var countdownTimer: Timer?
-    @State private var showSuccessArrow = false
     @State private var legRotation: Double = 0
     @State private var navigateToWorking2 = false
+
+    private enum CalibrationPhase {
+        case preparingPosture
+        case aboutToCalibrate
+        case calibrating
+    }
 
     private var stepTitle: String {
         switch step {
@@ -27,13 +34,71 @@ struct PreWorking2: View {
     }
 
     private func resetCalibration() {
-        didAttemptCalibration = false
-        calibrationCountdown = 5
+        postureTimer?.invalidate()
+        postureTimer = nil
         countdownTimer?.invalidate()
         countdownTimer = nil
-        showSuccessArrow = false
+        calibrationPhase = .preparingPosture
+        postureCountdown = 10
+        calibrationCountdown = 5
         btVM.baselineResult = nil
         btVM.isCollectingBaseline = false
+    }
+
+    // 校正頁進來後全自動跑：先給 10 秒擺姿勢時間，接著提示「不要動」2 秒，
+    // 最後才是真正的 5 秒收集（校正倒數 5→1）。成功就直接翻頁，失敗則回到
+    // 「不要動」提示重新收集一次，不用使用者手動按重試。
+    private func startCalibrationFlow() {
+        resetCalibration()
+        startPostureCountdown()
+    }
+
+    private func startPostureCountdown() {
+        calibrationPhase = .preparingPosture
+        postureCountdown = 10
+        postureTimer?.invalidate()
+        postureTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
+            if postureCountdown > 1 {
+                postureCountdown -= 1
+            } else {
+                timer.invalidate()
+                scheduleCalibrationAttempt()
+            }
+        }
+    }
+
+    private func scheduleCalibrationAttempt() {
+        calibrationPhase = .aboutToCalibrate
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            startCalibrationAttempt()
+        }
+    }
+
+    private func startCalibrationAttempt() {
+        calibrationPhase = .calibrating
+        calibrationCountdown = 5
+        countdownTimer?.invalidate()
+        if let pair = thighAndCalfPeripherals {
+            btVM.startBaselineCalibration(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+        }
+        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
+            if calibrationCountdown > 1 {
+                calibrationCountdown -= 1
+            } else {
+                timer.invalidate()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    evaluateCalibrationResult()
+                }
+            }
+        }
+    }
+
+    private func evaluateCalibrationResult() {
+        if btVM.baselineResult != nil {
+            step += 1
+        } else {
+            scheduleCalibrationAttempt()
+        }
     }
 
     private var thighAndCalfPeripherals: (thigh: CBPeripheral, calf: CBPeripheral)? {
@@ -141,85 +206,51 @@ struct PreWorking2: View {
                     .padding(.horizontal, 24)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if step == 3 {
-                    VStack(spacing: 16) {
-                        Image("StopNoMoveIcon")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 500, height: 500)
+                    Image("StopNoMoveIcon")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 500, height: 500)
+                        .padding(.horizontal, 24)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                        Text("請坐在椅子上，將膝蓋保持 90 度彎曲。\n點擊『校正』按鈕後，請維持身體靜止不動 5 秒鐘喔！")
-                            .font(.system(size: 20, weight: .medium))
-                            .foregroundStyle(.black)
-                            .multilineTextAlignment(.center)
-                            .padding(.leading, 40)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                    }
-                    .padding(.horizontal, 24)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    VStack(spacing: 12) {
+                        ZStack {
+                            Circle()
+                                .fill(Color(red: 0.99, green: 0.88, blue: 0.49))
+                            Circle()
+                                .strokeBorder(Color.black, lineWidth: 6)
 
-                    if showSuccessArrow {
-                        Button(action: { step += 1 }) {
-                            Image("ArrowIcon")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 150, height: 150)
-                        }
-                        .buttonStyle(.plain)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-                        .padding(.trailing, 0)
-                    } else {
-                        VStack(spacing: 12) {
-                            Button(action: {
-                                guard let pair = thighAndCalfPeripherals else { return }
-                                didAttemptCalibration = true
-                                calibrationCountdown = 5
-                                countdownTimer?.invalidate()
-                                countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
-                                    if calibrationCountdown > 1 {
-                                        calibrationCountdown -= 1
-                                    } else {
-                                        timer.invalidate()
-                                    }
+                            switch calibrationPhase {
+                            case .preparingPosture:
+                                VStack(spacing: 4) {
+                                    Text("準備姿勢")
+                                        .font(.system(size: 26, weight: .bold))
+                                        .foregroundStyle(.black)
+                                    Text("\(postureCountdown)")
+                                        .font(.system(size: 56, weight: .bold))
+                                        .foregroundStyle(.black)
                                 }
-                                btVM.startBaselineCalibration(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
-                            }) {
-                                ZStack {
-                                    Circle()
-                                        .fill(Color(red: 0.99, green: 0.88, blue: 0.49))
-                                    Circle()
-                                        .strokeBorder(Color.black, lineWidth: 6)
-                                    if btVM.isCollectingBaseline {
-                                        Text("\(calibrationCountdown)")
-                                            .font(.system(size: 100, weight: .bold))
-                                            .foregroundStyle(.black)
-                                    } else {
-                                        Text("校正")
-                                            .font(.system(size: 28, weight: .bold))
-                                            .foregroundStyle(.black)
-                                    }
-                                }
-                                .frame(width: 200, height: 200)
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(btVM.isCollectingBaseline)
-
-                            if thighAndCalfPeripherals == nil {
-                                Text("裝置未連線")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(.red)
-                            } else if btVM.baselineResult != nil {
-                                Text("校正成功！")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(.green)
-                            } else if didAttemptCalibration && !btVM.isCollectingBaseline {
-                                Text("校正失敗，請重試！")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(.red)
+                            case .aboutToCalibrate:
+                                Text("準備校正\n不要動喔")
+                                    .font(.system(size: 22, weight: .bold))
+                                    .foregroundStyle(.black)
+                                    .multilineTextAlignment(.center)
+                            case .calibrating:
+                                Text("\(calibrationCountdown)")
+                                    .font(.system(size: 100, weight: .bold))
+                                    .foregroundStyle(.black)
                             }
                         }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-                        .padding(.trailing, 40)
+                        .frame(width: 200, height: 200)
+
+                        if thighAndCalfPeripherals == nil {
+                            Text("裝置未連線")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.red)
+                        }
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                    .padding(.trailing, 40)
                 } else if step == 4 {
                     HStack(spacing: -80) {
                         Image("OnlyLegIcon")
@@ -315,10 +346,12 @@ struct PreWorking2: View {
                     .padding(.trailing, 0)
                 }
 
-                if step > 0 {
+                if step > 0 && step != 3 {
                     Button(action: {
-                        if step == 3 || step == 4 { resetCalibration() }
-                        if step == 4 { stopLiveTestIfNeeded() }
+                        if step == 4 {
+                            resetCalibration()
+                            stopLiveTestIfNeeded()
+                        }
                         step -= 1
                     }) {
                         Image("ArrowIcon")
@@ -337,22 +370,12 @@ struct PreWorking2: View {
             .padding(.leading, 60)
             .padding(.trailing, 60)
         }
-        .onChange(of: btVM.baselineResult) { _, newValue in
-            if newValue != nil {
-                showSuccessArrow = false
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    showSuccessArrow = true
-                }
-            } else {
-                showSuccessArrow = false
-            }
-        }
         .onChange(of: step) { oldValue, newValue in
-            if oldValue == 3 && newValue < oldValue {
-                resetCalibration()
-            }
             if oldValue == 4 && newValue != 4 {
                 stopLiveTestIfNeeded()
+            }
+            if newValue == 3 {
+                startCalibrationFlow()
             }
             if newValue == 4 {
                 legRotation = -90
