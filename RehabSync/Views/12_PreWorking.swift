@@ -396,7 +396,7 @@ struct PreWorking12: View {
                 }
                 .buttonStyle(.plain)
 
-                if step < 2 {
+                if step < 3 {
                     Button(action: { step += 1 }) {
                         Image("ArrowIcon")
                             .resizable()
@@ -406,22 +406,6 @@ struct PreWorking12: View {
                     .buttonStyle(.plain)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
                     .padding(.trailing, 0)
-                } else if step == 2 {
-                    Button(action: { step += 1 }) {
-                        ZStack {
-                            Circle()
-                                .fill(Color(red: 0.99, green: 0.88, blue: 0.49))
-                            Circle()
-                                .strokeBorder(Color.black, lineWidth: 6)
-                            Text("開始")
-                                .font(.system(size: 28, weight: .bold))
-                                .foregroundStyle(.black)
-                        }
-                        .frame(width: 200, height: 200)
-                    }
-                    .buttonStyle(.plain)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-                    .padding(.trailing, 40)
                 }
 
                 if step > 0 && step != 3 && step != 4 {
