@@ -10,6 +10,7 @@ struct PreWorking2: View {
     @Environment(BluetoothViewModel.self) private var btVM
     @State private var step = 0
     @State private var calibrationPhase: CalibrationPhase = .idle
+    @State private var calibrationFailed = false
     @State private var aboutToCalibrateCountdown = 2
     @State private var aboutToCalibrateTimer: Timer?
     @State private var calibrationCountdown = 5
@@ -39,6 +40,7 @@ struct PreWorking2: View {
         countdownTimer?.invalidate()
         countdownTimer = nil
         calibrationPhase = .idle
+        calibrationFailed = false
         aboutToCalibrateCountdown = 2
         calibrationCountdown = 5
         btVM.baselineResult = nil
@@ -50,6 +52,7 @@ struct PreWorking2: View {
     // 失敗則回到 idle，需要使用者再按一次「校正」才會重新開始，不自動重試。
     private func scheduleCalibrationAttempt() {
         calibrationPhase = .aboutToCalibrate
+        calibrationFailed = false
         aboutToCalibrateCountdown = 2
         aboutToCalibrateTimer?.invalidate()
         aboutToCalibrateTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
@@ -86,6 +89,7 @@ struct PreWorking2: View {
             step += 1
         } else {
             resetCalibration()
+            calibrationFailed = true
         }
     }
 
@@ -257,6 +261,12 @@ struct PreWorking2: View {
                                 .frame(width: 200, height: 200)
                             }
 
+                            if calibrationFailed {
+                                Text("校正失敗，請重新嘗試")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(.red)
+                            }
+
                             if thighAndCalfPeripherals == nil {
                                 Text("裝置未連線")
                                     .font(.system(size: 16, weight: .semibold))
@@ -347,7 +357,7 @@ struct PreWorking2: View {
                     .padding(.trailing, 0)
                 }
 
-                if step > 0 && step != 3 && step != 4 {
+                if step > 0 && step != 3 {
                     Button(action: {
                         if step == 4 {
                             resetCalibration()
