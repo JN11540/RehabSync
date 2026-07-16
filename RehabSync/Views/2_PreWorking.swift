@@ -48,8 +48,8 @@ struct PreWorking2: View {
     }
 
     // 使用者按下「校正」圓圈才開始：先提示「不要動」2 秒，
-    // 接著才是真正的 5 秒收集（校正倒數 5→1）。成功就直接翻頁，失敗則回到
-    // 「不要動」提示重新收集一次，不用使用者手動再按一次。
+    // 接著才是真正的 5 秒收集（校正倒數 5→1）。成功就直接翻頁，
+    // 失敗則回到 idle，需要使用者再按一次「校正」才會重新開始，不自動重試。
     private func scheduleCalibrationAttempt() {
         calibrationPhase = .aboutToCalibrate
         aboutToCalibrateCountdown = 2
@@ -87,7 +87,7 @@ struct PreWorking2: View {
         if btVM.baselineResult != nil {
             step += 1
         } else {
-            scheduleCalibrationAttempt()
+            resetCalibration()
         }
     }
 
