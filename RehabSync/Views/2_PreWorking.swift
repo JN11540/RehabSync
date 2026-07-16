@@ -9,9 +9,7 @@ struct PreWorking2: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(BluetoothViewModel.self) private var btVM
     @State private var step = 0
-    @State private var calibrationPhase: CalibrationPhase = .preparingPosture
-    @State private var postureCountdown = 10
-    @State private var postureTimer: Timer?
+    @State private var calibrationPhase: CalibrationPhase = .idle
     @State private var aboutToCalibrateCountdown = 2
     @State private var aboutToCalibrateTimer: Timer?
     @State private var calibrationCountdown = 5
@@ -22,7 +20,7 @@ struct PreWorking2: View {
     @State private var navigateToWorking2 = false
 
     private enum CalibrationPhase {
-        case preparingPosture
+        case idle
         case aboutToCalibrate
         case calibrating
     }
@@ -38,42 +36,20 @@ struct PreWorking2: View {
     }
 
     private func resetCalibration() {
-        postureTimer?.invalidate()
-        postureTimer = nil
         aboutToCalibrateTimer?.invalidate()
         aboutToCalibrateTimer = nil
         countdownTimer?.invalidate()
         countdownTimer = nil
-        calibrationPhase = .preparingPosture
-        postureCountdown = 10
+        calibrationPhase = .idle
         aboutToCalibrateCountdown = 2
         calibrationCountdown = 5
         btVM.baselineResult = nil
         btVM.isCollectingBaseline = false
     }
 
-    // 校正頁進來後全自動跑：先給 10 秒擺姿勢時間，接著提示「不要動」2 秒，
-    // 最後才是真正的 5 秒收集（校正倒數 5→1）。成功就直接翻頁，失敗則回到
-    // 「不要動」提示重新收集一次，不用使用者手動按重試。
-    private func startCalibrationFlow() {
-        resetCalibration()
-        startPostureCountdown()
-    }
-
-    private func startPostureCountdown() {
-        calibrationPhase = .preparingPosture
-        postureCountdown = 10
-        postureTimer?.invalidate()
-        postureTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
-            if postureCountdown > 1 {
-                postureCountdown -= 1
-            } else {
-                timer.invalidate()
-                scheduleCalibrationAttempt()
-            }
-        }
-    }
-
+    // 使用者按下「校正」圓圈才開始：先提示「不要動」2 秒，
+    // 接著才是真正的 5 秒收集（校正倒數 5→1）。成功就直接翻頁，失敗則回到
+    // 「不要動」提示重新收集一次，不用使用者手動再按一次。
     private func scheduleCalibrationAttempt() {
         calibrationPhase = .aboutToCalibrate
         aboutToCalibrateCountdown = 2
@@ -117,7 +93,7 @@ struct PreWorking2: View {
 
     private var calibrationPhaseLabel: String? {
         switch calibrationPhase {
-        case .preparingPosture: return "準備姿勢"
+        case .idle:             return nil
         case .aboutToCalibrate: return "準備校正\n不要動喔"
         case .calibrating:      return "校正"
         }
@@ -125,7 +101,7 @@ struct PreWorking2: View {
 
     private var calibrationPhaseNumber: String? {
         switch calibrationPhase {
-        case .preparingPosture: return "\(postureCountdown)"
+        case .idle:             return nil
         case .aboutToCalibrate: return "\(aboutToCalibrateCountdown)"
         case .calibrating:      return "\(calibrationCountdown)"
         }
@@ -267,19 +243,39 @@ struct PreWorking2: View {
                                 .multilineTextAlignment(.center)
                                 .frame(minHeight: 76)
 
-                            ZStack {
-                                Circle()
-                                    .fill(Color(red: 0.99, green: 0.88, blue: 0.49))
-                                Circle()
-                                    .strokeBorder(Color.black, lineWidth: 6)
-
-                                if let number = calibrationPhaseNumber {
-                                    Text(number)
-                                        .font(.system(size: 100, weight: .bold))
-                                        .foregroundStyle(.black)
+                            if calibrationPhase == .idle {
+                                Button(action: {
+                                    guard thighAndCalfPeripherals != nil else { return }
+                                    scheduleCalibrationAttempt()
+                                }) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(Color(red: 0.99, green: 0.88, blue: 0.49))
+                                        Circle()
+                                            .strokeBorder(Color.black, lineWidth: 6)
+                                        Text("校正")
+                                            .font(.system(size: 28, weight: .bold))
+                                            .foregroundStyle(.black)
+                                    }
+                                    .frame(width: 200, height: 200)
                                 }
+                                .buttonStyle(.plain)
+                                .disabled(thighAndCalfPeripherals == nil)
+                            } else {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color(red: 0.99, green: 0.88, blue: 0.49))
+                                    Circle()
+                                        .strokeBorder(Color.black, lineWidth: 6)
+
+                                    if let number = calibrationPhaseNumber {
+                                        Text(number)
+                                            .font(.system(size: 100, weight: .bold))
+                                            .foregroundStyle(.black)
+                                    }
+                                }
+                                .frame(width: 200, height: 200)
                             }
-                            .frame(width: 200, height: 200)
 
                             if thighAndCalfPeripherals == nil {
                                 Text("裝置未連線")
@@ -409,7 +405,7 @@ struct PreWorking2: View {
                 stopTestCountdown()
             }
             if newValue == 3 {
-                startCalibrationFlow()
+                resetCalibration()
             }
             if newValue == 4 {
                 legRotation = -90
