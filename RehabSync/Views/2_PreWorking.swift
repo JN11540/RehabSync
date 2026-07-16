@@ -14,8 +14,6 @@ struct PreWorking2: View {
     @State private var aboutToCalibrateTimer: Timer?
     @State private var calibrationCountdown = 5
     @State private var countdownTimer: Timer?
-    @State private var testCountdown = 30
-    @State private var testCountdownTimer: Timer?
     @State private var legRotation: Double = 0
     @State private var navigateToWorking2 = false
 
@@ -137,24 +135,6 @@ struct PreWorking2: View {
     private func stopLiveTestIfNeeded() {
         guard btVM.isLiveEstimating, let pair = thighAndCalfPeripherals else { return }
         btVM.stopLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
-    }
-
-    private func startTestCountdown() {
-        testCountdown = 30
-        testCountdownTimer?.invalidate()
-        testCountdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
-            if testCountdown > 1 {
-                testCountdown -= 1
-            } else {
-                timer.invalidate()
-                navigateToWorking2 = true
-            }
-        }
-    }
-
-    private func stopTestCountdown() {
-        testCountdownTimer?.invalidate()
-        testCountdownTimer = nil
     }
 
     var body: some View {
@@ -317,32 +297,12 @@ struct PreWorking2: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                     .padding(.bottom, 40)
-
-                    VStack(spacing: 16) {
-                        Text("測試")
-                            .font(.system(size: 32, weight: .bold))
-                            .foregroundStyle(.black)
-
-                        ZStack {
-                            Circle()
-                                .fill(Color(red: 0.99, green: 0.88, blue: 0.49))
-                            Circle()
-                                .strokeBorder(Color.black, lineWidth: 6)
-                            Text("\(testCountdown)")
-                                .font(.system(size: 100, weight: .bold))
-                                .foregroundStyle(.black)
-                        }
-                        .frame(width: 200, height: 200)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-                    .padding(.trailing, 40)
                 }
 
                 Button(action: {
                     if step == 3 { resetCalibration() }
                     if step == 4 {
                         stopLiveTestIfNeeded()
-                        stopTestCountdown()
                     }
                     dismiss()
                 }) {
@@ -365,6 +325,18 @@ struct PreWorking2: View {
 
                 if step < 3 {
                     Button(action: { step += 1 }) {
+                        Image("ArrowIcon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 150, height: 150)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                    .padding(.trailing, 0)
+                } else if step == 4 {
+                    Button(action: {
+                        navigateToWorking2 = true
+                    }) {
                         Image("ArrowIcon")
                             .resizable()
                             .scaledToFit()
@@ -402,7 +374,6 @@ struct PreWorking2: View {
         .onChange(of: step) { oldValue, newValue in
             if oldValue == 4 && newValue != 4 {
                 stopLiveTestIfNeeded()
-                stopTestCountdown()
             }
             if newValue == 3 {
                 resetCalibration()
@@ -410,7 +381,6 @@ struct PreWorking2: View {
             if newValue == 4 {
                 legRotation = -90
                 startLiveTestIfNeeded()
-                startTestCountdown()
             }
         }
         .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
