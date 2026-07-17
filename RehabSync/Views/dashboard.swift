@@ -18,7 +18,6 @@ private enum DashboardPalette {
 
 struct Dashboard: View {
     @State private var selectedNav: DashboardNavItem = .overview
-    @State private var selectedDay = 10
     var onNavigateToTest: () -> Void = {}
     var onNavigateToTest1: () -> Void = {}
     var onNavigateToSettings: () -> Void = {}
@@ -33,21 +32,17 @@ struct Dashboard: View {
             )
                 .frame(width: 220)
 
-            if selectedNav == .device {
-                DeviceIllustrationCard()
-                    .padding(28)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color.white)
-            } else {
-                DashboardOverview()
-                    .frame(maxWidth: .infinity)
-                    .padding(28)
-                    .background(Color.white)
-
-                DashboardSchedulePanel(selectedDay: $selectedDay)
-                    .frame(width: 380)
-                    .background(DashboardPalette.panelBackground)
+            Group {
+                switch selectedNav {
+                case .device:
+                    DeviceIllustrationCard()
+                case .overview, .training, .importData, .exportData, .test, .test1, .settings:
+                    DashboardPlaceholderCard(title: selectedNav.title)
+                }
             }
+            .padding(28)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.white)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.white)
@@ -171,17 +166,27 @@ private struct DashboardSidebarItem: View {
     }
 }
 
-// MARK: - Overview (center column)
+// MARK: - Placeholder Card
 
-private struct DashboardOverview: View {
+private struct DashboardPlaceholderCard: View {
+    let title: String
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("總覽")
-                .font(.system(size: 26, weight: .bold))
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(Color.black)
 
             Spacer()
         }
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(DashboardPalette.indigoFaint)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.black.opacity(0.06), lineWidth: 1)
+        )
     }
 }
 
