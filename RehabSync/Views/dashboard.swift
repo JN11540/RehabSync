@@ -224,7 +224,7 @@ private struct DeviceIllustrationCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("裝置")
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(Color.black)
                 Spacer()
                 Image(systemName: "plus.magnifyingglass")
@@ -286,7 +286,7 @@ private struct LegDeviceCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(legTitle)
-                .font(.system(size: 17, weight: .semibold))
+                .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(Color.black)
 
             DeviceStatusRow(title: "大腿：", isConnected: deviceVM.fetch(limb: 0) != nil)
@@ -310,26 +310,15 @@ private struct DeviceStatusRow: View {
         HStack(spacing: 14) {
             DashboardSensorIcon()
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(Color.black)
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(isConnected ? DashboardPalette.onlineDot : DashboardPalette.offlineDot)
-                        .frame(width: 7, height: 7)
-                    Text(isConnected ? "已連線" : "未連線")
-                        .font(.system(size: 13))
-                        .foregroundStyle(DashboardPalette.mutedText)
-                }
-            }
+            Text(title)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(Color.black)
 
             Spacer()
 
-            Image(systemName: "wifi")
-                .font(.system(size: 15, weight: .medium))
+            Text(isConnected ? "已連線" : "未連線")
+                .font(.system(size: 13))
                 .foregroundStyle(DashboardPalette.mutedText)
-                .rotationEffect(.degrees(90))
         }
         .padding(.vertical, 14)
         .padding(.horizontal, 16)
