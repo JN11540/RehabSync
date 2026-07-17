@@ -252,7 +252,7 @@ private struct DeviceImageBadge: View {
                     Image(imageName)
                         .resizable()
                         .scaledToFill()
-                        .scaleEffect(1.2)
+                        .scaleEffect(1.1)
                 }
                 .aspectRatio(Self.referenceAspectRatio, contentMode: .fit)
                 .clipped()
