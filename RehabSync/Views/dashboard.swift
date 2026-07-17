@@ -19,38 +19,56 @@ private enum DashboardPalette {
 struct Dashboard: View {
     @State private var selectedNav: DashboardNavItem = .overview
     @State private var selectedDay = 10
+    @State private var showDeviceListModal = false
+    @State private var deviceListLimb = 0
     var onNavigateToTest: () -> Void = {}
     var onNavigateToTest1: () -> Void = {}
     var onNavigateToSettings: () -> Void = {}
 
+    private func openDeviceList(limb: Int) {
+        deviceListLimb = limb
+        showDeviceListModal = true
+    }
+
     var body: some View {
-        HStack(spacing: 0) {
-            DashboardSidebar(
-                selectedNav: $selectedNav,
-                onNavigateToTest: onNavigateToTest,
-                onNavigateToTest1: onNavigateToTest1,
-                onNavigateToSettings: onNavigateToSettings
-            )
-                .frame(width: 220)
+        ZStack {
+            HStack(spacing: 0) {
+                DashboardSidebar(
+                    selectedNav: $selectedNav,
+                    onNavigateToTest: onNavigateToTest,
+                    onNavigateToTest1: onNavigateToTest1,
+                    onNavigateToSettings: onNavigateToSettings
+                )
+                    .frame(width: 220)
 
-            if selectedNav == .overview {
-                DashboardOverviewContent()
-                    .frame(maxWidth: .infinity)
-                    .padding(28)
-                    .background(Color.white)
+                if selectedNav == .overview {
+                    DashboardOverviewContent(onDeviceRowTap: openDeviceList)
+                        .frame(maxWidth: .infinity)
+                        .padding(28)
+                        .background(Color.white)
 
-                DashboardSchedulePanel(selectedDay: $selectedDay)
-                    .frame(width: 380)
-                    .background(DashboardPalette.panelBackground)
-            } else {
-                DashboardPlaceholderCard(title: selectedNav.title)
-                    .padding(28)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color.white)
+                    DashboardSchedulePanel(selectedDay: $selectedDay)
+                        .frame(width: 380)
+                        .background(DashboardPalette.panelBackground)
+                } else {
+                    DashboardPlaceholderCard(title: selectedNav.title)
+                        .padding(28)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color.white)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.white)
+
+            if showDeviceListModal {
+                Color.black.opacity(0.25)
+                    .ignoresSafeArea()
+                    .onTapGesture { showDeviceListModal = false }
+
+                DashboardDeviceListModal(limb: deviceListLimb, onClose: { showDeviceListModal = false })
+                    .frame(maxWidth: 420, maxHeight: 520)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.white)
     }
 }
 
@@ -189,6 +207,8 @@ private struct DashboardPlaceholderCard: View {
 // MARK: - Overview Content (center column)
 
 private struct DashboardOverviewContent: View {
+    var onDeviceRowTap: (Int) -> Void = { _ in }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             HStack {
@@ -206,8 +226,8 @@ private struct DashboardOverviewContent: View {
                     .frame(maxWidth: .infinity)
 
                 VStack(spacing: 20) {
-                    LegDeviceCard(legTitle: "左腿")
-                    LegDeviceCard(legTitle: "右腿")
+                    LegDeviceCard(legTitle: "左腿", onRowTap: onDeviceRowTap)
+                    LegDeviceCard(legTitle: "右腿", onRowTap: onDeviceRowTap)
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -290,6 +310,7 @@ private struct DashboardConnectionBadge: View {
 
 private struct LegDeviceCard: View {
     let legTitle: String
+    var onRowTap: (Int) -> Void = { _ in }
     @State private var deviceVM = DeviceViewModel()
 
     var body: some View {
@@ -299,7 +320,11 @@ private struct LegDeviceCard: View {
                 .foregroundStyle(Color.black)
 
             DeviceStatusRow(title: "大腿：", isConnected: deviceVM.fetch(limb: 0) != nil)
+                .contentShape(Rectangle())
+                .onTapGesture { onRowTap(0) }
             DeviceStatusRow(title: "小腿：", isConnected: deviceVM.fetch(limb: 1) != nil)
+                .contentShape(Rectangle())
+                .onTapGesture { onRowTap(1) }
         }
         .padding(20)
         .background(DashboardPalette.cardBackground)
@@ -325,7 +350,7 @@ private struct DeviceStatusRow: View {
 
             Spacer()
 
-            Text(isConnected ? "已連線" : "未連線")
+            Text(isConnected ? "已連線" : "--")
                 .font(.system(size: 18))
                 .foregroundStyle(DashboardPalette.mutedText)
         }
@@ -401,6 +426,98 @@ private struct ActivityChartCard: View {
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.black.opacity(0.06), lineWidth: 1)
         )
+    }
+}
+
+// MARK: - Device List Modal
+
+private struct DashboardDeviceListModal: View {
+    let limb: Int
+    let onClose: () -> Void
+
+    @Environment(BluetoothViewModel.self) private var btVM
+    private let deviceVM = DeviceViewModel()
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white)
+                .shadow(color: .black.opacity(0.2), radius: 20, y: 8)
+
+            VStack(alignment: .leading, spacing: 16) {
+                Text("藍牙裝置")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(Color.black)
+                    .padding(.top, 44)
+                    .padding(.horizontal, 24)
+
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 12) {
+                        if btVM.discoveredDevices.isEmpty {
+                            Text("掃描中…")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(DashboardPalette.mutedText)
+                                .padding(.top, 20)
+                        } else {
+                            ForEach(btVM.discoveredDevices) { device in
+                                Button {
+                                    btVM.connectDiscovered(device)
+                                    deviceVM.insert(uuid: device.id.uuidString, name: device.name, limb: limb)
+                                    onClose()
+                                } label: {
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(device.name)
+                                                .font(.system(size: 15, weight: .semibold))
+                                                .foregroundStyle(Color.black)
+                                                .lineLimit(1)
+                                            Text(device.id.uuidString)
+                                                .font(.system(size: 11))
+                                                .foregroundStyle(DashboardPalette.mutedText)
+                                                .lineLimit(1)
+                                                .minimumScaleFactor(0.6)
+                                        }
+                                        Spacer()
+                                        if btVM.connectedPeripherals[device.id] != nil {
+                                            ProgressView()
+                                                .tint(DashboardPalette.indigo)
+                                        }
+                                    }
+                                    .padding(14)
+                                    .background(DashboardPalette.indigoFaint)
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 24)
+                }
+            }
+
+            Button(action: onClose) {
+                ZStack {
+                    Circle()
+                        .fill(Color.white)
+                    Circle()
+                        .stroke(DashboardPalette.indigo, lineWidth: 1.5)
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(DashboardPalette.indigo)
+                }
+                .frame(width: 32, height: 32)
+                .padding(16)
+            }
+            .buttonStyle(.plain)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.black.opacity(0.06), lineWidth: 1)
+        )
+        .onAppear { btVM.startScan() }
+        .onDisappear { btVM.stopScan() }
     }
 }
 
@@ -645,4 +762,5 @@ private struct DashboardAppointmentTile: View {
 
 #Preview {
     Dashboard()
+        .environment(BluetoothViewModel())
 }
