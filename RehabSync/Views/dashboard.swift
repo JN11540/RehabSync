@@ -91,7 +91,7 @@ private struct DashboardSidebar: View {
                 Text("Sync")
                     .foregroundStyle(Color.black)
             }
-            .font(.system(size: 26, weight: .bold))
+            .font(.system(size: 30, weight: .bold))
             .padding(.horizontal, 24)
             .padding(.top, 24)
             .padding(.bottom, 32)
@@ -120,7 +120,7 @@ private struct DashboardSidebarSectionLabel: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 13, weight: .medium))
+            .font(.system(size: 20, weight: .medium))
             .foregroundStyle(DashboardPalette.mutedText)
             .padding(.horizontal, 24)
             .padding(.bottom, 8)
@@ -141,10 +141,10 @@ private struct DashboardSidebarItem: View {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: item.systemImage)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 22, weight: .semibold))
                     .frame(width: 20)
                 Text(item.title)
-                    .font(.system(size: 16, weight: isSelected ? .semibold : .regular))
+                    .font(.system(size: 22, weight: isSelected ? .semibold : .regular))
                 Spacer()
             }
             .foregroundStyle(isSelected ? DashboardPalette.indigo : Color.black.opacity(0.75))
