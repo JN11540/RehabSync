@@ -34,7 +34,9 @@ struct Home: View {
             }
         }
         .safeAreaInset(edge: .top) {
-            FloatingTabBar(selectedTab: $selectedTab)
+            if selectedTab != .dashboard {
+                FloatingTabBar(selectedTab: $selectedTab)
+            }
         }
         .environment(btVM)
         .overlay {
