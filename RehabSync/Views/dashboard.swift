@@ -33,21 +33,21 @@ struct Dashboard: View {
             )
                 .frame(width: 220)
 
-            DashboardOverview()
-                .frame(maxWidth: .infinity)
-                .padding(28)
-                .background(Color.white)
+            if selectedNav == .device {
+                DeviceIllustrationCard()
+                    .padding(28)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.white)
+            } else {
+                DashboardOverview()
+                    .frame(maxWidth: .infinity)
+                    .padding(28)
+                    .background(Color.white)
 
-            Group {
-                if selectedNav == .device {
-                    DeviceIllustrationCard()
-                        .padding(24)
-                } else {
-                    DashboardSchedulePanel(selectedDay: $selectedDay)
-                }
+                DashboardSchedulePanel(selectedDay: $selectedDay)
+                    .frame(width: 380)
+                    .background(DashboardPalette.panelBackground)
             }
-            .frame(width: 380)
-            .background(DashboardPalette.panelBackground)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.white)
