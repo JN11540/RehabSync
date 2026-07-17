@@ -182,7 +182,6 @@ private struct DashboardOverview: View {
                 }
                 .frame(maxWidth: .infinity)
             }
-            .padding(.top, 59)
 
             ActivityChartCard()
         }
