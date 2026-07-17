@@ -211,13 +211,13 @@ private struct DeviceIllustrationCard: View {
                         .scaledToFit()
                         .frame(width: geo.size.width, height: geo.size.height)
 
-                    DeviceCircleBadge(title: "左大腿", isConnected: thighConnected)
+                    DeviceRectangleBadge(title: "左大腿", isConnected: thighConnected)
                         .position(x: geo.size.width * 0.14, y: geo.size.height * 0.54)
-                    DeviceCircleBadge(title: "左小腿", isConnected: calfConnected)
+                    DeviceRectangleBadge(title: "左小腿", isConnected: calfConnected)
                         .position(x: geo.size.width * 0.14, y: geo.size.height * 0.84)
-                    DeviceCircleBadge(title: "右大腿", isConnected: thighConnected)
+                    DeviceRectangleBadge(title: "右大腿", isConnected: thighConnected)
                         .position(x: geo.size.width * 0.86, y: geo.size.height * 0.54)
-                    DeviceCircleBadge(title: "右小腿", isConnected: calfConnected)
+                    DeviceRectangleBadge(title: "右小腿", isConnected: calfConnected)
                         .position(x: geo.size.width * 0.86, y: geo.size.height * 0.84)
                 }
             }
@@ -233,57 +233,56 @@ private struct DeviceIllustrationCard: View {
     }
 }
 
-// MARK: - Device Circle Badge
+// MARK: - Device Rectangle Badge
 
-private struct DeviceCircleBadge: View {
+/// 比照 Test1.swift 的 DeviceImageCard：標題列（斜紋裝飾）+ 連線狀態列，改用 dashboard 的 indigo 配色。
+private struct DeviceRectangleBadge: View {
     let title: String
     var isConnected: Bool = false
 
+    private let badgeWidth: CGFloat = 84
+
     var body: some View {
-        VStack(spacing: 4) {
-            ZStack {
-                Circle()
-                    .fill(Color.white)
-                    .frame(width: 56, height: 56)
-                    .overlay(
-                        Circle()
-                            .stroke(isConnected ? DashboardPalette.onlineDot : DashboardPalette.offlineDot, lineWidth: 3)
-                    )
-                    .shadow(color: .black.opacity(0.12), radius: 5, y: 2)
-
-                DashboardSensorIcon()
-                    .scaleEffect(0.85)
-            }
-
+        VStack(spacing: 6) {
             Text(title)
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(Color.black.opacity(0.8))
-                .fixedSize()
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.black)
+                .padding(.vertical, 6)
+                .frame(width: badgeWidth)
+                .background {
+                    ZStack {
+                        DashboardPalette.indigo
+                        HStack(spacing: 8) {
+                            Rectangle()
+                                .fill(Color.white.opacity(0.3))
+                                .frame(width: 18, height: 80)
+                                .rotationEffect(.degrees(20))
+                            Rectangle()
+                                .fill(Color.white.opacity(0.3))
+                                .frame(width: 10, height: 80)
+                                .rotationEffect(.degrees(20))
+                        }
+                    }
+                }
+                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color.black, lineWidth: 2)
+                )
 
-            HStack(spacing: 4) {
-                Circle()
-                    .fill(isConnected ? DashboardPalette.onlineDot : DashboardPalette.offlineDot)
-                    .frame(width: 6, height: 6)
-                Text(isConnected ? "已連線" : "未連線")
-                    .font(.system(size: 18))
-                    .foregroundStyle(DashboardPalette.mutedText)
-            }
-            .fixedSize()
+            Text(isConnected ? "已連線" : "未連線")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.white)
+                .padding(.vertical, 5)
+                .frame(width: badgeWidth)
+                .background(DashboardPalette.indigoDark)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color.black, lineWidth: 2)
+                )
         }
-    }
-}
-
-private struct DashboardSensorIcon: View {
-    var body: some View {
-        RoundedRectangle(cornerRadius: 6)
-            .fill(Color.black)
-            .frame(width: 20, height: 34)
-            .overlay(
-                Capsule()
-                    .fill(Color.white.opacity(0.85))
-                    .frame(width: 10, height: 3)
-                    .offset(y: -9)
-            )
     }
 }
 
