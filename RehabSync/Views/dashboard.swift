@@ -148,10 +148,10 @@ private struct DashboardSidebarItem: View {
         } label: {
             HStack(spacing: 20) {
                 Image(systemName: item.systemImage)
-                    .font(.system(size: 22, weight: .semibold))
+                    .font(.system(size: 20, weight: .semibold))
                     .frame(width: 20)
                 Text(item.title)
-                    .font(.system(size: 22, weight: isSelected ? .semibold : .regular))
+                    .font(.system(size: 20, weight: isSelected ? .semibold : .regular))
                 Spacer()
             }
             .foregroundStyle(isSelected ? DashboardPalette.indigo : Color.black.opacity(0.75))
