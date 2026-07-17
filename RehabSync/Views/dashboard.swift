@@ -187,7 +187,7 @@ private struct DeviceIllustrationCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("裝置")
-                .font(.system(size: 17, weight: .semibold))
+                .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(Color.black)
 
             GeometryReader { geo in
@@ -242,7 +242,7 @@ private struct DeviceCircleBadge: View {
             }
 
             Text(title)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(Color.black.opacity(0.8))
                 .fixedSize()
 
@@ -251,7 +251,7 @@ private struct DeviceCircleBadge: View {
                     .fill(isConnected ? DashboardPalette.onlineDot : DashboardPalette.offlineDot)
                     .frame(width: 6, height: 6)
                 Text(isConnected ? "已連線" : "未連線")
-                    .font(.system(size: 10))
+                    .font(.system(size: 18))
                     .foregroundStyle(DashboardPalette.mutedText)
             }
             .fixedSize()
