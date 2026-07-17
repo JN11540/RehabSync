@@ -170,16 +170,7 @@ private struct DashboardOverview: View {
                 .font(.system(size: 26, weight: .bold))
                 .foregroundStyle(Color.black)
 
-            HStack(alignment: .top, spacing: 20) {
-                DeviceIllustrationCard()
-                    .frame(maxWidth: .infinity)
-
-                VStack(spacing: 20) {
-                    LegDeviceCard(legTitle: "左腿")
-                    LegDeviceCard(legTitle: "右腿")
-                }
-                .frame(maxWidth: .infinity)
-            }
+            DeviceIllustrationCard()
 
             ActivityChartCard()
         }
@@ -210,6 +201,11 @@ private struct DeviceIllustrationCard: View {
 
                 DashboardConnectionLegend()
                     .padding(16)
+            }
+
+            HStack(alignment: .top, spacing: 20) {
+                LegDeviceSection(legTitle: "左腿")
+                LegDeviceSection(legTitle: "右腿")
             }
         }
         .padding(20)
@@ -246,9 +242,9 @@ private struct DashboardConnectionLegend: View {
     }
 }
 
-// MARK: - Leg Device Card
+// MARK: - Leg Device Section
 
-private struct LegDeviceCard: View {
+private struct LegDeviceSection: View {
     let legTitle: String
     @State private var deviceVM = DeviceViewModel()
 
@@ -261,13 +257,7 @@ private struct LegDeviceCard: View {
             DeviceStatusRow(title: "大腿：", isConnected: deviceVM.fetch(limb: 0) != nil)
             DeviceStatusRow(title: "小腿：", isConnected: deviceVM.fetch(limb: 1) != nil)
         }
-        .padding(20)
-        .background(DashboardPalette.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.black.opacity(0.06), lineWidth: 1)
-        )
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
