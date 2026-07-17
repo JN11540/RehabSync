@@ -22,6 +22,9 @@ struct Dashboard: View {
     @State private var showDeviceListModal = false
     @State private var deviceListSide = 0
     @State private var deviceListLimb = 0
+    @State private var deviceStatusTick = 0
+    @Environment(BluetoothViewModel.self) private var btVM
+    private let deviceVM = DeviceViewModel()
     var onNavigateToTest: () -> Void = {}
     var onNavigateToTest1: () -> Void = {}
     var onNavigateToSettings: () -> Void = {}
@@ -30,6 +33,21 @@ struct Dashboard: View {
         deviceListSide = side
         deviceListLimb = limb
         showDeviceListModal = true
+    }
+
+    /// 每 5 秒檢查已綁定的裝置是否仍偵測得到（存在於 btVM.connectedPeripherals），
+    /// 偵測不到（裝置關機/斷線）就自動解除綁定，並用 deviceStatusTick 強制畫面重新讀取最新狀態。
+    private func checkBoundDevicesReachable() {
+        for side in 0...1 {
+            for limb in 0...1 {
+                guard let device = deviceVM.fetch(side: side, limb: limb),
+                      let uuid = UUID(uuidString: device.device_uuid),
+                      btVM.connectedPeripherals[uuid] == nil
+                else { continue }
+                deviceVM.delete(uuid: device.device_uuid)
+            }
+        }
+        deviceStatusTick += 1
     }
 
     var body: some View {
@@ -45,6 +63,7 @@ struct Dashboard: View {
 
                 if selectedNav == .overview {
                     DashboardOverviewContent(onDeviceRowTap: openDeviceList)
+                        .id(deviceStatusTick)
                         .frame(maxWidth: .infinity)
                         .padding(28)
                         .background(Color.white)
@@ -70,6 +89,9 @@ struct Dashboard: View {
                 DashboardDeviceListModal(side: deviceListSide, limb: deviceListLimb, onClose: { showDeviceListModal = false })
                     .frame(maxWidth: 420, maxHeight: 520)
             }
+        }
+        .onReceive(Timer.publish(every: 5, on: .main, in: .common).autoconnect()) { _ in
+            checkBoundDevicesReachable()
         }
     }
 }
