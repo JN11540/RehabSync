@@ -436,10 +436,29 @@ private struct DashboardDeviceListModal: View {
     let onClose: () -> Void
 
     @Environment(BluetoothViewModel.self) private var btVM
+    @State private var selectedDevice: DiscoveredDevice? = nil
     private let deviceVM = DeviceViewModel()
 
+    private func handleCancel() {
+        if let selectedDevice {
+            if btVM.connectedPeripherals[selectedDevice.id] != nil {
+                btVM.disconnect(id: selectedDevice.id)
+            } else {
+                btVM.cancelPendingConnection()
+            }
+        }
+        onClose()
+    }
+
+    private func handleConfirm() {
+        if let selectedDevice {
+            deviceVM.insert(uuid: selectedDevice.id.uuidString, name: selectedDevice.name, limb: limb)
+        }
+        onClose()
+    }
+
     var body: some View {
-        ZStack(alignment: .topLeading) {
+        ZStack(alignment: .top) {
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color.white)
                 .shadow(color: .black.opacity(0.2), radius: 20, y: 8)
@@ -461,9 +480,8 @@ private struct DashboardDeviceListModal: View {
                         } else {
                             ForEach(btVM.discoveredDevices) { device in
                                 Button {
+                                    selectedDevice = device
                                     btVM.connectDiscovered(device)
-                                    deviceVM.insert(uuid: device.id.uuidString, name: device.name, limb: limb)
-                                    onClose()
                                 } label: {
                                     HStack {
                                         VStack(alignment: .leading, spacing: 2) {
@@ -478,13 +496,20 @@ private struct DashboardDeviceListModal: View {
                                                 .minimumScaleFactor(0.6)
                                         }
                                         Spacer()
-                                        if btVM.connectedPeripherals[device.id] != nil {
+                                        if device.id == selectedDevice?.id, case .connecting = btVM.connectionState {
                                             ProgressView()
                                                 .tint(DashboardPalette.indigo)
+                                        } else if btVM.connectedPeripherals[device.id] != nil {
+                                            Image(systemName: "checkmark.circle.fill")
+                                                .foregroundStyle(DashboardPalette.indigo)
                                         }
                                     }
                                     .padding(14)
-                                    .background(DashboardPalette.indigoFaint)
+                                    .background(
+                                        device.id == selectedDevice?.id
+                                            ? DashboardPalette.indigo.opacity(0.15)
+                                            : DashboardPalette.indigoFaint
+                                    )
                                     .clipShape(RoundedRectangle(cornerRadius: 10))
                                 }
                                 .buttonStyle(.plain)
@@ -492,11 +517,11 @@ private struct DashboardDeviceListModal: View {
                         }
                     }
                     .padding(.horizontal, 24)
-                    .padding(.bottom, 24)
+                    .padding(.bottom, 80)
                 }
             }
 
-            Button(action: onClose) {
+            Button(action: handleCancel) {
                 ZStack {
                     Circle()
                         .fill(Color.white)
@@ -510,6 +535,23 @@ private struct DashboardDeviceListModal: View {
                 .padding(16)
             }
             .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .trailing)
+
+            Button(action: handleConfirm) {
+                ZStack {
+                    Circle()
+                        .fill(DashboardPalette.indigo)
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+                .frame(width: 32, height: 32)
+                .padding(16)
+            }
+            .buttonStyle(.plain)
+            .disabled(selectedDevice == nil)
+            .opacity(selectedDevice == nil ? 0.4 : 1)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
         }
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
