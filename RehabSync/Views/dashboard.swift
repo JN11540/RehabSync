@@ -204,24 +204,24 @@ private struct DeviceIllustrationCard: View {
                 .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(Color.black)
 
-            GeometryReader { geo in
-                ZStack {
-                    Image("MuscleFigure")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: geo.size.width, height: geo.size.height)
-
-                    DeviceRectangleBadge(title: "左大腿", isConnected: thighConnected)
-                        .position(x: geo.size.width * 0.14, y: geo.size.height * 0.54)
-                    DeviceRectangleBadge(title: "左小腿", isConnected: calfConnected)
-                        .position(x: geo.size.width * 0.14, y: geo.size.height * 0.84)
-                    DeviceRectangleBadge(title: "右大腿", isConnected: thighConnected)
-                        .position(x: geo.size.width * 0.86, y: geo.size.height * 0.54)
-                    DeviceRectangleBadge(title: "右小腿", isConnected: calfConnected)
-                        .position(x: geo.size.width * 0.86, y: geo.size.height * 0.84)
+            HStack(alignment: .top, spacing: 20) {
+                VStack(spacing: 20) {
+                    DeviceImageBadge(imageName: "KneeThighDisconnectedIcon", title: "左大腿", isConnected: thighConnected)
+                    DeviceImageBadge(imageName: "KneeCalfDisconnectedIcon", title: "左小腿", isConnected: calfConnected)
                 }
+                .frame(width: 220)
+
+                Image("MuscleFigure")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity, minHeight: 340)
+
+                VStack(spacing: 20) {
+                    DeviceImageBadge(imageName: "KneeThighDisconnectedIcon", title: "右大腿", isConnected: thighConnected)
+                    DeviceImageBadge(imageName: "KneeCalfDisconnectedIcon", title: "右小腿", isConnected: calfConnected)
+                }
+                .frame(width: 220)
             }
-            .frame(maxWidth: .infinity, minHeight: 340)
         }
         .padding(20)
         .background(DashboardPalette.cardBackground)
@@ -233,54 +233,67 @@ private struct DeviceIllustrationCard: View {
     }
 }
 
-// MARK: - Device Rectangle Badge
+// MARK: - Device Image Badge
 
-/// 比照 Test1.swift 的 DeviceImageCard：標題列（斜紋裝飾）+ 連線狀態列，改用 dashboard 的 indigo 配色。
-private struct DeviceRectangleBadge: View {
+/// 比照 Test1.swift 的 DeviceImageCard：圖片 + 標題列（斜紋裝飾）+ 連線狀態列，尺寸完全一致，改用 dashboard 的 indigo 配色。
+private struct DeviceImageBadge: View {
+    let imageName: String
     let title: String
     var isConnected: Bool = false
 
-    private let badgeWidth: CGFloat = 84
+    /// 以 knee_thigh_disconnected.png / knee_calf_disconnected.png 原始尺寸（557 x 844）為圖片區域比例基準
+    private static let referenceAspectRatio: CGFloat = 557.0 / 844.0
 
     var body: some View {
-        VStack(spacing: 6) {
-            Text(title)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.black)
-                .padding(.vertical, 6)
-                .frame(width: badgeWidth)
-                .background {
-                    ZStack {
-                        DashboardPalette.indigo
-                        HStack(spacing: 8) {
-                            Rectangle()
-                                .fill(Color.white.opacity(0.3))
-                                .frame(width: 18, height: 80)
-                                .rotationEffect(.degrees(20))
-                            Rectangle()
-                                .fill(Color.white.opacity(0.3))
-                                .frame(width: 10, height: 80)
-                                .rotationEffect(.degrees(20))
+        VStack(spacing: 8) {
+            VStack(spacing: 0) {
+                ZStack {
+                    Color.black
+                    Image(imageName)
+                        .resizable()
+                        .scaledToFit()
+                }
+                .aspectRatio(Self.referenceAspectRatio, contentMode: .fit)
+
+                Text(title)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.black)
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity)
+                    .background {
+                        ZStack {
+                            DashboardPalette.indigo
+                            HStack(spacing: 14) {
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.3))
+                                    .frame(width: 46, height: 200)
+                                    .rotationEffect(.degrees(20))
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.3))
+                                    .frame(width: 26, height: 200)
+                                    .rotationEffect(.degrees(20))
+                            }
                         }
                     }
-                }
-                .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color.black, lineWidth: 2)
-                )
+                    .clipped()
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.black, lineWidth: 4)
+            )
 
             Text(isConnected ? "已連線" : "未連線")
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(.white)
-                .padding(.vertical, 5)
-                .frame(width: badgeWidth)
+                .padding(.horizontal, 14)
+                .frame(height: 36)
+                .frame(maxWidth: .infinity, alignment: .trailing)
                 .background(DashboardPalette.indigoDark)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color.black, lineWidth: 2)
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.black, lineWidth: 4)
                 )
         }
     }
