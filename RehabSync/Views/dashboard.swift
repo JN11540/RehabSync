@@ -12,8 +12,6 @@ private enum DashboardPalette {
     static let onlineDot = Color(red: 0.30, green: 0.78, blue: 0.62)
     static let offlineDot = Color(red: 0.75, green: 0.75, blue: 0.79)
     static let mutedText = Color(red: 0.55, green: 0.56, blue: 0.62)
-    static let muscleRed = Color(red: 0.75, green: 0.18, blue: 0.18)
-    static let muscleRedDark = Color(red: 0.42, green: 0.06, blue: 0.06)
 }
 
 // MARK: - Dashboard
@@ -204,16 +202,9 @@ private struct DeviceIllustrationCard: View {
             }
 
             ZStack(alignment: .bottomTrailing) {
-                Image(systemName: "figure.arms.open")
+                Image("MuscleFigure")
                     .resizable()
                     .scaledToFit()
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [DashboardPalette.muscleRed, DashboardPalette.muscleRedDark],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
                     .padding(.vertical, 24)
                     .frame(maxWidth: .infinity, minHeight: 340)
 
