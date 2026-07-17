@@ -248,7 +248,7 @@ private struct DeviceImageBadge: View {
         VStack(spacing: 8) {
             VStack(spacing: 0) {
                 ZStack {
-                    Color.black
+                    Color.white
                     Image(imageName)
                         .resizable()
                         .scaledToFit()
@@ -278,10 +278,6 @@ private struct DeviceImageBadge: View {
                     .clipped()
             }
             .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.black, lineWidth: 4)
-            )
 
             Text(isConnected ? "已連線" : "未連線")
                 .font(.system(size: 15, weight: .medium))
@@ -291,10 +287,6 @@ private struct DeviceImageBadge: View {
                 .frame(maxWidth: .infinity, alignment: .trailing)
                 .background(DashboardPalette.indigoDark)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.black, lineWidth: 4)
-                )
         }
     }
 }
