@@ -18,6 +18,7 @@ private enum DashboardPalette {
 
 struct Dashboard: View {
     @State private var selectedNav: DashboardNavItem = .overview
+    @State private var selectedDay = 10
     var onNavigateToTest: () -> Void = {}
     var onNavigateToTest1: () -> Void = {}
     var onNavigateToSettings: () -> Void = {}
@@ -32,10 +33,21 @@ struct Dashboard: View {
             )
                 .frame(width: 220)
 
-            DashboardPlaceholderCard(title: selectedNav.title)
-                .padding(28)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.white)
+            if selectedNav == .overview {
+                DashboardOverviewContent()
+                    .frame(maxWidth: .infinity)
+                    .padding(28)
+                    .background(Color.white)
+
+                DashboardSchedulePanel(selectedDay: $selectedDay)
+                    .frame(width: 380)
+                    .background(DashboardPalette.panelBackground)
+            } else {
+                DashboardPlaceholderCard(title: selectedNav.title)
+                    .padding(28)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.white)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.white)
@@ -171,6 +183,226 @@ private struct DashboardPlaceholderCard: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+// MARK: - Overview Content (center column)
+
+private struct DashboardOverviewContent: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            HStack {
+                Text("總覽")
+                    .font(.system(size: 26, weight: .bold))
+                    .foregroundStyle(Color.black)
+                Spacer()
+                Image(systemName: "bell.fill")
+                    .font(.system(size: 20))
+                    .foregroundStyle(DashboardPalette.indigo)
+            }
+
+            HStack(alignment: .top, spacing: 20) {
+                DeviceIllustrationCard()
+                    .frame(maxWidth: .infinity)
+
+                VStack(spacing: 20) {
+                    LegDeviceCard(legTitle: "左腿")
+                    LegDeviceCard(legTitle: "右腿")
+                }
+                .frame(maxWidth: .infinity)
+            }
+
+            ActivityChartCard()
+        }
+    }
+}
+
+// MARK: - Device Illustration Card
+
+private struct DeviceIllustrationCard: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("裝置")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Color.black)
+                Spacer()
+                Image(systemName: "plus.magnifyingglass")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(DashboardPalette.mutedText)
+            }
+
+            ZStack(alignment: .bottomTrailing) {
+                Image("MuscleFigure")
+                    .resizable()
+                    .scaledToFit()
+                    .padding(.vertical, 24)
+                    .frame(maxWidth: .infinity, minHeight: 340)
+
+                DashboardConnectionLegend()
+                    .padding(16)
+            }
+        }
+        .padding(20)
+        .background(DashboardPalette.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.black.opacity(0.06), lineWidth: 1)
+        )
+    }
+}
+
+private struct DashboardConnectionLegend: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Circle().fill(DashboardPalette.onlineDot).frame(width: 8, height: 8)
+                Text("已連線")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color.black.opacity(0.7))
+            }
+            HStack(spacing: 8) {
+                Circle().fill(DashboardPalette.offlineDot).frame(width: 8, height: 8)
+                Text("未連線")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color.black.opacity(0.7))
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.08), radius: 6, y: 2)
+    }
+}
+
+// MARK: - Leg Device Card
+
+private struct LegDeviceCard: View {
+    let legTitle: String
+    @State private var deviceVM = DeviceViewModel()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(legTitle)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(Color.black)
+
+            DeviceStatusRow(title: "大腿：", isConnected: deviceVM.fetch(limb: 0) != nil)
+            DeviceStatusRow(title: "小腿：", isConnected: deviceVM.fetch(limb: 1) != nil)
+        }
+        .padding(20)
+        .background(DashboardPalette.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.black.opacity(0.06), lineWidth: 1)
+        )
+    }
+}
+
+private struct DeviceStatusRow: View {
+    let title: String
+    var isConnected: Bool = false
+
+    var body: some View {
+        HStack(spacing: 14) {
+            DashboardSensorIcon()
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Color.black)
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(isConnected ? DashboardPalette.onlineDot : DashboardPalette.offlineDot)
+                        .frame(width: 7, height: 7)
+                    Text(isConnected ? "已連線" : "未連線")
+                        .font(.system(size: 13))
+                        .foregroundStyle(DashboardPalette.mutedText)
+                }
+            }
+
+            Spacer()
+
+            Image(systemName: "wifi")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(DashboardPalette.mutedText)
+                .rotationEffect(.degrees(90))
+        }
+        .padding(.vertical, 14)
+        .padding(.horizontal, 16)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.black.opacity(0.06), lineWidth: 1)
+        )
+    }
+}
+
+private struct DashboardSensorIcon: View {
+    var body: some View {
+        RoundedRectangle(cornerRadius: 6)
+            .fill(Color.black)
+            .frame(width: 20, height: 34)
+            .overlay(
+                Capsule()
+                    .fill(Color.white.opacity(0.85))
+                    .frame(width: 10, height: 3)
+                    .offset(y: -9)
+            )
+    }
+}
+
+// MARK: - Activity Chart Card
+
+private struct ActivityChartCard: View {
+    private let weekdays = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
+    /// 每天兩根長條的相對高度（0~1），僅作示意用途
+    private let barHeights: [(teal: CGFloat, indigo: CGFloat)] = [
+        (0.55, 0.85), (0.65, 0.45), (0.80, 0.60), (0.50, 0.90),
+        (0.70, 0.55), (0.60, 0.75), (0.45, 0.65)
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("活動數據")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(Color.black)
+
+            HStack(alignment: .bottom, spacing: 0) {
+                ForEach(Array(barHeights.enumerated()), id: \.offset) { _, heights in
+                    HStack(alignment: .bottom, spacing: 6) {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(DashboardPalette.teal)
+                            .frame(width: 10, height: 90 * heights.teal)
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(DashboardPalette.indigo)
+                            .frame(width: 10, height: 90 * heights.indigo)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+            .frame(height: 90)
+
+            HStack(spacing: 0) {
+                ForEach(weekdays, id: \.self) { day in
+                    Text(day)
+                        .font(.system(size: 13))
+                        .foregroundStyle(DashboardPalette.mutedText)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+        }
+        .padding(20)
+        .background(DashboardPalette.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.black.opacity(0.06), lineWidth: 1)
+        )
     }
 }
 
