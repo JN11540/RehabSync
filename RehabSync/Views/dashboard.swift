@@ -123,7 +123,7 @@ private struct DashboardSidebarSectionLabel: View {
             .font(.system(size: 20, weight: .medium))
             .foregroundStyle(DashboardPalette.mutedText)
             .padding(.horizontal, 24)
-            .padding(.bottom, 8)
+            .padding(.bottom, 14)
     }
 }
 
@@ -139,7 +139,7 @@ private struct DashboardSidebarItem: View {
             selectedNav = item
             action?()
         } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: 20) {
                 Image(systemName: item.systemImage)
                     .font(.system(size: 22, weight: .semibold))
                     .frame(width: 20)
