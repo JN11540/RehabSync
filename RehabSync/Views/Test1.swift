@@ -4,10 +4,11 @@ import Combine
 // MARK: - Home Tab
 
 private enum HomeTab: CaseIterable {
-    case test, setting, test1
+    case dashboard, test, setting, test1
 
     var title: String {
         switch self {
+        case .dashboard: "總覽"
         case .test: "測試"
         case .setting: "設定"
         case .test1: "測試1"
@@ -22,6 +23,7 @@ struct Home: View {
     var body: some View {
         Group {
             switch selectedTab {
+            case .dashboard: Dashboard()
             case .test: TestPage(btVM: btVM)
             case .setting: Setting()
             case .test1: Test1()
