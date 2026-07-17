@@ -20,12 +20,14 @@ struct Dashboard: View {
     @State private var selectedNav: DashboardNavItem = .overview
     @State private var selectedDay = 10
     @State private var showDeviceListModal = false
+    @State private var deviceListSide = 0
     @State private var deviceListLimb = 0
     var onNavigateToTest: () -> Void = {}
     var onNavigateToTest1: () -> Void = {}
     var onNavigateToSettings: () -> Void = {}
 
-    private func openDeviceList(limb: Int) {
+    private func openDeviceList(side: Int, limb: Int) {
+        deviceListSide = side
         deviceListLimb = limb
         showDeviceListModal = true
     }
@@ -65,7 +67,7 @@ struct Dashboard: View {
                     .ignoresSafeArea()
                     .onTapGesture { showDeviceListModal = false }
 
-                DashboardDeviceListModal(limb: deviceListLimb, onClose: { showDeviceListModal = false })
+                DashboardDeviceListModal(side: deviceListSide, limb: deviceListLimb, onClose: { showDeviceListModal = false })
                     .frame(maxWidth: 420, maxHeight: 520)
             }
         }
@@ -207,7 +209,7 @@ private struct DashboardPlaceholderCard: View {
 // MARK: - Overview Content (center column)
 
 private struct DashboardOverviewContent: View {
-    var onDeviceRowTap: (Int) -> Void = { _ in }
+    var onDeviceRowTap: (Int, Int) -> Void = { _, _ in }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -226,8 +228,8 @@ private struct DashboardOverviewContent: View {
                     .frame(maxWidth: .infinity)
 
                 VStack(spacing: 20) {
-                    LegDeviceCard(legTitle: "左腿", onRowTap: onDeviceRowTap)
-                    LegDeviceCard(legTitle: "右腿", onRowTap: onDeviceRowTap)
+                    LegDeviceCard(legTitle: "左腿", side: 0, onRowTap: onDeviceRowTap)
+                    LegDeviceCard(legTitle: "右腿", side: 1, onRowTap: onDeviceRowTap)
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -242,8 +244,10 @@ private struct DashboardOverviewContent: View {
 private struct DeviceIllustrationCard: View {
     @State private var deviceVM = DeviceViewModel()
 
-    private var thighConnected: Bool { deviceVM.fetch(limb: 0) != nil }
-    private var calfConnected: Bool { deviceVM.fetch(limb: 1) != nil }
+    private var leftThighConnected: Bool { deviceVM.fetch(side: 0, limb: 0) != nil }
+    private var leftCalfConnected: Bool { deviceVM.fetch(side: 0, limb: 1) != nil }
+    private var rightThighConnected: Bool { deviceVM.fetch(side: 1, limb: 0) != nil }
+    private var rightCalfConnected: Bool { deviceVM.fetch(side: 1, limb: 1) != nil }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -264,13 +268,13 @@ private struct DeviceIllustrationCard: View {
                         .scaledToFit()
                         .frame(width: geo.size.width, height: geo.size.height)
 
-                    DashboardConnectionBadge(isConnected: thighConnected)
+                    DashboardConnectionBadge(isConnected: leftThighConnected)
                         .position(x: geo.size.width * 0.22, y: geo.size.height * 0.54)
-                    DashboardConnectionBadge(isConnected: calfConnected)
+                    DashboardConnectionBadge(isConnected: leftCalfConnected)
                         .position(x: geo.size.width * 0.22, y: geo.size.height * 0.84)
-                    DashboardConnectionBadge(isConnected: thighConnected)
+                    DashboardConnectionBadge(isConnected: rightThighConnected)
                         .position(x: geo.size.width * 0.78, y: geo.size.height * 0.54)
-                    DashboardConnectionBadge(isConnected: calfConnected)
+                    DashboardConnectionBadge(isConnected: rightCalfConnected)
                         .position(x: geo.size.width * 0.78, y: geo.size.height * 0.84)
                 }
             }
@@ -310,7 +314,9 @@ private struct DashboardConnectionBadge: View {
 
 private struct LegDeviceCard: View {
     let legTitle: String
-    var onRowTap: (Int) -> Void = { _ in }
+    /// 0 = 左腿, 1 = 右腿
+    let side: Int
+    var onRowTap: (Int, Int) -> Void = { _, _ in }
     @State private var deviceVM = DeviceViewModel()
 
     var body: some View {
@@ -319,12 +325,12 @@ private struct LegDeviceCard: View {
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(Color.black)
 
-            DeviceStatusRow(title: "大腿：", isConnected: deviceVM.fetch(limb: 0) != nil)
+            DeviceStatusRow(title: "大腿：", isConnected: deviceVM.fetch(side: side, limb: 0) != nil)
                 .contentShape(Rectangle())
-                .onTapGesture { onRowTap(0) }
-            DeviceStatusRow(title: "小腿：", isConnected: deviceVM.fetch(limb: 1) != nil)
+                .onTapGesture { onRowTap(side, 0) }
+            DeviceStatusRow(title: "小腿：", isConnected: deviceVM.fetch(side: side, limb: 1) != nil)
                 .contentShape(Rectangle())
-                .onTapGesture { onRowTap(1) }
+                .onTapGesture { onRowTap(side, 1) }
         }
         .padding(20)
         .background(DashboardPalette.cardBackground)
@@ -432,6 +438,7 @@ private struct ActivityChartCard: View {
 // MARK: - Device List Modal
 
 private struct DashboardDeviceListModal: View {
+    let side: Int
     let limb: Int
     let onClose: () -> Void
 
@@ -452,7 +459,7 @@ private struct DashboardDeviceListModal: View {
 
     private func handleConfirm() {
         if let selectedDevice {
-            deviceVM.insert(uuid: selectedDevice.id.uuidString, name: selectedDevice.name, limb: limb)
+            deviceVM.insert(uuid: selectedDevice.id.uuidString, name: selectedDevice.name, side: side, limb: limb)
         }
         onClose()
     }
@@ -479,6 +486,12 @@ private struct DashboardDeviceListModal: View {
                                 .padding(.top, 20)
                         } else {
                             ForEach(btVM.discoveredDevices) { device in
+                                let isConnected = btVM.connectedPeripherals[device.id] != nil
+                                let isConnecting = device.id == selectedDevice?.id && {
+                                    if case .connecting = btVM.connectionState { return true }
+                                    return false
+                                }()
+
                                 Button {
                                     selectedDevice = device
                                     btVM.connectDiscovered(device)
@@ -487,28 +500,28 @@ private struct DashboardDeviceListModal: View {
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text(device.name)
                                                 .font(.system(size: 15, weight: .semibold))
-                                                .foregroundStyle(Color.black)
+                                                .foregroundStyle(isConnected ? .white : Color.black)
                                                 .lineLimit(1)
                                             Text(device.id.uuidString)
                                                 .font(.system(size: 11))
-                                                .foregroundStyle(DashboardPalette.mutedText)
+                                                .foregroundStyle(isConnected ? .white.opacity(0.8) : DashboardPalette.mutedText)
                                                 .lineLimit(1)
                                                 .minimumScaleFactor(0.6)
                                         }
                                         Spacer()
-                                        if device.id == selectedDevice?.id, case .connecting = btVM.connectionState {
+                                        if isConnecting {
                                             ProgressView()
-                                                .tint(DashboardPalette.indigo)
-                                        } else if btVM.connectedPeripherals[device.id] != nil {
+                                                .tint(isConnected ? .white : DashboardPalette.indigo)
+                                        } else if isConnected {
                                             Image(systemName: "checkmark.circle.fill")
-                                                .foregroundStyle(DashboardPalette.indigo)
+                                                .foregroundStyle(.white)
                                         }
                                     }
                                     .padding(14)
                                     .background(
-                                        device.id == selectedDevice?.id
-                                            ? DashboardPalette.indigo.opacity(0.15)
-                                            : DashboardPalette.indigoFaint
+                                        isConnected
+                                            ? DashboardPalette.indigo
+                                            : (device.id == selectedDevice?.id ? DashboardPalette.indigo.opacity(0.15) : DashboardPalette.indigoFaint)
                                     )
                                     .clipShape(RoundedRectangle(cornerRadius: 10))
                                 }

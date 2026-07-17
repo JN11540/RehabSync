@@ -6,21 +6,25 @@ import Observation
 class DeviceViewModel {
     private let db = DatabaseManager.shared.dbQueue
 
-    func fetch(limb: Int) -> Device? {
+    /// `side`：0 = 左，1 = 右。舊呼叫端（單一大腿/小腿裝置的畫面）不傳就固定用 0，行為與過去完全一致。
+    func fetch(side: Int = 0, limb: Int) -> Device? {
         try? db.read { db in
-            try Device.filter(Column("limb") == limb).fetchOne(db)
+            try Device.filter(Column("side") == side && Column("limb") == limb).fetchOne(db)
         }
     }
 
-    func insert(uuid: String, name: String, limb: Int) {
+    func insert(uuid: String, name: String, side: Int = 0, limb: Int) {
         guard let bluetoothId = defaultBluetoothId() else { return }
         var device = Device(
             device_uuid:  uuid,
             device_name:  name,
             limb:         limb,
+            side:         side,
             bluetooth_id: bluetoothId
         )
-        device.id = Int64(limb)
+        // side/limb 各只有 0、1 兩種值，id = side*2 + limb 讓四種組合各自對應唯一的一列，
+        // 不會像過去只用 limb 當 id 時，左右腿共用同一列而互相覆蓋。
+        device.id = Int64(side * 2 + limb)
         try? db.write { db in
             try device.insert(db, onConflict: .replace)
         }

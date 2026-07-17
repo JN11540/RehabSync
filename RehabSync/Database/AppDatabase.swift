@@ -128,6 +128,12 @@ func createAppDatabase() throws -> DatabaseQueue {
         }
     }
 
+    migrator.registerMigration("v7") { db in
+        try db.alter(table: "device") { t in
+            t.add(column: "side", .integer).notNull().defaults(to: 0)
+        }
+    }
+
     try migrator.migrate(dbQueue)
     return dbQueue
 }
