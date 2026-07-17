@@ -23,7 +23,11 @@ struct Home: View {
     var body: some View {
         Group {
             switch selectedTab {
-            case .dashboard: Dashboard()
+            case .dashboard: Dashboard(
+                onNavigateToTest: { selectedTab = .test },
+                onNavigateToTest1: { selectedTab = .test1 },
+                onNavigateToSettings: { selectedTab = .setting }
+            )
             case .test: TestPage(btVM: btVM)
             case .setting: Setting()
             case .test1: Test1()

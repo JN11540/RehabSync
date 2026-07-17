@@ -21,10 +21,18 @@ private enum DashboardPalette {
 struct Dashboard: View {
     @State private var selectedNav: DashboardNavItem = .overview
     @State private var selectedDay = 10
+    var onNavigateToTest: () -> Void = {}
+    var onNavigateToTest1: () -> Void = {}
+    var onNavigateToSettings: () -> Void = {}
 
     var body: some View {
         HStack(spacing: 0) {
-            DashboardSidebar(selectedNav: $selectedNav)
+            DashboardSidebar(
+                selectedNav: $selectedNav,
+                onNavigateToTest: onNavigateToTest,
+                onNavigateToTest1: onNavigateToTest1,
+                onNavigateToSettings: onNavigateToSettings
+            )
                 .frame(width: 220)
 
             DashboardOverview()
@@ -44,12 +52,14 @@ struct Dashboard: View {
 // MARK: - Sidebar Nav
 
 private enum DashboardNavItem: CaseIterable {
-    case overview, training, importData, exportData, settings
+    case overview, training, test, test1, importData, exportData, settings
 
     var title: String {
         switch self {
         case .overview: "總覽"
         case .training: "訓練"
+        case .test: "測試"
+        case .test1: "測試1"
         case .importData: "匯入"
         case .exportData: "匯出"
         case .settings: "設定"
@@ -60,6 +70,8 @@ private enum DashboardNavItem: CaseIterable {
         switch self {
         case .overview: "square.grid.2x2.fill"
         case .training: "arrow.left.arrow.right"
+        case .test: "wrench.and.screwdriver"
+        case .test1: "wrench.and.screwdriver.fill"
         case .importData: "square.and.arrow.down"
         case .exportData: "square.and.arrow.up"
         case .settings: "gearshape.fill"
@@ -69,6 +81,9 @@ private enum DashboardNavItem: CaseIterable {
 
 private struct DashboardSidebar: View {
     @Binding var selectedNav: DashboardNavItem
+    var onNavigateToTest: () -> Void = {}
+    var onNavigateToTest1: () -> Void = {}
+    var onNavigateToSettings: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -86,6 +101,8 @@ private struct DashboardSidebar: View {
             DashboardSidebarSectionLabel(text: "一般")
             DashboardSidebarItem(item: .overview, selectedNav: $selectedNav)
             DashboardSidebarItem(item: .training, selectedNav: $selectedNav)
+            DashboardSidebarItem(item: .test, selectedNav: $selectedNav, action: onNavigateToTest)
+            DashboardSidebarItem(item: .test1, selectedNav: $selectedNav, action: onNavigateToTest1)
 
             DashboardSidebarSectionLabel(text: "工具")
                 .padding(.top, 24)
@@ -94,7 +111,7 @@ private struct DashboardSidebar: View {
 
             Spacer()
 
-            DashboardSidebarItem(item: .settings, selectedNav: $selectedNav)
+            DashboardSidebarItem(item: .settings, selectedNav: $selectedNav, action: onNavigateToSettings)
                 .padding(.bottom, 20)
         }
     }
@@ -115,12 +132,14 @@ private struct DashboardSidebarSectionLabel: View {
 private struct DashboardSidebarItem: View {
     let item: DashboardNavItem
     @Binding var selectedNav: DashboardNavItem
+    var action: (() -> Void)? = nil
 
     private var isSelected: Bool { selectedNav == item }
 
     var body: some View {
         Button {
             selectedNav = item
+            action?()
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: item.systemImage)
