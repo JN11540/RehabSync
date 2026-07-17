@@ -168,6 +168,10 @@ private struct DashboardSidebarItem: View {
 private struct DashboardOverview: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
+            Text("總覽")
+                .font(.system(size: 26, weight: .bold))
+                .foregroundStyle(Color.black)
+
             HStack(alignment: .top, spacing: 20) {
                 DeviceIllustrationCard()
                     .frame(maxWidth: .infinity)
