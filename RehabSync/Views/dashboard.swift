@@ -251,9 +251,11 @@ private struct DeviceImageBadge: View {
                     Color.white
                     Image(imageName)
                         .resizable()
-                        .scaledToFit()
+                        .scaledToFill()
+                        .scaleEffect(1.2)
                 }
                 .aspectRatio(Self.referenceAspectRatio, contentMode: .fit)
+                .clipped()
 
                 Text(title)
                     .font(.system(size: 18, weight: .semibold))
