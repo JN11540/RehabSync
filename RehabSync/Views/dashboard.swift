@@ -38,9 +38,16 @@ struct Dashboard: View {
                 .padding(28)
                 .background(Color.white)
 
-            DashboardSchedulePanel(selectedDay: $selectedDay)
-                .frame(width: 380)
-                .background(DashboardPalette.panelBackground)
+            Group {
+                if selectedNav == .device {
+                    DeviceIllustrationCard()
+                        .padding(24)
+                } else {
+                    DashboardSchedulePanel(selectedDay: $selectedDay)
+                }
+            }
+            .frame(width: 380)
+            .background(DashboardPalette.panelBackground)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.white)
@@ -50,7 +57,7 @@ struct Dashboard: View {
 // MARK: - Sidebar Nav
 
 private enum DashboardNavItem: CaseIterable {
-    case overview, training, test, test1, importData, exportData, settings
+    case overview, training, test, test1, device, importData, exportData, settings
 
     var title: String {
         switch self {
@@ -58,6 +65,7 @@ private enum DashboardNavItem: CaseIterable {
         case .training: "訓練"
         case .test: "測試"
         case .test1: "測試1"
+        case .device: "裝置"
         case .importData: "匯入"
         case .exportData: "匯出"
         case .settings: "設定"
@@ -70,6 +78,7 @@ private enum DashboardNavItem: CaseIterable {
         case .training: "arrow.left.arrow.right"
         case .test: "wrench.and.screwdriver"
         case .test1: "wrench.and.screwdriver.fill"
+        case .device: "sensor.tag.radiowaves.forward.fill"
         case .importData: "square.and.arrow.down"
         case .exportData: "square.and.arrow.up"
         case .settings: "gearshape.fill"
@@ -104,6 +113,7 @@ private struct DashboardSidebar: View {
 
             DashboardSidebarSectionLabel(text: "工具")
                 .padding(.top, 24)
+            DashboardSidebarItem(item: .device, selectedNav: $selectedNav)
             DashboardSidebarItem(item: .importData, selectedNav: $selectedNav)
             DashboardSidebarItem(item: .exportData, selectedNav: $selectedNav)
 
@@ -170,8 +180,7 @@ private struct DashboardOverview: View {
                 .font(.system(size: 26, weight: .bold))
                 .foregroundStyle(Color.black)
 
-            DeviceIllustrationCard()
-                .frame(maxHeight: .infinity)
+            Spacer()
         }
     }
 }
