@@ -311,13 +311,13 @@ private struct DeviceStatusRow: View {
             DashboardSensorIcon()
 
             Text(title)
-                .font(.system(size: 15, weight: .medium))
+                .font(.system(size: 18, weight: .medium))
                 .foregroundStyle(Color.black)
 
             Spacer()
 
             Text(isConnected ? "已連線" : "未連線")
-                .font(.system(size: 13))
+                .font(.system(size: 18))
                 .foregroundStyle(DashboardPalette.mutedText)
         }
         .padding(.vertical, 14)
