@@ -220,6 +220,11 @@ private struct DashboardOverviewContent: View {
 // MARK: - Device Illustration Card
 
 private struct DeviceIllustrationCard: View {
+    @State private var deviceVM = DeviceViewModel()
+
+    private var thighConnected: Bool { deviceVM.fetch(limb: 0) != nil }
+    private var calfConnected: Bool { deviceVM.fetch(limb: 1) != nil }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -232,16 +237,24 @@ private struct DeviceIllustrationCard: View {
                     .foregroundStyle(DashboardPalette.mutedText)
             }
 
-            ZStack(alignment: .bottomTrailing) {
-                Image("MuscleFigure")
-                    .resizable()
-                    .scaledToFit()
-                    .padding(.vertical, 24)
-                    .frame(maxWidth: .infinity, minHeight: 340)
+            GeometryReader { geo in
+                ZStack {
+                    Image("MuscleFigure")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: geo.size.width, height: geo.size.height)
 
-                DashboardConnectionLegend()
-                    .padding(16)
+                    DashboardConnectionBadge(isConnected: thighConnected)
+                        .position(x: geo.size.width * 0.22, y: geo.size.height * 0.54)
+                    DashboardConnectionBadge(isConnected: calfConnected)
+                        .position(x: geo.size.width * 0.22, y: geo.size.height * 0.84)
+                    DashboardConnectionBadge(isConnected: thighConnected)
+                        .position(x: geo.size.width * 0.78, y: geo.size.height * 0.54)
+                    DashboardConnectionBadge(isConnected: calfConnected)
+                        .position(x: geo.size.width * 0.78, y: geo.size.height * 0.84)
+                }
             }
+            .frame(maxWidth: .infinity, minHeight: 340)
         }
         .padding(20)
         .background(DashboardPalette.cardBackground)
@@ -253,27 +266,23 @@ private struct DeviceIllustrationCard: View {
     }
 }
 
-private struct DashboardConnectionLegend: View {
+private struct DashboardConnectionBadge: View {
+    var isConnected: Bool = false
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Circle().fill(DashboardPalette.onlineDot).frame(width: 8, height: 8)
-                Text("已連線")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Color.black.opacity(0.7))
-            }
-            HStack(spacing: 8) {
-                Circle().fill(DashboardPalette.offlineDot).frame(width: 8, height: 8)
-                Text("未連線")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Color.black.opacity(0.7))
-            }
+        HStack(spacing: 6) {
+            Circle()
+                .fill(isConnected ? DashboardPalette.onlineDot : DashboardPalette.offlineDot)
+                .frame(width: 8, height: 8)
+            Text(isConnected ? "已連線" : "未連線")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color.black.opacity(0.7))
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
         .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.08), radius: 6, y: 2)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .shadow(color: .black.opacity(0.08), radius: 5, y: 2)
     }
 }
 
