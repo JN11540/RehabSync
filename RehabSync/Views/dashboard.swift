@@ -89,11 +89,11 @@ private struct DashboardSidebar: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 2) {
                 Text("Rehab")
-                    .foregroundStyle(DashboardPalette.indigo)
+                    .foregroundStyle(DashboardPalette.teal)
                 Text("Sync")
                     .foregroundStyle(Color.black)
             }
-            .font(.system(size: 24, weight: .bold))
+            .font(.system(size: 26, weight: .bold))
             .padding(.horizontal, 24)
             .padding(.top, 24)
             .padding(.bottom, 32)
@@ -178,6 +178,7 @@ private struct DashboardOverview: View {
                 }
                 .frame(maxWidth: .infinity)
             }
+            .padding(.top, 59)
 
             ActivityChartCard()
         }
