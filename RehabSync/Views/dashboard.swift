@@ -180,6 +180,11 @@ private struct DashboardOverview: View {
 // MARK: - Device Illustration Card
 
 private struct DeviceIllustrationCard: View {
+    @State private var deviceVM = DeviceViewModel()
+
+    private var thighConnected: Bool { deviceVM.fetch(limb: 0) != nil }
+    private var calfConnected: Bool { deviceVM.fetch(limb: 1) != nil }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -192,20 +197,27 @@ private struct DeviceIllustrationCard: View {
                     .foregroundStyle(DashboardPalette.mutedText)
             }
 
-            ZStack(alignment: .bottomTrailing) {
-                Image("MuscleFigure")
-                    .resizable()
-                    .scaledToFit()
-                    .padding(.vertical, 24)
-                    .frame(maxWidth: .infinity, minHeight: 340)
+            GeometryReader { geo in
+                ZStack {
+                    Image("MuscleFigure")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: geo.size.width, height: geo.size.height)
 
+                    DeviceCircleBadge(title: "左大腿", isConnected: thighConnected)
+                        .position(x: geo.size.width * 0.22, y: geo.size.height * 0.54)
+                    DeviceCircleBadge(title: "左小腿", isConnected: calfConnected)
+                        .position(x: geo.size.width * 0.22, y: geo.size.height * 0.84)
+                    DeviceCircleBadge(title: "右大腿", isConnected: thighConnected)
+                        .position(x: geo.size.width * 0.78, y: geo.size.height * 0.54)
+                    DeviceCircleBadge(title: "右小腿", isConnected: calfConnected)
+                        .position(x: geo.size.width * 0.78, y: geo.size.height * 0.84)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 340)
+            .overlay(alignment: .bottomTrailing) {
                 DashboardConnectionLegend()
                     .padding(16)
-            }
-
-            HStack(alignment: .top, spacing: 20) {
-                LegDeviceSection(legTitle: "左腿")
-                LegDeviceSection(legTitle: "右腿")
             }
         }
         .padding(20)
@@ -242,62 +254,43 @@ private struct DashboardConnectionLegend: View {
     }
 }
 
-// MARK: - Leg Device Section
+// MARK: - Device Circle Badge
 
-private struct LegDeviceSection: View {
-    let legTitle: String
-    @State private var deviceVM = DeviceViewModel()
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(legTitle)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(Color.black)
-
-            DeviceStatusRow(title: "大腿：", isConnected: deviceVM.fetch(limb: 0) != nil)
-            DeviceStatusRow(title: "小腿：", isConnected: deviceVM.fetch(limb: 1) != nil)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-private struct DeviceStatusRow: View {
+private struct DeviceCircleBadge: View {
     let title: String
     var isConnected: Bool = false
 
     var body: some View {
-        HStack(spacing: 14) {
-            DashboardSensorIcon()
+        VStack(spacing: 4) {
+            ZStack {
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 56, height: 56)
+                    .overlay(
+                        Circle()
+                            .stroke(isConnected ? DashboardPalette.onlineDot : DashboardPalette.offlineDot, lineWidth: 3)
+                    )
+                    .shadow(color: .black.opacity(0.12), radius: 5, y: 2)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(Color.black)
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(isConnected ? DashboardPalette.onlineDot : DashboardPalette.offlineDot)
-                        .frame(width: 7, height: 7)
-                    Text(isConnected ? "已連線" : "未連線")
-                        .font(.system(size: 13))
-                        .foregroundStyle(DashboardPalette.mutedText)
-                }
+                DashboardSensorIcon()
+                    .scaleEffect(0.85)
             }
 
-            Spacer()
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Color.black.opacity(0.8))
+                .fixedSize()
 
-            Image(systemName: "wifi")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(DashboardPalette.mutedText)
-                .rotationEffect(.degrees(90))
+            HStack(spacing: 4) {
+                Circle()
+                    .fill(isConnected ? DashboardPalette.onlineDot : DashboardPalette.offlineDot)
+                    .frame(width: 6, height: 6)
+                Text(isConnected ? "已連線" : "未連線")
+                    .font(.system(size: 10))
+                    .foregroundStyle(DashboardPalette.mutedText)
+            }
+            .fixedSize()
         }
-        .padding(.vertical, 14)
-        .padding(.horizontal, 16)
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.black.opacity(0.06), lineWidth: 1)
-        )
     }
 }
 
