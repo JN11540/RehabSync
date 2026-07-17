@@ -198,13 +198,13 @@ private struct DeviceIllustrationCard: View {
                         .frame(width: geo.size.width, height: geo.size.height)
 
                     DeviceCircleBadge(title: "左大腿", isConnected: thighConnected)
-                        .position(x: geo.size.width * 0.22, y: geo.size.height * 0.54)
+                        .position(x: geo.size.width * 0.14, y: geo.size.height * 0.54)
                     DeviceCircleBadge(title: "左小腿", isConnected: calfConnected)
-                        .position(x: geo.size.width * 0.22, y: geo.size.height * 0.84)
+                        .position(x: geo.size.width * 0.14, y: geo.size.height * 0.84)
                     DeviceCircleBadge(title: "右大腿", isConnected: thighConnected)
-                        .position(x: geo.size.width * 0.78, y: geo.size.height * 0.54)
+                        .position(x: geo.size.width * 0.86, y: geo.size.height * 0.54)
                     DeviceCircleBadge(title: "右小腿", isConnected: calfConnected)
-                        .position(x: geo.size.width * 0.78, y: geo.size.height * 0.84)
+                        .position(x: geo.size.width * 0.86, y: geo.size.height * 0.84)
                 }
             }
             .frame(maxWidth: .infinity, minHeight: 340)
