@@ -171,8 +171,7 @@ private struct DashboardOverview: View {
                 .foregroundStyle(Color.black)
 
             DeviceIllustrationCard()
-
-            ActivityChartCard()
+                .frame(maxHeight: .infinity)
         }
     }
 }
@@ -187,15 +186,9 @@ private struct DeviceIllustrationCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("裝置")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Color.black)
-                Spacer()
-                Image(systemName: "plus.magnifyingglass")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(DashboardPalette.mutedText)
-            }
+            Text("裝置")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(Color.black)
 
             GeometryReader { geo in
                 ZStack {
@@ -215,10 +208,6 @@ private struct DeviceIllustrationCard: View {
                 }
             }
             .frame(maxWidth: .infinity, minHeight: 340)
-            .overlay(alignment: .bottomTrailing) {
-                DashboardConnectionLegend()
-                    .padding(16)
-            }
         }
         .padding(20)
         .background(DashboardPalette.cardBackground)
@@ -227,30 +216,6 @@ private struct DeviceIllustrationCard: View {
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.black.opacity(0.06), lineWidth: 1)
         )
-    }
-}
-
-private struct DashboardConnectionLegend: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Circle().fill(DashboardPalette.onlineDot).frame(width: 8, height: 8)
-                Text("已連線")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Color.black.opacity(0.7))
-            }
-            HStack(spacing: 8) {
-                Circle().fill(DashboardPalette.offlineDot).frame(width: 8, height: 8)
-                Text("未連線")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Color.black.opacity(0.7))
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.08), radius: 6, y: 2)
     }
 }
 
@@ -305,56 +270,6 @@ private struct DashboardSensorIcon: View {
                     .frame(width: 10, height: 3)
                     .offset(y: -9)
             )
-    }
-}
-
-// MARK: - Activity Chart Card
-
-private struct ActivityChartCard: View {
-    private let weekdays = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
-    /// 每天兩根長條的相對高度（0~1），僅作示意用途
-    private let barHeights: [(teal: CGFloat, indigo: CGFloat)] = [
-        (0.55, 0.85), (0.65, 0.45), (0.80, 0.60), (0.50, 0.90),
-        (0.70, 0.55), (0.60, 0.75), (0.45, 0.65)
-    ]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("活動數據")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(Color.black)
-
-            HStack(alignment: .bottom, spacing: 0) {
-                ForEach(Array(barHeights.enumerated()), id: \.offset) { _, heights in
-                    HStack(alignment: .bottom, spacing: 6) {
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(DashboardPalette.teal)
-                            .frame(width: 10, height: 90 * heights.teal)
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(DashboardPalette.indigo)
-                            .frame(width: 10, height: 90 * heights.indigo)
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-            }
-            .frame(height: 90)
-
-            HStack(spacing: 0) {
-                ForEach(weekdays, id: \.self) { day in
-                    Text(day)
-                        .font(.system(size: 13))
-                        .foregroundStyle(DashboardPalette.mutedText)
-                        .frame(maxWidth: .infinity)
-                }
-            }
-        }
-        .padding(20)
-        .background(DashboardPalette.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.black.opacity(0.06), lineWidth: 1)
-        )
     }
 }
 
