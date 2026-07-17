@@ -32,17 +32,10 @@ struct Dashboard: View {
             )
                 .frame(width: 220)
 
-            Group {
-                switch selectedNav {
-                case .device:
-                    DeviceIllustrationCard()
-                case .overview, .training, .importData, .exportData, .test, .test1, .settings:
-                    DashboardPlaceholderCard(title: selectedNav.title)
-                }
-            }
-            .padding(28)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.white)
+            DashboardPlaceholderCard(title: selectedNav.title)
+                .padding(28)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.white)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.white)
@@ -52,7 +45,7 @@ struct Dashboard: View {
 // MARK: - Sidebar Nav
 
 private enum DashboardNavItem: CaseIterable {
-    case overview, training, test, test1, device, importData, exportData, settings
+    case overview, training, test, test1, importData, exportData, settings
 
     var title: String {
         switch self {
@@ -60,7 +53,6 @@ private enum DashboardNavItem: CaseIterable {
         case .training: "訓練"
         case .test: "測試"
         case .test1: "測試1"
-        case .device: "裝置"
         case .importData: "匯入"
         case .exportData: "匯出"
         case .settings: "設定"
@@ -73,7 +65,6 @@ private enum DashboardNavItem: CaseIterable {
         case .training: "arrow.left.arrow.right"
         case .test: "wrench.and.screwdriver"
         case .test1: "wrench.and.screwdriver.fill"
-        case .device: "sensor.tag.radiowaves.forward.fill"
         case .importData: "square.and.arrow.down"
         case .exportData: "square.and.arrow.up"
         case .settings: "gearshape.fill"
@@ -108,7 +99,6 @@ private struct DashboardSidebar: View {
 
             DashboardSidebarSectionLabel(text: "工具")
                 .padding(.top, 24)
-            DashboardSidebarItem(item: .device, selectedNav: $selectedNav)
             DashboardSidebarItem(item: .importData, selectedNav: $selectedNav)
             DashboardSidebarItem(item: .exportData, selectedNav: $selectedNav)
 
@@ -187,109 +177,6 @@ private struct DashboardPlaceholderCard: View {
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.black.opacity(0.06), lineWidth: 1)
         )
-    }
-}
-
-// MARK: - Device Illustration Card
-
-private struct DeviceIllustrationCard: View {
-    @State private var deviceVM = DeviceViewModel()
-
-    private var thighConnected: Bool { deviceVM.fetch(limb: 0) != nil }
-    private var calfConnected: Bool { deviceVM.fetch(limb: 1) != nil }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("裝置")
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(Color.black)
-
-            HStack(alignment: .top, spacing: 20) {
-                VStack(spacing: 20) {
-                    DeviceImageBadge(imageName: "KneeThighDisconnectedIcon", title: "左大腿", isConnected: thighConnected)
-                    DeviceImageBadge(imageName: "KneeCalfDisconnectedIcon", title: "左小腿", isConnected: calfConnected)
-                }
-                .frame(width: 220)
-
-                Image("MuscleFigure")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxWidth: .infinity, minHeight: 340)
-
-                VStack(spacing: 20) {
-                    DeviceImageBadge(imageName: "KneeThighDisconnectedIcon", title: "右大腿", isConnected: thighConnected)
-                    DeviceImageBadge(imageName: "KneeCalfDisconnectedIcon", title: "右小腿", isConnected: calfConnected)
-                }
-                .frame(width: 220)
-            }
-        }
-        .padding(20)
-        .background(DashboardPalette.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.black.opacity(0.06), lineWidth: 1)
-        )
-    }
-}
-
-// MARK: - Device Image Badge
-
-/// 比照 Test1.swift 的 DeviceImageCard：圖片 + 標題列（斜紋裝飾）+ 連線狀態列，尺寸完全一致，改用 dashboard 的 indigo 配色。
-private struct DeviceImageBadge: View {
-    let imageName: String
-    let title: String
-    var isConnected: Bool = false
-
-    /// 以 knee_thigh_disconnected.png / knee_calf_disconnected.png 原始尺寸（557 x 844）為圖片區域比例基準
-    private static let referenceAspectRatio: CGFloat = 557.0 / 844.0
-
-    var body: some View {
-        VStack(spacing: 8) {
-            VStack(spacing: 0) {
-                ZStack {
-                    Color.white
-                    Image(imageName)
-                        .resizable()
-                        .scaledToFill()
-                        .scaleEffect(1.01)
-                }
-                .aspectRatio(Self.referenceAspectRatio, contentMode: .fit)
-                .clipped()
-
-                Text(title)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.black)
-                    .padding(.vertical, 12)
-                    .frame(maxWidth: .infinity)
-                    .background {
-                        ZStack {
-                            DashboardPalette.indigo
-                            HStack(spacing: 14) {
-                                Rectangle()
-                                    .fill(Color.white.opacity(0.3))
-                                    .frame(width: 46, height: 200)
-                                    .rotationEffect(.degrees(20))
-                                Rectangle()
-                                    .fill(Color.white.opacity(0.3))
-                                    .frame(width: 26, height: 200)
-                                    .rotationEffect(.degrees(20))
-                            }
-                        }
-                    }
-                    .clipped()
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-
-            Text(isConnected ? "已連線" : "未連線")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 14)
-                .frame(height: 36)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-                .background(DashboardPalette.indigoDark)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-        }
     }
 }
 
