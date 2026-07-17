@@ -91,7 +91,7 @@ private struct DashboardSidebar: View {
                 Text("Sync")
                     .foregroundStyle(Color.black)
             }
-            .font(.system(size: 30, weight: .bold))
+            .font(.system(size: 34, weight: .bold))
             .padding(.horizontal, 24)
             .padding(.top, 24)
             .padding(.bottom, 32)
