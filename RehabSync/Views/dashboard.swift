@@ -418,7 +418,7 @@ private struct ActivityChartCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             Text("活動數據")
                 .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(Color.black)
@@ -443,7 +443,7 @@ private struct ActivityChartCard: View {
                                         .frame(width: barWidth, height: (index == 1 || index == 3) ? shortBarHeight : barHeight)
                                 }
                             }
-                            .offset(y: index == 1 ? -30 : (index == 2 ? -20 : 0))
+                            .offset(y: index == 1 ? -28 : (index == 2 ? -18 : 2))
                         }
                     }
                     .frame(width: dayGroupWidth)
@@ -706,10 +706,6 @@ private struct DashboardSchedulePanel: View {
 private struct DashboardWeekColumn {
     let weekday: String
     let date: Int
-    /// 該日各時段的顯示文字，無預約則為 "—"
-    let times: [String]
-    /// times 陣列中需要以醒目樣式呈現的索引（已預約的時段）
-    let highlighted: Set<Int>
 }
 
 private struct DashboardCalendarCard: View {
@@ -717,13 +713,13 @@ private struct DashboardCalendarCard: View {
 
     /// 2021 年 10 月 25 日～31 日的週曆，僅作示意用途
     private let columns: [DashboardWeekColumn] = [
-        DashboardWeekColumn(weekday: "一", date: 25, times: ["10:00", "11:00", "12:00"], highlighted: []),
-        DashboardWeekColumn(weekday: "二", date: 26, times: ["08:00", "09:00", "10:00"], highlighted: [1]),
-        DashboardWeekColumn(weekday: "三", date: 27, times: ["12:00", "—", "13:00"], highlighted: []),
-        DashboardWeekColumn(weekday: "四", date: 28, times: ["10:00", "11:00", "—"], highlighted: [1]),
-        DashboardWeekColumn(weekday: "五", date: 29, times: ["—", "14:00", "16:00"], highlighted: []),
-        DashboardWeekColumn(weekday: "六", date: 30, times: ["13:00", "09:00", "15:00"], highlighted: [0, 1]),
-        DashboardWeekColumn(weekday: "日", date: 31, times: ["09:00", "10:00", "11:00"], highlighted: [0])
+        DashboardWeekColumn(weekday: "一", date: 25),
+        DashboardWeekColumn(weekday: "二", date: 26),
+        DashboardWeekColumn(weekday: "三", date: 27),
+        DashboardWeekColumn(weekday: "四", date: 28),
+        DashboardWeekColumn(weekday: "五", date: 29),
+        DashboardWeekColumn(weekday: "六", date: 30),
+        DashboardWeekColumn(weekday: "日", date: 31)
     ]
 
     var body: some View {
@@ -775,21 +771,6 @@ private struct DashboardWeekDayColumnView: View {
                     .background(
                         Circle().fill(isSelected ? DashboardPalette.indigo : Color.clear)
                     )
-            }
-
-            VStack(spacing: 8) {
-                ForEach(Array(column.times.enumerated()), id: \.offset) { index, time in
-                    let isHighlighted = column.highlighted.contains(index)
-                    Text(time)
-                        .font(.system(size: 12, weight: isHighlighted ? .semibold : .regular))
-                        .foregroundStyle(isHighlighted ? DashboardPalette.indigoDark : DashboardPalette.mutedText)
-                        .padding(.vertical, 4)
-                        .frame(maxWidth: .infinity)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(isHighlighted ? DashboardPalette.indigoFaint : Color.clear)
-                        )
-                }
             }
         }
     }
