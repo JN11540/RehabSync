@@ -321,7 +321,7 @@ private enum PreWorkingGuideStep {
         case .prepare:
             "首先舒適地坐在穩固的椅子上。雙腳平放在地面上，確保背部挺直並得到支撐。雙手放在椅子兩側以穩定上半身，並將注意力集中在腿部肌肉上。"
         case .extendKnee:
-            "使用右腿開始練習。慢慢伸直膝蓋，抬起腳，直到腿與地面平行。伸展時，保持腳尖繃直－這樣可以啟動股四頭肌，這是這個動作的主要目標肌群。重點在於控制動作，而不是追求速度。"
+            "慢慢伸直膝蓋，抬起腳，直到腿與地面平行。伸展時，保持腳尖繃直－這樣可以啟動股四頭肌，這是這個動作的主要目標肌群。重點在於控制動作，而不是追求速度。"
         case .holdAndLower:
             "保持伸展姿勢 2-3 秒，感受大腿肌肉的收縮。緩慢地將腿放回起始位置，保持動作控制。避免腿放下太快，因為這會降低肌肉參與並拉傷膝蓋。"
         }
@@ -384,6 +384,10 @@ private struct PreWorking2ImpactPage: View {
         return side == 1 ? "Exercise2FrontView\(stage)Right" : "Exercise2FrontView\(stage)Left"
     }
 
+    private var sideLabelText: String {
+        "\(side == 1 ? "右" : "左")腳版本"
+    }
+
     private var mainImageName: String {
         switch selectedAngle {
         case .side: sideViewImageName
@@ -428,6 +432,15 @@ private struct PreWorking2ImpactPage: View {
             .frame(maxWidth: 380, alignment: .leading)
 
             VStack(alignment: .leading, spacing: 16) {
+                if guideStep.hasPoseImages {
+                    Text(sideLabelText)
+                        .font(.system(size: 20))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(PreWorking_2.midPurple)
+                }
+
                 PreWorking2PoseImageCard(imageName: guideStep.hasPoseImages ? mainImageName : nil)
                     .frame(width: 500, height: 500)
 
