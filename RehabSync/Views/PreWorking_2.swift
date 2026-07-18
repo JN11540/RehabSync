@@ -1,16 +1,18 @@
 import SwiftUI
 
-/// 訓練前的準備流程，依序為：確認裝備 → 準備椅子 → 放置平板。
-private enum PreWorkingStep {
+/// 訓練前的準備流程，依序為：確認裝備 → 準備椅子 → 放置平板 → 成果數據頁。
+private enum PreWorkingStep: Equatable {
     case equipment
     case chair
     case tablet
+    case numbers
 
     var title: String {
         switch self {
         case .equipment: "確認裝備齊全"
         case .chair: "準備椅子"
         case .tablet: "放置平板"
+        case .numbers: ""
         }
     }
 
@@ -19,6 +21,7 @@ private enum PreWorkingStep {
         case .equipment: "請確認是否都已準備就緒"
         case .chair: "請先找一張高度剛好到您膝蓋的椅子"
         case .tablet: "請將平板放置於桌面上"
+        case .numbers: ""
         }
     }
 
@@ -26,7 +29,8 @@ private enum PreWorkingStep {
         switch self {
         case .equipment: .chair
         case .chair: .tablet
-        case .tablet: nil
+        case .tablet: .numbers
+        case .numbers: nil
         }
     }
 }
@@ -43,14 +47,20 @@ struct PreWorking_2: View {
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            HStack(spacing: 24) {
-                PreWorking2EquipmentPanel(step: step)
-                    .frame(maxWidth: .infinity)
+            Group {
+                if step == .numbers {
+                    PreWorking2ImpactPage()
+                } else {
+                    HStack(spacing: 24) {
+                        PreWorking2EquipmentPanel(step: step)
+                            .frame(maxWidth: .infinity)
 
-                PreWorking2AboutPanel(title: step.title, subtitle: step.subtitle) {
-                    if let next = step.next { step = next }
+                        PreWorking2AboutPanel(title: step.title, subtitle: step.subtitle) {
+                            if let next = step.next { step = next }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(24)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -124,6 +134,8 @@ private struct PreWorking2EquipmentPanel: View {
                     .frame(maxWidth: 500, maxHeight: 500)
                     .padding(40)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+            case .numbers:
+                EmptyView()
             }
         }
     }
@@ -251,6 +263,122 @@ private struct PreWorking2AboutPanel: View {
             Spacer()
         }
         .padding(40)
+    }
+}
+
+// MARK: - Impact / Numbers Page
+
+private struct PreWorking2ImpactPage: View {
+    private static let statAccent = Color(red: 0.45, green: 0.85, blue: 0.55)
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 40) {
+            VStack(alignment: .leading, spacing: 20) {
+                Text("OUR NUMBERS MEAN\nMORE THAN WORDS")
+                    .font(.system(size: 34, weight: .heavy))
+                    .foregroundStyle(PreWorking_2.darkPurple)
+                    .lineSpacing(6)
+
+                Text("Lorem ipsum dolor sit amet consectetur condimentum aliquet auctor diam vulputate est ullamcorper tincidunt arcu orci et elit.")
+                    .font(.system(size: 17))
+                    .foregroundStyle(Color.black.opacity(0.6))
+                    .lineSpacing(6)
+
+                Button {} label: {
+                    HStack(spacing: 12) {
+                        Text("SUPPORT OUR CAUSE")
+                            .font(.system(size: 14, weight: .bold))
+                        ZStack {
+                            Circle().fill(Color.white.opacity(0.2))
+                            Image(systemName: "arrow.right")
+                                .font(.system(size: 11, weight: .bold))
+                        }
+                        .frame(width: 26, height: 26)
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 22)
+                    .padding(.vertical, 12)
+                    .background(PreWorking_2.darkPurple)
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            VStack(spacing: 16) {
+                PreWorking2ImpactStatCard(
+                    icon: "leaf.fill",
+                    valueMain: "10",
+                    valueAccent: "M+",
+                    label: "TREES PLANTED",
+                    accentColor: Self.statAccent
+                )
+                .frame(maxWidth: .infinity, minHeight: 220)
+
+                HStack(spacing: 16) {
+                    PreWorking2ImpactStatCard(
+                        icon: "pawprint.fill",
+                        valueMain: "300",
+                        valueAccent: "K+",
+                        label: "ANIMALS SAVED",
+                        accentColor: Self.statAccent
+                    )
+                    PreWorking2ImpactStatCard(
+                        icon: "drop.fill",
+                        valueMain: "5",
+                        valueAccent: "K+",
+                        label: "RIVERS CLEANED",
+                        accentColor: Self.statAccent
+                    )
+                }
+                .frame(maxHeight: 150)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .padding(48)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+private struct PreWorking2ImpactStatCard: View {
+    let icon: String
+    let valueMain: String
+    let valueAccent: String
+    let label: String
+    let accentColor: Color
+
+    var body: some View {
+        ZStack(alignment: .bottomLeading) {
+            RoundedRectangle(cornerRadius: 20)
+                .fill(
+                    LinearGradient(
+                        colors: [PreWorking_2.midPurple, PreWorking_2.darkPurple],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            Image(systemName: icon)
+                .font(.system(size: 44))
+                .foregroundStyle(.white.opacity(0.2))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 2) {
+                    Text(valueMain)
+                        .foregroundStyle(.white)
+                    Text(valueAccent)
+                        .foregroundStyle(accentColor)
+                }
+                .font(.system(size: 24, weight: .heavy))
+
+                Text(label)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+            .padding(16)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 20))
     }
 }
 
