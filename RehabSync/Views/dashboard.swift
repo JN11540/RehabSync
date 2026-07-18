@@ -643,12 +643,19 @@ private struct DashboardSchedulePanel: View {
         exerciseVM.fetchAll()
     }
 
-    /// 只顯示今天（台灣時區）的訓練菜單。
-    private var todayContents: [TreatmentContent] {
+    /// 週曆目前選取的日期（selectedDay 只是「幾號」，要對照這週的日期陣列才能還原完整日期）。
+    private var selectedDate: Date? {
         let calendar = taipeiCalendar()
-        let today = calendar.startOfDay(for: Date())
+        return currentWeekDates().first { calendar.component(.day, from: $0) == selectedDay }
+    }
+
+    /// 只顯示週曆目前選取那天（台灣時區）的訓練菜單，點擊其他天就換成當天的菜單。
+    private var selectedDayContents: [TreatmentContent] {
+        guard let selectedDate else { return [] }
+        let calendar = taipeiCalendar()
+        let target = calendar.startOfDay(for: selectedDate)
         return contentVM.contents.filter {
-            calendar.startOfDay(for: Date(timeIntervalSince1970: TimeInterval($0.date))) == today
+            calendar.startOfDay(for: Date(timeIntervalSince1970: TimeInterval($0.date))) == target
         }
     }
 
@@ -683,7 +690,7 @@ private struct DashboardSchedulePanel: View {
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(Color.black)
 
-                    ForEach(todayContents, id: \.self) { content in
+                    ForEach(selectedDayContents, id: \.self) { content in
                         DashboardTrainingMenuRow(content: content, exercise: exerciseVM.fetch(by: content.exercise_id))
                     }
                 }
