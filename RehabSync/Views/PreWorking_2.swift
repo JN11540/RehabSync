@@ -297,7 +297,7 @@ private enum PreWorkingGuideStep {
         switch self {
         case .prepare: true
         case .extendKnee: true
-        case .holdAndLower: false
+        case .holdAndLower: true
         }
     }
 
@@ -306,7 +306,7 @@ private enum PreWorkingGuideStep {
         switch self {
         case .prepare: "Ready"
         case .extendKnee: "45"
-        case .holdAndLower: ""
+        case .holdAndLower: "90"
         }
     }
 
