@@ -13,11 +13,30 @@ private enum DashboardPalette {
     static let chartGray = Color(red: 0.80, green: 0.81, blue: 0.86)
 }
 
+// MARK: - Taipei Week Helper
+
+private func taipeiCalendar() -> Calendar {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(identifier: "Asia/Taipei") ?? .current
+    calendar.firstWeekday = 2 // 週一為一週的開始
+    return calendar
+}
+
+/// 以台灣時區偵測今天所在的這週（週一~週日）日期。
+private func currentWeekDates() -> [Date] {
+    let calendar = taipeiCalendar()
+    let today = calendar.startOfDay(for: Date())
+    let weekday = calendar.component(.weekday, from: today) // 1=週日, 2=週一, ..., 7=週六
+    let daysSinceMonday = (weekday + 5) % 7
+    guard let monday = calendar.date(byAdding: .day, value: -daysSinceMonday, to: today) else { return [] }
+    return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: monday) }
+}
+
 // MARK: - Dashboard
 
 struct Dashboard: View {
     @State private var selectedNav: DashboardNavItem = .overview
-    @State private var selectedDay = 26
+    @State private var selectedDay = taipeiCalendar().component(.day, from: Date())
     @State private var showDeviceListModal = false
     @State private var deviceListSide = 0
     @State private var deviceListLimb = 0
@@ -393,25 +412,10 @@ private struct ActivityChartCard: View {
     /// 同一天 4 根柱子的總寬度，讓不同天之間的間距（barSpacing）跟同一天內柱子的間距一致。
     private var dayGroupWidth: CGFloat { 4 * barWidth + 3 * barSpacing }
 
-    private var taipeiCalendar: Calendar {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "Asia/Taipei") ?? .current
-        calendar.firstWeekday = 2 // 週一為一週的開始
-        return calendar
-    }
-
-    /// 以台灣時區偵測今天所在的這週（週一~週日）日期。
-    private var weekDates: [Date] {
-        let calendar = taipeiCalendar
-        let today = calendar.startOfDay(for: Date())
-        let weekday = calendar.component(.weekday, from: today) // 1=週日, 2=週一, ..., 7=週六
-        let daysSinceMonday = (weekday + 5) % 7
-        guard let monday = calendar.date(byAdding: .day, value: -daysSinceMonday, to: today) else { return [] }
-        return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: monday) }
-    }
+    private var weekDates: [Date] { currentWeekDates() }
 
     private func dateLabel(for date: Date) -> String {
-        let calendar = taipeiCalendar
+        let calendar = taipeiCalendar()
         let month = calendar.component(.month, from: date)
         let day = calendar.component(.day, from: date)
         return "\(month)/\(day)"
@@ -691,21 +695,28 @@ private struct DashboardWeekColumn {
 private struct DashboardCalendarCard: View {
     @Binding var selectedDay: Int
 
-    /// 2021 年 10 月 25 日～31 日的週曆，僅作示意用途
-    private let columns: [DashboardWeekColumn] = [
-        DashboardWeekColumn(weekday: "一", date: 25),
-        DashboardWeekColumn(weekday: "二", date: 26),
-        DashboardWeekColumn(weekday: "三", date: 27),
-        DashboardWeekColumn(weekday: "四", date: 28),
-        DashboardWeekColumn(weekday: "五", date: 29),
-        DashboardWeekColumn(weekday: "六", date: 30),
-        DashboardWeekColumn(weekday: "日", date: 31)
-    ]
+    private static let weekdayLabels = ["一", "二", "三", "四", "五", "六", "日"]
+
+    /// 以台灣時區偵測今天所在的這週（週一~週日），跟活動數據卡片使用同一套週別邏輯。
+    private var columns: [DashboardWeekColumn] {
+        let calendar = taipeiCalendar()
+        return zip(Self.weekdayLabels, currentWeekDates()).map { weekday, date in
+            DashboardWeekColumn(weekday: weekday, date: calendar.component(.day, from: date))
+        }
+    }
+
+    private var monthTitle: String {
+        let calendar = taipeiCalendar()
+        let now = Date()
+        let year = calendar.component(.year, from: now)
+        let month = calendar.component(.month, from: now)
+        return "\(year) 年 \(month) 月"
+    }
 
     var body: some View {
         VStack(spacing: 16) {
             HStack {
-                Text("2021 年 10 月")
+                Text(monthTitle)
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(Color.black)
                 Spacer()
