@@ -88,7 +88,7 @@ struct Dashboard: View {
                     .onTapGesture { showDeviceListModal = false }
 
                 DashboardDeviceListModal(side: deviceListSide, limb: deviceListLimb, onClose: { showDeviceListModal = false })
-                    .frame(maxWidth: 420, maxHeight: 520)
+                    .frame(width: 420, height: 520)
             }
         }
         .onReceive(Timer.publish(every: 5, on: .main, in: .common).autoconnect()) { _ in
@@ -490,7 +490,7 @@ private struct DashboardDeviceListModal: View {
 
             VStack(alignment: .leading, spacing: 16) {
                 Text("藍牙裝置")
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(Color.black)
                     .padding(.top, 44)
                     .padding(.horizontal, 24)
@@ -499,7 +499,7 @@ private struct DashboardDeviceListModal: View {
                     VStack(spacing: 12) {
                         if btVM.discoveredDevices.isEmpty {
                             Text("掃描中…")
-                                .font(.system(size: 14, weight: .medium))
+                                .font(.system(size: 20, weight: .medium))
                                 .foregroundStyle(DashboardPalette.mutedText)
                                 .padding(.top, 20)
                         } else {
@@ -517,7 +517,7 @@ private struct DashboardDeviceListModal: View {
                                     HStack {
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text(device.name)
-                                                .font(.system(size: 15, weight: .semibold))
+                                                .font(.system(size: 20, weight: .semibold))
                                                 .foregroundStyle(isConnected ? .white : Color.black)
                                                 .lineLimit(1)
                                             Text(device.id.uuidString)
@@ -559,7 +559,7 @@ private struct DashboardDeviceListModal: View {
                     Circle()
                         .stroke(DashboardPalette.indigo, lineWidth: 1.5)
                     Image(systemName: "xmark")
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.system(size: 16, weight: .bold))
                         .foregroundStyle(DashboardPalette.indigo)
                 }
                 .frame(width: 32, height: 32)
@@ -573,7 +573,7 @@ private struct DashboardDeviceListModal: View {
                     Circle()
                         .fill(DashboardPalette.indigo)
                     Image(systemName: "checkmark")
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.system(size: 16, weight: .bold))
                         .foregroundStyle(.white)
                 }
                 .frame(width: 32, height: 32)
