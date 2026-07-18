@@ -130,10 +130,10 @@ private struct PreWorking2EquipmentItem: View {
 private struct PreWorking2AboutPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
-            Spacer().frame(height: 8)
+            Spacer()
 
             HStack(spacing: 8) {
-                Text("關於我們")
+                Text("確認裝備齊全")
                     .font(.system(size: 34, weight: .heavy))
                     .foregroundStyle(PreWorking_2.darkPurple)
                 Image(systemName: "sparkle")
@@ -145,7 +145,7 @@ private struct PreWorking2AboutPanel: View {
                 Rectangle()
                     .fill(PreWorking_2.midPurple)
                     .frame(width: 4)
-                Text("沒有極限，只有你願意挑戰到達的巔峰。\n更多關於我們致力於臨床數據、專利技術以及科學驗證的研發與創新。")
+                Text("請確認是否都已準備就緒")
                     .font(.system(size: 18))
                     .foregroundStyle(Color.black.opacity(0.75))
                     .lineSpacing(8)
