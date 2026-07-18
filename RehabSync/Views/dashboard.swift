@@ -22,21 +22,28 @@ private func taipeiCalendar() -> Calendar {
     return calendar
 }
 
-/// 以台灣時區偵測今天所在的這週（週一~週日）日期。
-private func currentWeekDates() -> [Date] {
+/// 以台灣時區偵測今天所在的這週（週一~週日）日期，weekOffset 可往前/往後移動整週（-1 = 上週，1 = 下週）。
+private func currentWeekDates(weekOffset: Int = 0) -> [Date] {
     let calendar = taipeiCalendar()
     let today = calendar.startOfDay(for: Date())
     let weekday = calendar.component(.weekday, from: today) // 1=週日, 2=週一, ..., 7=週六
     let daysSinceMonday = (weekday + 5) % 7
-    guard let monday = calendar.date(byAdding: .day, value: -daysSinceMonday, to: today) else { return [] }
-    return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: monday) }
+    guard let thisMonday = calendar.date(byAdding: .day, value: -daysSinceMonday, to: today),
+          let targetMonday = calendar.date(byAdding: .day, value: weekOffset * 7, to: thisMonday)
+    else { return [] }
+    return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: targetMonday) }
 }
 
 // MARK: - Dashboard
 
 struct Dashboard: View {
     @State private var selectedNav: DashboardNavItem = .overview
-    @State private var selectedDay = taipeiCalendar().component(.day, from: Date())
+    @State private var weekOffset = 0
+    @State private var selectedWeekdayIndex: Int = {
+        let calendar = taipeiCalendar()
+        let weekday = calendar.component(.weekday, from: Date()) // 1=週日, 2=週一, ..., 7=週六
+        return (weekday + 5) % 7 // 轉成週一為 0 的索引
+    }()
     @State private var showDeviceListModal = false
     @State private var deviceListSide = 0
     @State private var deviceListLimb = 0
@@ -97,7 +104,7 @@ struct Dashboard: View {
                         .padding(28)
                         .background(Color.white)
 
-                    DashboardSchedulePanel(selectedDay: $selectedDay)
+                    DashboardSchedulePanel(weekOffset: $weekOffset, selectedWeekdayIndex: $selectedWeekdayIndex)
                         .frame(width: 420)
                         .background(DashboardPalette.panelBackground)
                 } else {
@@ -268,15 +275,9 @@ private struct DashboardOverviewContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            HStack {
-                Text("總覽")
-                    .font(.system(size: 26, weight: .bold))
-                    .foregroundStyle(Color.black)
-                Spacer()
-                Image(systemName: "bell.fill")
-                    .font(.system(size: 20))
-                    .foregroundStyle(DashboardPalette.indigo)
-            }
+            Text("總覽")
+                .font(.system(size: 26, weight: .bold))
+                .foregroundStyle(Color.black)
 
             DeviceOverviewCard(onDeviceRowTap: onDeviceRowTap)
 
@@ -628,7 +629,8 @@ private struct DashboardDeviceListModal: View {
 // MARK: - Schedule Panel (right column)
 
 private struct DashboardSchedulePanel: View {
-    @Binding var selectedDay: Int
+    @Binding var weekOffset: Int
+    @Binding var selectedWeekdayIndex: Int
 
     @State private var treatmentVM = TreatmentViewModel()
     @State private var contentVM = TreatmentContentViewModel()
@@ -643,13 +645,14 @@ private struct DashboardSchedulePanel: View {
         exerciseVM.fetchAll()
     }
 
-    /// 週曆目前選取的日期（selectedDay 只是「幾號」，要對照這週的日期陣列才能還原完整日期）。
+    /// 週曆目前選取的日期（依 weekOffset 決定是哪一週，再依 selectedWeekdayIndex 取出那週的第幾天）。
     private var selectedDate: Date? {
-        let calendar = taipeiCalendar()
-        return currentWeekDates().first { calendar.component(.day, from: $0) == selectedDay }
+        let dates = currentWeekDates(weekOffset: weekOffset)
+        guard dates.indices.contains(selectedWeekdayIndex) else { return nil }
+        return dates[selectedWeekdayIndex]
     }
 
-    /// 只顯示週曆目前選取那天（台灣時區）的訓練菜單，點擊其他天就換成當天的菜單。
+    /// 只顯示週曆目前選取那天（台灣時區）的訓練菜單，點擊其他天／切換上下週就換成當天的菜單。
     private var selectedDayContents: [TreatmentContent] {
         guard let selectedDate else { return [] }
         let calendar = taipeiCalendar()
@@ -662,28 +665,7 @@ private struct DashboardSchedulePanel: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 24) {
-                HStack {
-                    Spacer()
-                    Circle()
-                        .fill(Color(red: 0.35, green: 0.85, blue: 0.90))
-                        .frame(width: 36, height: 36)
-                        .overlay(
-                            Image(systemName: "person.fill")
-                                .font(.system(size: 16))
-                                .foregroundStyle(.white)
-                        )
-                    Button {} label: {
-                        Image(systemName: "plus")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 36, height: 36)
-                            .background(DashboardPalette.indigo)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                DashboardCalendarCard(selectedDay: $selectedDay)
+                DashboardCalendarCard(weekOffset: $weekOffset, selectedWeekdayIndex: $selectedWeekdayIndex)
 
                 VStack(alignment: .leading, spacing: 14) {
                     Text("訓練菜單")
@@ -747,23 +729,26 @@ private struct DashboardWeekColumn {
 }
 
 private struct DashboardCalendarCard: View {
-    @Binding var selectedDay: Int
+    @Binding var weekOffset: Int
+    @Binding var selectedWeekdayIndex: Int
 
     private static let weekdayLabels = ["一", "二", "三", "四", "五", "六", "日"]
 
-    /// 以台灣時區偵測今天所在的這週（週一~週日），跟活動數據卡片使用同一套週別邏輯。
+    /// 以台灣時區偵測 weekOffset 所指定的那一週（週一~週日），跟活動數據卡片使用同一套週別邏輯。
+    private var weekDates: [Date] { currentWeekDates(weekOffset: weekOffset) }
+
     private var columns: [DashboardWeekColumn] {
         let calendar = taipeiCalendar()
-        return zip(Self.weekdayLabels, currentWeekDates()).map { weekday, date in
+        return zip(Self.weekdayLabels, weekDates).map { weekday, date in
             DashboardWeekColumn(weekday: weekday, date: calendar.component(.day, from: date))
         }
     }
 
     private var monthTitle: String {
         let calendar = taipeiCalendar()
-        let now = Date()
-        let year = calendar.component(.year, from: now)
-        let month = calendar.component(.month, from: now)
+        guard let anchor = weekDates.first else { return "" }
+        let year = calendar.component(.year, from: anchor)
+        let month = calendar.component(.month, from: anchor)
         return "\(year) 年 \(month) 月"
     }
 
@@ -774,27 +759,33 @@ private struct DashboardCalendarCard: View {
                     .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(Color.black)
                 Spacer()
-                Button {} label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(Color.black.opacity(0.6))
+                HStack(spacing: 20) {
+                    Button {
+                        weekOffset -= 1
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundStyle(Color.black.opacity(0.6))
+                    }
+                    .buttonStyle(.plain)
+                    Button {
+                        weekOffset += 1
+                    } label: {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundStyle(Color.black.opacity(0.6))
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
-                Button {} label: {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(Color.black.opacity(0.6))
-                }
-                .buttonStyle(.plain)
             }
 
             HStack(alignment: .top, spacing: 0) {
-                ForEach(columns, id: \.date) { column in
-                    DashboardWeekDayColumnView(column: column, isSelected: column.date == selectedDay)
+                ForEach(Array(columns.enumerated()), id: \.offset) { index, column in
+                    DashboardWeekDayColumnView(column: column, isSelected: index == selectedWeekdayIndex)
                         .padding(.vertical, 8)
                         .frame(maxWidth: .infinity, minHeight: 64)
                         .contentShape(Rectangle())
-                        .onTapGesture { selectedDay = column.date }
+                        .onTapGesture { selectedWeekdayIndex = index }
                 }
             }
         }
