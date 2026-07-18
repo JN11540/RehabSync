@@ -297,19 +297,19 @@ private struct PreWorking2ImpactPage: View {
         HStack(alignment: .center, spacing: 40) {
             VStack(alignment: .leading, spacing: 20) {
                 Text("動作逐步指南\n1. 準備姿勢")
-                    .font(.system(size: 34, weight: .heavy))
+                    .font(.system(size: 40, weight: .heavy))
                     .foregroundStyle(PreWorking_2.darkPurple)
                     .lineSpacing(6)
 
-                Text("Lorem ipsum dolor sit amet consectetur condimentum aliquet auctor diam vulputate est ullamcorper tincidunt arcu orci et elit.")
-                    .font(.system(size: 17))
+                Text("首先舒適地坐在穩固的椅子上。雙腳平放在地面上，確保背部挺直並得到支撐。雙手放在椅子兩側以穩定上半身，並將注意力集中在腿部肌肉上。")
+                    .font(.system(size: 20))
                     .foregroundStyle(Color.black.opacity(0.6))
                     .lineSpacing(6)
                     .frame(maxWidth: 320, alignment: .leading)
 
                 Button {} label: {
                     HStack(spacing: 12) {
-                        Text("SUPPORT OUR CAUSE")
+                        Text("下一步")
                             .font(.system(size: 14, weight: .bold))
                         ZStack {
                             Circle().fill(Color.white.opacity(0.2))
