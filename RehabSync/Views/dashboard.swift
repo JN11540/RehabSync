@@ -382,11 +382,12 @@ private struct DashboardConnectionBadge: View {
 
 private struct ActivityChartCard: View {
     private let weekdays = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
-    /// 每天兩根長條的相對高度（0~1），僅作示意用途
-    private let barHeights: [(teal: CGFloat, indigo: CGFloat)] = [
-        (0.55, 0.85), (0.65, 0.45), (0.80, 0.60), (0.50, 0.90),
-        (0.70, 0.55), (0.60, 0.75), (0.45, 0.65)
+    /// 每天四根長條的相對高度（0~1），僅作示意用途
+    private let barHeights: [[CGFloat]] = [
+        [0.55, 0.85, 0.40, 0.70], [0.65, 0.45, 0.75, 0.35], [0.80, 0.60, 0.50, 0.65], [0.50, 0.90, 0.45, 0.60],
+        [0.70, 0.55, 0.65, 0.80], [0.60, 0.75, 0.55, 0.40], [0.45, 0.65, 0.70, 0.50]
     ]
+    private let barColors: [Color] = [DashboardPalette.teal, DashboardPalette.indigo, DashboardPalette.teal, DashboardPalette.indigo]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -397,12 +398,11 @@ private struct ActivityChartCard: View {
             HStack(alignment: .bottom, spacing: 0) {
                 ForEach(Array(barHeights.enumerated()), id: \.offset) { _, heights in
                     HStack(alignment: .bottom, spacing: 6) {
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(DashboardPalette.teal)
-                            .frame(width: 10, height: 90 * heights.teal)
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(DashboardPalette.indigo)
-                            .frame(width: 10, height: 90 * heights.indigo)
+                        ForEach(Array(heights.enumerated()), id: \.offset) { index, height in
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(barColors[index])
+                                .frame(width: 5, height: 90 * height)
+                        }
                     }
                     .frame(maxWidth: .infinity)
                 }
