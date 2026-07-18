@@ -405,7 +405,7 @@ private struct ActivityChartCard: View {
                         ForEach(0..<4, id: \.self) { index in
                             Group {
                                 if index == 2 {
-                                    VStack(spacing: 10) {
+                                    VStack(spacing: 3) {
                                         Capsule()
                                             .fill(barColor)
                                             .frame(width: barWidth, height: 15)
