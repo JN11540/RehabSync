@@ -28,7 +28,7 @@ struct PreWorking_2: View {
                 Image(systemName: "xmark")
                     .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(Self.midPurple)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 50, height: 50)
                     .background(Color.white)
                     .clipShape(Circle())
                     .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
@@ -110,12 +110,12 @@ private struct PreWorking2EquipmentItem<Icon: View>: View {
         VStack(spacing: 16) {
             Circle()
                 .fill(Color.white)
-                .frame(width: 160, height: 160)
+                .frame(width: 200, height: 200)
                 .overlay(Circle().stroke(Color(red: 0.75, green: 0.68, blue: 0.95), lineWidth: 3))
                 .overlay { icon() }
                 .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
             Text(label)
-                .font(.system(size: 19, weight: .bold))
+                .font(.system(size: 25, weight: .bold))
                 .foregroundStyle(PreWorking_2.darkPurple)
         }
     }
@@ -158,10 +158,10 @@ private struct PreWorking2AboutPanel: View {
 
             HStack(spacing: 8) {
                 Text("確認裝備齊全")
-                    .font(.system(size: 34, weight: .heavy))
+                    .font(.system(size: 40, weight: .heavy))
                     .foregroundStyle(PreWorking_2.darkPurple)
                 Image(systemName: "sparkle")
-                    .font(.system(size: 20))
+                    .font(.system(size: 25))
                     .foregroundStyle(Color(red: 0.7, green: 0.62, blue: 0.95))
             }
 
@@ -170,7 +170,7 @@ private struct PreWorking2AboutPanel: View {
                     .fill(PreWorking_2.midPurple)
                     .frame(width: 4, height: 24)
                 Text("請確認是否都已準備就緒")
-                    .font(.system(size: 18))
+                    .font(.system(size: 25))
                     .foregroundStyle(Color.black.opacity(0.75))
                     .lineSpacing(8)
             }
@@ -180,7 +180,7 @@ private struct PreWorking2AboutPanel: View {
                     Text("下一步")
                     Image(systemName: "arrow.right")
                 }
-                .font(.system(size: 17, weight: .semibold))
+                .font(.system(size: 25, weight: .semibold))
                 .foregroundStyle(PreWorking_2.darkPurple)
                 .padding(.horizontal, 28)
                 .padding(.vertical, 14)
