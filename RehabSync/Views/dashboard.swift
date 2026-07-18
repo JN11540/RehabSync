@@ -384,18 +384,9 @@ private struct DashboardConnectionBadge: View {
 private struct ActivityChartCard: View {
     private let weekdays = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
     private let chartHeight: CGFloat = 90
-    /// 每天四根長條的相對位置與長度（底部偏移, 長條長度，皆為 0~1），僅作示意用途，
-    /// 同一天的四根長條長度相同，只有底部偏移不同，呈現懸浮的柱狀效果
-    private let barSpans: [[(bottom: CGFloat, length: CGFloat)]] = [
-        [(0.30, 0.55), (0.05, 0.55), (0.45, 0.55), (0.10, 0.55)],
-        [(0.15, 0.45), (0.50, 0.45), (0.05, 0.45), (0.35, 0.45)],
-        [(0.40, 0.50), (0.10, 0.50), (0.55, 0.50), (0.00, 0.50)],
-        [(0.20, 0.40), (0.45, 0.40), (0.05, 0.40), (0.50, 0.40)],
-        [(0.35, 0.45), (0.05, 0.45), (0.40, 0.45), (0.55, 0.45)],
-        [(0.10, 0.55), (0.45, 0.55), (0.20, 0.55), (0.00, 0.55)],
-        [(0.25, 0.35), (0.50, 0.35), (0.05, 0.35), (0.40, 0.35)]
-    ]
-    private let barColors: [Color] = Array(repeating: DashboardPalette.chartGray, count: 4)
+    /// 每天長條的相對長度（0~1），僅作示意用途；同一天的四根長條長度、頂端與底端高度都一致。
+    private let barLengths: [CGFloat] = [0.55, 0.45, 0.50, 0.40, 0.45, 0.55, 0.35]
+    private let barColor = DashboardPalette.chartGray
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -404,13 +395,12 @@ private struct ActivityChartCard: View {
                 .foregroundStyle(Color.black)
 
             HStack(alignment: .bottom, spacing: 0) {
-                ForEach(Array(barSpans.enumerated()), id: \.offset) { _, spans in
+                ForEach(Array(barLengths.enumerated()), id: \.offset) { _, length in
                     HStack(alignment: .bottom, spacing: 6) {
-                        ForEach(Array(spans.enumerated()), id: \.offset) { index, span in
+                        ForEach(0..<4, id: \.self) { _ in
                             Capsule()
-                                .fill(barColors[index])
-                                .frame(width: 5, height: chartHeight * span.length)
-                                .offset(y: -chartHeight * span.bottom)
+                                .fill(barColor)
+                                .frame(width: 5, height: chartHeight * length)
                         }
                     }
                     .frame(maxWidth: .infinity)
