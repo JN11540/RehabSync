@@ -778,6 +778,7 @@ private struct DashboardCalendarCard: View {
                     .buttonStyle(.plain)
                 }
             }
+            .padding(.top, 75)
 
             HStack(alignment: .top, spacing: 0) {
                 ForEach(Array(columns.enumerated()), id: \.offset) { index, column in
