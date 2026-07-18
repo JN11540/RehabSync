@@ -385,7 +385,7 @@ private struct ActivityChartCard: View {
     private let weekdays = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
     private let chartHeight: CGFloat = 90
     private let barHeight: CGFloat = 80
-    private let secondBarHeight: CGFloat = 40
+    private let shortBarHeight: CGFloat = 40
     private let barWidth: CGFloat = 3
     private let barSpacing: CGFloat = 12
     private let barColor = DashboardPalette.chartGray
@@ -403,10 +403,23 @@ private struct ActivityChartCard: View {
                 ForEach(weekdays, id: \.self) { _ in
                     HStack(alignment: .bottom, spacing: barSpacing) {
                         ForEach(0..<4, id: \.self) { index in
-                            Capsule()
-                                .fill(barColor)
-                                .frame(width: barWidth, height: index == 1 ? secondBarHeight : barHeight)
-                                .offset(y: index == 1 ? -10 : 10)
+                            Group {
+                                if index == 2 {
+                                    VStack(spacing: 10) {
+                                        Capsule()
+                                            .fill(barColor)
+                                            .frame(width: barWidth, height: 15)
+                                        Capsule()
+                                            .fill(barColor)
+                                            .frame(width: barWidth, height: 15)
+                                    }
+                                } else {
+                                    Capsule()
+                                        .fill(barColor)
+                                        .frame(width: barWidth, height: index == 1 ? shortBarHeight : barHeight)
+                                }
+                            }
+                            .offset(y: index == 1 ? -10 : (index == 2 ? 0 : 10))
                         }
                     }
                     .frame(width: dayGroupWidth)
