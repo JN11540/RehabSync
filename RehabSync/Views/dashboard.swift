@@ -320,18 +320,18 @@ private struct DashboardConnectionBadge: View {
     var isConnected: Bool = false
 
     var body: some View {
-        HStack(spacing: 6) {
+        VStack(spacing: 4) {
             Circle()
                 .fill(isConnected ? DashboardPalette.onlineDot : DashboardPalette.offlineDot)
                 .frame(width: 8, height: 8)
             Text(isConnected ? "已連線" : "未連線")
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(Color.black.opacity(0.7))
+                .multilineTextAlignment(.center)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .frame(width: 72, height: 72)
         .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .clipShape(Circle())
         .shadow(color: .black.opacity(0.08), radius: 5, y: 2)
     }
 }
