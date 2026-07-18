@@ -641,8 +641,7 @@ private struct DashboardSchedulePanel: View {
     @Binding var selectedDay: Int
 
     private let topAppointments: [DashboardAppointment] = [
-        DashboardAppointment(icon: "🦷", title: "牙科門診", time: "09:00-11:00", subtitle: "Dr. Cameron Wülamcon"),
-        DashboardAppointment(icon: "💪", title: "物理治療預約", time: "11:00-12:00", subtitle: "Dr. Kevin Djeens")
+        DashboardAppointment(icon: "🦷", title: "牙科門診", time: "09:00-11:00", subtitle: "Dr. Cameron Wülamcon")
     ]
 
     private let todayAppointments: [DashboardAppointment] = [
