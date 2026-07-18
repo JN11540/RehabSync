@@ -494,14 +494,19 @@ private struct DashboardDeviceListModal: View {
     private let deviceVM = DeviceViewModel()
 
     private func handleCancel() {
-        if let selectedDevice {
-            if btVM.connectedPeripherals[selectedDevice.id] != nil {
-                btVM.disconnect(id: selectedDevice.id)
-            } else {
-                btVM.cancelPendingConnection()
-            }
-        }
+        releaseSelectedDevice()
         onClose()
+    }
+
+    /// 解除目前選取裝置的連線（已連上就斷線，還在連線中就取消），
+    /// 供「關閉視窗」與「改點其他裝置」共用。
+    private func releaseSelectedDevice() {
+        guard let selectedDevice else { return }
+        if btVM.connectedPeripherals[selectedDevice.id] != nil {
+            btVM.disconnect(id: selectedDevice.id)
+        } else {
+            btVM.cancelPendingConnection()
+        }
     }
 
     private func handleConfirm() {
@@ -559,6 +564,8 @@ private struct DashboardDeviceListModal: View {
                                 }()
 
                                 Button {
+                                    guard device.id != selectedDevice?.id else { return }
+                                    releaseSelectedDevice()
                                     selectedDevice = device
                                     btVM.connectDiscovered(device)
                                 } label: {
