@@ -669,15 +669,15 @@ private struct DashboardSchedulePanel: View {
     }
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 24) {
-                DashboardCalendarCard(weekOffset: $weekOffset, selectedWeekdayIndex: $selectedWeekdayIndex)
+        VStack(alignment: .leading, spacing: 24) {
+            DashboardCalendarCard(weekOffset: $weekOffset, selectedWeekdayIndex: $selectedWeekdayIndex)
 
+            Text("訓練菜單")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(Color.black)
+
+            ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("訓練菜單")
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(Color.black)
-
                     if selectedDayContents.isEmpty {
                         Text("當天沒有安排任何訓練動作")
                             .font(.system(size: 16))
@@ -693,9 +693,10 @@ private struct DashboardSchedulePanel: View {
                         }
                     }
                 }
+                .padding(.bottom, 24)
             }
-            .padding(24)
         }
+        .padding(24)
         .onAppear { loadTrainingMenu() }
     }
 }
