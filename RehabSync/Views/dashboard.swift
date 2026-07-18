@@ -264,16 +264,8 @@ private struct DeviceOverviewCard: View {
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(Color.black)
 
-            HStack(alignment: .top, spacing: 20) {
-                DeviceIllustration(onRowTap: onDeviceRowTap)
-                    .frame(maxWidth: .infinity)
-
-                VStack(spacing: 20) {
-                    LegDeviceCard(legTitle: "左腿", side: 0, onRowTap: onDeviceRowTap)
-                    LegDeviceCard(legTitle: "右腿", side: 1, onRowTap: onDeviceRowTap)
-                }
+            DeviceIllustration(onRowTap: onDeviceRowTap)
                 .frame(maxWidth: .infinity)
-            }
         }
         .padding(20)
         .background(DashboardPalette.cardBackground)
@@ -341,74 +333,6 @@ private struct DashboardConnectionBadge: View {
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .shadow(color: .black.opacity(0.08), radius: 5, y: 2)
-    }
-}
-
-// MARK: - Leg Device Card
-
-private struct LegDeviceCard: View {
-    let legTitle: String
-    /// 0 = 左腿, 1 = 右腿
-    let side: Int
-    var onRowTap: (Int, Int) -> Void = { _, _ in }
-    @State private var deviceVM = DeviceViewModel()
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(legTitle)
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(Color.black)
-
-            DeviceStatusRow(title: "大腿：", isConnected: deviceVM.fetch(side: side, limb: 0) != nil)
-                .contentShape(Rectangle())
-                .onTapGesture { onRowTap(side, 0) }
-            DeviceStatusRow(title: "小腿：", isConnected: deviceVM.fetch(side: side, limb: 1) != nil)
-                .contentShape(Rectangle())
-                .onTapGesture { onRowTap(side, 1) }
-        }
-    }
-}
-
-private struct DeviceStatusRow: View {
-    let title: String
-    var isConnected: Bool = false
-
-    var body: some View {
-        HStack(spacing: 14) {
-            DashboardSensorIcon()
-
-            Text(title)
-                .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(Color.black)
-
-            Spacer()
-
-            Text(isConnected ? "已連線" : "--")
-                .font(.system(size: 18))
-                .foregroundStyle(DashboardPalette.mutedText)
-        }
-        .padding(.vertical, 14)
-        .padding(.horizontal, 16)
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.black.opacity(0.06), lineWidth: 1)
-        )
-    }
-}
-
-private struct DashboardSensorIcon: View {
-    var body: some View {
-        RoundedRectangle(cornerRadius: 6)
-            .fill(Color.black)
-            .frame(width: 20, height: 34)
-            .overlay(
-                Capsule()
-                    .fill(Color.white.opacity(0.85))
-                    .frame(width: 10, height: 3)
-                    .offset(y: -9)
-            )
     }
 }
 
