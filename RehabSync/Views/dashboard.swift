@@ -792,6 +792,7 @@ private struct DashboardCalendarCard: View {
                 ForEach(columns, id: \.date) { column in
                     DashboardWeekDayColumnView(column: column, isSelected: column.date == selectedDay)
                         .frame(maxWidth: .infinity)
+                        .contentShape(Rectangle())
                         .onTapGesture { selectedDay = column.date }
                 }
             }
