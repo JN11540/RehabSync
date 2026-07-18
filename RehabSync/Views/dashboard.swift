@@ -706,7 +706,7 @@ private struct DashboardTrainingMenuRow: View {
     let exercise: Exercise?
 
     var body: some View {
-        HStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 12) {
             Group {
                 if let id = exercise?.id {
                     Image("Exercise\(id)")
@@ -717,9 +717,11 @@ private struct DashboardTrainingMenuRow: View {
                         .foregroundStyle(DashboardPalette.mutedText)
                 }
             }
-            .frame(width: 48, height: 48)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .frame(maxWidth: .infinity)
+            .frame(height: 120)
+            .clipped()
             .background(DashboardPalette.indigoFaint)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(exercise?.name ?? "未知動作")
