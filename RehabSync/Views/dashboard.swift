@@ -459,7 +459,7 @@ private struct ActivityChartCard: View {
                             .font(.system(size: 16))
                             .foregroundStyle(DashboardPalette.mutedText)
                         Text(dateLabel(for: pair.1))
-                            .font(.system(size: 12))
+                            .font(.system(size: 16))
                             .foregroundStyle(DashboardPalette.mutedText)
                     }
                     .frame(width: dayGroupWidth)
