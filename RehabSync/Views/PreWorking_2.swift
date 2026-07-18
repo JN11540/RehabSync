@@ -10,7 +10,7 @@ struct PreWorking_2: View {
     fileprivate static let midPurple = Color(red: 0.45, green: 0.35, blue: 0.85)
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
+        ZStack(alignment: .topLeading) {
             HStack(spacing: 24) {
                 PreWorking2EquipmentPanel()
                     .frame(maxWidth: .infinity)
@@ -57,8 +57,12 @@ private struct PreWorking2EquipmentPanel: View {
             PreWorking2CloudDecoration()
 
             VStack(spacing: 40) {
-                PreWorking2EquipmentItem(iconSystemName: "cpu", label: "裝置連線了嗎？")
-                PreWorking2EquipmentItem(iconSystemName: "figure.walk", label: "護膝穿戴了嗎？")
+                PreWorking2EquipmentItem(label: "裝置連線了嗎？") {
+                    BluetoothIcon()
+                        .stroke(PreWorking_2.midPurple, style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
+                        .frame(width: 44, height: 64)
+                }
+                PreWorking2EquipmentItem(label: "護膝穿戴了嗎？")
             }
             .padding(40)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -93,26 +97,50 @@ private struct PreWorking2CloudDecoration: View {
     }
 }
 
-private struct PreWorking2EquipmentItem: View {
-    let iconSystemName: String
+private struct PreWorking2EquipmentItem<Icon: View>: View {
     let label: String
+    @ViewBuilder var icon: () -> Icon
 
     var body: some View {
         VStack(spacing: 16) {
-            ZStack {
-                Circle()
-                    .fill(Color.white)
-                    .frame(width: 160, height: 160)
-                    .overlay(Circle().stroke(Color(red: 0.75, green: 0.68, blue: 0.95), lineWidth: 3))
-                    .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
-                Image(systemName: iconSystemName)
-                    .font(.system(size: 56, weight: .medium))
-                    .foregroundStyle(PreWorking_2.midPurple)
-            }
+            Circle()
+                .fill(Color.white)
+                .frame(width: 160, height: 160)
+                .overlay(Circle().stroke(Color(red: 0.75, green: 0.68, blue: 0.95), lineWidth: 3))
+                .overlay { icon() }
+                .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
             Text(label)
                 .font(.system(size: 19, weight: .bold))
                 .foregroundStyle(PreWorking_2.darkPurple)
         }
+    }
+}
+
+extension PreWorking2EquipmentItem where Icon == EmptyView {
+    init(label: String) {
+        self.label = label
+        self.icon = { EmptyView() }
+    }
+}
+
+/// 藍牙標誌（SF Symbols 沒有官方藍牙圖示，改用路徑手繪經典的藍牙符文外形）。
+private struct BluetoothIcon: Shape {
+    func path(in rect: CGRect) -> Path {
+        let w = rect.width
+        let h = rect.height
+        var path = Path()
+        path.move(to: CGPoint(x: w * 0.5, y: 0))
+        path.addLine(to: CGPoint(x: w * 0.78, y: h * 0.26))
+        path.addLine(to: CGPoint(x: w * 0.5, y: h * 0.5))
+        path.addLine(to: CGPoint(x: w * 0.78, y: h * 0.74))
+        path.addLine(to: CGPoint(x: w * 0.5, y: h))
+        path.addLine(to: CGPoint(x: w * 0.5, y: h * 0.62))
+        path.addLine(to: CGPoint(x: w * 0.22, y: h * 0.76))
+        path.addLine(to: CGPoint(x: w * 0.5, y: h * 0.5))
+        path.addLine(to: CGPoint(x: w * 0.22, y: h * 0.24))
+        path.addLine(to: CGPoint(x: w * 0.5, y: h * 0.38))
+        path.closeSubpath()
+        return path
     }
 }
 
@@ -144,7 +172,7 @@ private struct PreWorking2AboutPanel: View {
 
             Button {} label: {
                 HStack(spacing: 8) {
-                    Text("了解更多")
+                    Text("下一步")
                     Image(systemName: "arrow.right")
                 }
                 .font(.system(size: 17, weight: .semibold))
