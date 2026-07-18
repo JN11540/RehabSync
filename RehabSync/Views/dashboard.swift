@@ -627,26 +627,21 @@ private struct DashboardDeviceListModal: View {
 
 // MARK: - Schedule Panel (right column)
 
-private struct DashboardAppointment {
-    let icon: String
-    let title: String
-    let time: String
-    let subtitle: String?
-
-    init(icon: String, title: String, time: String, subtitle: String? = nil) {
-        self.icon = icon
-        self.title = title
-        self.time = time
-        self.subtitle = subtitle
-    }
-}
-
 private struct DashboardSchedulePanel: View {
     @Binding var selectedDay: Int
 
-    private let topAppointments: [DashboardAppointment] = [
-        DashboardAppointment(icon: "🦷", title: "牙科門診", time: "09:00-11:00", subtitle: "Dr. Cameron Wülamcon")
-    ]
+    @State private var treatmentVM = TreatmentViewModel()
+    @State private var contentVM = TreatmentContentViewModel()
+    @State private var exerciseVM = ExerciseViewModel()
+
+    /// 資料庫沒有治療計畫選擇 UI，比照 Test1 的作法，以第一個治療計畫代表「目前的訓練菜單」。
+    private func loadTrainingMenu() {
+        treatmentVM.fetchAll()
+        if let treatmentId = treatmentVM.treatments.first?.id {
+            contentVM.fetchAll(for: Int(treatmentId))
+        }
+        exerciseVM.fetchAll()
+    }
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -674,14 +669,55 @@ private struct DashboardSchedulePanel: View {
 
                 DashboardCalendarCard(selectedDay: $selectedDay)
 
-                HStack(spacing: 12) {
-                    ForEach(topAppointments.indices, id: \.self) { index in
-                        DashboardAppointmentChip(appointment: topAppointments[index], highlighted: index == 0)
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("訓練菜單")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.black)
+
+                    ForEach(contentVM.contents, id: \.self) { content in
+                        DashboardTrainingMenuRow(content: content, exercise: exerciseVM.fetch(by: content.exercise_id))
                     }
                 }
             }
             .padding(24)
         }
+        .onAppear { loadTrainingMenu() }
+    }
+}
+
+private struct DashboardTrainingMenuRow: View {
+    let content: TreatmentContent
+    let exercise: Exercise?
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Group {
+                if let id = exercise?.id {
+                    Image("Exercise\(id)")
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    Image(systemName: "photo")
+                        .foregroundStyle(DashboardPalette.mutedText)
+                }
+            }
+            .frame(width: 48, height: 48)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .background(DashboardPalette.indigoFaint)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(exercise?.name ?? "未知動作")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.black)
+                Text("組數 \(content.sets) · 次數 \(content.reps) · 組間休息 \(content.set_rest_time) 秒")
+                    .font(.system(size: 12))
+                    .foregroundStyle(DashboardPalette.mutedText)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
@@ -764,38 +800,6 @@ private struct DashboardWeekDayColumnView: View {
                     )
             }
         }
-    }
-}
-
-// MARK: - Appointment Chips
-
-private struct DashboardAppointmentChip: View {
-    let appointment: DashboardAppointment
-    var highlighted: Bool = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text(appointment.title)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(highlighted ? .white : Color.black)
-                Spacer()
-                Text(appointment.icon)
-                    .font(.system(size: 18))
-            }
-            Text(appointment.time)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(highlighted ? .white.opacity(0.85) : DashboardPalette.mutedText)
-            if let subtitle = appointment.subtitle {
-                Text(subtitle)
-                    .font(.system(size: 12))
-                    .foregroundStyle(highlighted ? .white.opacity(0.7) : DashboardPalette.mutedText)
-            }
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(highlighted ? DashboardPalette.indigoDark : DashboardPalette.indigoFaint)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 }
 
