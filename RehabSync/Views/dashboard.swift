@@ -637,6 +637,7 @@ private struct DashboardSchedulePanel: View {
     @State private var exerciseVM = ExerciseViewModel()
     @State private var showPreWorking2 = false
     @State private var preWorking2Content: TreatmentContent? = nil
+    @State private var preWorking2Exercise: Exercise? = nil
 
     /// 資料庫沒有治療計畫選擇 UI，比照 Test1 的作法，以第一個治療計畫代表「目前的訓練菜單」。
     private func loadTrainingMenu() {
@@ -695,6 +696,7 @@ private struct DashboardSchedulePanel: View {
                                 onTap: {
                                     guard exercise?.name == "膝關節終端伸展" else { return }
                                     preWorking2Content = content
+                                    preWorking2Exercise = exercise
                                     showPreWorking2 = true
                                 }
                             )
@@ -708,7 +710,7 @@ private struct DashboardSchedulePanel: View {
         .onAppear { loadTrainingMenu() }
         .fullScreenCover(isPresented: $showPreWorking2) {
             if let preWorking2Content {
-                PreWorking_2(content: preWorking2Content, exercise: exerciseVM.fetch(by: preWorking2Content.exercise_id))
+                PreWorking_2(content: preWorking2Content, exercise: preWorking2Exercise)
             }
         }
     }
