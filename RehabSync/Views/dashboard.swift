@@ -265,7 +265,7 @@ private struct DeviceOverviewCard: View {
                 .foregroundStyle(Color.black)
 
             HStack(alignment: .top, spacing: 20) {
-                DeviceIllustration()
+                DeviceIllustration(onRowTap: onDeviceRowTap)
                     .frame(maxWidth: .infinity)
 
                 VStack(spacing: 20) {
@@ -286,6 +286,7 @@ private struct DeviceOverviewCard: View {
 }
 
 private struct DeviceIllustration: View {
+    var onRowTap: (Int, Int) -> Void = { _, _ in }
     @State private var deviceVM = DeviceViewModel()
 
     private var leftThighConnected: Bool { deviceVM.fetch(side: 0, limb: 0) != nil }
@@ -303,12 +304,20 @@ private struct DeviceIllustration: View {
 
                 DashboardConnectionBadge(isConnected: leftThighConnected)
                     .position(x: geo.size.width * 0.22, y: geo.size.height * 0.54)
+                    .contentShape(Rectangle())
+                    .onTapGesture { onRowTap(0, 0) }
                 DashboardConnectionBadge(isConnected: leftCalfConnected)
                     .position(x: geo.size.width * 0.22, y: geo.size.height * 0.84)
+                    .contentShape(Rectangle())
+                    .onTapGesture { onRowTap(0, 1) }
                 DashboardConnectionBadge(isConnected: rightThighConnected)
                     .position(x: geo.size.width * 0.78, y: geo.size.height * 0.54)
+                    .contentShape(Rectangle())
+                    .onTapGesture { onRowTap(1, 0) }
                 DashboardConnectionBadge(isConnected: rightCalfConnected)
                     .position(x: geo.size.width * 0.78, y: geo.size.height * 0.84)
+                    .contentShape(Rectangle())
+                    .onTapGesture { onRowTap(1, 1) }
             }
         }
         .frame(maxWidth: .infinity, minHeight: 340)
