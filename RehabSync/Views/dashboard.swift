@@ -635,6 +635,8 @@ private struct DashboardSchedulePanel: View {
     @State private var treatmentVM = TreatmentViewModel()
     @State private var contentVM = TreatmentContentViewModel()
     @State private var exerciseVM = ExerciseViewModel()
+    @State private var showPreWorking2 = false
+    @State private var preWorking2Content: TreatmentContent? = nil
 
     /// 資料庫沒有治療計畫選擇 UI，比照 Test1 的作法，以第一個治療計畫代表「目前的訓練菜單」。
     private func loadTrainingMenu() {
@@ -685,10 +687,16 @@ private struct DashboardSchedulePanel: View {
                             .frame(maxWidth: .infinity, alignment: .center)
                     } else {
                         ForEach(selectedDayContents, id: \.self) { content in
+                            let exercise = exerciseVM.fetch(by: content.exercise_id)
                             DashboardTrainingMenuRow(
                                 content: content,
-                                exercise: exerciseVM.fetch(by: content.exercise_id),
-                                isInteractive: isSelectedDayToday
+                                exercise: exercise,
+                                isInteractive: isSelectedDayToday,
+                                onTap: {
+                                    guard exercise?.name == "膝關節終端伸展" else { return }
+                                    preWorking2Content = content
+                                    showPreWorking2 = true
+                                }
                             )
                         }
                     }
@@ -698,6 +706,11 @@ private struct DashboardSchedulePanel: View {
         }
         .padding(24)
         .onAppear { loadTrainingMenu() }
+        .fullScreenCover(isPresented: $showPreWorking2) {
+            if let preWorking2Content {
+                PreWorking_2(content: preWorking2Content, exercise: exerciseVM.fetch(by: preWorking2Content.exercise_id))
+            }
+        }
     }
 }
 
@@ -705,6 +718,7 @@ private struct DashboardTrainingMenuRow: View {
     let content: TreatmentContent
     let exercise: Exercise?
     var isInteractive: Bool = true
+    var onTap: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -737,6 +751,8 @@ private struct DashboardTrainingMenuRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        .contentShape(Rectangle())
+        .onTapGesture { onTap() }
         .opacity(isInteractive ? 1 : 0.5)
         .allowsHitTesting(isInteractive)
     }
