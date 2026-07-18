@@ -60,13 +60,13 @@ private struct PreWorking2EquipmentPanel: View {
                 PreWorking2EquipmentItem(label: "裝置連線了嗎？") {
                     BluetoothIcon()
                         .stroke(PreWorking_2.midPurple, style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
-                        .frame(width: 44, height: 64)
+                        .frame(width: 60, height: 88)
                 }
                 PreWorking2EquipmentItem(label: "護膝穿戴了嗎？") {
                     Image("WearPadAndGearsIcon")
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 100, height: 100)
+                        .frame(width: 130, height: 130)
                 }
             }
             .padding(40)
