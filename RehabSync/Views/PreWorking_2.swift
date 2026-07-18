@@ -5,6 +5,7 @@ struct PreWorking_2: View {
     let exercise: Exercise?
 
     @Environment(\.dismiss) private var dismiss
+    @State private var pageTitle = "確認裝備齊全"
 
     fileprivate static let darkPurple = Color(red: 0.30, green: 0.16, blue: 0.65)
     fileprivate static let midPurple = Color(red: 0.45, green: 0.35, blue: 0.85)
@@ -15,8 +16,10 @@ struct PreWorking_2: View {
                 PreWorking2EquipmentPanel()
                     .frame(maxWidth: .infinity)
 
-                PreWorking2AboutPanel()
-                    .frame(maxWidth: .infinity)
+                PreWorking2AboutPanel(title: pageTitle) {
+                    pageTitle = "準備椅子"
+                }
+                .frame(maxWidth: .infinity)
             }
             .padding(24)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -154,12 +157,15 @@ private struct BluetoothIcon: Shape {
 // MARK: - About Us Panel
 
 private struct PreWorking2AboutPanel: View {
+    let title: String
+    var onNext: () -> Void = {}
+
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             Spacer()
 
             HStack(spacing: 8) {
-                Text("確認裝備齊全")
+                Text(title)
                     .font(.system(size: 40, weight: .heavy))
                     .foregroundStyle(PreWorking_2.darkPurple)
                 Image(systemName: "sparkle")
@@ -177,7 +183,7 @@ private struct PreWorking2AboutPanel: View {
                     .lineSpacing(8)
             }
 
-            Button {} label: {
+            Button(action: onNext) {
                 HStack(spacing: 8) {
                     Text("下一步")
                     Image(systemName: "arrow.right")
