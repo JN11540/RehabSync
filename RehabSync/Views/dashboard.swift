@@ -393,10 +393,34 @@ private struct ActivityChartCard: View {
     /// 同一天 4 根柱子的總寬度，讓不同天之間的間距（barSpacing）跟同一天內柱子的間距一致。
     private var dayGroupWidth: CGFloat { 4 * barWidth + 3 * barSpacing }
 
+    private var taipeiCalendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Asia/Taipei") ?? .current
+        calendar.firstWeekday = 2 // 週一為一週的開始
+        return calendar
+    }
+
+    /// 以台灣時區偵測今天所在的這週（週一~週日）日期。
+    private var weekDates: [Date] {
+        let calendar = taipeiCalendar
+        let today = calendar.startOfDay(for: Date())
+        let weekday = calendar.component(.weekday, from: today) // 1=週日, 2=週一, ..., 7=週六
+        let daysSinceMonday = (weekday + 5) % 7
+        guard let monday = calendar.date(byAdding: .day, value: -daysSinceMonday, to: today) else { return [] }
+        return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: monday) }
+    }
+
+    private func dateLabel(for date: Date) -> String {
+        let calendar = taipeiCalendar
+        let month = calendar.component(.month, from: date)
+        let day = calendar.component(.day, from: date)
+        return "\(month)/\(day)"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("活動數據")
-                .font(.system(size: 17, weight: .semibold))
+                .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(Color.black)
 
             HStack(alignment: .bottom, spacing: barSpacing) {
@@ -429,11 +453,16 @@ private struct ActivityChartCard: View {
             .frame(height: chartHeight)
 
             HStack(spacing: barSpacing) {
-                ForEach(weekdays, id: \.self) { day in
-                    Text(day)
-                        .font(.system(size: 13))
-                        .foregroundStyle(DashboardPalette.mutedText)
-                        .frame(width: dayGroupWidth)
+                ForEach(Array(zip(weekdays, weekDates).enumerated()), id: \.offset) { _, pair in
+                    VStack(spacing: 2) {
+                        Text(pair.0)
+                            .font(.system(size: 16))
+                            .foregroundStyle(DashboardPalette.mutedText)
+                        Text(dateLabel(for: pair.1))
+                            .font(.system(size: 12))
+                            .foregroundStyle(DashboardPalette.mutedText)
+                    }
+                    .frame(width: dayGroupWidth)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .center)
