@@ -644,16 +644,6 @@ private struct DashboardSchedulePanel: View {
         DashboardAppointment(icon: "🦷", title: "牙科門診", time: "09:00-11:00", subtitle: "Dr. Cameron Wülamcon")
     ]
 
-    private let todayAppointments: [DashboardAppointment] = [
-        DashboardAppointment(icon: "🏃", title: "徒步康復訓練", time: "11:00 AM"),
-        DashboardAppointment(icon: "👁️", title: "眼科檢查", time: "14:00 PM")
-    ]
-
-    private let upcomingAppointments: [DashboardAppointment] = [
-        DashboardAppointment(icon: "❤️", title: "心率諮詢師", time: "12:00 AM"),
-        DashboardAppointment(icon: "👨‍⚕️", title: "神經科回診", time: "16:00 PM")
-    ]
-
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 24) {
@@ -684,15 +674,6 @@ private struct DashboardSchedulePanel: View {
                     ForEach(topAppointments.indices, id: \.self) { index in
                         DashboardAppointmentChip(appointment: topAppointments[index], highlighted: index == 0)
                     }
-                }
-
-                VStack(alignment: .leading, spacing: 14) {
-                    Text("即將到來的預約")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.black)
-
-                    DashboardAppointmentSection(label: "當日", appointments: todayAppointments)
-                    DashboardAppointmentSection(label: "近六", appointments: upcomingAppointments)
                 }
             }
             .padding(24)
@@ -803,47 +784,6 @@ private struct DashboardAppointmentChip: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(highlighted ? DashboardPalette.indigoDark : DashboardPalette.indigoFaint)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-    }
-}
-
-private struct DashboardAppointmentSection: View {
-    let label: String
-    let appointments: [DashboardAppointment]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(label)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(DashboardPalette.mutedText)
-
-            HStack(spacing: 12) {
-                ForEach(appointments.indices, id: \.self) { index in
-                    DashboardAppointmentTile(appointment: appointments[index])
-                }
-            }
-        }
-    }
-}
-
-private struct DashboardAppointmentTile: View {
-    let appointment: DashboardAppointment
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(appointment.icon)
-                .font(.system(size: 20))
-            Text(appointment.title)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Color.black)
-                .lineLimit(1)
-            Text(appointment.time)
-                .font(.system(size: 12))
-                .foregroundStyle(DashboardPalette.mutedText)
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(DashboardPalette.indigoFaint)
         .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 }
