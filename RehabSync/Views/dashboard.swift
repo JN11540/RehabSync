@@ -284,6 +284,18 @@ private struct DeviceIllustration: View {
     private var rightThighConnected: Bool { deviceVM.fetch(side: 1, limb: 0) != nil }
     private var rightCalfConnected: Bool { deviceVM.fetch(side: 1, limb: 1) != nil }
 
+    /// 已連線的左腿裝置數（0~2），用來判斷目前是不是「正要裝第二個裝置」的狀態。
+    private var leftConnectedCount: Int {
+        (leftThighConnected ? 1 : 0) + (leftCalfConnected ? 1 : 0)
+    }
+    private var rightConnectedCount: Int {
+        (rightThighConnected ? 1 : 0) + (rightCalfConnected ? 1 : 0)
+    }
+
+    /// 第一個裝置裝在左腿、右腿還沒開始裝時，鎖住右腿，強迫先把左腿裝滿；反之亦然。
+    private var isLeftDisabled: Bool { rightConnectedCount == 1 && leftConnectedCount == 0 }
+    private var isRightDisabled: Bool { leftConnectedCount == 1 && rightConnectedCount == 0 }
+
     var body: some View {
         GeometryReader { geo in
             ZStack {
@@ -295,18 +307,26 @@ private struct DeviceIllustration: View {
                 DashboardConnectionBadge(label: "左大腿", isConnected: leftThighConnected)
                     .contentShape(Rectangle())
                     .onTapGesture { onRowTap(0, 0) }
+                    .allowsHitTesting(!isLeftDisabled)
+                    .opacity(isLeftDisabled ? 0.4 : 1)
                     .position(x: geo.size.width * 0.22, y: geo.size.height * 0.54)
                 DashboardConnectionBadge(label: "左小腿", isConnected: leftCalfConnected)
                     .contentShape(Rectangle())
                     .onTapGesture { onRowTap(0, 1) }
+                    .allowsHitTesting(!isLeftDisabled)
+                    .opacity(isLeftDisabled ? 0.4 : 1)
                     .position(x: geo.size.width * 0.22, y: geo.size.height * 0.84)
                 DashboardConnectionBadge(label: "右大腿", isConnected: rightThighConnected)
                     .contentShape(Rectangle())
                     .onTapGesture { onRowTap(1, 0) }
+                    .allowsHitTesting(!isRightDisabled)
+                    .opacity(isRightDisabled ? 0.4 : 1)
                     .position(x: geo.size.width * 0.78, y: geo.size.height * 0.54)
                 DashboardConnectionBadge(label: "右小腿", isConnected: rightCalfConnected)
                     .contentShape(Rectangle())
                     .onTapGesture { onRowTap(1, 1) }
+                    .allowsHitTesting(!isRightDisabled)
+                    .opacity(isRightDisabled ? 0.4 : 1)
                     .position(x: geo.size.width * 0.78, y: geo.size.height * 0.84)
             }
         }
@@ -321,7 +341,7 @@ private struct DashboardConnectionBadge: View {
     var body: some View {
         VStack(spacing: 6) {
             Text(label)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Color.black)
 
             Text(isConnected ? "已連線" : "未連線")
