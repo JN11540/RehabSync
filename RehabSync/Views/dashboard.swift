@@ -643,6 +643,15 @@ private struct DashboardSchedulePanel: View {
         exerciseVM.fetchAll()
     }
 
+    /// 只顯示今天（台灣時區）的訓練菜單。
+    private var todayContents: [TreatmentContent] {
+        let calendar = taipeiCalendar()
+        let today = calendar.startOfDay(for: Date())
+        return contentVM.contents.filter {
+            calendar.startOfDay(for: Date(timeIntervalSince1970: TimeInterval($0.date))) == today
+        }
+    }
+
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 24) {
@@ -674,7 +683,7 @@ private struct DashboardSchedulePanel: View {
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(Color.black)
 
-                    ForEach(contentVM.contents, id: \.self) { content in
+                    ForEach(todayContents, id: \.self) { content in
                         DashboardTrainingMenuRow(content: content, exercise: exerciseVM.fetch(by: content.exercise_id))
                     }
                 }
