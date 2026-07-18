@@ -56,13 +56,12 @@ private struct PreWorking2EquipmentPanel: View {
 
             PreWorking2CloudDecoration()
 
-            VStack(alignment: .leading, spacing: 12) {
-                VStack(spacing: 40) {
-                    PreWorking2EquipmentItem(iconSystemName: "cpu", label: "裝置連線了嗎？")
-                    PreWorking2EquipmentItem(iconSystemName: "figure.walk", label: "護膝穿戴了嗎？")
-                }
+            VStack(spacing: 40) {
+                PreWorking2EquipmentItem(iconSystemName: "cpu", label: "裝置連線了嗎？")
+                PreWorking2EquipmentItem(iconSystemName: "figure.walk", label: "護膝穿戴了嗎？")
             }
             .padding(40)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 }
