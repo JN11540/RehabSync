@@ -268,6 +268,43 @@ private struct PreWorking2AboutPanel: View {
 
 // MARK: - Impact / Numbers Page
 
+/// 「動作逐步指南」內部的分頁，之後每新增一頁指南就在這裡加一個 case。
+private enum PreWorkingGuideStep {
+    case prepare
+    case extendKnee
+
+    var title: String {
+        switch self {
+        case .prepare: "動作逐步指南\n1. 準備姿勢"
+        case .extendKnee: "動作逐步指南\n2. 伸展膝蓋"
+        }
+    }
+
+    var bodyText: String {
+        switch self {
+        case .prepare:
+            "首先舒適地坐在穩固的椅子上。雙腳平放在地面上，確保背部挺直並得到支撐。雙手放在椅子兩側以穩定上半身，並將注意力集中在腿部肌肉上。"
+        case .extendKnee:
+            "使用右腿開始練習。慢慢伸直膝蓋，抬起腳，直到腿與地面平行。伸展時，保持腳尖繃直－這樣可以啟動股四頭肌，這是這個動作的主要目標肌群。重點在於控制動作，而不是追求速度。"
+        }
+    }
+
+    /// 目前只有準備姿勢頁有示範圖，伸展膝蓋頁的矩形框先留空。
+    var hasPoseImages: Bool {
+        switch self {
+        case .prepare: true
+        case .extendKnee: false
+        }
+    }
+
+    var next: PreWorkingGuideStep? {
+        switch self {
+        case .prepare: .extendKnee
+        case .extendKnee: nil
+        }
+    }
+}
+
 private struct PreWorking2ImpactPage: View {
     private enum PoseAngle {
         case side
@@ -276,6 +313,7 @@ private struct PreWorking2ImpactPage: View {
 
     @State private var side: Int = 0
     @State private var selectedAngle: PoseAngle = .side
+    @State private var guideStep: PreWorkingGuideStep = .prepare
 
     /// side = 0（左，含資料庫查無資料時的預設值）或 1（右），對應到匯入的示範圖 asset 名稱。
     private var sideViewImageName: String {
@@ -296,18 +334,20 @@ private struct PreWorking2ImpactPage: View {
     var body: some View {
         HStack(alignment: .center, spacing: 40) {
             VStack(alignment: .leading, spacing: 20) {
-                Text("動作逐步指南\n1. 準備姿勢")
+                Text(guideStep.title)
                     .font(.system(size: 40, weight: .heavy))
                     .foregroundStyle(PreWorking_2.darkPurple)
                     .lineSpacing(6)
 
-                Text("首先舒適地坐在穩固的椅子上。雙腳平放在地面上，確保背部挺直並得到支撐。雙手放在椅子兩側以穩定上半身，並將注意力集中在腿部肌肉上。")
+                Text(guideStep.bodyText)
                     .font(.system(size: 20))
                     .foregroundStyle(Color.black.opacity(0.6))
                     .lineSpacing(6)
                     .frame(maxWidth: 320, alignment: .leading)
 
-                Button {} label: {
+                Button(action: {
+                    if let next = guideStep.next { guideStep = next }
+                }) {
                     HStack(spacing: 8) {
                         Text("下一步")
                         Image(systemName: "arrow.right")
@@ -320,20 +360,29 @@ private struct PreWorking2ImpactPage: View {
                     .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
+                .disabled(guideStep.next == nil)
+                .opacity(guideStep.next == nil ? 0.4 : 1)
             }
             .frame(maxWidth: 380, alignment: .leading)
 
             VStack(alignment: .leading, spacing: 16) {
-                PreWorking2PoseImageCard(imageName: mainImageName)
+                PreWorking2PoseImageCard(imageName: guideStep.hasPoseImages ? mainImageName : nil)
                     .frame(width: 500, height: 500)
 
                 HStack(spacing: 16) {
-                    PreWorking2PoseImageCard(imageName: sideViewImageName, isSelected: selectedAngle == .side)
-                        .frame(width: 100, height: 100)
-                        .onTapGesture { selectedAngle = .side }
-                    PreWorking2PoseImageCard(imageName: frontViewImageName, isSelected: selectedAngle == .front)
-                        .frame(width: 100, height: 100)
-                        .onTapGesture { selectedAngle = .front }
+                    PreWorking2PoseImageCard(
+                        imageName: guideStep.hasPoseImages ? sideViewImageName : nil,
+                        isSelected: selectedAngle == .side
+                    )
+                    .frame(width: 100, height: 100)
+                    .onTapGesture { if guideStep.hasPoseImages { selectedAngle = .side } }
+
+                    PreWorking2PoseImageCard(
+                        imageName: guideStep.hasPoseImages ? frontViewImageName : nil,
+                        isSelected: selectedAngle == .front
+                    )
+                    .frame(width: 100, height: 100)
+                    .onTapGesture { if guideStep.hasPoseImages { selectedAngle = .front } }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -347,17 +396,19 @@ private struct PreWorking2ImpactPage: View {
 }
 
 private struct PreWorking2PoseImageCard: View {
-    let imageName: String
+    let imageName: String?
     var isSelected: Bool = true
 
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 20)
                 .fill(Color.white)
-            Image(imageName)
-                .resizable()
-                .scaledToFit()
-                .padding(8)
+            if let imageName {
+                Image(imageName)
+                    .resizable()
+                    .scaledToFit()
+                    .padding(8)
+            }
         }
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .overlay(
