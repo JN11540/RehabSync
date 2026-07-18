@@ -672,8 +672,14 @@ private struct DashboardSchedulePanel: View {
                         .font(.system(size: 22, weight: .semibold))
                         .foregroundStyle(Color.black)
 
-                    ForEach(selectedDayContents, id: \.self) { content in
-                        DashboardTrainingMenuRow(content: content, exercise: exerciseVM.fetch(by: content.exercise_id))
+                    if selectedDayContents.isEmpty {
+                        Text("當天沒有安排任何訓練動作")
+                            .font(.system(size: 16))
+                            .foregroundStyle(DashboardPalette.mutedText)
+                    } else {
+                        ForEach(selectedDayContents, id: \.self) { content in
+                            DashboardTrainingMenuRow(content: content, exercise: exerciseVM.fetch(by: content.exercise_id))
+                        }
                     }
                 }
             }
