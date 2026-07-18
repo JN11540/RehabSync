@@ -76,16 +76,16 @@ struct Dashboard: View {
                         .frame(maxWidth: .infinity)
                         .padding(28)
                         .background(Color.white)
+
+                    DashboardSchedulePanel(selectedDay: $selectedDay)
+                        .frame(width: 380)
+                        .background(DashboardPalette.panelBackground)
                 } else {
                     DashboardPlaceholderCard(title: selectedNav.title)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .padding(28)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .background(Color.white)
                 }
-
-                DashboardSchedulePanel(selectedDay: $selectedDay)
-                    .frame(width: 380)
-                    .background(DashboardPalette.panelBackground)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.white)
@@ -229,19 +229,14 @@ private struct DashboardPlaceholderCard: View {
     let title: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            HStack {
-                Text(title)
-                    .font(.system(size: 26, weight: .bold))
-                    .foregroundStyle(Color.black)
-                Spacer()
-                Image(systemName: "bell.fill")
-                    .font(.system(size: 20))
-                    .foregroundStyle(DashboardPalette.indigo)
-            }
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(Color.black)
 
             Spacer()
         }
+        .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
