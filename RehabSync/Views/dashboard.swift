@@ -489,11 +489,30 @@ private struct DashboardDeviceListModal: View {
                 .shadow(color: .black.opacity(0.2), radius: 20, y: 8)
 
             VStack(alignment: .leading, spacing: 16) {
-                Text("藍牙裝置")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(Color.black)
-                    .padding(.top, 44)
-                    .padding(.horizontal, 24)
+                HStack {
+                    Text("藍牙裝置")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(Color.black)
+                        .padding(.leading, 24)
+
+                    Spacer()
+
+                    Button(action: handleCancel) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.white)
+                            Circle()
+                                .stroke(DashboardPalette.indigo, lineWidth: 1.5)
+                            Image(systemName: "xmark")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundStyle(DashboardPalette.indigo)
+                        }
+                        .frame(width: 32, height: 32)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.trailing, 16)
+                }
+                .padding(.top, 16)
 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 12) {
@@ -551,22 +570,6 @@ private struct DashboardDeviceListModal: View {
                     .padding(.bottom, 80)
                 }
             }
-
-            Button(action: handleCancel) {
-                ZStack {
-                    Circle()
-                        .fill(Color.white)
-                    Circle()
-                        .stroke(DashboardPalette.indigo, lineWidth: 1.5)
-                    Image(systemName: "xmark")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(DashboardPalette.indigo)
-                }
-                .frame(width: 32, height: 32)
-                .padding(16)
-            }
-            .buttonStyle(.plain)
-            .frame(maxWidth: .infinity, alignment: .trailing)
 
             Button(action: handleConfirm) {
                 ZStack {
