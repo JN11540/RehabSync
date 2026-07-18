@@ -70,7 +70,7 @@ private struct PreWorking2EquipmentPanel: View {
                 Image("ChairIcon")
                     .resizable()
                     .scaledToFit()
-                    .frame(maxWidth: 320, maxHeight: 320)
+                    .frame(maxWidth: 500, maxHeight: 500)
                     .padding(40)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
