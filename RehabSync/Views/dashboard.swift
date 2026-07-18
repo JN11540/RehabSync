@@ -1,5 +1,4 @@
 import SwiftUI
-import Combine
 
 // MARK: - Dashboard Palette
 
@@ -46,6 +45,17 @@ struct Dashboard: View {
                 deviceVM.delete(uuid: device.device_uuid)
             }
         }
+
+        // 一腿裝一個裝置（左右各一，非同腿湊滿兩個）不是合法配對狀態，偵測到就兩個都解除綁定。
+        let leftCount = (0...1).filter { deviceVM.fetch(side: 0, limb: $0) != nil }.count
+        let rightCount = (0...1).filter { deviceVM.fetch(side: 1, limb: $0) != nil }.count
+        if leftCount == 1 && rightCount == 1 {
+            for limb in 0...1 {
+                if let device = deviceVM.fetch(side: 0, limb: limb) { deviceVM.delete(uuid: device.device_uuid) }
+                if let device = deviceVM.fetch(side: 1, limb: limb) { deviceVM.delete(uuid: device.device_uuid) }
+            }
+        }
+
         deviceStatusTick += 1
     }
 
@@ -89,8 +99,12 @@ struct Dashboard: View {
                     .frame(width: 420, height: 520)
             }
         }
-        .onReceive(Timer.publish(every: 5, on: .main, in: .common).autoconnect()) { _ in
-            checkBoundDevicesReachable()
+        .task {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            while !Task.isCancelled {
+                checkBoundDevicesReachable()
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+            }
         }
     }
 }
@@ -296,6 +310,14 @@ private struct DeviceIllustration: View {
     private var isLeftDisabled: Bool { rightConnectedCount == 1 && leftConnectedCount == 0 }
     private var isRightDisabled: Bool { leftConnectedCount == 1 && rightConnectedCount == 0 }
 
+    /// 裝置最多接兩個，湊滿兩個之後，尚未連線的圓形都不可再點擊。
+    private var isMaxDevicesReached: Bool { leftConnectedCount + rightConnectedCount >= 2 }
+
+    private var isLeftThighDisabled: Bool { isLeftDisabled || (isMaxDevicesReached && !leftThighConnected) }
+    private var isLeftCalfDisabled: Bool { isLeftDisabled || (isMaxDevicesReached && !leftCalfConnected) }
+    private var isRightThighDisabled: Bool { isRightDisabled || (isMaxDevicesReached && !rightThighConnected) }
+    private var isRightCalfDisabled: Bool { isRightDisabled || (isMaxDevicesReached && !rightCalfConnected) }
+
     var body: some View {
         GeometryReader { geo in
             ZStack {
@@ -307,26 +329,26 @@ private struct DeviceIllustration: View {
                 DashboardConnectionBadge(label: "左大腿", isConnected: leftThighConnected)
                     .contentShape(Rectangle())
                     .onTapGesture { onRowTap(0, 0) }
-                    .allowsHitTesting(!isLeftDisabled)
-                    .opacity(isLeftDisabled ? 0.4 : 1)
+                    .allowsHitTesting(!isLeftThighDisabled)
+                    .opacity(isLeftThighDisabled ? 0.4 : 1)
                     .position(x: geo.size.width * 0.22, y: geo.size.height * 0.54)
                 DashboardConnectionBadge(label: "左小腿", isConnected: leftCalfConnected)
                     .contentShape(Rectangle())
                     .onTapGesture { onRowTap(0, 1) }
-                    .allowsHitTesting(!isLeftDisabled)
-                    .opacity(isLeftDisabled ? 0.4 : 1)
+                    .allowsHitTesting(!isLeftCalfDisabled)
+                    .opacity(isLeftCalfDisabled ? 0.4 : 1)
                     .position(x: geo.size.width * 0.22, y: geo.size.height * 0.84)
                 DashboardConnectionBadge(label: "右大腿", isConnected: rightThighConnected)
                     .contentShape(Rectangle())
                     .onTapGesture { onRowTap(1, 0) }
-                    .allowsHitTesting(!isRightDisabled)
-                    .opacity(isRightDisabled ? 0.4 : 1)
+                    .allowsHitTesting(!isRightThighDisabled)
+                    .opacity(isRightThighDisabled ? 0.4 : 1)
                     .position(x: geo.size.width * 0.78, y: geo.size.height * 0.54)
                 DashboardConnectionBadge(label: "右小腿", isConnected: rightCalfConnected)
                     .contentShape(Rectangle())
                     .onTapGesture { onRowTap(1, 1) }
-                    .allowsHitTesting(!isRightDisabled)
-                    .opacity(isRightDisabled ? 0.4 : 1)
+                    .allowsHitTesting(!isRightCalfDisabled)
+                    .opacity(isRightCalfDisabled ? 0.4 : 1)
                     .position(x: geo.size.width * 0.78, y: geo.size.height * 0.84)
             }
         }
