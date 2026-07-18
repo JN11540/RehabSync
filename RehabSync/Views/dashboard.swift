@@ -10,8 +10,6 @@ private enum DashboardPalette {
     static let teal = Color(red: 0.38, green: 0.85, blue: 0.78)
     static let panelBackground = Color(red: 0.965, green: 0.965, blue: 0.99)
     static let cardBackground = Color(red: 0.98, green: 0.98, blue: 0.995)
-    static let onlineDot = Color(red: 0.30, green: 0.78, blue: 0.62)
-    static let offlineDot = Color(red: 0.75, green: 0.75, blue: 0.79)
     static let mutedText = Color(red: 0.55, green: 0.56, blue: 0.62)
 }
 
@@ -261,7 +259,7 @@ private struct DeviceOverviewCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("裝置")
-                .font(.system(size: 20, weight: .semibold))
+                .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(Color.black)
 
             DeviceIllustration(onRowTap: onDeviceRowTap)
@@ -320,19 +318,14 @@ private struct DashboardConnectionBadge: View {
     var isConnected: Bool = false
 
     var body: some View {
-        VStack(spacing: 4) {
-            Circle()
-                .fill(isConnected ? DashboardPalette.onlineDot : DashboardPalette.offlineDot)
-                .frame(width: 8, height: 8)
-            Text(isConnected ? "已連線" : "未連線")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(Color.black.opacity(0.7))
-                .multilineTextAlignment(.center)
-        }
-        .frame(width: 72, height: 72)
-        .background(Color.white)
-        .clipShape(Circle())
-        .shadow(color: .black.opacity(0.08), radius: 5, y: 2)
+        Text(isConnected ? "已連線" : "未連線")
+            .font(.system(size: 16, weight: .medium))
+            .foregroundStyle(isConnected ? Color.white : Color.black.opacity(0.7))
+            .multilineTextAlignment(.center)
+            .frame(width: 72, height: 72)
+            .background(isConnected ? DashboardPalette.teal : Color.white)
+            .clipShape(Circle())
+            .shadow(color: .black.opacity(0.08), radius: 5, y: 2)
     }
 }
 
