@@ -35,6 +35,7 @@ struct PreWorking_2: View {
             }
             .buttonStyle(.plain)
             .padding(20)
+            .offset(x: 10, y: 10)
         }
         .ignoresSafeArea()
     }
@@ -66,7 +67,7 @@ private struct PreWorking2EquipmentPanel: View {
                     Image("WearPadAndGearsIcon")
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 130, height: 130)
+                        .frame(width: 180, height: 180)
                 }
             }
             .padding(40)
@@ -111,8 +112,9 @@ private struct PreWorking2EquipmentItem<Icon: View>: View {
             Circle()
                 .fill(Color.white)
                 .frame(width: 200, height: 200)
-                .overlay(Circle().stroke(Color(red: 0.75, green: 0.68, blue: 0.95), lineWidth: 3))
                 .overlay { icon() }
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color(red: 0.75, green: 0.68, blue: 0.95), lineWidth: 3))
                 .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
             Text(label)
                 .font(.system(size: 25, weight: .bold))
