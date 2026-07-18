@@ -384,7 +384,7 @@ private struct DashboardConnectionBadge: View {
 private struct ActivityChartCard: View {
     private let weekdays = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
     private let chartHeight: CGFloat = 90
-    private let barHeight: CGFloat = 64
+    private let barHeight: CGFloat = 80
     private let barWidth: CGFloat = 3
     private let barSpacing: CGFloat = 12
     private let barColor = DashboardPalette.chartGray
