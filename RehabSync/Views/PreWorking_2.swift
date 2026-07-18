@@ -306,7 +306,7 @@ private struct PreWorking2ImpactPage: View {
             }
             .frame(maxWidth: 380, alignment: .leading)
 
-            VStack(spacing: 16) {
+            VStack(alignment: .leading, spacing: 16) {
                 PreWorking2ImpactStatCard(
                     icon: "leaf.fill",
                     valueMain: "10",
@@ -324,7 +324,7 @@ private struct PreWorking2ImpactPage: View {
                         label: "ANIMALS SAVED",
                         accentColor: Self.statAccent
                     )
-                    .frame(width: 192, height: 192)
+                    .frame(width: 150, height: 150)
                     PreWorking2ImpactStatCard(
                         icon: "drop.fill",
                         valueMain: "5",
@@ -332,7 +332,7 @@ private struct PreWorking2ImpactPage: View {
                         label: "RIVERS CLEANED",
                         accentColor: Self.statAccent
                     )
-                    .frame(width: 192, height: 192)
+                    .frame(width: 150, height: 150)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
