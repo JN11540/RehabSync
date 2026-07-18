@@ -35,7 +35,7 @@ struct PreWorking_2: View {
             }
             .buttonStyle(.plain)
             .padding(20)
-            .offset(x: 10, y: 10)
+            .offset(x: 20, y: 20)
         }
         .ignoresSafeArea()
     }
