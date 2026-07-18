@@ -669,7 +669,7 @@ private struct DashboardSchedulePanel: View {
 
                 VStack(alignment: .leading, spacing: 14) {
                     Text("訓練菜單")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 22, weight: .semibold))
                         .foregroundStyle(Color.black)
 
                     ForEach(selectedDayContents, id: \.self) { content in
@@ -710,7 +710,7 @@ private struct DashboardTrainingMenuRow: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(Color.black)
                 Text("組數 \(content.sets) · 次數 \(content.reps) · 組間休息 \(content.set_rest_time) 秒")
-                    .font(.system(size: 14))
+                    .font(.system(size: 16))
                     .foregroundStyle(DashboardPalette.mutedText)
             }
         }
