@@ -314,7 +314,7 @@ private struct PreWorking2ImpactPage: View {
                     label: "TREES PLANTED",
                     accentColor: Self.statAccent
                 )
-                .frame(width: 500, height: 500)
+                .frame(width: 400, height: 400)
 
                 PreWorking2ImpactStatCard(
                     icon: "pawprint.fill",
@@ -323,7 +323,7 @@ private struct PreWorking2ImpactPage: View {
                     label: "ANIMALS SAVED",
                     accentColor: Self.statAccent
                 )
-                .frame(width: 500, height: 500)
+                .frame(width: 400, height: 400)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
