@@ -352,7 +352,7 @@ private struct DeviceIllustration: View {
                     .position(x: geo.size.width * 0.78, y: geo.size.height * 0.84)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 370)
+        .frame(maxWidth: .infinity, minHeight: 340)
     }
 }
 
