@@ -418,7 +418,7 @@ private struct ActivityChartCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 8) {
             Text("活動數據")
                 .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(Color.black)
@@ -443,7 +443,7 @@ private struct ActivityChartCard: View {
                                         .frame(width: barWidth, height: (index == 1 || index == 3) ? shortBarHeight : barHeight)
                                 }
                             }
-                            .offset(y: index == 1 ? -20 : (index == 2 ? -10 : 10))
+                            .offset(y: index == 1 ? -30 : (index == 2 ? -20 : 0))
                         }
                     }
                     .frame(width: dayGroupWidth)
