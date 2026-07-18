@@ -23,7 +23,7 @@ struct PreWorking_2: View {
                     pageSubtitle = "請先找一張高度剛好到您膝蓋的椅子"
                     isChairStep = true
                 }
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(24)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
