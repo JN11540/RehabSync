@@ -662,6 +662,12 @@ private struct DashboardSchedulePanel: View {
         }
     }
 
+    /// 動作卡片只有在檢視「今天」時才能點擊，檢視其他天（過去/未來）點擊要沒有反應。
+    private var isSelectedDayToday: Bool {
+        guard let selectedDate else { return false }
+        return taipeiCalendar().isDate(selectedDate, inSameDayAs: Date())
+    }
+
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 24) {
@@ -679,7 +685,11 @@ private struct DashboardSchedulePanel: View {
                             .frame(maxWidth: .infinity, alignment: .center)
                     } else {
                         ForEach(selectedDayContents, id: \.self) { content in
-                            DashboardTrainingMenuRow(content: content, exercise: exerciseVM.fetch(by: content.exercise_id))
+                            DashboardTrainingMenuRow(
+                                content: content,
+                                exercise: exerciseVM.fetch(by: content.exercise_id),
+                                isInteractive: isSelectedDayToday
+                            )
                         }
                     }
                 }
@@ -693,6 +703,7 @@ private struct DashboardSchedulePanel: View {
 private struct DashboardTrainingMenuRow: View {
     let content: TreatmentContent
     let exercise: Exercise?
+    var isInteractive: Bool = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -725,6 +736,8 @@ private struct DashboardTrainingMenuRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        .opacity(isInteractive ? 1 : 0.5)
+        .allowsHitTesting(isInteractive)
     }
 }
 
