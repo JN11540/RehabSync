@@ -314,7 +314,7 @@ private struct PreWorking2ImpactPage: View {
                     label: "TREES PLANTED",
                     accentColor: Self.statAccent
                 )
-                .frame(width: 400, height: 400)
+                .frame(width: 500, height: 500)
 
                 HStack(spacing: 16) {
                     PreWorking2ImpactStatCard(
@@ -324,7 +324,7 @@ private struct PreWorking2ImpactPage: View {
                         label: "ANIMALS SAVED",
                         accentColor: Self.statAccent
                     )
-                    .frame(width: 150, height: 150)
+                    .frame(width: 100, height: 100)
                     PreWorking2ImpactStatCard(
                         icon: "drop.fill",
                         valueMain: "5",
@@ -332,7 +332,7 @@ private struct PreWorking2ImpactPage: View {
                         label: "RIVERS CLEANED",
                         accentColor: Self.statAccent
                     )
-                    .frame(width: 150, height: 150)
+                    .frame(width: 100, height: 100)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
