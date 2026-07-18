@@ -33,6 +33,15 @@ private enum PreWorkingStep: Equatable {
         case .numbers: nil
         }
     }
+
+    var previous: PreWorkingStep? {
+        switch self {
+        case .equipment: nil
+        case .chair: .equipment
+        case .tablet: .chair
+        case .numbers: .tablet
+        }
+    }
 }
 
 struct PreWorking_2: View {
@@ -49,15 +58,20 @@ struct PreWorking_2: View {
         ZStack(alignment: .topLeading) {
             Group {
                 if step == .numbers {
-                    PreWorking2ImpactPage()
+                    PreWorking2ImpactPage(onExitToPreviousStep: {
+                        if let previous = step.previous { step = previous }
+                    })
                 } else {
                     HStack(spacing: 24) {
                         PreWorking2EquipmentPanel(step: step)
                             .frame(maxWidth: .infinity)
 
-                        PreWorking2AboutPanel(title: step.title, subtitle: step.subtitle) {
-                            if let next = step.next { step = next }
-                        }
+                        PreWorking2AboutPanel(
+                            title: step.title,
+                            subtitle: step.subtitle,
+                            onPrevious: step.previous.map { previous in { step = previous } },
+                            onNext: { if let next = step.next { step = next } }
+                        )
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
@@ -221,6 +235,7 @@ private struct BluetoothIcon: Shape {
 private struct PreWorking2AboutPanel: View {
     let title: String
     let subtitle: String
+    var onPrevious: (() -> Void)? = nil
     var onNext: () -> Void = {}
 
     var body: some View {
@@ -246,23 +261,42 @@ private struct PreWorking2AboutPanel: View {
                     .lineSpacing(8)
             }
 
-            Button(action: onNext) {
-                HStack(spacing: 8) {
-                    Text("下一步")
-                    Image(systemName: "arrow.right")
+            HStack(spacing: 16) {
+                if let onPrevious {
+                    PreWorkingStepCapsuleButton(text: "上一步", icon: "arrow.left", iconLeading: true, action: onPrevious)
                 }
-                .font(.system(size: 25, weight: .semibold))
-                .foregroundStyle(PreWorking_2.darkPurple)
-                .padding(.horizontal, 28)
-                .padding(.vertical, 14)
-                .background(Color(red: 0.90, green: 0.87, blue: 0.98))
-                .clipShape(Capsule())
+                PreWorkingStepCapsuleButton(text: "下一步", icon: "arrow.right", iconLeading: false, action: onNext)
             }
-            .buttonStyle(.plain)
 
             Spacer()
         }
         .padding(40)
+    }
+}
+
+// MARK: - Step Navigation Capsule Button
+
+private struct PreWorkingStepCapsuleButton: View {
+    let text: String
+    let icon: String
+    var iconLeading: Bool = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                if iconLeading { Image(systemName: icon) }
+                Text(text)
+                if !iconLeading { Image(systemName: icon) }
+            }
+            .font(.system(size: 25, weight: .semibold))
+            .foregroundStyle(PreWorking_2.darkPurple)
+            .padding(.horizontal, 28)
+            .padding(.vertical, 14)
+            .background(Color(red: 0.90, green: 0.87, blue: 0.98))
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -317,6 +351,14 @@ private enum PreWorkingGuideStep {
         case .holdAndLower: nil
         }
     }
+
+    var previous: PreWorkingGuideStep? {
+        switch self {
+        case .prepare: nil
+        case .extendKnee: .prepare
+        case .holdAndLower: .extendKnee
+        }
+    }
 }
 
 private struct PreWorking2ImpactPage: View {
@@ -328,6 +370,8 @@ private struct PreWorking2ImpactPage: View {
     @State private var side: Int = 0
     @State private var selectedAngle: PoseAngle = .side
     @State private var guideStep: PreWorkingGuideStep = .prepare
+    /// 從第一頁「準備姿勢」再按上一步時，回到外層的「放置平板」頁。
+    var onExitToPreviousStep: () -> Void = {}
 
     /// side = 0（左，含資料庫查無資料時的預設值）或 1（右），對應到匯入的示範圖 asset 名稱。
     private var sideViewImageName: String {
@@ -361,26 +405,25 @@ private struct PreWorking2ImpactPage: View {
                     .lineSpacing(6)
                     .frame(maxWidth: 320, alignment: .leading)
 
-                Button(action: {
-                    if let next = guideStep.next {
-                        guideStep = next
-                        selectedAngle = .side
+                HStack(spacing: 16) {
+                    PreWorkingStepCapsuleButton(text: "上一步", icon: "arrow.left", iconLeading: true) {
+                        if let previous = guideStep.previous {
+                            guideStep = previous
+                            selectedAngle = .side
+                        } else {
+                            onExitToPreviousStep()
+                        }
                     }
-                }) {
-                    HStack(spacing: 8) {
-                        Text("下一步")
-                        Image(systemName: "arrow.right")
+
+                    PreWorkingStepCapsuleButton(text: "下一步", icon: "arrow.right", iconLeading: false) {
+                        if let next = guideStep.next {
+                            guideStep = next
+                            selectedAngle = .side
+                        }
                     }
-                    .font(.system(size: 25, weight: .semibold))
-                    .foregroundStyle(PreWorking_2.darkPurple)
-                    .padding(.horizontal, 28)
-                    .padding(.vertical, 14)
-                    .background(Color(red: 0.90, green: 0.87, blue: 0.98))
-                    .clipShape(Capsule())
+                    .disabled(guideStep.next == nil)
+                    .opacity(guideStep.next == nil ? 0.4 : 1)
                 }
-                .buttonStyle(.plain)
-                .disabled(guideStep.next == nil)
-                .opacity(guideStep.next == nil ? 0.4 : 1)
             }
             .frame(maxWidth: 380, alignment: .leading)
 
