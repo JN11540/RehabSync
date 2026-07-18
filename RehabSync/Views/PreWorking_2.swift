@@ -142,10 +142,10 @@ private struct PreWorking2AboutPanel: View {
                     .foregroundStyle(Color(red: 0.7, green: 0.62, blue: 0.95))
             }
 
-            HStack(alignment: .top, spacing: 16) {
+            HStack(alignment: .center, spacing: 16) {
                 Rectangle()
                     .fill(PreWorking_2.midPurple)
-                    .frame(width: 4)
+                    .frame(width: 4, height: 24)
                 Text("請確認是否都已準備就緒")
                     .font(.system(size: 18))
                     .foregroundStyle(Color.black.opacity(0.75))
