@@ -385,7 +385,12 @@ private struct ActivityChartCard: View {
     private let weekdays = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
     private let chartHeight: CGFloat = 90
     private let barHeight: CGFloat = 64
+    private let barWidth: CGFloat = 3
+    private let barSpacing: CGFloat = 6
     private let barColor = DashboardPalette.chartGray
+
+    /// 同一天 4 根柱子的總寬度，讓不同天之間的間距（barSpacing）跟同一天內柱子的間距一致。
+    private var dayGroupWidth: CGFloat { 4 * barWidth + 3 * barSpacing }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -393,29 +398,31 @@ private struct ActivityChartCard: View {
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(Color.black)
 
-            HStack(alignment: .bottom, spacing: 0) {
+            HStack(alignment: .bottom, spacing: barSpacing) {
                 ForEach(weekdays, id: \.self) { _ in
-                    HStack(alignment: .bottom, spacing: 6) {
+                    HStack(alignment: .bottom, spacing: barSpacing) {
                         ForEach(0..<4, id: \.self) { _ in
                             Capsule()
                                 .fill(barColor)
-                                .frame(width: 5, height: barHeight)
+                                .frame(width: barWidth, height: barHeight)
                                 .offset(y: 10)
                         }
                     }
-                    .frame(maxWidth: .infinity)
+                    .frame(width: dayGroupWidth)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .center)
             .frame(height: chartHeight)
 
-            HStack(spacing: 0) {
+            HStack(spacing: barSpacing) {
                 ForEach(weekdays, id: \.self) { day in
                     Text(day)
                         .font(.system(size: 13))
                         .foregroundStyle(DashboardPalette.mutedText)
-                        .frame(maxWidth: .infinity)
+                        .frame(width: dayGroupWidth)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .center)
         }
         .padding(20)
         .background(DashboardPalette.cardBackground)
