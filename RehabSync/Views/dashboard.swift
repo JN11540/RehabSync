@@ -386,7 +386,7 @@ private struct ActivityChartCard: View {
     private let chartHeight: CGFloat = 90
     private let barHeight: CGFloat = 64
     private let barWidth: CGFloat = 3
-    private let barSpacing: CGFloat = 6
+    private let barSpacing: CGFloat = 12
     private let barColor = DashboardPalette.chartGray
 
     /// 同一天 4 根柱子的總寬度，讓不同天之間的間距（barSpacing）跟同一天內柱子的間距一致。
