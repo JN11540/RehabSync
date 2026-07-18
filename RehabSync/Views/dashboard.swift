@@ -791,7 +791,8 @@ private struct DashboardCalendarCard: View {
             HStack(alignment: .top, spacing: 0) {
                 ForEach(columns, id: \.date) { column in
                     DashboardWeekDayColumnView(column: column, isSelected: column.date == selectedDay)
-                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity, minHeight: 64)
                         .contentShape(Rectangle())
                         .onTapGesture { selectedDay = column.date }
                 }
