@@ -303,21 +303,21 @@ private struct DeviceIllustration: View {
                     .frame(width: geo.size.width, height: geo.size.height)
 
                 DashboardConnectionBadge(isConnected: leftThighConnected)
-                    .position(x: geo.size.width * 0.22, y: geo.size.height * 0.54)
                     .contentShape(Rectangle())
                     .onTapGesture { onRowTap(0, 0) }
+                    .position(x: geo.size.width * 0.22, y: geo.size.height * 0.54)
                 DashboardConnectionBadge(isConnected: leftCalfConnected)
-                    .position(x: geo.size.width * 0.22, y: geo.size.height * 0.84)
                     .contentShape(Rectangle())
                     .onTapGesture { onRowTap(0, 1) }
+                    .position(x: geo.size.width * 0.22, y: geo.size.height * 0.84)
                 DashboardConnectionBadge(isConnected: rightThighConnected)
-                    .position(x: geo.size.width * 0.78, y: geo.size.height * 0.54)
                     .contentShape(Rectangle())
                     .onTapGesture { onRowTap(1, 0) }
+                    .position(x: geo.size.width * 0.78, y: geo.size.height * 0.54)
                 DashboardConnectionBadge(isConnected: rightCalfConnected)
-                    .position(x: geo.size.width * 0.78, y: geo.size.height * 0.84)
                     .contentShape(Rectangle())
                     .onTapGesture { onRowTap(1, 1) }
+                    .position(x: geo.size.width * 0.78, y: geo.size.height * 0.84)
             }
         }
         .frame(maxWidth: .infinity, minHeight: 340)
