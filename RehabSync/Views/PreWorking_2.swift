@@ -283,6 +283,7 @@ private struct PreWorking2ImpactPage: View {
                     .font(.system(size: 17))
                     .foregroundStyle(Color.black.opacity(0.6))
                     .lineSpacing(6)
+                    .frame(maxWidth: 320, alignment: .leading)
 
                 Button {} label: {
                     HStack(spacing: 12) {
@@ -303,7 +304,7 @@ private struct PreWorking2ImpactPage: View {
                 }
                 .buttonStyle(.plain)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: 380, alignment: .leading)
 
             VStack(spacing: 16) {
                 Text("左腿")
