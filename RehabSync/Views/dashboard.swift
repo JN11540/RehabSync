@@ -10,6 +10,8 @@ private enum DashboardPalette {
     static let panelBackground = Color(red: 0.965, green: 0.965, blue: 0.99)
     static let cardBackground = Color(red: 0.98, green: 0.98, blue: 0.995)
     static let mutedText = Color(red: 0.55, green: 0.56, blue: 0.62)
+    static let chartGray = Color(red: 0.80, green: 0.81, blue: 0.86)
+    static let chartGrayLight = Color(red: 0.90, green: 0.90, blue: 0.94)
 }
 
 // MARK: - Dashboard
@@ -382,12 +384,19 @@ private struct DashboardConnectionBadge: View {
 
 private struct ActivityChartCard: View {
     private let weekdays = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
-    /// 每天四根長條的相對高度（0~1），僅作示意用途
-    private let barHeights: [[CGFloat]] = [
-        [0.55, 0.85, 0.40, 0.70], [0.65, 0.45, 0.75, 0.35], [0.80, 0.60, 0.50, 0.65], [0.50, 0.90, 0.45, 0.60],
-        [0.70, 0.55, 0.65, 0.80], [0.60, 0.75, 0.55, 0.40], [0.45, 0.65, 0.70, 0.50]
+    private let chartHeight: CGFloat = 90
+    /// 每天四根長條的相對位置與長度（底部偏移, 長條長度，皆為 0~1），僅作示意用途，
+    /// 長條懸浮於不同高度而非齊底，以呈現如設計圖所示的浮動柱狀效果
+    private let barSpans: [[(bottom: CGFloat, length: CGFloat)]] = [
+        [(0.30, 0.60), (0.05, 0.35), (0.45, 0.45), (0.10, 0.30)],
+        [(0.15, 0.40), (0.50, 0.30), (0.05, 0.65), (0.35, 0.35)],
+        [(0.40, 0.50), (0.10, 0.55), (0.55, 0.30), (0.00, 0.40)],
+        [(0.20, 0.65), (0.45, 0.35), (0.05, 0.40), (0.50, 0.25)],
+        [(0.35, 0.45), (0.05, 0.50), (0.40, 0.35), (0.55, 0.30)],
+        [(0.10, 0.55), (0.45, 0.40), (0.20, 0.30), (0.00, 0.60)],
+        [(0.25, 0.35), (0.50, 0.45), (0.05, 0.55), (0.40, 0.30)]
     ]
-    private let barColors: [Color] = [DashboardPalette.teal, DashboardPalette.indigo, DashboardPalette.teal, DashboardPalette.indigo]
+    private let barColors: [Color] = [DashboardPalette.teal, DashboardPalette.indigoDark, DashboardPalette.chartGray, DashboardPalette.chartGrayLight]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -396,18 +405,19 @@ private struct ActivityChartCard: View {
                 .foregroundStyle(Color.black)
 
             HStack(alignment: .bottom, spacing: 0) {
-                ForEach(Array(barHeights.enumerated()), id: \.offset) { _, heights in
+                ForEach(Array(barSpans.enumerated()), id: \.offset) { _, spans in
                     HStack(alignment: .bottom, spacing: 6) {
-                        ForEach(Array(heights.enumerated()), id: \.offset) { index, height in
-                            RoundedRectangle(cornerRadius: 3)
+                        ForEach(Array(spans.enumerated()), id: \.offset) { index, span in
+                            Capsule()
                                 .fill(barColors[index])
-                                .frame(width: 5, height: 90 * height)
+                                .frame(width: 5, height: chartHeight * span.length)
+                                .offset(y: -chartHeight * span.bottom)
                         }
                     }
                     .frame(maxWidth: .infinity)
                 }
             }
-            .frame(height: 90)
+            .frame(height: chartHeight)
 
             HStack(spacing: 0) {
                 ForEach(weekdays, id: \.self) { day in
