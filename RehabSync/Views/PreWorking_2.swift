@@ -306,14 +306,31 @@ private struct PreWorking2ImpactPage: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             VStack(spacing: 16) {
-                PreWorking2ImpactStatCard(
-                    icon: "leaf.fill",
-                    valueMain: "10",
-                    valueAccent: "M+",
-                    label: "TREES PLANTED",
-                    accentColor: Self.statAccent
-                )
-                .frame(maxWidth: .infinity, minHeight: 220)
+                Text("左腿")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(PreWorking_2.darkPurple)
+
+                HStack(spacing: 16) {
+                    PreWorking2ImpactStatCard(
+                        icon: "leaf.fill",
+                        valueMain: "10",
+                        valueAccent: "M+",
+                        label: "TREES PLANTED",
+                        accentColor: Self.statAccent
+                    )
+                    PreWorking2ImpactStatCard(
+                        icon: "leaf.fill",
+                        valueMain: "10",
+                        valueAccent: "M+",
+                        label: "TREES PLANTED",
+                        accentColor: Self.statAccent
+                    )
+                }
+                .frame(maxWidth: .infinity, minHeight: 180, maxHeight: 180)
+
+                Text("右腿")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(PreWorking_2.darkPurple)
 
                 HStack(spacing: 16) {
                     PreWorking2ImpactStatCard(
@@ -331,7 +348,7 @@ private struct PreWorking2ImpactPage: View {
                         accentColor: Self.statAccent
                     )
                 }
-                .frame(maxHeight: 150)
+                .frame(maxWidth: .infinity, minHeight: 180, maxHeight: 180)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
