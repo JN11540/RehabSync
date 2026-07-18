@@ -307,48 +307,22 @@ private struct PreWorking2ImpactPage: View {
             .frame(maxWidth: 380, alignment: .leading)
 
             VStack(spacing: 16) {
-                Text("左腿")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(PreWorking_2.darkPurple)
-
-                HStack(spacing: 16) {
-                    PreWorking2ImpactStatCard(
-                        icon: "leaf.fill",
-                        valueMain: "10",
-                        valueAccent: "M+",
-                        label: "TREES PLANTED",
-                        accentColor: Self.statAccent
-                    )
-                    PreWorking2ImpactStatCard(
-                        icon: "leaf.fill",
-                        valueMain: "10",
-                        valueAccent: "M+",
-                        label: "TREES PLANTED",
-                        accentColor: Self.statAccent
-                    )
-                }
+                PreWorking2ImpactStatCard(
+                    icon: "leaf.fill",
+                    valueMain: "10",
+                    valueAccent: "M+",
+                    label: "TREES PLANTED",
+                    accentColor: Self.statAccent
+                )
                 .frame(maxWidth: .infinity, minHeight: 180, maxHeight: 180)
 
-                Text("右腿")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(PreWorking_2.darkPurple)
-
-                HStack(spacing: 16) {
-                    PreWorking2ImpactStatCard(
-                        icon: "pawprint.fill",
-                        valueMain: "300",
-                        valueAccent: "K+",
-                        label: "ANIMALS SAVED",
-                        accentColor: Self.statAccent
-                    )
-                    PreWorking2ImpactStatCard(
-                        icon: "drop.fill",
-                        valueMain: "5",
-                        valueAccent: "K+",
-                        label: "RIVERS CLEANED",
-                        accentColor: Self.statAccent
-                    )
-                }
+                PreWorking2ImpactStatCard(
+                    icon: "pawprint.fill",
+                    valueMain: "300",
+                    valueAccent: "K+",
+                    label: "ANIMALS SAVED",
+                    accentColor: Self.statAccent
+                )
                 .frame(maxWidth: .infinity, minHeight: 180, maxHeight: 180)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
