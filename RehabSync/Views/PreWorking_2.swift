@@ -289,11 +289,18 @@ private enum PreWorkingGuideStep {
         }
     }
 
-    /// 目前只有準備姿勢頁有示範圖，伸展膝蓋頁的矩形框先留空。
     var hasPoseImages: Bool {
         switch self {
         case .prepare: true
-        case .extendKnee: false
+        case .extendKnee: true
+        }
+    }
+
+    /// 對應匯入的示範圖 asset 名稱中間那段角度字樣（Exercise2SideView{stage}Left 之類）。
+    var poseImageStage: String {
+        switch self {
+        case .prepare: "Ready"
+        case .extendKnee: "45"
         }
     }
 
@@ -317,11 +324,13 @@ private struct PreWorking2ImpactPage: View {
 
     /// side = 0（左，含資料庫查無資料時的預設值）或 1（右），對應到匯入的示範圖 asset 名稱。
     private var sideViewImageName: String {
-        side == 1 ? "Exercise2SideViewReadyRight" : "Exercise2SideViewReadyLeft"
+        let stage = guideStep.poseImageStage
+        return side == 1 ? "Exercise2SideView\(stage)Right" : "Exercise2SideView\(stage)Left"
     }
 
     private var frontViewImageName: String {
-        side == 1 ? "Exercise2FrontViewReadyRight" : "Exercise2FrontViewReadyLeft"
+        let stage = guideStep.poseImageStage
+        return side == 1 ? "Exercise2FrontView\(stage)Right" : "Exercise2FrontView\(stage)Left"
     }
 
     private var mainImageName: String {
@@ -346,7 +355,10 @@ private struct PreWorking2ImpactPage: View {
                     .frame(maxWidth: 320, alignment: .leading)
 
                 Button(action: {
-                    if let next = guideStep.next { guideStep = next }
+                    if let next = guideStep.next {
+                        guideStep = next
+                        selectedAngle = .side
+                    }
                 }) {
                     HStack(spacing: 8) {
                         Text("下一步")
