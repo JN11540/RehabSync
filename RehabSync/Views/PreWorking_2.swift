@@ -324,6 +324,7 @@ private struct PreWorking2ImpactPage: View {
                         label: "ANIMALS SAVED",
                         accentColor: Self.statAccent
                     )
+                    .frame(width: 192, height: 192)
                     PreWorking2ImpactStatCard(
                         icon: "drop.fill",
                         valueMain: "5",
@@ -331,8 +332,8 @@ private struct PreWorking2ImpactPage: View {
                         label: "RIVERS CLEANED",
                         accentColor: Self.statAccent
                     )
+                    .frame(width: 192, height: 192)
                 }
-                .frame(maxWidth: .infinity, minHeight: 180, maxHeight: 180)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
