@@ -406,7 +406,7 @@ private struct ActivityChartCard: View {
                             Capsule()
                                 .fill(barColor)
                                 .frame(width: barWidth, height: index == 1 ? secondBarHeight : barHeight)
-                                .offset(y: 10)
+                                .offset(y: index == 1 ? -10 : 10)
                         }
                     }
                     .frame(width: dayGroupWidth)
