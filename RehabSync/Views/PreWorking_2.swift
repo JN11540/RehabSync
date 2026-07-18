@@ -57,16 +57,7 @@ private struct PreWorking2EquipmentPanel: View {
             PreWorking2CloudDecoration()
 
             VStack(alignment: .leading, spacing: 12) {
-                Text("確認裝備齊全")
-                    .font(.system(size: 34, weight: .heavy))
-                    .foregroundStyle(PreWorking_2.darkPurple)
-                Text("請確認以下兩項裝備是否已就緒")
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(PreWorking_2.midPurple)
-
-                Spacer().frame(height: 28)
-
-                HStack(spacing: 40) {
+                VStack(spacing: 40) {
                     PreWorking2EquipmentItem(iconSystemName: "cpu", label: "裝置連線了嗎？")
                     PreWorking2EquipmentItem(iconSystemName: "figure.walk", label: "護膝穿戴了嗎？")
                 }
