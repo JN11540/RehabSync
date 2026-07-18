@@ -798,20 +798,19 @@ private struct DashboardWeekDayColumnView: View {
     let isSelected: Bool
 
     var body: some View {
-        VStack(spacing: 12) {
-            VStack(spacing: 4) {
-                Text(column.weekday)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(DashboardPalette.mutedText)
-                Text("\(column.date)")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(isSelected ? .white : Color.black.opacity(0.85))
-                    .frame(width: 28, height: 28)
-                    .background(
-                        Circle().fill(isSelected ? DashboardPalette.indigo : Color.clear)
-                    )
-            }
+        VStack(spacing: 8) {
+            Text(column.weekday)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(isSelected ? .white : DashboardPalette.mutedText)
+            Text("\(column.date)")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(isSelected ? .white : Color.black.opacity(0.85))
         }
+        .padding(.vertical, 12)
+        .frame(width: 44)
+        .background(
+            Capsule().fill(isSelected ? DashboardPalette.indigo : Color.clear)
+        )
     }
 }
 
