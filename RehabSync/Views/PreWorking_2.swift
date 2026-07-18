@@ -6,6 +6,8 @@ struct PreWorking_2: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var pageTitle = "確認裝備齊全"
+    @State private var pageSubtitle = "請確認是否都已準備就緒"
+    @State private var isChairStep = false
 
     fileprivate static let darkPurple = Color(red: 0.30, green: 0.16, blue: 0.65)
     fileprivate static let midPurple = Color(red: 0.45, green: 0.35, blue: 0.85)
@@ -13,11 +15,13 @@ struct PreWorking_2: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             HStack(spacing: 24) {
-                PreWorking2EquipmentPanel()
+                PreWorking2EquipmentPanel(isChairStep: isChairStep)
                     .frame(maxWidth: .infinity)
 
-                PreWorking2AboutPanel(title: pageTitle) {
+                PreWorking2AboutPanel(title: pageTitle, subtitle: pageSubtitle) {
                     pageTitle = "準備椅子"
+                    pageSubtitle = "請先找一張高度剛好到您膝蓋的椅子"
+                    isChairStep = true
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -47,6 +51,8 @@ struct PreWorking_2: View {
 // MARK: - Equipment Check Panel
 
 private struct PreWorking2EquipmentPanel: View {
+    let isChairStep: Bool
+
     var body: some View {
         ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: 32)
@@ -60,21 +66,30 @@ private struct PreWorking2EquipmentPanel: View {
 
             PreWorking2CloudDecoration()
 
-            VStack(spacing: 40) {
-                PreWorking2EquipmentItem(label: "裝置連線了嗎？") {
-                    BluetoothIcon()
-                        .stroke(PreWorking_2.midPurple, style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
-                        .frame(width: 60, height: 88)
+            if isChairStep {
+                Image("ChairIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: 320, maxHeight: 320)
+                    .padding(40)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                VStack(spacing: 40) {
+                    PreWorking2EquipmentItem(label: "裝置連線了嗎？") {
+                        BluetoothIcon()
+                            .stroke(PreWorking_2.midPurple, style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
+                            .frame(width: 60, height: 88)
+                    }
+                    PreWorking2EquipmentItem(label: "護膝穿戴了嗎？") {
+                        Image("WearPadAndGearsIcon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 180, height: 180)
+                    }
                 }
-                PreWorking2EquipmentItem(label: "護膝穿戴了嗎？") {
-                    Image("WearPadAndGearsIcon")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 180, height: 180)
-                }
+                .padding(40)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .padding(40)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 }
@@ -158,6 +173,7 @@ private struct BluetoothIcon: Shape {
 
 private struct PreWorking2AboutPanel: View {
     let title: String
+    let subtitle: String
     var onNext: () -> Void = {}
 
     var body: some View {
@@ -177,7 +193,7 @@ private struct PreWorking2AboutPanel: View {
                 Rectangle()
                     .fill(PreWorking_2.midPurple)
                     .frame(width: 4, height: 24)
-                Text("請確認是否都已準備就緒")
+                Text(subtitle)
                     .font(.system(size: 25))
                     .foregroundStyle(Color.black.opacity(0.75))
                     .lineSpacing(8)
