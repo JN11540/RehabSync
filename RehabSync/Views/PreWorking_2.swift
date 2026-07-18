@@ -274,7 +274,7 @@ private struct PreWorking2ImpactPage: View {
     var body: some View {
         HStack(alignment: .center, spacing: 40) {
             VStack(alignment: .leading, spacing: 20) {
-                Text("OUR NUMBERS MEAN\nMORE THAN WORDS")
+                Text("動作逐步指南\n1. 準備姿勢")
                     .font(.system(size: 34, weight: .heavy))
                     .foregroundStyle(PreWorking_2.darkPurple)
                     .lineSpacing(6)
