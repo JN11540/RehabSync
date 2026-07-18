@@ -455,10 +455,10 @@ private struct ActivityChartCard: View {
             HStack(spacing: barSpacing) {
                 ForEach(Array(zip(weekdays, weekDates).enumerated()), id: \.offset) { _, pair in
                     VStack(spacing: 2) {
-                        Text(pair.0)
+                        Text(dateLabel(for: pair.1))
                             .font(.system(size: 16))
                             .foregroundStyle(DashboardPalette.mutedText)
-                        Text(dateLabel(for: pair.1))
+                        Text(pair.0)
                             .font(.system(size: 16))
                             .foregroundStyle(DashboardPalette.mutedText)
                     }
