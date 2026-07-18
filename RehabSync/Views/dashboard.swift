@@ -272,7 +272,7 @@ private struct DeviceOverviewCard: View {
     var onDeviceRowTap: (Int, Int) -> Void = { _, _ in }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 2) {
             Text("裝置")
                 .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(Color.black)
