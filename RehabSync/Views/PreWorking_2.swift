@@ -316,14 +316,23 @@ private struct PreWorking2ImpactPage: View {
                 )
                 .frame(width: 400, height: 400)
 
-                PreWorking2ImpactStatCard(
-                    icon: "pawprint.fill",
-                    valueMain: "300",
-                    valueAccent: "K+",
-                    label: "ANIMALS SAVED",
-                    accentColor: Self.statAccent
-                )
-                .frame(width: 400, height: 400)
+                HStack(spacing: 16) {
+                    PreWorking2ImpactStatCard(
+                        icon: "pawprint.fill",
+                        valueMain: "300",
+                        valueAccent: "K+",
+                        label: "ANIMALS SAVED",
+                        accentColor: Self.statAccent
+                    )
+                    PreWorking2ImpactStatCard(
+                        icon: "drop.fill",
+                        valueMain: "5",
+                        valueAccent: "K+",
+                        label: "RIVERS CLEANED",
+                        accentColor: Self.statAccent
+                    )
+                }
+                .frame(maxWidth: .infinity, minHeight: 180, maxHeight: 180)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
