@@ -269,7 +269,29 @@ private struct PreWorking2AboutPanel: View {
 // MARK: - Impact / Numbers Page
 
 private struct PreWorking2ImpactPage: View {
-    private static let statAccent = Color(red: 0.45, green: 0.85, blue: 0.55)
+    private enum PoseAngle {
+        case side
+        case front
+    }
+
+    @State private var side: Int = 0
+    @State private var selectedAngle: PoseAngle = .side
+
+    /// side = 0（左，含資料庫查無資料時的預設值）或 1（右），對應到匯入的示範圖 asset 名稱。
+    private var sideViewImageName: String {
+        side == 1 ? "Exercise2SideViewReadyRight" : "Exercise2SideViewReadyLeft"
+    }
+
+    private var frontViewImageName: String {
+        side == 1 ? "Exercise2FrontViewReadyRight" : "Exercise2FrontViewReadyLeft"
+    }
+
+    private var mainImageName: String {
+        switch selectedAngle {
+        case .side: sideViewImageName
+        case .front: frontViewImageName
+        }
+    }
 
     var body: some View {
         HStack(alignment: .center, spacing: 40) {
@@ -307,80 +329,47 @@ private struct PreWorking2ImpactPage: View {
             .frame(maxWidth: 380, alignment: .leading)
 
             VStack(alignment: .leading, spacing: 16) {
-                PreWorking2ImpactStatCard(
-                    icon: "leaf.fill",
-                    valueMain: "10",
-                    valueAccent: "M+",
-                    label: "TREES PLANTED",
-                    accentColor: Self.statAccent
-                )
-                .frame(width: 500, height: 500)
+                PreWorking2PoseImageCard(imageName: mainImageName)
+                    .frame(width: 500, height: 500)
 
                 HStack(spacing: 16) {
-                    PreWorking2ImpactStatCard(
-                        icon: "pawprint.fill",
-                        valueMain: "300",
-                        valueAccent: "K+",
-                        label: "ANIMALS SAVED",
-                        accentColor: Self.statAccent
-                    )
-                    .frame(width: 100, height: 100)
-                    PreWorking2ImpactStatCard(
-                        icon: "drop.fill",
-                        valueMain: "5",
-                        valueAccent: "K+",
-                        label: "RIVERS CLEANED",
-                        accentColor: Self.statAccent
-                    )
-                    .frame(width: 100, height: 100)
+                    PreWorking2PoseImageCard(imageName: sideViewImageName, isSelected: selectedAngle == .side)
+                        .frame(width: 100, height: 100)
+                        .onTapGesture { selectedAngle = .side }
+                    PreWorking2PoseImageCard(imageName: frontViewImageName, isSelected: selectedAngle == .front)
+                        .frame(width: 100, height: 100)
+                        .onTapGesture { selectedAngle = .front }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .padding(48)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear {
+            side = DeviceViewModel().fetchAnySide() ?? 0
+        }
     }
 }
 
-private struct PreWorking2ImpactStatCard: View {
-    let icon: String
-    let valueMain: String
-    let valueAccent: String
-    let label: String
-    let accentColor: Color
+private struct PreWorking2PoseImageCard: View {
+    let imageName: String
+    var isSelected: Bool = true
 
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
+        ZStack {
             RoundedRectangle(cornerRadius: 20)
-                .fill(
-                    LinearGradient(
-                        colors: [PreWorking_2.midPurple, PreWorking_2.darkPurple],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-
-            Image(systemName: icon)
-                .font(.system(size: 44))
-                .foregroundStyle(.white.opacity(0.2))
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 2) {
-                    Text(valueMain)
-                        .foregroundStyle(.white)
-                    Text(valueAccent)
-                        .foregroundStyle(accentColor)
-                }
-                .font(.system(size: 24, weight: .heavy))
-
-                Text(label)
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.white)
-            }
-            .padding(16)
+                .fill(Color.white)
+            Image(imageName)
+                .resizable()
+                .scaledToFit()
+                .padding(8)
         }
         .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(PreWorking_2.midPurple, lineWidth: isSelected ? 3 : 0)
+        )
+        .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
     }
 }
 

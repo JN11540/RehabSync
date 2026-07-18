@@ -13,6 +13,14 @@ class DeviceViewModel {
         }
     }
 
+    /// 不指定 side，直接取任一筆已配對裝置的 side 值（用來判斷使用者裝的是左腳還是右腳）。
+    /// 資料表沒有任何裝置時回傳 nil，呼叫端應視為預設左腳。
+    func fetchAnySide() -> Int? {
+        try? db.read { db in
+            try Device.fetchOne(db)?.side
+        }
+    }
+
     func insert(uuid: String, name: String, side: Int = 0, limb: Int) {
         guard let bluetoothId = defaultBluetoothId() else { return }
         var device = Device(
