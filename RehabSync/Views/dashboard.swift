@@ -11,7 +11,6 @@ private enum DashboardPalette {
     static let cardBackground = Color(red: 0.98, green: 0.98, blue: 0.995)
     static let mutedText = Color(red: 0.55, green: 0.56, blue: 0.62)
     static let chartGray = Color(red: 0.80, green: 0.81, blue: 0.86)
-    static let chartGrayLight = Color(red: 0.90, green: 0.90, blue: 0.94)
 }
 
 // MARK: - Dashboard
@@ -386,17 +385,17 @@ private struct ActivityChartCard: View {
     private let weekdays = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
     private let chartHeight: CGFloat = 90
     /// 每天四根長條的相對位置與長度（底部偏移, 長條長度，皆為 0~1），僅作示意用途，
-    /// 長條懸浮於不同高度而非齊底，以呈現如設計圖所示的浮動柱狀效果
+    /// 同一天的四根長條長度相同，只有底部偏移不同，呈現懸浮的柱狀效果
     private let barSpans: [[(bottom: CGFloat, length: CGFloat)]] = [
-        [(0.30, 0.60), (0.05, 0.35), (0.45, 0.45), (0.10, 0.30)],
-        [(0.15, 0.40), (0.50, 0.30), (0.05, 0.65), (0.35, 0.35)],
-        [(0.40, 0.50), (0.10, 0.55), (0.55, 0.30), (0.00, 0.40)],
-        [(0.20, 0.65), (0.45, 0.35), (0.05, 0.40), (0.50, 0.25)],
-        [(0.35, 0.45), (0.05, 0.50), (0.40, 0.35), (0.55, 0.30)],
-        [(0.10, 0.55), (0.45, 0.40), (0.20, 0.30), (0.00, 0.60)],
-        [(0.25, 0.35), (0.50, 0.45), (0.05, 0.55), (0.40, 0.30)]
+        [(0.30, 0.55), (0.05, 0.55), (0.45, 0.55), (0.10, 0.55)],
+        [(0.15, 0.45), (0.50, 0.45), (0.05, 0.45), (0.35, 0.45)],
+        [(0.40, 0.50), (0.10, 0.50), (0.55, 0.50), (0.00, 0.50)],
+        [(0.20, 0.40), (0.45, 0.40), (0.05, 0.40), (0.50, 0.40)],
+        [(0.35, 0.45), (0.05, 0.45), (0.40, 0.45), (0.55, 0.45)],
+        [(0.10, 0.55), (0.45, 0.55), (0.20, 0.55), (0.00, 0.55)],
+        [(0.25, 0.35), (0.50, 0.35), (0.05, 0.35), (0.40, 0.35)]
     ]
-    private let barColors: [Color] = [DashboardPalette.teal, DashboardPalette.indigoDark, DashboardPalette.chartGray, DashboardPalette.chartGrayLight]
+    private let barColors: [Color] = Array(repeating: DashboardPalette.chartGray, count: 4)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
