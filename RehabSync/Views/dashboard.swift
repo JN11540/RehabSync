@@ -687,7 +687,7 @@ private struct DashboardSchedulePanel: View {
 
                 VStack(alignment: .leading, spacing: 14) {
                     Text("訓練菜單")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(Color.black)
 
                     ForEach(selectedDayContents, id: \.self) { content in
@@ -723,10 +723,10 @@ private struct DashboardTrainingMenuRow: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(exercise?.name ?? "未知動作")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(Color.black)
                 Text("組數 \(content.sets) · 次數 \(content.reps) · 組間休息 \(content.set_rest_time) 秒")
-                    .font(.system(size: 12))
+                    .font(.system(size: 14))
                     .foregroundStyle(DashboardPalette.mutedText)
             }
         }
@@ -769,18 +769,18 @@ private struct DashboardCalendarCard: View {
         VStack(spacing: 16) {
             HStack {
                 Text(monthTitle)
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(Color.black)
                 Spacer()
                 Button {} label: {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 22, weight: .semibold))
                         .foregroundStyle(Color.black.opacity(0.6))
                 }
                 .buttonStyle(.plain)
                 Button {} label: {
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 22, weight: .semibold))
                         .foregroundStyle(Color.black.opacity(0.6))
                 }
                 .buttonStyle(.plain)
@@ -805,10 +805,10 @@ private struct DashboardWeekDayColumnView: View {
         VStack(spacing: 12) {
             VStack(spacing: 4) {
                 Text(column.weekday)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(DashboardPalette.mutedText)
                 Text("\(column.date)")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(isSelected ? .white : Color.black.opacity(0.85))
                     .frame(width: 28, height: 28)
                     .background(
