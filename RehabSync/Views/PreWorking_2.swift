@@ -1,13 +1,42 @@
 import SwiftUI
 
+/// 訓練前的準備流程，依序為：確認裝備 → 準備椅子 → 放置平板。
+private enum PreWorkingStep {
+    case equipment
+    case chair
+    case tablet
+
+    var title: String {
+        switch self {
+        case .equipment: "確認裝備齊全"
+        case .chair: "準備椅子"
+        case .tablet: "放置平板"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .equipment: "請確認是否都已準備就緒"
+        case .chair: "請先找一張高度剛好到您膝蓋的椅子"
+        case .tablet: "請將平板放置於桌面上"
+        }
+    }
+
+    var next: PreWorkingStep? {
+        switch self {
+        case .equipment: .chair
+        case .chair: .tablet
+        case .tablet: nil
+        }
+    }
+}
+
 struct PreWorking_2: View {
     let content: TreatmentContent
     let exercise: Exercise?
 
     @Environment(\.dismiss) private var dismiss
-    @State private var pageTitle = "確認裝備齊全"
-    @State private var pageSubtitle = "請確認是否都已準備就緒"
-    @State private var isChairStep = false
+    @State private var step: PreWorkingStep = .equipment
 
     fileprivate static let darkPurple = Color(red: 0.30, green: 0.16, blue: 0.65)
     fileprivate static let midPurple = Color(red: 0.45, green: 0.35, blue: 0.85)
@@ -15,13 +44,11 @@ struct PreWorking_2: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             HStack(spacing: 24) {
-                PreWorking2EquipmentPanel(isChairStep: isChairStep)
+                PreWorking2EquipmentPanel(step: step)
                     .frame(maxWidth: .infinity)
 
-                PreWorking2AboutPanel(title: pageTitle, subtitle: pageSubtitle) {
-                    pageTitle = "準備椅子"
-                    pageSubtitle = "請先找一張高度剛好到您膝蓋的椅子"
-                    isChairStep = true
+                PreWorking2AboutPanel(title: step.title, subtitle: step.subtitle) {
+                    if let next = step.next { step = next }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -51,7 +78,7 @@ struct PreWorking_2: View {
 // MARK: - Equipment Check Panel
 
 private struct PreWorking2EquipmentPanel: View {
-    let isChairStep: Bool
+    let step: PreWorkingStep
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -66,14 +93,8 @@ private struct PreWorking2EquipmentPanel: View {
 
             PreWorking2CloudDecoration()
 
-            if isChairStep {
-                Image("ChairIcon")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxWidth: 500, maxHeight: 500)
-                    .padding(40)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
+            switch step {
+            case .equipment:
                 VStack(spacing: 40) {
                     PreWorking2EquipmentItem(label: "裝置連線了嗎？") {
                         BluetoothIcon()
@@ -89,6 +110,20 @@ private struct PreWorking2EquipmentPanel: View {
                 }
                 .padding(40)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+            case .chair:
+                Image("ChairIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: 500, maxHeight: 500)
+                    .padding(40)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            case .tablet:
+                Image("TabletDeskIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: 500, maxHeight: 500)
+                    .padding(40)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
