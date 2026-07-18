@@ -79,7 +79,7 @@ struct Dashboard: View {
                         .background(Color.white)
 
                     DashboardSchedulePanel(selectedDay: $selectedDay)
-                        .frame(width: 380)
+                        .frame(width: 420)
                         .background(DashboardPalette.panelBackground)
                 } else {
                     DashboardPlaceholderCard(title: selectedNav.title)
