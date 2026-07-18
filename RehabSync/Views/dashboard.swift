@@ -292,40 +292,47 @@ private struct DeviceIllustration: View {
                     .scaledToFit()
                     .frame(width: geo.size.width, height: geo.size.height)
 
-                DashboardConnectionBadge(isConnected: leftThighConnected)
+                DashboardConnectionBadge(label: "左大腿", isConnected: leftThighConnected)
                     .contentShape(Rectangle())
                     .onTapGesture { onRowTap(0, 0) }
                     .position(x: geo.size.width * 0.22, y: geo.size.height * 0.54)
-                DashboardConnectionBadge(isConnected: leftCalfConnected)
+                DashboardConnectionBadge(label: "左小腿", isConnected: leftCalfConnected)
                     .contentShape(Rectangle())
                     .onTapGesture { onRowTap(0, 1) }
                     .position(x: geo.size.width * 0.22, y: geo.size.height * 0.84)
-                DashboardConnectionBadge(isConnected: rightThighConnected)
+                DashboardConnectionBadge(label: "右大腿", isConnected: rightThighConnected)
                     .contentShape(Rectangle())
                     .onTapGesture { onRowTap(1, 0) }
                     .position(x: geo.size.width * 0.78, y: geo.size.height * 0.54)
-                DashboardConnectionBadge(isConnected: rightCalfConnected)
+                DashboardConnectionBadge(label: "右小腿", isConnected: rightCalfConnected)
                     .contentShape(Rectangle())
                     .onTapGesture { onRowTap(1, 1) }
                     .position(x: geo.size.width * 0.78, y: geo.size.height * 0.84)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 340)
+        .frame(maxWidth: .infinity, minHeight: 400)
     }
 }
 
 private struct DashboardConnectionBadge: View {
+    let label: String
     var isConnected: Bool = false
 
     var body: some View {
-        Text(isConnected ? "已連線" : "未連線")
-            .font(.system(size: 16, weight: .medium))
-            .foregroundStyle(isConnected ? Color.white : Color.black.opacity(0.7))
-            .multilineTextAlignment(.center)
-            .frame(width: 72, height: 72)
-            .background(isConnected ? DashboardPalette.teal : Color.white)
-            .clipShape(Circle())
-            .shadow(color: .black.opacity(0.08), radius: 5, y: 2)
+        VStack(spacing: 6) {
+            Text(label)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Color.black)
+
+            Text(isConnected ? "已連線" : "未連線")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(isConnected ? Color.white : Color.black.opacity(0.7))
+                .multilineTextAlignment(.center)
+                .frame(width: 72, height: 72)
+                .background(isConnected ? DashboardPalette.teal : Color.white)
+                .clipShape(Circle())
+                .shadow(color: .black.opacity(0.08), radius: 5, y: 2)
+        }
     }
 }
 
