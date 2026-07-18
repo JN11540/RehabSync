@@ -8,7 +8,7 @@ private enum DashboardPalette {
     static let indigoFaint = Color(red: 0.93, green: 0.93, blue: 0.98)
     static let teal = Color(red: 0.38, green: 0.85, blue: 0.78)
     static let panelBackground = Color(red: 0.965, green: 0.965, blue: 0.99)
-    static let cardBackground = Color(red: 0.98, green: 0.98, blue: 0.995)
+    static let cardBackground = Color(red: 0.90, green: 0.87, blue: 0.98)
     static let mutedText = Color(red: 0.55, green: 0.56, blue: 0.62)
     static let chartGray = Color(red: 0.80, green: 0.81, blue: 0.86)
 }
