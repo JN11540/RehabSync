@@ -308,20 +308,15 @@ private struct PreWorking2ImpactPage: View {
                     .frame(maxWidth: 320, alignment: .leading)
 
                 Button {} label: {
-                    HStack(spacing: 12) {
+                    HStack(spacing: 8) {
                         Text("下一步")
-                            .font(.system(size: 14, weight: .bold))
-                        ZStack {
-                            Circle().fill(Color.white.opacity(0.2))
-                            Image(systemName: "arrow.right")
-                                .font(.system(size: 11, weight: .bold))
-                        }
-                        .frame(width: 26, height: 26)
+                        Image(systemName: "arrow.right")
                     }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 22)
-                    .padding(.vertical, 12)
-                    .background(PreWorking_2.darkPurple)
+                    .font(.system(size: 25, weight: .semibold))
+                    .foregroundStyle(PreWorking_2.darkPurple)
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 14)
+                    .background(Color(red: 0.90, green: 0.87, blue: 0.98))
                     .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
