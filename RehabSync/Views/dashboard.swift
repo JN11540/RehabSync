@@ -246,8 +246,26 @@ private struct DashboardOverviewContent: View {
                     .foregroundStyle(DashboardPalette.indigo)
             }
 
+            DeviceOverviewCard(onDeviceRowTap: onDeviceRowTap)
+
+            ActivityChartCard()
+        }
+    }
+}
+
+// MARK: - Device Overview Card
+
+private struct DeviceOverviewCard: View {
+    var onDeviceRowTap: (Int, Int) -> Void = { _, _ in }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("裝置")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(Color.black)
+
             HStack(alignment: .top, spacing: 20) {
-                DeviceIllustrationCard()
+                DeviceIllustration()
                     .frame(maxWidth: .infinity)
 
                 VStack(spacing: 20) {
@@ -256,52 +274,6 @@ private struct DashboardOverviewContent: View {
                 }
                 .frame(maxWidth: .infinity)
             }
-
-            ActivityChartCard()
-        }
-    }
-}
-
-// MARK: - Device Illustration Card
-
-private struct DeviceIllustrationCard: View {
-    @State private var deviceVM = DeviceViewModel()
-
-    private var leftThighConnected: Bool { deviceVM.fetch(side: 0, limb: 0) != nil }
-    private var leftCalfConnected: Bool { deviceVM.fetch(side: 0, limb: 1) != nil }
-    private var rightThighConnected: Bool { deviceVM.fetch(side: 1, limb: 0) != nil }
-    private var rightCalfConnected: Bool { deviceVM.fetch(side: 1, limb: 1) != nil }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("裝置")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(Color.black)
-                Spacer()
-                Image(systemName: "plus.magnifyingglass")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(DashboardPalette.mutedText)
-            }
-
-            GeometryReader { geo in
-                ZStack {
-                    Image("MuscleFigure")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: geo.size.width, height: geo.size.height)
-
-                    DashboardConnectionBadge(isConnected: leftThighConnected)
-                        .position(x: geo.size.width * 0.22, y: geo.size.height * 0.54)
-                    DashboardConnectionBadge(isConnected: leftCalfConnected)
-                        .position(x: geo.size.width * 0.22, y: geo.size.height * 0.84)
-                    DashboardConnectionBadge(isConnected: rightThighConnected)
-                        .position(x: geo.size.width * 0.78, y: geo.size.height * 0.54)
-                    DashboardConnectionBadge(isConnected: rightCalfConnected)
-                        .position(x: geo.size.width * 0.78, y: geo.size.height * 0.84)
-                }
-            }
-            .frame(maxWidth: .infinity, minHeight: 340)
         }
         .padding(20)
         .background(DashboardPalette.cardBackground)
@@ -310,6 +282,36 @@ private struct DeviceIllustrationCard: View {
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.black.opacity(0.06), lineWidth: 1)
         )
+    }
+}
+
+private struct DeviceIllustration: View {
+    @State private var deviceVM = DeviceViewModel()
+
+    private var leftThighConnected: Bool { deviceVM.fetch(side: 0, limb: 0) != nil }
+    private var leftCalfConnected: Bool { deviceVM.fetch(side: 0, limb: 1) != nil }
+    private var rightThighConnected: Bool { deviceVM.fetch(side: 1, limb: 0) != nil }
+    private var rightCalfConnected: Bool { deviceVM.fetch(side: 1, limb: 1) != nil }
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack {
+                Image("MuscleFigure")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: geo.size.width, height: geo.size.height)
+
+                DashboardConnectionBadge(isConnected: leftThighConnected)
+                    .position(x: geo.size.width * 0.22, y: geo.size.height * 0.54)
+                DashboardConnectionBadge(isConnected: leftCalfConnected)
+                    .position(x: geo.size.width * 0.22, y: geo.size.height * 0.84)
+                DashboardConnectionBadge(isConnected: rightThighConnected)
+                    .position(x: geo.size.width * 0.78, y: geo.size.height * 0.54)
+                DashboardConnectionBadge(isConnected: rightCalfConnected)
+                    .position(x: geo.size.width * 0.78, y: geo.size.height * 0.84)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 340)
     }
 }
 
@@ -355,13 +357,6 @@ private struct LegDeviceCard: View {
                 .contentShape(Rectangle())
                 .onTapGesture { onRowTap(side, 1) }
         }
-        .padding(20)
-        .background(DashboardPalette.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.black.opacity(0.06), lineWidth: 1)
-        )
     }
 }
 
