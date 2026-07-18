@@ -419,7 +419,7 @@ private struct ActivityChartCard: View {
                                         .frame(width: barWidth, height: (index == 1 || index == 3) ? shortBarHeight : barHeight)
                                 }
                             }
-                            .offset(y: index == 1 ? -10 : (index == 2 ? 0 : 10))
+                            .offset(y: index == 1 ? -20 : (index == 2 ? -10 : 10))
                         }
                     }
                     .frame(width: dayGroupWidth)
