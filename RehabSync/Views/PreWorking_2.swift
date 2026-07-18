@@ -19,6 +19,7 @@ struct PreWorking_2: View {
                     .frame(maxWidth: .infinity)
             }
             .padding(24)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.white)
 
             Button {
