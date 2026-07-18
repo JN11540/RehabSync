@@ -17,7 +17,7 @@ private enum DashboardPalette {
 
 struct Dashboard: View {
     @State private var selectedNav: DashboardNavItem = .overview
-    @State private var selectedDay = 10
+    @State private var selectedDay = 26
     @State private var showDeviceListModal = false
     @State private var deviceListSide = 0
     @State private var deviceListLimb = 0
@@ -703,18 +703,27 @@ private struct DashboardSchedulePanel: View {
 
 // MARK: - Calendar Card
 
+private struct DashboardWeekColumn {
+    let weekday: String
+    let date: Int
+    /// 該日各時段的顯示文字，無預約則為 "—"
+    let times: [String]
+    /// times 陣列中需要以醒目樣式呈現的索引（已預約的時段）
+    let highlighted: Set<Int>
+}
+
 private struct DashboardCalendarCard: View {
     @Binding var selectedDay: Int
 
-    private let weekdaySymbols = ["日", "一", "二", "三", "四", "五", "六"]
-    /// 2021 年 10 月：(顯示的日期, 是否為當月)
-    private let calendarRows: [[(day: Int, inMonth: Bool)]] = [
-        [(26, false), (27, false), (28, false), (29, false), (30, false), (1, true), (2, true)],
-        [(3, true), (4, true), (5, true), (6, true), (7, true), (8, true), (9, true)],
-        [(10, true), (11, true), (12, true), (13, true), (14, true), (15, true), (16, true)],
-        [(17, true), (18, true), (19, true), (20, true), (21, true), (22, true), (23, true)],
-        [(24, true), (25, true), (26, true), (27, true), (28, true), (29, true), (30, true)],
-        [(31, true), (1, false), (2, false), (3, false), (4, false), (5, false), (6, false)]
+    /// 2021 年 10 月 25 日～31 日的週曆，僅作示意用途
+    private let columns: [DashboardWeekColumn] = [
+        DashboardWeekColumn(weekday: "一", date: 25, times: ["10:00", "11:00", "12:00"], highlighted: []),
+        DashboardWeekColumn(weekday: "二", date: 26, times: ["08:00", "09:00", "10:00"], highlighted: [1]),
+        DashboardWeekColumn(weekday: "三", date: 27, times: ["12:00", "—", "13:00"], highlighted: []),
+        DashboardWeekColumn(weekday: "四", date: 28, times: ["10:00", "11:00", "—"], highlighted: [1]),
+        DashboardWeekColumn(weekday: "五", date: 29, times: ["—", "14:00", "16:00"], highlighted: []),
+        DashboardWeekColumn(weekday: "六", date: 30, times: ["13:00", "09:00", "15:00"], highlighted: [0, 1]),
+        DashboardWeekColumn(weekday: "日", date: 31, times: ["09:00", "10:00", "11:00"], highlighted: [0])
     ]
 
     var body: some View {
@@ -738,52 +747,51 @@ private struct DashboardCalendarCard: View {
                 .buttonStyle(.plain)
             }
 
-            HStack(spacing: 0) {
-                ForEach(weekdaySymbols, id: \.self) { symbol in
-                    Text(symbol)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(DashboardPalette.mutedText)
+            HStack(alignment: .top, spacing: 0) {
+                ForEach(columns, id: \.date) { column in
+                    DashboardWeekDayColumnView(column: column, isSelected: column.date == selectedDay)
                         .frame(maxWidth: .infinity)
-                }
-            }
-
-            VStack(spacing: 10) {
-                ForEach(calendarRows.indices, id: \.self) { rowIndex in
-                    HStack(spacing: 0) {
-                        ForEach(calendarRows[rowIndex], id: \.day) { cell in
-                            DashboardCalendarDayCell(
-                                day: cell.day,
-                                inMonth: cell.inMonth,
-                                isSelected: cell.inMonth && cell.day == selectedDay
-                            )
-                            .frame(maxWidth: .infinity)
-                            .onTapGesture {
-                                guard cell.inMonth else { return }
-                                selectedDay = cell.day
-                            }
-                        }
-                    }
+                        .onTapGesture { selectedDay = column.date }
                 }
             }
         }
     }
 }
 
-private struct DashboardCalendarDayCell: View {
-    let day: Int
-    let inMonth: Bool
+private struct DashboardWeekDayColumnView: View {
+    let column: DashboardWeekColumn
     let isSelected: Bool
 
     var body: some View {
-        Text("\(day)")
-            .font(.system(size: 14, weight: isSelected ? .semibold : .regular))
-            .foregroundStyle(
-                isSelected ? .white : (inMonth ? Color.black.opacity(0.85) : Color.black.opacity(0.25))
-            )
-            .frame(width: 30, height: 30)
-            .background(
-                Circle().fill(isSelected ? DashboardPalette.indigo : Color.clear)
-            )
+        VStack(spacing: 12) {
+            VStack(spacing: 4) {
+                Text(column.weekday)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(DashboardPalette.mutedText)
+                Text("\(column.date)")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(isSelected ? .white : Color.black.opacity(0.85))
+                    .frame(width: 28, height: 28)
+                    .background(
+                        Circle().fill(isSelected ? DashboardPalette.indigo : Color.clear)
+                    )
+            }
+
+            VStack(spacing: 8) {
+                ForEach(Array(column.times.enumerated()), id: \.offset) { index, time in
+                    let isHighlighted = column.highlighted.contains(index)
+                    Text(time)
+                        .font(.system(size: 12, weight: isHighlighted ? .semibold : .regular))
+                        .foregroundStyle(isHighlighted ? DashboardPalette.indigoDark : DashboardPalette.mutedText)
+                        .padding(.vertical, 4)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(isHighlighted ? DashboardPalette.indigoFaint : Color.clear)
+                        )
+                }
+            }
+        }
     }
 }
 
