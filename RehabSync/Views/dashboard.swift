@@ -385,7 +385,7 @@ private struct ActivityChartCard: View {
     private let weekdays = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
     private let chartHeight: CGFloat = 90
     /// 每天長條的相對長度（0~1），僅作示意用途；同一天的四根長條長度、頂端與底端高度都一致。
-    private let barLengths: [CGFloat] = [0.55, 0.45, 0.50, 0.40, 0.45, 0.55, 0.35]
+    private let barLengths: [CGFloat] = Array(repeating: 0.55, count: 7)
     private let barColor = DashboardPalette.chartGray
 
     var body: some View {
