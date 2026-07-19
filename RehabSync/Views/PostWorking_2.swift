@@ -312,41 +312,23 @@ private struct PostWorking2DonationOverviewCard: View {
                 .frame(height: 220, alignment: .leading)
                 .offset(y: 35)
 
-                VStack(alignment: .center, spacing: 16) {
-                    ZStack {
-                        Chart(slices, id: \.label) { slice in
-                            SectorMark(
-                                angle: .value("Percent", slice.percent),
-                                innerRadius: .ratio(0.65),
-                                angularInset: 1.5
-                            )
-                            .foregroundStyle(slice.color)
-                            .cornerRadius(2)
-                        }
-                        .frame(width: 200, height: 200)
-
-                        Text("伸直時間比例")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundStyle(Color.black)
-                            .multilineTextAlignment(.center)
-                            .frame(width: 90)
+                ZStack {
+                    Chart(slices, id: \.label) { slice in
+                        SectorMark(
+                            angle: .value("Percent", slice.percent),
+                            innerRadius: .ratio(0.65),
+                            angularInset: 1.5
+                        )
+                        .foregroundStyle(slice.color)
+                        .cornerRadius(2)
                     }
-                    .frame(width: 200)
+                    .frame(width: 200, height: 200)
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(slices, id: \.label) { slice in
-                            HStack(spacing: 8) {
-                                Circle().fill(slice.color).frame(width: 8, height: 8)
-                                Text(slice.label)
-                                    .font(.system(size: 20))
-                                    .foregroundStyle(Color.black.opacity(0.75))
-                                Text("\(Int(slice.percent * 100))%")
-                                    .font(.system(size: 20, weight: .semibold))
-                                    .foregroundStyle(Color.black)
-                            }
-                        }
-                    }
-                    .frame(width: 200)
+                    Text("伸直時間比例")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(Color.black)
+                        .multilineTextAlignment(.center)
+                        .frame(width: 90)
                 }
                 .frame(width: 200)
             }
