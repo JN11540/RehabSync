@@ -120,7 +120,6 @@ struct Dashboard: View {
             if showDeviceListModal {
                 Color.black.opacity(0.25)
                     .ignoresSafeArea()
-                    .onTapGesture { showDeviceListModal = false }
 
                 DashboardDeviceListModal(side: deviceListSide, limb: deviceListLimb, onClose: { showDeviceListModal = false })
                     .frame(width: 420, height: 520)
