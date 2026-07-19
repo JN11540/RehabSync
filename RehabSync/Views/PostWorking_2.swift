@@ -231,6 +231,7 @@ private enum PostWorking2Group: CaseIterable {
 
 private struct PostWorking2DonationOverviewCard: View {
     @State private var selectedGroup: PostWorking2Group = .first
+    @State private var showRetentionDetail = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -239,6 +240,14 @@ private struct PostWorking2DonationOverviewCard: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(Color.black)
                 Spacer()
+                Button {
+                    showRetentionDetail = true
+                } label: {
+                    Text("檢視")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(PostWorking_2.mutedText)
+                }
+                .buttonStyle(.plain)
                 Menu {
                     ForEach(PostWorking2Group.allCases, id: \.label) { group in
                         Button(group.label) { selectedGroup = group }
@@ -317,6 +326,9 @@ private struct PostWorking2DonationOverviewCard: View {
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black.opacity(0.05)))
+        .fullScreenCover(isPresented: $showRetentionDetail) {
+            PostWorking2RetentionDetailSheet()
+        }
     }
 }
 
@@ -482,6 +494,34 @@ private struct PostWorking2LineChart: View {
                 }
             }
             .stroke(PostWorking_2.darkPurple, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+        }
+    }
+}
+
+private struct PostWorking2RetentionDetailSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            PostWorking_2.panelBackground.ignoresSafeArea()
+
+            PostWorking2RetentionCard()
+                .padding(28)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(PostWorking_2.darkPurple)
+                    .frame(width: 44, height: 44)
+                    .background(Color.white)
+                    .clipShape(Circle())
+                    .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
+            }
+            .buttonStyle(.plain)
+            .padding(20)
         }
     }
 }
