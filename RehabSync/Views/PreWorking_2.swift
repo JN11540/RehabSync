@@ -420,6 +420,10 @@ private struct PreWorking2CalibrationAboutPanel: View {
         isCalibrating ? "\(calibrationCountdown)" : "校正"
     }
 
+    private var sideLabelText: String {
+        "\(side == 1 ? "右" : "左")腳版本"
+    }
+
     /// 按下「校正」開始 5 秒倒數，同時呼叫真正的校正演算法（收集 5 秒加速度計算基準角）；
     /// 倒數結束後看 btVM.baselineResult 有沒有值決定成功或失敗，失敗要讓使用者能再按一次「校正」重試。
     private func startCalibration() {
@@ -462,9 +466,18 @@ private struct PreWorking2CalibrationAboutPanel: View {
         VStack(alignment: .leading, spacing: 24) {
             Spacer()
 
-            Text(title)
-                .font(.system(size: 40, weight: .heavy))
-                .foregroundStyle(PreWorking_2.darkPurple)
+            HStack(spacing: 16) {
+                Text(title)
+                    .font(.system(size: 40, weight: .heavy))
+                    .foregroundStyle(PreWorking_2.darkPurple)
+
+                Text(sideLabelText)
+                    .font(.system(size: 20))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(PreWorking_2.midPurple)
+            }
 
             HStack(alignment: .top, spacing: 16) {
                 Rectangle()
@@ -556,13 +569,26 @@ private struct PreWorking2MotionTestAboutPanel: View {
         btVM.stopLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
     }
 
+    private var sideLabelText: String {
+        "\(side == 1 ? "右" : "左")腳版本"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             Spacer()
 
-            Text(title)
-                .font(.system(size: 40, weight: .heavy))
-                .foregroundStyle(PreWorking_2.darkPurple)
+            HStack(spacing: 16) {
+                Text(title)
+                    .font(.system(size: 40, weight: .heavy))
+                    .foregroundStyle(PreWorking_2.darkPurple)
+
+                Text(sideLabelText)
+                    .font(.system(size: 20))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(PreWorking_2.midPurple)
+            }
 
             HStack(alignment: .top, spacing: 16) {
                 Rectangle()
