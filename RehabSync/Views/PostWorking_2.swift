@@ -311,6 +311,7 @@ private struct PostWorking2DonationOverviewCard: View {
                 }
                 .frame(width: contentWidth * 0.55)
                 .frame(height: 220, alignment: .leading)
+                .offset(y: 20)
 
                 VStack(alignment: .leading, spacing: 16) {
                     ZStack {
@@ -323,7 +324,7 @@ private struct PostWorking2DonationOverviewCard: View {
                             .foregroundStyle(slice.color)
                             .cornerRadius(2)
                         }
-                        .frame(width: 140, height: 140)
+                        .frame(width: 200, height: 200)
 
                         Text("伸直時間比例")
                             .font(.system(size: 20, weight: .semibold))
@@ -340,7 +341,6 @@ private struct PostWorking2DonationOverviewCard: View {
                                 Text(slice.label)
                                     .font(.system(size: 20))
                                     .foregroundStyle(Color.black.opacity(0.75))
-                                Spacer()
                                 Text("\(Int(slice.percent * 100))%")
                                     .font(.system(size: 20, weight: .semibold))
                                     .foregroundStyle(Color.black)
