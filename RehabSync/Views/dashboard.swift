@@ -515,6 +515,11 @@ private struct DashboardDeviceListModal: View {
         onClose()
     }
 
+    private var isConnecting: Bool {
+        if case .connecting = btVM.connectionState { return true }
+        return false
+    }
+
     var body: some View {
         ZStack(alignment: .top) {
             RoundedRectangle(cornerRadius: 16)
@@ -543,6 +548,8 @@ private struct DashboardDeviceListModal: View {
                         .frame(width: 32, height: 32)
                     }
                     .buttonStyle(.plain)
+                    .disabled(isConnecting)
+                    .opacity(isConnecting ? 0.4 : 1)
                     .padding(.trailing, 16)
                 }
                 .padding(.top, 16)
@@ -618,8 +625,8 @@ private struct DashboardDeviceListModal: View {
                 .padding(16)
             }
             .buttonStyle(.plain)
-            .disabled(selectedDevice == nil)
-            .opacity(selectedDevice == nil ? 0.4 : 1)
+            .disabled(selectedDevice == nil || isConnecting)
+            .opacity(selectedDevice == nil || isConnecting ? 0.4 : 1)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
         }
         .clipShape(RoundedRectangle(cornerRadius: 16))
