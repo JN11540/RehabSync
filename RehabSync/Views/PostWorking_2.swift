@@ -246,7 +246,7 @@ private struct PostWorking2DonationOverviewCard: View {
                 .foregroundStyle(PostWorking_2.darkPurple)
                 .cornerRadius(2)
             }
-            .chartXScale(domain: 1...10)
+            .chartXScale(domain: 0.5...10.5)
             .chartYScale(domain: 0...7)
             .chartXAxis {
                 AxisMarks(values: Array(1...10)) { value in
