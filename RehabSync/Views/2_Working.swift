@@ -682,7 +682,7 @@ struct Working2: View {
             }
         }
         .fullScreenCover(isPresented: $navigateToPostWorking2) {
-            PostWorking2(
+            PostWorking_2(
                 content: content,
                 exercise: exercise,
                 totalCoins: totalCoins,
