@@ -63,9 +63,14 @@ struct PreWorking_2: View {
         ZStack(alignment: .topLeading) {
             Group {
                 if step == .numbers {
-                    PreWorking2ImpactPage(onExitToPreviousStep: {
-                        if let previous = step.previous { step = previous }
-                    })
+                    PreWorking2ImpactPage(
+                        onExitToPreviousStep: {
+                            if let previous = step.previous { step = previous }
+                        },
+                        onAdvanceToNextStep: {
+                            if let next = step.next { step = next }
+                        }
+                    )
                 } else {
                     HStack(spacing: 24) {
                         PreWorking2EquipmentPanel(step: step)
@@ -380,6 +385,8 @@ private struct PreWorking2ImpactPage: View {
     @State private var guideStep: PreWorkingGuideStep = .prepare
     /// 從第一頁「準備姿勢」再按上一步時，回到外層的「放置平板」頁。
     var onExitToPreviousStep: () -> Void = {}
+    /// 從最後一頁「保持並放下」再按下一步時，前進到外層的「校正」頁。
+    var onAdvanceToNextStep: () -> Void = {}
 
     /// side = 0（左，含資料庫查無資料時的預設值）或 1（右），對應到匯入的示範圖 asset 名稱。
     private var sideViewImageName: String {
@@ -431,10 +438,10 @@ private struct PreWorking2ImpactPage: View {
                         if let next = guideStep.next {
                             guideStep = next
                             selectedAngle = .side
+                        } else {
+                            onAdvanceToNextStep()
                         }
                     }
-                    .disabled(guideStep.next == nil)
-                    .opacity(guideStep.next == nil ? 0.4 : 1)
                 }
             }
             .frame(maxWidth: 380, alignment: .leading)
