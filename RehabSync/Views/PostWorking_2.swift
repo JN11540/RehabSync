@@ -190,24 +190,76 @@ private struct PostWorking2AttemptDuration: Identifiable {
     var id: Int { attempt }
 }
 
-private struct PostWorking2DonationOverviewCard: View {
-    private let data: [PostWorking2AttemptDuration] = (1...10).map { attempt in
-        PostWorking2AttemptDuration(attempt: attempt, seconds: attempt == 10 ? 4 : 5)
+private enum PostWorking2Group: CaseIterable {
+    case first
+    case second
+    case third
+
+    var label: String {
+        switch self {
+        case .first: "第一組"
+        case .second: "第二組"
+        case .third: "第三組"
+        }
     }
+
+    var totalTime: String {
+        switch self {
+        case .first: "3 分 00 秒"
+        case .second: "2 分 45 秒"
+        case .third: "3 分 20 秒"
+        }
+    }
+
+    var totalCount: String {
+        "10 次"
+    }
+
+    var averageDuration: String {
+        switch self {
+        case .first: "5.5 秒"
+        case .second: "5.0 秒"
+        case .third: "6.0 秒"
+        }
+    }
+
+    var durations: [Double] {
+        switch self {
+        case .first: [5, 5, 5, 5, 5, 5, 5, 5, 5, 4]
+        case .second: [5, 5, 4, 5, 6, 5, 4, 5, 5, 6]
+        case .third: [6, 6, 7, 6, 5, 6, 7, 6, 6, 5]
+        }
+    }
+
+    var data: [PostWorking2AttemptDuration] {
+        durations.enumerated().map { index, seconds in
+            PostWorking2AttemptDuration(attempt: index + 1, seconds: seconds)
+        }
+    }
+}
+
+private struct PostWorking2DonationOverviewCard: View {
+    @State private var selectedGroup: PostWorking2Group = .first
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("第一組資訊")
+                Text("\(selectedGroup.label)資訊")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(Color.black)
                 Spacer()
-                HStack(spacing: 4) {
-                    Text("Monthly")
-                    Image(systemName: "chevron.down")
+                Menu {
+                    ForEach(PostWorking2Group.allCases, id: \.label) { group in
+                        Button(group.label) { selectedGroup = group }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("選擇組數")
+                        Image(systemName: "chevron.down")
+                    }
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(PostWorking_2.mutedText)
                 }
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(PostWorking_2.mutedText)
             }
 
             HStack(alignment: .top, spacing: 32) {
@@ -215,7 +267,7 @@ private struct PostWorking2DonationOverviewCard: View {
                     Text("總時間")
                         .font(.system(size: 12))
                         .foregroundStyle(PostWorking_2.mutedText)
-                    Text("3 分 00 秒")
+                    Text(selectedGroup.totalTime)
                         .font(.system(size: 20, weight: .bold))
                         .foregroundStyle(Color.black)
                 }
@@ -223,7 +275,7 @@ private struct PostWorking2DonationOverviewCard: View {
                     Text("次數")
                         .font(.system(size: 12))
                         .foregroundStyle(PostWorking_2.mutedText)
-                    Text("10 次")
+                    Text(selectedGroup.totalCount)
                         .font(.system(size: 20, weight: .bold))
                         .foregroundStyle(Color.black)
                 }
@@ -231,13 +283,13 @@ private struct PostWorking2DonationOverviewCard: View {
                     Text("平均伸直時間")
                         .font(.system(size: 12))
                         .foregroundStyle(PostWorking_2.mutedText)
-                    Text("5.5 秒")
+                    Text(selectedGroup.averageDuration)
                         .font(.system(size: 20, weight: .bold))
                         .foregroundStyle(Color.black)
                 }
             }
 
-            Chart(data) { point in
+            Chart(selectedGroup.data) { point in
                 BarMark(
                     x: .value("次數", point.attempt),
                     y: .value("時間（秒）", point.seconds),
