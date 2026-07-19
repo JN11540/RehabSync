@@ -288,6 +288,7 @@ private struct PostWorking2DonationOverviewCard: View {
                         AxisValueLabel {
                             if let count = value.as(Int.self) {
                                 Text("\(count)")
+                                    .font(.system(size: 16))
                             }
                         }
                     }
@@ -297,12 +298,19 @@ private struct PostWorking2DonationOverviewCard: View {
                         AxisGridLine()
                         AxisTick()
                         AxisValueLabel()
+                            .font(.system(size: 16))
                     }
                 }
-                .chartXAxisLabel("次數", alignment: .center)
-                .chartYAxisLabel("時間（秒）", position: .leading, alignment: .center)
-                .frame(width: contentWidth * 0.8)
-                .frame(height: 160, alignment: .leading)
+                .chartXAxisLabel(alignment: .center) {
+                    Text("次數")
+                        .font(.system(size: 18))
+                }
+                .chartYAxisLabel(position: .leading, alignment: .center) {
+                    Text("時間（秒）")
+                        .font(.system(size: 18))
+                }
+                .frame(width: contentWidth * 0.7)
+                .frame(maxHeight: .infinity, alignment: .leading)
 
                 VStack(alignment: .leading, spacing: 16) {
                     ZStack {
@@ -340,7 +348,7 @@ private struct PostWorking2DonationOverviewCard: View {
                         }
                     }
                 }
-                .frame(width: contentWidth * 0.2)
+                .frame(width: contentWidth * 0.3)
                 }
             }
             .frame(height: 300)
