@@ -80,6 +80,8 @@ private struct PostWorking2Stat {
 private struct PostWorking2StatRow: View {
     let onReturnToDashboard: () -> Void
 
+    @State private var showReturnConfirm = false
+
     private let stats: [PostWorking2Stat] = [
         PostWorking2Stat(icon: "clock.fill", color: PostWorking_2.midPurple, label: "總時間", value: "10 分 00 秒", change: "", isPositive: true, note: ""),
         PostWorking2Stat(icon: "repeat.circle.fill", color: PostWorking_2.blue, label: "總次數", value: "30 次", change: "", isPositive: true, note: ""),
@@ -92,29 +94,76 @@ private struct PostWorking2StatRow: View {
                 PostWorking2StatCard(stat: stat)
             }
 
-            Button(action: onReturnToDashboard) {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack {
-                        ZStack {
-                            Circle().fill(PostWorking_2.orange.opacity(0.15))
-                            Image(systemName: "arrow.uturn.left.circle.fill")
-                                .font(.system(size: 14))
-                                .foregroundStyle(PostWorking_2.orange)
-                        }
-                        .frame(width: 32, height: 32)
-                        Spacer()
-                    }
-                    Text("回到總覽")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(Color.black)
-                }
-                .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.white)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black.opacity(0.05)))
+            Button {
+                showReturnConfirm = true
+            } label: {
+                Text("回到總覽")
+                    .font(.system(size: 30, weight: .semibold))
+                    .foregroundStyle(Color.black)
+                    .multilineTextAlignment(.center)
+                    .padding(16)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    .background(Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black.opacity(0.05)))
             }
             .buttonStyle(.plain)
+        }
+        .fullScreenCover(isPresented: $showReturnConfirm) {
+            PostWorking2ReturnConfirmSheet(onConfirm: onReturnToDashboard)
+        }
+    }
+}
+
+private struct PostWorking2ReturnConfirmSheet: View {
+    let onConfirm: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ZStack {
+            PostWorking_2.panelBackground.ignoresSafeArea()
+
+            ZStack(alignment: .topTrailing) {
+                VStack(spacing: 24) {
+                    Text("確定要回到總覽嗎？")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(Color.black)
+                        .multilineTextAlignment(.center)
+
+                    Button {
+                        onConfirm()
+                    } label: {
+                        Text("確定")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(Color.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(PostWorking_2.darkPurple)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(28)
+                .padding(.top, 12)
+                .frame(width: 320)
+                .background(Color.white)
+                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .shadow(color: .black.opacity(0.1), radius: 12, y: 4)
+
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(PostWorking_2.darkPurple)
+                        .frame(width: 32, height: 32)
+                        .background(Color.white)
+                        .clipShape(Circle())
+                        .shadow(color: .black.opacity(0.1), radius: 3, y: 1)
+                }
+                .buttonStyle(.plain)
+                .offset(x: 8, y: -8)
+            }
         }
     }
 }
