@@ -194,20 +194,6 @@ private enum PostWorking2Group: CaseIterable, Equatable {
 }
 
 private struct PostWorking2DonationOverviewCard: View {
-    private struct Slice {
-        let label: String
-        let percent: Double
-        let amount: String
-        let color: Color
-    }
-
-    private let slices: [Slice] = [
-        Slice(label: "1~3 秒", percent: 0.25, amount: "$3,025.32", color: PostWorking_2.teal),
-        Slice(label: "3~5 秒", percent: 0.25, amount: "$1,925.13", color: PostWorking_2.orange),
-        Slice(label: "> 5 秒", percent: 0.25, amount: "$1,283.42", color: PostWorking_2.blue),
-        Slice(label: "0~1 秒", percent: 0.25, amount: "$641.03", color: Color.black.opacity(0.2))
-    ]
-
     @State private var selectedGroup: PostWorking2Group = .first
     @State private var showRetentionDetail = false
 
@@ -311,26 +297,6 @@ private struct PostWorking2DonationOverviewCard: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 220, alignment: .leading)
                 .offset(y: 35)
-
-                ZStack {
-                    Chart(slices, id: \.label) { slice in
-                        SectorMark(
-                            angle: .value("Percent", slice.percent),
-                            innerRadius: .ratio(0.65),
-                            angularInset: 1.5
-                        )
-                        .foregroundStyle(slice.color)
-                        .cornerRadius(2)
-                    }
-                    .frame(width: 200, height: 200)
-
-                    Text("伸直時間比例")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(Color.black)
-                        .multilineTextAlignment(.center)
-                        .frame(width: 90)
-                }
-                .frame(width: 200)
             }
             .padding(.trailing, 20)
             .frame(height: 300)
