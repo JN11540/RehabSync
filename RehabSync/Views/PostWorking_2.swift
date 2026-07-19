@@ -25,14 +25,18 @@ struct PostWorking_2: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 24) {
-                    PostWorking2Header()
-                    PostWorking2StatRow()
+            GeometryReader { geo in
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 24) {
+                        PostWorking2Header()
+                        PostWorking2StatRow()
 
-                    PostWorking2DonationOverviewCard()
+                        PostWorking2DonationOverviewCard()
+                            .frame(maxHeight: .infinity)
+                    }
+                    .padding(28)
+                    .frame(minHeight: geo.size.height)
                 }
-                .padding(28)
             }
             .background(Self.panelBackground)
         }
@@ -48,10 +52,10 @@ private struct PostWorking2Header: View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("你好棒！")
-                    .font(.system(size: 24, weight: .bold))
+                    .font(.system(size: 36, weight: .bold))
                     .foregroundStyle(Color.black)
                 Text("來看看遊戲結果吧！")
-                    .font(.system(size: 14))
+                    .font(.system(size: 20))
                     .foregroundStyle(PostWorking_2.mutedText)
             }
 
@@ -104,10 +108,10 @@ private struct PostWorking2StatCard: View {
                 Spacer()
             }
             Text(stat.label)
-                .font(.system(size: 12))
+                .font(.system(size: 20))
                 .foregroundStyle(PostWorking_2.mutedText)
             Text(stat.value)
-                .font(.system(size: 20, weight: .bold))
+                .font(.system(size: 30, weight: .bold))
                 .foregroundStyle(Color.black)
 
             if !stat.change.isEmpty {
@@ -211,14 +215,14 @@ private struct PostWorking2DonationOverviewCard: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Text("\(selectedGroup.label)資訊")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(Color.black)
                 Spacer()
                 Button {
                     showRetentionDetail = true
                 } label: {
                     Text("檢視")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 20, weight: .medium))
                         .foregroundStyle(PostWorking_2.mutedText)
                 }
                 .buttonStyle(.plain)
@@ -231,34 +235,34 @@ private struct PostWorking2DonationOverviewCard: View {
                         Text("選擇組數")
                         Image(systemName: "chevron.down")
                     }
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 20, weight: .medium))
                     .foregroundStyle(PostWorking_2.mutedText)
                 }
             }
 
-            HStack(alignment: .top, spacing: 32) {
+            HStack(alignment: .top, spacing: 56) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("總時間")
-                        .font(.system(size: 12))
+                        .font(.system(size: 20))
                         .foregroundStyle(PostWorking_2.mutedText)
                     Text(selectedGroup.totalTime)
-                        .font(.system(size: 20, weight: .bold))
+                        .font(.system(size: 30, weight: .bold))
                         .foregroundStyle(Color.black)
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text("次數")
-                        .font(.system(size: 12))
+                        .font(.system(size: 20))
                         .foregroundStyle(PostWorking_2.mutedText)
                     Text(selectedGroup.totalCount)
-                        .font(.system(size: 20, weight: .bold))
+                        .font(.system(size: 30, weight: .bold))
                         .foregroundStyle(Color.black)
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text("平均伸直時間")
-                        .font(.system(size: 12))
+                        .font(.system(size: 20))
                         .foregroundStyle(PostWorking_2.mutedText)
                     Text(selectedGroup.averageDuration)
-                        .font(.system(size: 20, weight: .bold))
+                        .font(.system(size: 30, weight: .bold))
                         .foregroundStyle(Color.black)
                 }
             }
@@ -295,7 +299,8 @@ private struct PostWorking2DonationOverviewCard: View {
                 }
                 .chartXAxisLabel("次數", alignment: .center)
                 .chartYAxisLabel("時間（秒）", position: .leading, alignment: .center)
-                .frame(width: 463, height: 160, alignment: .leading)
+                .frame(maxWidth: .infinity)
+                .frame(height: 160, alignment: .leading)
 
                 VStack(alignment: .leading, spacing: 16) {
                     ZStack {
@@ -311,7 +316,7 @@ private struct PostWorking2DonationOverviewCard: View {
                         .frame(width: 140, height: 140)
 
                         Text("伸直時間比例")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(Color.black)
                             .multilineTextAlignment(.center)
                             .frame(width: 90)
@@ -323,20 +328,21 @@ private struct PostWorking2DonationOverviewCard: View {
                             HStack(spacing: 8) {
                                 Circle().fill(slice.color).frame(width: 8, height: 8)
                                 Text(slice.label)
-                                    .font(.system(size: 12))
+                                    .font(.system(size: 20))
                                     .foregroundStyle(Color.black.opacity(0.75))
                                 Spacer()
                                 Text("\(Int(slice.percent * 100))%")
-                                    .font(.system(size: 12, weight: .semibold))
+                                    .font(.system(size: 20, weight: .semibold))
                                     .foregroundStyle(Color.black)
                             }
                         }
                     }
                 }
-                .frame(width: 220)
+                .frame(maxWidth: .infinity)
             }
         }
         .padding(20)
+        .frame(maxHeight: .infinity, alignment: .top)
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black.opacity(0.05)))
