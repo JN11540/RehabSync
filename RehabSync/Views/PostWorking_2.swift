@@ -247,20 +247,26 @@ private struct PostWorking2DonationOverviewCard: View {
                 }
                 .frame(height: chartHeight)
 
-                VStack(spacing: 6) {
-                    HStack(alignment: .bottom, spacing: 10) {
-                        ForEach(Array(counts.enumerated()), id: \.offset) { index, _ in
-                            RoundedRectangle(cornerRadius: 2)
-                                .fill(PostWorking_2.darkPurple)
-                                .frame(width: 6, height: chartHeight * income[index])
-                                .frame(maxWidth: .infinity)
-                        }
-                    }
-                    .frame(height: chartHeight)
+                Rectangle()
+                    .fill(Color.black.opacity(0.15))
+                    .frame(width: 1, height: chartHeight)
 
-                    Rectangle()
-                        .fill(Color.black.opacity(0.15))
-                        .frame(height: 1)
+                VStack(spacing: 6) {
+                    VStack(spacing: 0) {
+                        HStack(alignment: .bottom, spacing: 10) {
+                            ForEach(Array(counts.enumerated()), id: \.offset) { index, _ in
+                                RoundedRectangle(cornerRadius: 2)
+                                    .fill(PostWorking_2.darkPurple)
+                                    .frame(width: 6, height: chartHeight * income[index])
+                                    .frame(maxWidth: .infinity)
+                            }
+                        }
+                        .frame(height: chartHeight)
+
+                        Rectangle()
+                            .fill(Color.black.opacity(0.15))
+                            .frame(height: 1)
+                    }
 
                     HStack(spacing: 10) {
                         ForEach(counts, id: \.self) { count in
