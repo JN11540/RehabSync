@@ -1,4 +1,5 @@
 import SwiftUI
+import Charts
 
 struct PostWorking_2: View {
     let content: TreatmentContent
@@ -183,10 +184,16 @@ private struct PostWorking2StatCard: View {
 
 // MARK: - Donation Overview (Bar Chart)
 
+private struct PostWorking2AttemptDuration: Identifiable {
+    let attempt: Int
+    let seconds: Double
+    var id: Int { attempt }
+}
+
 private struct PostWorking2DonationOverviewCard: View {
-    private let counts = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
-    private let income: [CGFloat] = [0.45, 0.55, 0.60, 0.50, 0.90, 0.65, 0.70, 0.60, 0.75, 0.68]
-    private let chartHeight: CGFloat = 140
+    private let data: [PostWorking2AttemptDuration] = (1...10).map { attempt in
+        PostWorking2AttemptDuration(attempt: attempt, seconds: attempt == 10 ? 4 : 5)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -230,59 +237,38 @@ private struct PostWorking2DonationOverviewCard: View {
                 }
             }
 
-            Text("時間（秒）")
-                .font(.system(size: 10))
-                .foregroundStyle(PostWorking_2.mutedText)
-
-            HStack(alignment: .bottom, spacing: 8) {
-                VStack {
-                    ForEach((0...7).reversed(), id: \.self) { value in
-                        Text("\(value)")
-                            .font(.system(size: 10))
-                            .foregroundStyle(PostWorking_2.mutedText)
-                        if value != 0 {
-                            Spacer(minLength: 0)
-                        }
-                    }
-                }
-                .frame(height: chartHeight)
-
-                Rectangle()
-                    .fill(Color.black.opacity(0.15))
-                    .frame(width: 1, height: chartHeight)
-
-                VStack(spacing: 6) {
-                    VStack(spacing: 0) {
-                        HStack(alignment: .bottom, spacing: 10) {
-                            ForEach(Array(counts.enumerated()), id: \.offset) { index, _ in
-                                RoundedRectangle(cornerRadius: 2)
-                                    .fill(PostWorking_2.darkPurple)
-                                    .frame(width: 6, height: chartHeight * income[index])
-                                    .frame(maxWidth: .infinity)
-                            }
-                        }
-                        .frame(height: chartHeight)
-
-                        Rectangle()
-                            .fill(Color.black.opacity(0.15))
-                            .frame(height: 1)
-                    }
-
-                    HStack(spacing: 10) {
-                        ForEach(counts, id: \.self) { count in
-                            Text(count)
-                                .font(.system(size: 10))
-                                .foregroundStyle(PostWorking_2.mutedText)
-                                .frame(maxWidth: .infinity)
+            Chart(data) { point in
+                BarMark(
+                    x: .value("次數", point.attempt),
+                    y: .value("時間（秒）", point.seconds),
+                    width: .fixed(14)
+                )
+                .foregroundStyle(PostWorking_2.darkPurple)
+                .cornerRadius(2)
+            }
+            .chartXScale(domain: 1...10)
+            .chartYScale(domain: 0...7)
+            .chartXAxis {
+                AxisMarks(values: Array(1...10)) { value in
+                    AxisGridLine()
+                    AxisTick()
+                    AxisValueLabel {
+                        if let count = value.as(Int.self) {
+                            Text("\(count)")
                         }
                     }
                 }
             }
-
-            Text("次數")
-                .font(.system(size: 10))
-                .foregroundStyle(PostWorking_2.mutedText)
-                .frame(maxWidth: .infinity, alignment: .center)
+            .chartYAxis {
+                AxisMarks(values: Array(0...7)) { value in
+                    AxisGridLine()
+                    AxisTick()
+                    AxisValueLabel()
+                }
+            }
+            .chartXAxisLabel("次數", alignment: .center)
+            .chartYAxisLabel("時間（秒）", alignment: .center)
+            .frame(height: 160)
         }
         .padding(20)
         .background(Color.white)
