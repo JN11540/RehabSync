@@ -35,18 +35,9 @@ struct PostWorking_2: View {
                             .frame(maxWidth: .infinity)
                         PostWorking2DonationSourceCard()
                             .frame(width: 260)
-                        PostWorking2RecentDonationsCard()
-                            .frame(width: 260)
                     }
 
-                    HStack(alignment: .top, spacing: 20) {
-                        PostWorking2TopCampaignsCard()
-                            .frame(maxWidth: .infinity)
-                        PostWorking2RetentionCard()
-                            .frame(maxWidth: .infinity)
-                        PostWorking2QuickInsightsCard()
-                            .frame(width: 260)
-                    }
+                    PostWorking2RetentionCard()
                 }
                 .padding(28)
             }
@@ -348,9 +339,6 @@ private struct PostWorking2DonationSourceCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Donations by Source")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Color.black)
 
             ZStack {
                 Chart(slices, id: \.label) { slice in
@@ -364,17 +352,11 @@ private struct PostWorking2DonationSourceCard: View {
                 }
                 .frame(width: 140, height: 140)
 
-                VStack(spacing: 2) {
-                    Text("Total")
-                        .font(.system(size: 11))
-                        .foregroundStyle(PostWorking_2.mutedText)
-                    Text("$12,834.19")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(Color.black)
-                    Text("100%")
-                        .font(.system(size: 11))
-                        .foregroundStyle(PostWorking_2.mutedText)
-                }
+                Text("伸直時間比例")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.black)
+                    .multilineTextAlignment(.center)
+                    .frame(width: 90)
             }
             .frame(maxWidth: .infinity)
 
@@ -389,138 +371,6 @@ private struct PostWorking2DonationSourceCard: View {
                         Text("\(Int(slice.percent * 100))%")
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(Color.black)
-                    }
-                }
-            }
-        }
-        .padding(20)
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black.opacity(0.05)))
-    }
-}
-
-// MARK: - Recent Donations
-
-private struct PostWorking2Donor {
-    let name: String
-    let time: String
-    let amount: String
-}
-
-private struct PostWorking2RecentDonationsCard: View {
-    private let donors: [PostWorking2Donor] = [
-        PostWorking2Donor(name: "Sarah Williams", time: "2 mins ago", amount: "$100.00"),
-        PostWorking2Donor(name: "Michael Brown", time: "10 mins ago", amount: "$250.00"),
-        PostWorking2Donor(name: "Emily Davis", time: "25 mins ago", amount: "$75.00"),
-        PostWorking2Donor(name: "James Wilson", time: "1 hour ago", amount: "$500.00"),
-        PostWorking2Donor(name: "Olivia Martinez", time: "2 hours ago", amount: "$120.00")
-    ]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("Recent Donations")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.black)
-                Spacer()
-                Text("View all")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(PostWorking_2.darkPurple)
-            }
-
-            VStack(spacing: 14) {
-                ForEach(donors, id: \.name) { donor in
-                    HStack(spacing: 10) {
-                        ZStack {
-                            Circle().fill(PostWorking_2.midPurple.opacity(0.2))
-                            Text(donor.name.split(separator: " ").compactMap { $0.first }.map(String.init).joined())
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(PostWorking_2.darkPurple)
-                        }
-                        .frame(width: 34, height: 34)
-
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(donor.name)
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(Color.black)
-                            Text(donor.time)
-                                .font(.system(size: 11))
-                                .foregroundStyle(PostWorking_2.mutedText)
-                        }
-                        Spacer()
-                        Text(donor.amount)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(PostWorking_2.green)
-                    }
-                }
-            }
-        }
-        .padding(20)
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black.opacity(0.05)))
-    }
-}
-
-// MARK: - Top Campaigns
-
-private struct PostWorking2Campaign {
-    let name: String
-    let raised: String
-    let percent: Double
-}
-
-private struct PostWorking2TopCampaignsCard: View {
-    private let campaigns: [PostWorking2Campaign] = [
-        PostWorking2Campaign(name: "Clean Water Initiative", raised: "$4,250.00 raised", percent: 0.85),
-        PostWorking2Campaign(name: "Education for All", raised: "$3,120.00 raised", percent: 0.62),
-        PostWorking2Campaign(name: "Food for Families", raised: "$2,850.00 raised", percent: 0.71),
-        PostWorking2Campaign(name: "Health & Wellness", raised: "$1,950.00 raised", percent: 0.49)
-    ]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("Top Campaigns")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.black)
-                Spacer()
-                Text("View all")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(PostWorking_2.darkPurple)
-            }
-
-            VStack(spacing: 16) {
-                ForEach(campaigns, id: \.name) { campaign in
-                    HStack(spacing: 12) {
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(PostWorking_2.lightPurple)
-                            .frame(width: 40, height: 40)
-                            .overlay(Image(systemName: "leaf.fill").foregroundStyle(PostWorking_2.darkPurple))
-
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text(campaign.name)
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundStyle(Color.black)
-                                Spacer()
-                                Text("\(Int(campaign.percent * 100))%")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(PostWorking_2.darkPurple)
-                            }
-                            GeometryReader { geo in
-                                ZStack(alignment: .leading) {
-                                    Capsule().fill(Color.black.opacity(0.06))
-                                    Capsule().fill(PostWorking_2.darkPurple)
-                                        .frame(width: geo.size.width * campaign.percent)
-                                }
-                            }
-                            .frame(height: 6)
-                            Text(campaign.raised)
-                                .font(.system(size: 11))
-                                .foregroundStyle(PostWorking_2.mutedText)
-                        }
                     }
                 }
             }
@@ -633,54 +483,6 @@ private struct PostWorking2LineChart: View {
             }
             .stroke(PostWorking_2.darkPurple, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
         }
-    }
-}
-
-// MARK: - Quick Insights
-
-private struct PostWorking2Insight {
-    let label: String
-    let value: String
-    let note: String
-}
-
-private struct PostWorking2QuickInsightsCard: View {
-    private let insights: [PostWorking2Insight] = [
-        PostWorking2Insight(label: "Lifetime Value (LTV)", value: "$325.50", note: "+12.7%"),
-        PostWorking2Insight(label: "Highest Donation", value: "$2,500.00", note: "By John Doe"),
-        PostWorking2Insight(label: "Most Active Donor", value: "Sarah Williams", note: "12 donations"),
-        PostWorking2Insight(label: "Donor Countries", value: "24", note: "Across the world")
-    ]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Quick Insights")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Color.black)
-
-            VStack(spacing: 16) {
-                ForEach(insights, id: \.label) { insight in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(insight.label)
-                                .font(.system(size: 11))
-                                .foregroundStyle(PostWorking_2.mutedText)
-                            Text(insight.value)
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(Color.black)
-                        }
-                        Spacer()
-                        Text(insight.note)
-                            .font(.system(size: 11))
-                            .foregroundStyle(PostWorking_2.mutedText)
-                    }
-                }
-            }
-        }
-        .padding(20)
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black.opacity(0.05)))
     }
 }
 
