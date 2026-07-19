@@ -30,12 +30,7 @@ struct PostWorking_2: View {
                     PostWorking2Header()
                     PostWorking2StatRow()
 
-                    HStack(alignment: .top, spacing: 20) {
-                        PostWorking2DonationOverviewCard()
-                            .frame(maxWidth: .infinity)
-                        PostWorking2DonationSourceCard()
-                            .frame(width: 260)
-                    }
+                    PostWorking2DonationOverviewCard()
                 }
                 .padding(28)
             }
@@ -61,39 +56,6 @@ private struct PostWorking2Header: View {
             }
 
             Spacer()
-
-            HStack(spacing: 12) {
-                HStack(spacing: 8) {
-                    Image(systemName: "calendar")
-                    Text("May 1 - May 31, 2025")
-                        .font(.system(size: 13, weight: .medium))
-                }
-                .foregroundStyle(Color.black.opacity(0.7))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(Color.white)
-                .clipShape(Capsule())
-                .overlay(Capsule().stroke(Color.black.opacity(0.08)))
-
-                ZStack(alignment: .topTrailing) {
-                    Circle()
-                        .fill(Color.white)
-                        .overlay(Circle().stroke(Color.black.opacity(0.08)))
-                        .frame(width: 40, height: 40)
-                        .overlay(
-                            Image(systemName: "bell.fill")
-                                .font(.system(size: 15))
-                                .foregroundStyle(Color.black.opacity(0.7))
-                        )
-                    Text("3")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 16, height: 16)
-                        .background(PostWorking_2.pink)
-                        .clipShape(Circle())
-                        .offset(x: 2, y: -2)
-                }
-            }
         }
     }
 }
@@ -228,6 +190,20 @@ private enum PostWorking2Group: CaseIterable {
 }
 
 private struct PostWorking2DonationOverviewCard: View {
+    private struct Slice {
+        let label: String
+        let percent: Double
+        let amount: String
+        let color: Color
+    }
+
+    private let slices: [Slice] = [
+        Slice(label: "1~3 秒", percent: 0.25, amount: "$3,025.32", color: PostWorking_2.teal),
+        Slice(label: "3~5 秒", percent: 0.25, amount: "$1,925.13", color: PostWorking_2.orange),
+        Slice(label: "> 5 秒", percent: 0.25, amount: "$1,283.42", color: PostWorking_2.blue),
+        Slice(label: "0~1 秒", percent: 0.25, amount: "$641.03", color: Color.black.opacity(0.2))
+    ]
+
     @State private var selectedGroup: PostWorking2Group = .first
     @State private var showRetentionDetail = false
 
@@ -287,38 +263,78 @@ private struct PostWorking2DonationOverviewCard: View {
                 }
             }
 
-            Chart(selectedGroup.data) { point in
-                BarMark(
-                    x: .value("次數", point.attempt),
-                    y: .value("時間（秒）", point.seconds),
-                    width: .fixed(22)
-                )
-                .foregroundStyle(PostWorking_2.darkPurple)
-                .cornerRadius(2)
-            }
-            .chartXScale(domain: 0.5...10.5)
-            .chartYScale(domain: 0...7)
-            .chartXAxis {
-                AxisMarks(values: Array(1...10)) { value in
-                    AxisGridLine()
-                    AxisTick()
-                    AxisValueLabel {
-                        if let count = value.as(Int.self) {
-                            Text("\(count)")
+            HStack(alignment: .top, spacing: 20) {
+                Chart(selectedGroup.data) { point in
+                    BarMark(
+                        x: .value("次數", point.attempt),
+                        y: .value("時間（秒）", point.seconds),
+                        width: .fixed(22)
+                    )
+                    .foregroundStyle(PostWorking_2.darkPurple)
+                    .cornerRadius(2)
+                }
+                .chartXScale(domain: 0.5...10.5)
+                .chartYScale(domain: 0...7)
+                .chartXAxis {
+                    AxisMarks(values: Array(1...10)) { value in
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel {
+                            if let count = value.as(Int.self) {
+                                Text("\(count)")
+                            }
                         }
                     }
                 }
-            }
-            .chartYAxis {
-                AxisMarks(position: .leading, values: Array(0...7)) { value in
-                    AxisGridLine()
-                    AxisTick()
-                    AxisValueLabel()
+                .chartYAxis {
+                    AxisMarks(position: .leading, values: Array(0...7)) { value in
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel()
+                    }
                 }
+                .chartXAxisLabel("次數", alignment: .center)
+                .chartYAxisLabel("時間（秒）", position: .leading, alignment: .center)
+                .frame(width: 463, height: 160, alignment: .leading)
+
+                VStack(alignment: .leading, spacing: 16) {
+                    ZStack {
+                        Chart(slices, id: \.label) { slice in
+                            SectorMark(
+                                angle: .value("Percent", slice.percent),
+                                innerRadius: .ratio(0.65),
+                                angularInset: 1.5
+                            )
+                            .foregroundStyle(slice.color)
+                            .cornerRadius(2)
+                        }
+                        .frame(width: 140, height: 140)
+
+                        Text("伸直時間比例")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Color.black)
+                            .multilineTextAlignment(.center)
+                            .frame(width: 90)
+                    }
+                    .frame(maxWidth: .infinity)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(slices, id: \.label) { slice in
+                            HStack(spacing: 8) {
+                                Circle().fill(slice.color).frame(width: 8, height: 8)
+                                Text(slice.label)
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(Color.black.opacity(0.75))
+                                Spacer()
+                                Text("\(Int(slice.percent * 100))%")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(Color.black)
+                            }
+                        }
+                    }
+                }
+                .frame(width: 220)
             }
-            .chartXAxisLabel("次數", alignment: .center)
-            .chartYAxisLabel("時間（秒）", position: .leading, alignment: .center)
-            .frame(width: 463, height: 160, alignment: .leading)
         }
         .padding(20)
         .background(Color.white)
@@ -327,68 +343,6 @@ private struct PostWorking2DonationOverviewCard: View {
         .fullScreenCover(isPresented: $showRetentionDetail) {
             PostWorking2RetentionDetailSheet()
         }
-    }
-}
-
-// MARK: - Donations by Source (Donut Chart)
-
-private struct PostWorking2DonationSourceCard: View {
-    private struct Slice {
-        let label: String
-        let percent: Double
-        let amount: String
-        let color: Color
-    }
-
-    private let slices: [Slice] = [
-        Slice(label: "1~3 秒", percent: 0.25, amount: "$3,025.32", color: PostWorking_2.teal),
-        Slice(label: "3~5 秒", percent: 0.25, amount: "$1,925.13", color: PostWorking_2.orange),
-        Slice(label: "> 5 秒", percent: 0.25, amount: "$1,283.42", color: PostWorking_2.blue),
-        Slice(label: "0~1 秒", percent: 0.25, amount: "$641.03", color: Color.black.opacity(0.2))
-    ]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-
-            ZStack {
-                Chart(slices, id: \.label) { slice in
-                    SectorMark(
-                        angle: .value("Percent", slice.percent),
-                        innerRadius: .ratio(0.65),
-                        angularInset: 1.5
-                    )
-                    .foregroundStyle(slice.color)
-                    .cornerRadius(2)
-                }
-                .frame(width: 140, height: 140)
-
-                Text("伸直時間比例")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Color.black)
-                    .multilineTextAlignment(.center)
-                    .frame(width: 90)
-            }
-            .frame(maxWidth: .infinity)
-
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(slices, id: \.label) { slice in
-                    HStack(spacing: 8) {
-                        Circle().fill(slice.color).frame(width: 8, height: 8)
-                        Text(slice.label)
-                            .font(.system(size: 12))
-                            .foregroundStyle(Color.black.opacity(0.75))
-                        Spacer()
-                        Text("\(Int(slice.percent * 100))%")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Color.black)
-                    }
-                }
-            }
-        }
-        .padding(20)
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black.opacity(0.05)))
     }
 }
 
