@@ -184,9 +184,8 @@ private struct PostWorking2StatCard: View {
 // MARK: - Donation Overview (Bar Chart)
 
 private struct PostWorking2DonationOverviewCard: View {
-    private let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-    private let income: [CGFloat] = [0.45, 0.55, 0.60, 0.50, 0.90, 0.65, 0.70, 0.60, 0.75, 0.68, 0.72, 0.80]
-    private let expenses: [CGFloat] = [0.20, 0.25, 0.22, 0.18, 0.15, 0.20, 0.24, 0.19, 0.21, 0.23, 0.20, 0.22]
+    private let counts = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
+    private let income: [CGFloat] = [0.45, 0.55, 0.60, 0.50, 0.90, 0.65, 0.70, 0.60, 0.75, 0.68]
     private let chartHeight: CGFloat = 140
 
     var body: some View {
@@ -231,25 +230,53 @@ private struct PostWorking2DonationOverviewCard: View {
                 }
             }
 
-            HStack(alignment: .bottom, spacing: 10) {
-                ForEach(Array(months.enumerated()), id: \.offset) { index, month in
-                    VStack(spacing: 6) {
-                        HStack(alignment: .bottom, spacing: 3) {
+            Text("時間（秒）")
+                .font(.system(size: 10))
+                .foregroundStyle(PostWorking_2.mutedText)
+
+            HStack(alignment: .bottom, spacing: 8) {
+                VStack {
+                    ForEach((0...7).reversed(), id: \.self) { value in
+                        Text("\(value)")
+                            .font(.system(size: 10))
+                            .foregroundStyle(PostWorking_2.mutedText)
+                        if value != 0 {
+                            Spacer(minLength: 0)
+                        }
+                    }
+                }
+                .frame(height: chartHeight)
+
+                VStack(spacing: 6) {
+                    HStack(alignment: .bottom, spacing: 10) {
+                        ForEach(Array(counts.enumerated()), id: \.offset) { index, _ in
                             RoundedRectangle(cornerRadius: 2)
                                 .fill(PostWorking_2.darkPurple)
                                 .frame(width: 6, height: chartHeight * income[index])
-                            RoundedRectangle(cornerRadius: 2)
-                                .fill(PostWorking_2.lightPurple)
-                                .frame(width: 6, height: chartHeight * expenses[index])
+                                .frame(maxWidth: .infinity)
                         }
-                        Text(month)
-                            .font(.system(size: 10))
-                            .foregroundStyle(PostWorking_2.mutedText)
                     }
-                    .frame(maxWidth: .infinity)
+                    .frame(height: chartHeight)
+
+                    Rectangle()
+                        .fill(Color.black.opacity(0.15))
+                        .frame(height: 1)
+
+                    HStack(spacing: 10) {
+                        ForEach(counts, id: \.self) { count in
+                            Text(count)
+                                .font(.system(size: 10))
+                                .foregroundStyle(PostWorking_2.mutedText)
+                                .frame(maxWidth: .infinity)
+                        }
+                    }
                 }
             }
-            .frame(height: chartHeight + 20)
+
+            Text("次數")
+                .font(.system(size: 10))
+                .foregroundStyle(PostWorking_2.mutedText)
+                .frame(maxWidth: .infinity, alignment: .center)
         }
         .padding(20)
         .background(Color.white)
