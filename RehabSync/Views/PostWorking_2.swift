@@ -122,11 +122,9 @@ private struct PostWorking2Stat {
 
 private struct PostWorking2StatRow: View {
     private let stats: [PostWorking2Stat] = [
-        PostWorking2Stat(icon: "dollarsign.circle.fill", color: PostWorking_2.midPurple, label: "Total Donations", value: "$12,834.19", change: "18.2%", isPositive: true, note: "vs Apr 1 - Apr 30"),
-        PostWorking2Stat(icon: "person.2.fill", color: PostWorking_2.blue, label: "Total Donors", value: "1,248", change: "14.7%", isPositive: true, note: "vs Apr 1 - Apr 30"),
-        PostWorking2Stat(icon: "checkmark.seal.fill", color: PostWorking_2.green, label: "Donation Goal", value: "80%", change: "", isPositive: true, note: "$8,000 of $10,000"),
-        PostWorking2Stat(icon: "person.badge.plus.fill", color: PostWorking_2.orange, label: "New Donors", value: "164", change: "22.1%", isPositive: true, note: "vs Apr 1 - Apr 30"),
-        PostWorking2Stat(icon: "chart.line.uptrend.xyaxis", color: PostWorking_2.pink, label: "Avg. Donation", value: "$75.23", change: "2.4%", isPositive: false, note: "vs Apr 1 - Apr 30")
+        PostWorking2Stat(icon: "clock.fill", color: PostWorking_2.midPurple, label: "總時間", value: "10 分 00 秒", change: "", isPositive: true, note: ""),
+        PostWorking2Stat(icon: "repeat.circle.fill", color: PostWorking_2.blue, label: "總次數", value: "30 次", change: "", isPositive: true, note: ""),
+        PostWorking2Stat(icon: "figure.flexibility", color: PostWorking_2.green, label: "平均伸展時長", value: "4.5 秒", change: "", isPositive: true, note: "")
     ]
 
     var body: some View {
@@ -169,7 +167,7 @@ private struct PostWorking2StatCard: View {
                 }
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(stat.isPositive ? PostWorking_2.green : PostWorking_2.pink)
-            } else {
+            } else if !stat.note.isEmpty {
                 Text(stat.note)
                     .font(.system(size: 11))
                     .foregroundStyle(PostWorking_2.mutedText)
