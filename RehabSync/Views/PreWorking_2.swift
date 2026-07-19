@@ -534,7 +534,7 @@ private struct PreWorking2ImpactPage: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 40) {
+        HStack(alignment: .center, spacing: 40) {
             VStack(alignment: .leading, spacing: 20) {
                 Text(guideStep.title)
                     .font(.system(size: 40, weight: .heavy))
