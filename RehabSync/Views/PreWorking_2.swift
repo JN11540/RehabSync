@@ -114,6 +114,13 @@ struct PreWorking_2: View {
 private struct PreWorking2EquipmentPanel: View {
     let step: PreWorkingStep
 
+    @State private var side: Int = 0
+
+    /// side = 0（左，含資料庫查無資料時的預設值）或 1（右），對應到匯入的示範圖 asset 名稱。
+    private var calibrationImageName: String {
+        side == 1 ? "Exercise2SideViewReadyRight" : "Exercise2SideViewReadyLeft"
+    }
+
     var body: some View {
         ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: 32)
@@ -161,9 +168,16 @@ private struct PreWorking2EquipmentPanel: View {
             case .numbers:
                 EmptyView()
             case .calibration:
-                // 待補：校正動作的圖片。
-                EmptyView()
+                Image(calibrationImageName)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: 500, maxHeight: 500)
+                    .padding(40)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+        }
+        .onAppear {
+            side = DeviceViewModel().fetchAnySide() ?? 0
         }
     }
 }
