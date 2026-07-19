@@ -241,7 +241,7 @@ private struct PostWorking2DonationOverviewCard: View {
                 BarMark(
                     x: .value("次數", point.attempt),
                     y: .value("時間（秒）", point.seconds),
-                    width: .fixed(14)
+                    width: .fixed(22)
                 )
                 .foregroundStyle(PostWorking_2.darkPurple)
                 .cornerRadius(2)
@@ -260,14 +260,14 @@ private struct PostWorking2DonationOverviewCard: View {
                 }
             }
             .chartYAxis {
-                AxisMarks(values: Array(0...7)) { value in
+                AxisMarks(position: .leading, values: Array(0...7)) { value in
                     AxisGridLine()
                     AxisTick()
                     AxisValueLabel()
                 }
             }
             .chartXAxisLabel("次數", alignment: .center)
-            .chartYAxisLabel("時間（秒）", alignment: .center)
+            .chartYAxisLabel("時間（秒）", position: .leading, alignment: .center)
             .frame(height: 160)
         }
         .padding(20)
