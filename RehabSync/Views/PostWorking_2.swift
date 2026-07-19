@@ -315,105 +315,54 @@ private struct PostWorking2DonationOverviewCard: View {
 
 // MARK: - Donor Retention Rate
 
+private struct PostWorking2KneeAnglePoint: Identifiable {
+    let time: Double
+    let angle: Double
+    var id: Double { time }
+}
+
 private struct PostWorking2RetentionCard: View {
-    private let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"]
-    private let values: [CGFloat] = [0.45, 0.55, 0.50, 0.65, 0.60, 0.75, 0.684]
+    private let dataPoints: [PostWorking2KneeAnglePoint] = {
+        let sampleInterval = 0.2 // 每秒 5 筆
+        let totalSeconds = 180.0 // 3 分鐘
+        var points: [PostWorking2KneeAnglePoint] = []
+        var time = 0.0
+        while time <= totalSeconds {
+            let cycle = sin(time * 0.3)
+            let angle = min(90, max(0, 45 + 40 * cycle + Double.random(in: -3...3)))
+            points.append(PostWorking2KneeAnglePoint(time: time, angle: angle))
+            time += sampleInterval
+        }
+        return points
+    }()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("Donor Retention Rate")
+                Text("即時膝角度")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(Color.black)
                 Spacer()
-                HStack(spacing: 4) {
-                    Text("This Year")
-                    Image(systemName: "chevron.down")
-                }
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(PostWorking_2.mutedText)
             }
 
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("68.4%")
-                    .font(.system(size: 26, weight: .bold))
-                    .foregroundStyle(Color.black)
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.up")
-                    Text("8.3% vs Last Year")
-                }
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(PostWorking_2.green)
+            Chart(dataPoints) { point in
+                LineMark(
+                    x: .value("時間（秒）", point.time),
+                    y: .value("膝角度", point.angle)
+                )
+                .foregroundStyle(PostWorking_2.darkPurple)
+                .interpolationMethod(.catmullRom)
             }
-
-            PostWorking2LineChart(values: values)
-                .frame(height: 100)
-
-            HStack(spacing: 0) {
-                ForEach(months, id: \.self) { month in
-                    Text(month)
-                        .font(.system(size: 10))
-                        .foregroundStyle(PostWorking_2.mutedText)
-                        .frame(maxWidth: .infinity)
-                }
-            }
-
-            HStack(spacing: 20) {
-                PostWorking2RetentionStat(label: "New Donors", value: "532", change: "15.3%", isPositive: true)
-                PostWorking2RetentionStat(label: "Returning Donors", value: "716", change: "11.2%", isPositive: true)
-                PostWorking2RetentionStat(label: "Churned Donors", value: "232", change: "6.8%", isPositive: false)
-            }
+            .chartXScale(domain: 0...180)
+            .chartYScale(domain: 0...90)
+            .chartXAxisLabel("時間（秒）", alignment: .center)
+            .chartYAxisLabel("膝角度（度）", position: .leading, alignment: .center)
+            .frame(height: 220)
         }
         .padding(20)
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black.opacity(0.05)))
-    }
-}
-
-private struct PostWorking2RetentionStat: View {
-    let label: String
-    let value: String
-    let change: String
-    let isPositive: Bool
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(label)
-                .font(.system(size: 11))
-                .foregroundStyle(PostWorking_2.mutedText)
-            Text(value)
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(Color.black)
-            HStack(spacing: 3) {
-                Image(systemName: isPositive ? "arrow.up" : "arrow.down")
-                Text(change)
-            }
-            .font(.system(size: 10, weight: .semibold))
-            .foregroundStyle(isPositive ? PostWorking_2.green : PostWorking_2.pink)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-private struct PostWorking2LineChart: View {
-    let values: [CGFloat]
-
-    var body: some View {
-        GeometryReader { geo in
-            let stepX = geo.size.width / CGFloat(max(values.count - 1, 1))
-            Path { path in
-                for (index, value) in values.enumerated() {
-                    let point = CGPoint(x: stepX * CGFloat(index), y: geo.size.height * (1 - value))
-                    if index == 0 {
-                        path.move(to: point)
-                    } else {
-                        path.addLine(to: point)
-                    }
-                }
-            }
-            .stroke(PostWorking_2.darkPurple, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
-        }
     }
 }
 
@@ -426,6 +375,7 @@ private struct PostWorking2RetentionDetailSheet: View {
 
             PostWorking2RetentionCard()
                 .padding(28)
+                .padding(.top, 60)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
             Button {
