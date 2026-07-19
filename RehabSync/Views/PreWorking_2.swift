@@ -419,10 +419,10 @@ private struct PreWorking2CalibrationAboutPanel: View {
                     .foregroundStyle(Color(red: 0.7, green: 0.62, blue: 0.95))
             }
 
-            HStack(alignment: .center, spacing: 16) {
+            HStack(alignment: .top, spacing: 16) {
                 Rectangle()
                     .fill(PreWorking_2.midPurple)
-                    .frame(width: 4, height: 24)
+                    .frame(width: 4)
                 Text(subtitle)
                     .font(.system(size: 25))
                     .foregroundStyle(Color.black.opacity(0.75))
@@ -451,13 +451,13 @@ private struct PreWorking2CalibrationAboutPanel: View {
 
             if calibrationFailed {
                 Text("校正失敗，請重新嘗試")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 25, weight: .semibold))
                     .foregroundStyle(.red)
             }
 
             if !calibrationSucceeded && thighAndCalfPeripherals == nil {
                 Text("裝置未連線")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 25, weight: .semibold))
                     .foregroundStyle(.red)
             }
 
