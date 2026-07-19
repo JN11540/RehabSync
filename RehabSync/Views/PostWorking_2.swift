@@ -296,7 +296,7 @@ private struct PostWorking2DonationOverviewCard: View {
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 220, alignment: .leading)
-                .offset(y: 25)
+                .offset(y: 15)
             }
             .padding(.trailing, 20)
             .frame(height: 300)
