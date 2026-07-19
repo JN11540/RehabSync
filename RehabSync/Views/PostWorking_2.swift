@@ -340,11 +340,10 @@ private struct PostWorking2DonationSourceCard: View {
     }
 
     private let slices: [Slice] = [
-        Slice(label: "Website", percent: 0.45, amount: "$5,775.39", color: PostWorking_2.darkPurple),
-        Slice(label: "Mobile App", percent: 0.25, amount: "$3,025.32", color: PostWorking_2.teal),
-        Slice(label: "Social Media", percent: 0.15, amount: "$1,925.13", color: PostWorking_2.orange),
-        Slice(label: "Email Campaigns", percent: 0.10, amount: "$1,283.42", color: PostWorking_2.blue),
-        Slice(label: "Other", percent: 0.05, amount: "$641.03", color: Color.black.opacity(0.2))
+        Slice(label: "1~3 秒", percent: 0.25, amount: "$3,025.32", color: PostWorking_2.teal),
+        Slice(label: "3~5 秒", percent: 0.25, amount: "$1,925.13", color: PostWorking_2.orange),
+        Slice(label: "> 5 秒", percent: 0.25, amount: "$1,283.42", color: PostWorking_2.blue),
+        Slice(label: "0~1 秒", percent: 0.25, amount: "$641.03", color: Color.black.opacity(0.2))
     ]
 
     var body: some View {
@@ -354,8 +353,17 @@ private struct PostWorking2DonationSourceCard: View {
                 .foregroundStyle(Color.black)
 
             ZStack {
-                PostWorking2Donut(slices: slices.map { ($0.percent, $0.color) })
-                    .frame(width: 140, height: 140)
+                Chart(slices, id: \.label) { slice in
+                    SectorMark(
+                        angle: .value("Percent", slice.percent),
+                        innerRadius: .ratio(0.65),
+                        angularInset: 1.5
+                    )
+                    .foregroundStyle(slice.color)
+                    .cornerRadius(2)
+                }
+                .frame(width: 140, height: 140)
+
                 VStack(spacing: 2) {
                     Text("Total")
                         .font(.system(size: 11))
@@ -389,32 +397,6 @@ private struct PostWorking2DonationSourceCard: View {
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black.opacity(0.05)))
-    }
-}
-
-private struct PostWorking2Donut: View {
-    let slices: [(Double, Color)]
-
-    private var segments: [(start: Double, end: Double, color: Color)] {
-        var result: [(Double, Double, Color)] = []
-        var cursor = 0.0
-        for (percent, color) in slices {
-            let end = cursor + percent
-            result.append((cursor, end, color))
-            cursor = end
-        }
-        return result
-    }
-
-    var body: some View {
-        ZStack {
-            ForEach(Array(segments.enumerated()), id: \.offset) { _, segment in
-                Circle()
-                    .trim(from: segment.start, to: segment.end)
-                    .stroke(segment.color, style: StrokeStyle(lineWidth: 22, lineCap: .butt))
-                    .rotationEffect(.degrees(-90))
-            }
-        }
     }
 }
 
