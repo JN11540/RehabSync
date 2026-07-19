@@ -442,7 +442,7 @@ private struct PreWorking2CalibrationAboutPanel: View {
                             .font(.system(size: isCalibrating ? 60 : 25, weight: .bold))
                             .foregroundStyle(PreWorking_2.darkPurple)
                     }
-                    .frame(width: 120, height: 120)
+                    .frame(width: 200, height: 200)
                 }
                 .buttonStyle(.plain)
                 .disabled(isCalibrating || thighAndCalfPeripherals == nil)
