@@ -212,7 +212,7 @@ private struct PostWorking2DonationOverviewCard: View {
     @State private var showRetentionDetail = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 30) {
             HStack {
                 Text("\(selectedGroup.label)資訊")
                     .font(.system(size: 20, weight: .semibold))
