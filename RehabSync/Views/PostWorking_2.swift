@@ -309,8 +309,8 @@ private struct PostWorking2DonationOverviewCard: View {
                     Text("時間（秒）")
                         .font(.system(size: 18))
                 }
-                .frame(width: contentWidth * 0.7)
-                .frame(maxHeight: .infinity, alignment: .leading)
+                .frame(width: contentWidth * 0.55)
+                .frame(height: 220, alignment: .leading)
 
                 VStack(alignment: .leading, spacing: 16) {
                     ZStack {
