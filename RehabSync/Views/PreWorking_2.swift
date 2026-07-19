@@ -63,6 +63,7 @@ struct PreWorking_2: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var step: PreWorkingStep = .equipment
+    @State private var navigateToWorking2 = false
 
     fileprivate static let darkPurple = Color(red: 0.30, green: 0.16, blue: 0.65)
     fileprivate static let midPurple = Color(red: 0.45, green: 0.35, blue: 0.85)
@@ -92,8 +93,12 @@ struct PreWorking_2: View {
                             )
                             .frame(maxWidth: .infinity, alignment: .leading)
                         } else if step == .motionTest {
-                            PreWorking2MotionTestAboutPanel(title: step.title, subtitle: step.subtitle)
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                            PreWorking2MotionTestAboutPanel(
+                                title: step.title,
+                                subtitle: step.subtitle,
+                                onPlayGame: { navigateToWorking2 = true }
+                            )
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         } else {
                             PreWorking2AboutPanel(
                                 title: step.title,
@@ -126,6 +131,9 @@ struct PreWorking_2: View {
             .offset(x: 20, y: 20)
         }
         .ignoresSafeArea()
+        .fullScreenCover(isPresented: $navigateToWorking2) {
+            Working2(content: content, exercise: exercise)
+        }
     }
 }
 
