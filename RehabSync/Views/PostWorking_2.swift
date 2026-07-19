@@ -336,6 +336,7 @@ private struct PostWorking2DonationOverviewCard: View {
             .frame(height: 300)
         }
         .padding(20)
+        .padding(.top, 20)
         .frame(maxHeight: .infinity, alignment: .top)
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 16))
