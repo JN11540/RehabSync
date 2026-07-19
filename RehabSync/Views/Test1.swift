@@ -18,7 +18,7 @@ private enum HomeTab: CaseIterable {
 
 struct Home: View {
     @State private var btVM = BluetoothViewModel()
-    @State private var selectedTab: HomeTab = .test1
+    @State private var selectedTab: HomeTab = .dashboard
 
     var body: some View {
         Group {
