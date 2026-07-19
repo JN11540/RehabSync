@@ -36,8 +36,6 @@ struct PostWorking_2: View {
                         PostWorking2DonationSourceCard()
                             .frame(width: 260)
                     }
-
-                    PostWorking2RetentionCard()
                 }
                 .padding(28)
             }
