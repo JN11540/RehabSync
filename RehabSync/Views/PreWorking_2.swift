@@ -88,7 +88,7 @@ struct PreWorking_2: View {
                             PreWorking2AboutPanel(
                                 title: step.title,
                                 subtitle: step.subtitle,
-                                onPrevious: step.previous.map { previous in { step = previous } },
+                                onPrevious: step.previous.map { previous in { step = previous } } ?? { dismiss() },
                                 onNext: { if let next = step.next { step = next } }
                             )
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -534,7 +534,7 @@ private struct PreWorking2ImpactPage: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 40) {
+        HStack(alignment: .top, spacing: 40) {
             VStack(alignment: .leading, spacing: 20) {
                 Text(guideStep.title)
                     .font(.system(size: 40, weight: .heavy))
@@ -546,6 +546,7 @@ private struct PreWorking2ImpactPage: View {
                     .foregroundStyle(Color.black.opacity(0.6))
                     .lineSpacing(6)
                     .frame(maxWidth: 320, alignment: .leading)
+                    .frame(height: 120, alignment: .topLeading)
 
                 HStack(spacing: 16) {
                     PreWorkingStepCapsuleButton(text: "上一步", icon: "arrow.left", iconLeading: true) {
