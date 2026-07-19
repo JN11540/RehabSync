@@ -399,7 +399,7 @@ struct PreWorking2: View {
             }
         }
         .fullScreenCover(isPresented: $navigateToWorking2) {
-            Working2(content: content, exercise: exercise)
+            Working2(content: content, exercise: exercise, onReturnToDashboard: {})
         }
     }
 }

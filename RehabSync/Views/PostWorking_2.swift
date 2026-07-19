@@ -10,6 +10,7 @@ struct PostWorking_2: View {
     let bigFishCaught: Int
     let middleFishCaught: Int
     let smallFishCaught: Int
+    let onReturnToDashboard: () -> Void
 
     fileprivate static let darkPurple = Color(red: 0.30, green: 0.16, blue: 0.65)
     fileprivate static let midPurple = Color(red: 0.45, green: 0.35, blue: 0.85)
@@ -29,7 +30,7 @@ struct PostWorking_2: View {
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 24) {
                         PostWorking2Header()
-                        PostWorking2StatRow()
+                        PostWorking2StatRow(onReturnToDashboard: onReturnToDashboard)
 
                         PostWorking2DonationOverviewCard()
                             .frame(maxHeight: .infinity)
@@ -77,6 +78,8 @@ private struct PostWorking2Stat {
 }
 
 private struct PostWorking2StatRow: View {
+    let onReturnToDashboard: () -> Void
+
     private let stats: [PostWorking2Stat] = [
         PostWorking2Stat(icon: "clock.fill", color: PostWorking_2.midPurple, label: "總時間", value: "10 分 00 秒", change: "", isPositive: true, note: ""),
         PostWorking2Stat(icon: "repeat.circle.fill", color: PostWorking_2.blue, label: "總次數", value: "30 次", change: "", isPositive: true, note: ""),
@@ -88,6 +91,30 @@ private struct PostWorking2StatRow: View {
             ForEach(stats, id: \.label) { stat in
                 PostWorking2StatCard(stat: stat)
             }
+
+            Button(action: onReturnToDashboard) {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        ZStack {
+                            Circle().fill(PostWorking_2.orange.opacity(0.15))
+                            Image(systemName: "arrow.uturn.left.circle.fill")
+                                .font(.system(size: 14))
+                                .foregroundStyle(PostWorking_2.orange)
+                        }
+                        .frame(width: 32, height: 32)
+                        Spacer()
+                    }
+                    Text("回到總覽")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(Color.black)
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.white)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black.opacity(0.05)))
+            }
+            .buttonStyle(.plain)
         }
     }
 }
@@ -404,6 +431,7 @@ private struct PostWorking2RetentionDetailSheet: View {
         totalElapsedSeconds: 600,
         bigFishCaught: 5,
         middleFishCaught: 10,
-        smallFishCaught: 15
+        smallFishCaught: 15,
+        onReturnToDashboard: {}
     )
 }

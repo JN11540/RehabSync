@@ -60,6 +60,7 @@ private enum PreWorkingStep: Equatable {
 struct PreWorking_2: View {
     let content: TreatmentContent
     let exercise: Exercise?
+    let onReturnToDashboard: () -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var step: PreWorkingStep = .equipment
@@ -132,7 +133,7 @@ struct PreWorking_2: View {
         }
         .ignoresSafeArea()
         .fullScreenCover(isPresented: $navigateToWorking2) {
-            Working2(content: content, exercise: exercise)
+            Working2(content: content, exercise: exercise, onReturnToDashboard: onReturnToDashboard)
         }
     }
 }
@@ -835,6 +836,7 @@ private struct PreWorking2PoseImageCard: View {
 #Preview {
     PreWorking_2(
         content: TreatmentContent(treatment_id: 1, exercise_id: 2, sets: 3, set_rest_time: 30, reps: 10, date: Int(Date().timeIntervalSince1970)),
-        exercise: nil
+        exercise: nil,
+        onReturnToDashboard: {}
     )
 }

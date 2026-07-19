@@ -6,6 +6,7 @@ import CoreBluetooth
 struct Working2: View {
     let content: TreatmentContent
     let exercise: Exercise?
+    let onReturnToDashboard: () -> Void
     @Environment(BluetoothViewModel.self) private var btVM
 
     // 校正/測試階段在 PreWorking 啟動的即時角度預估，離開這裡時必須主動停止，
@@ -690,7 +691,8 @@ struct Working2: View {
                 totalElapsedSeconds: finalElapsedSeconds,
                 bigFishCaught: bigFishCaught,
                 middleFishCaught: middleFishCaught,
-                smallFishCaught: smallFishCaught
+                smallFishCaught: smallFishCaught,
+                onReturnToDashboard: onReturnToDashboard
             )
         }
         .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
@@ -995,6 +997,7 @@ private struct CompletionPopup: View {
             reps: 2,
             date: Int(Date().timeIntervalSince1970)
         ),
-        exercise: nil
+        exercise: nil,
+        onReturnToDashboard: {}
     )
 }
