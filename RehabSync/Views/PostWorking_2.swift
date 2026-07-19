@@ -267,7 +267,9 @@ private struct PostWorking2DonationOverviewCard: View {
                 }
             }
 
-            HStack(alignment: .top, spacing: 20) {
+            GeometryReader { geo in
+                let contentWidth = geo.size.width - 20
+                HStack(alignment: .top, spacing: 20) {
                 Chart(selectedGroup.data) { point in
                     BarMark(
                         x: .value("次數", point.attempt),
@@ -299,7 +301,7 @@ private struct PostWorking2DonationOverviewCard: View {
                 }
                 .chartXAxisLabel("次數", alignment: .center)
                 .chartYAxisLabel("時間（秒）", position: .leading, alignment: .center)
-                .frame(maxWidth: .infinity)
+                .frame(width: contentWidth * 0.8)
                 .frame(height: 160, alignment: .leading)
 
                 VStack(alignment: .leading, spacing: 16) {
@@ -338,8 +340,10 @@ private struct PostWorking2DonationOverviewCard: View {
                         }
                     }
                 }
-                .frame(maxWidth: .infinity)
+                .frame(width: contentWidth * 0.2)
+                }
             }
+            .frame(height: 300)
         }
         .padding(20)
         .frame(maxHeight: .infinity, alignment: .top)
