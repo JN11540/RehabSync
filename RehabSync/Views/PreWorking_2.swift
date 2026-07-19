@@ -546,7 +546,8 @@ private struct PreWorking2ImpactPage: View {
                     .foregroundStyle(Color.black.opacity(0.6))
                     .lineSpacing(6)
                     .frame(maxWidth: 320, alignment: .leading)
-                    .frame(height: 120, alignment: .topLeading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(minHeight: 180, alignment: .topLeading)
 
                 HStack(spacing: 16) {
                     PreWorkingStepCapsuleButton(text: "上一步", icon: "arrow.left", iconLeading: true) {
