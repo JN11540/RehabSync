@@ -427,7 +427,9 @@ private struct PreWorking2CalibrationAboutPanel: View {
                     .font(.system(size: 25))
                     .foregroundStyle(Color.black.opacity(0.75))
                     .lineSpacing(8)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            .fixedSize(horizontal: false, vertical: true)
 
             if calibrationSucceeded {
                 PreWorkingStepCapsuleButton(text: "下一步", icon: "arrow.right", action: handleButtonTap)
