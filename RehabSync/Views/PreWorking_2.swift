@@ -264,15 +264,16 @@ private struct PreWorking2AboutPanel: View {
                     .foregroundStyle(Color(red: 0.7, green: 0.62, blue: 0.95))
             }
 
-            HStack(alignment: .center, spacing: 16) {
-                Rectangle()
-                    .fill(PreWorking_2.midPurple)
-                    .frame(width: 4, height: 24)
-                Text(subtitle)
-                    .font(.system(size: 25))
-                    .foregroundStyle(Color.black.opacity(0.75))
-                    .lineSpacing(8)
-            }
+            Text(subtitle)
+                .font(.system(size: 25))
+                .foregroundStyle(Color.black.opacity(0.75))
+                .lineSpacing(8)
+                .padding(.leading, 16)
+                .background(alignment: .leading) {
+                    Rectangle()
+                        .fill(PreWorking_2.midPurple)
+                        .frame(width: 4)
+                }
 
             HStack(spacing: 16) {
                 if let onPrevious {
