@@ -545,7 +545,7 @@ private struct DashboardDeviceListModal: View {
                                 .font(.system(size: 16, weight: .bold))
                                 .foregroundStyle(DashboardPalette.indigo)
                         }
-                        .frame(width: 32, height: 32)
+                        .frame(width: 40, height: 40)
                     }
                     .buttonStyle(.plain)
                     .disabled(isConnecting)
@@ -621,7 +621,7 @@ private struct DashboardDeviceListModal: View {
                         .font(.system(size: 16, weight: .bold))
                         .foregroundStyle(.white)
                 }
-                .frame(width: 32, height: 32)
+                .frame(width: 40, height: 40)
                 .padding(16)
             }
             .buttonStyle(.plain)
