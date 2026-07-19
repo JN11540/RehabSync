@@ -192,7 +192,7 @@ private struct PostWorking2DonationOverviewCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("Donation Overview")
+                Text("第一組資訊")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(Color.black)
                 Spacer()
@@ -206,32 +206,28 @@ private struct PostWorking2DonationOverviewCard: View {
 
             HStack(alignment: .top, spacing: 32) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Income")
+                    Text("總時間")
                         .font(.system(size: 12))
                         .foregroundStyle(PostWorking_2.mutedText)
-                    Text("$8,234.19")
+                    Text("3 分 00 秒")
                         .font(.system(size: 20, weight: .bold))
                         .foregroundStyle(Color.black)
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.up")
-                        Text("20.6% vs Apr 1 - Apr 30")
-                    }
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(PostWorking_2.green)
                 }
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Expenses")
+                    Text("次數")
                         .font(.system(size: 12))
                         .foregroundStyle(PostWorking_2.mutedText)
-                    Text("$1,245.34")
+                    Text("10 次")
                         .font(.system(size: 20, weight: .bold))
                         .foregroundStyle(Color.black)
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.down")
-                        Text("4.3% vs Apr 1 - Apr 30")
-                    }
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(PostWorking_2.pink)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("平均伸直時間")
+                        .font(.system(size: 12))
+                        .foregroundStyle(PostWorking_2.mutedText)
+                    Text("5.5 秒")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(Color.black)
                 }
             }
 
