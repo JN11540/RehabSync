@@ -268,7 +268,7 @@ private struct PostWorking2DonationOverviewCard: View {
             }
             .chartXAxisLabel("次數", alignment: .center)
             .chartYAxisLabel("時間（秒）", position: .leading, alignment: .center)
-            .frame(width: 300, height: 160, alignment: .leading)
+            .frame(width: 463, height: 160, alignment: .leading)
         }
         .padding(20)
         .background(Color.white)
