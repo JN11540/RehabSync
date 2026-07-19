@@ -1,13 +1,14 @@
 import SwiftUI
 import CoreBluetooth
 
-/// 訓練前的準備流程，依序為：確認裝備 → 準備椅子 → 放置平板 → 成果數據頁 → 校正。
+/// 訓練前的準備流程，依序為：確認裝備 → 準備椅子 → 放置平板 → 成果數據頁 → 校正 → 動作測試。
 private enum PreWorkingStep: Equatable {
     case equipment
     case chair
     case tablet
     case numbers
     case calibration
+    case motionTest
 
     var title: String {
         switch self {
@@ -16,6 +17,7 @@ private enum PreWorkingStep: Equatable {
         case .tablet: "放置平板"
         case .numbers: ""
         case .calibration: "校正"
+        case .motionTest: "動作測試"
         }
     }
 
@@ -26,6 +28,7 @@ private enum PreWorkingStep: Equatable {
         case .tablet: "請將平板放置於桌面上"
         case .numbers: ""
         case .calibration: "請先擺出圖片中的姿勢，點擊『校正』後保持不動，等待系統完成校正。"
+        case .motionTest: "請依照引導動作進行操作，測試確認無誤後，即可點擊「遊戲」按鈕。"
         }
     }
 
@@ -35,7 +38,8 @@ private enum PreWorkingStep: Equatable {
         case .chair: .tablet
         case .tablet: .numbers
         case .numbers: .calibration
-        case .calibration: nil
+        case .calibration: .motionTest
+        case .motionTest: nil
         }
     }
 
@@ -46,6 +50,7 @@ private enum PreWorkingStep: Equatable {
         case .tablet: .chair
         case .numbers: .tablet
         case .calibration: .numbers
+        case .motionTest: .calibration
         }
     }
 }
@@ -84,6 +89,9 @@ struct PreWorking_2: View {
                                 onCalibrated: { if let next = step.next { step = next } }
                             )
                             .frame(maxWidth: .infinity, alignment: .leading)
+                        } else if step == .motionTest {
+                            PreWorking2MotionTestAboutPanel(title: step.title, subtitle: step.subtitle)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                         } else {
                             PreWorking2AboutPanel(
                                 title: step.title,
@@ -173,7 +181,8 @@ private struct PreWorking2EquipmentPanel: View {
                     .frame(maxWidth: 500, maxHeight: 500)
                     .padding(40)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            case .numbers:
+            case .numbers, .motionTest:
+                // 動作測試頁的左側欄先留空，之後再補要放的內容。
                 EmptyView()
             case .calibration:
                 Image(calibrationImageName)
@@ -432,6 +441,92 @@ private struct PreWorking2CalibrationAboutPanel: View {
         }
         .onDisappear {
             countdownTimer?.invalidate()
+        }
+    }
+}
+
+// MARK: - Motion Test About Panel
+
+private struct PreWorking2MotionTestAboutPanel: View {
+    let title: String
+    let subtitle: String
+    var onPlayGame: () -> Void = {}
+
+    @Environment(BluetoothViewModel.self) private var btVM
+    @State private var side: Int = 0
+
+    private var thighAndCalfPeripherals: (thigh: CBPeripheral, calf: CBPeripheral)? {
+        let dvm = DeviceViewModel()
+        guard let thigh = dvm.fetch(side: side, limb: 0), let thighUUID = UUID(uuidString: thigh.device_uuid),
+              let calf  = dvm.fetch(side: side, limb: 1), let calfUUID  = UUID(uuidString: calf.device_uuid),
+              let thighPeripheral = btVM.connectedPeripherals[thighUUID],
+              let calfPeripheral  = btVM.connectedPeripherals[calfUUID]
+        else { return nil }
+        return (thighPeripheral, calfPeripheral)
+    }
+
+    /// 呼叫即時角度預估（坐姿），圓圈裡的數字就是靠 btVM.currentEstimatedRealAngle 即時更新。
+    private func startLiveTestIfNeeded() {
+        guard !btVM.isLiveEstimating,
+              let pair = thighAndCalfPeripherals,
+              let baseline = btVM.baselineResult
+        else { return }
+        btVM.startLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf, baseline: baseline, posture: .sitting)
+    }
+
+    private func stopLiveTestIfNeeded() {
+        guard btVM.isLiveEstimating, let pair = thighAndCalfPeripherals else { return }
+        btVM.stopLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            Spacer()
+
+            Text(title)
+                .font(.system(size: 40, weight: .heavy))
+                .foregroundStyle(PreWorking_2.darkPurple)
+
+            HStack(alignment: .top, spacing: 16) {
+                Rectangle()
+                    .fill(PreWorking_2.midPurple)
+                    .frame(width: 4)
+                Text(subtitle)
+                    .font(.system(size: 25))
+                    .foregroundStyle(Color.black.opacity(0.75))
+                    .lineSpacing(8)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+
+            ZStack {
+                Circle()
+                    .fill(Color(red: 0.90, green: 0.87, blue: 0.98))
+                Circle()
+                    .strokeBorder(PreWorking_2.midPurple, lineWidth: 4)
+                if let angle = btVM.currentEstimatedRealAngle {
+                    Text(String(format: "%.1f°", angle))
+                        .font(.system(size: 36, weight: .bold))
+                        .foregroundStyle(PreWorking_2.darkPurple)
+                } else {
+                    Text("等待資料…")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(PreWorking_2.darkPurple.opacity(0.6))
+                }
+            }
+            .frame(width: 200, height: 200)
+
+            PreWorkingStepCapsuleButton(text: "遊戲", icon: "gamecontroller.fill", action: onPlayGame)
+
+            Spacer()
+        }
+        .padding(40)
+        .onAppear {
+            side = DeviceViewModel().fetchAnySide() ?? 0
+            startLiveTestIfNeeded()
+        }
+        .onDisappear {
+            stopLiveTestIfNeeded()
         }
     }
 }
