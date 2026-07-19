@@ -312,6 +312,16 @@ private struct DeviceOverviewCard: View {
 private struct DeviceIllustration: View {
     var onRowTap: (Int, Int) -> Void = { _, _ in }
     @State private var deviceVM = DeviceViewModel()
+    @Environment(BluetoothViewModel.self) private var btVM
+
+    /// 已連線裝置按壓超過兩秒才解除綁定，避免誤觸；解除時若還連著線也一併中斷藍牙連線。
+    private func unbind(side: Int, limb: Int) {
+        guard let device = deviceVM.fetch(side: side, limb: limb) else { return }
+        if let uuid = UUID(uuidString: device.device_uuid) {
+            btVM.disconnect(id: uuid)
+        }
+        deviceVM.delete(uuid: device.device_uuid)
+    }
 
     private var leftThighConnected: Bool { deviceVM.fetch(side: 0, limb: 0) != nil }
     private var leftCalfConnected: Bool { deviceVM.fetch(side: 0, limb: 1) != nil }
@@ -348,25 +358,29 @@ private struct DeviceIllustration: View {
 
                 DashboardConnectionBadge(label: "左大腿", isConnected: leftThighConnected)
                     .contentShape(Rectangle())
-                    .onTapGesture { onRowTap(0, 0) }
+                    .onTapGesture { if !leftThighConnected { onRowTap(0, 0) } }
+                    .onLongPressGesture(minimumDuration: 2) { unbind(side: 0, limb: 0) }
                     .allowsHitTesting(!isLeftThighDisabled)
                     .opacity(isLeftThighDisabled ? 0.4 : 1)
                     .position(x: geo.size.width * 0.22, y: geo.size.height * 0.54)
                 DashboardConnectionBadge(label: "左小腿", isConnected: leftCalfConnected)
                     .contentShape(Rectangle())
-                    .onTapGesture { onRowTap(0, 1) }
+                    .onTapGesture { if !leftCalfConnected { onRowTap(0, 1) } }
+                    .onLongPressGesture(minimumDuration: 2) { unbind(side: 0, limb: 1) }
                     .allowsHitTesting(!isLeftCalfDisabled)
                     .opacity(isLeftCalfDisabled ? 0.4 : 1)
                     .position(x: geo.size.width * 0.22, y: geo.size.height * 0.84)
                 DashboardConnectionBadge(label: "右大腿", isConnected: rightThighConnected)
                     .contentShape(Rectangle())
-                    .onTapGesture { onRowTap(1, 0) }
+                    .onTapGesture { if !rightThighConnected { onRowTap(1, 0) } }
+                    .onLongPressGesture(minimumDuration: 2) { unbind(side: 1, limb: 0) }
                     .allowsHitTesting(!isRightThighDisabled)
                     .opacity(isRightThighDisabled ? 0.4 : 1)
                     .position(x: geo.size.width * 0.78, y: geo.size.height * 0.54)
                 DashboardConnectionBadge(label: "右小腿", isConnected: rightCalfConnected)
                     .contentShape(Rectangle())
-                    .onTapGesture { onRowTap(1, 1) }
+                    .onTapGesture { if !rightCalfConnected { onRowTap(1, 1) } }
+                    .onLongPressGesture(minimumDuration: 2) { unbind(side: 1, limb: 1) }
                     .allowsHitTesting(!isRightCalfDisabled)
                     .opacity(isRightCalfDisabled ? 0.4 : 1)
                     .position(x: geo.size.width * 0.78, y: geo.size.height * 0.84)
@@ -545,7 +559,7 @@ private struct DashboardDeviceListModal: View {
                                 .font(.system(size: 16, weight: .bold))
                                 .foregroundStyle(DashboardPalette.indigo)
                         }
-                        .frame(width: 40, height: 40)
+                        .frame(width: 50, height: 50)
                     }
                     .buttonStyle(.plain)
                     .disabled(isConnecting)
@@ -621,7 +635,7 @@ private struct DashboardDeviceListModal: View {
                         .font(.system(size: 16, weight: .bold))
                         .foregroundStyle(.white)
                 }
-                .frame(width: 40, height: 40)
+                .frame(width: 50, height: 50)
                 .padding(16)
             }
             .buttonStyle(.plain)
