@@ -1,11 +1,12 @@
 import SwiftUI
 
-/// 訓練前的準備流程，依序為：確認裝備 → 準備椅子 → 放置平板 → 成果數據頁。
+/// 訓練前的準備流程，依序為：確認裝備 → 準備椅子 → 放置平板 → 成果數據頁 → 校正。
 private enum PreWorkingStep: Equatable {
     case equipment
     case chair
     case tablet
     case numbers
+    case calibration
 
     var title: String {
         switch self {
@@ -13,6 +14,7 @@ private enum PreWorkingStep: Equatable {
         case .chair: "準備椅子"
         case .tablet: "放置平板"
         case .numbers: ""
+        case .calibration: "校正"
         }
     }
 
@@ -22,6 +24,7 @@ private enum PreWorkingStep: Equatable {
         case .chair: "請先找一張高度剛好到您膝蓋的椅子"
         case .tablet: "請將平板放置於桌面上"
         case .numbers: ""
+        case .calibration: "請先擺出圖片中的姿勢，點擊『校正』後保持不動，等待系統完成校正。"
         }
     }
 
@@ -30,7 +33,8 @@ private enum PreWorkingStep: Equatable {
         case .equipment: .chair
         case .chair: .tablet
         case .tablet: .numbers
-        case .numbers: nil
+        case .numbers: .calibration
+        case .calibration: nil
         }
     }
 
@@ -40,6 +44,7 @@ private enum PreWorkingStep: Equatable {
         case .chair: .equipment
         case .tablet: .chair
         case .numbers: .tablet
+        case .calibration: .numbers
         }
     }
 }
@@ -149,6 +154,9 @@ private struct PreWorking2EquipmentPanel: View {
                     .padding(40)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .numbers:
+                EmptyView()
+            case .calibration:
+                // 待補：校正動作的圖片。
                 EmptyView()
             }
         }
