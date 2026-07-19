@@ -652,8 +652,7 @@ struct Working2: View {
                     },
                     onConfirm: {
                         showExitConfirmPopup = false
-                        finalElapsedSeconds = Int(Date().timeIntervalSince(sessionStartDate))
-                        navigateToPostWorking2 = true
+                        showCompletionPopup = true
                     }
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
@@ -663,11 +662,8 @@ struct Working2: View {
                 Color.black.opacity(0.3)
                     .ignoresSafeArea()
 
-                SetRestPopup(
-                    secondsRemaining: setRestCountdown,
-                    onSkip: { closeSetRestPopup() }
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                SetRestPopup(secondsRemaining: setRestCountdown)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             }
 
             if showCompletionPopup {
@@ -887,7 +883,6 @@ private struct ConfirmPopup: View {
 
 private struct SetRestPopup: View {
     let secondsRemaining: Int
-    let onSkip: () -> Void
 
     var body: some View {
         ZStack {
@@ -898,35 +893,19 @@ private struct SetRestPopup: View {
                     .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(.black)
 
-                HStack(spacing: 32) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.white)
-                        Circle()
-                            .strokeBorder(Color.black, lineWidth: 1.5)
-                        Text("\(max(secondsRemaining, 0))")
-                            .font(.system(size: 32, weight: .bold))
-                            .foregroundStyle(.black)
-                            .minimumScaleFactor(0.5)
-                            .lineLimit(1)
-                            .padding(8)
-                    }
-                    .frame(width: 90, height: 90)
-
-                    Button(action: onSkip) {
-                        ZStack {
-                            Circle()
-                                .fill(Color.white)
-                            Circle()
-                                .strokeBorder(Color.black, lineWidth: 1.5)
-                            Text("跳過")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundStyle(.black)
-                        }
-                        .frame(width: 90, height: 90)
-                    }
-                    .buttonStyle(.plain)
+                ZStack {
+                    Circle()
+                        .fill(Color.white)
+                    Circle()
+                        .strokeBorder(Color.black, lineWidth: 1.5)
+                    Text("\(max(secondsRemaining, 0))")
+                        .font(.system(size: 32, weight: .bold))
+                        .foregroundStyle(.black)
+                        .minimumScaleFactor(0.5)
+                        .lineLimit(1)
+                        .padding(8)
                 }
+                .frame(width: 90, height: 90)
             }
         }
         .frame(width: 320, height: 220)
@@ -942,6 +921,11 @@ private struct SetRestPopup: View {
 
 private struct CompletionPopup: View {
     let onComplete: () -> Void
+
+    @State private var countdown: Int = 5
+    @State private var countdownTimer: Timer?
+
+    private var isReady: Bool { countdown <= 0 }
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -963,7 +947,7 @@ private struct CompletionPopup: View {
             }
 
             Button(action: onComplete) {
-                Text("完成")
+                Text(isReady ? "完成" : "完成（\(countdown)）")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.black)
                     .padding(.horizontal, 20)
@@ -978,6 +962,8 @@ private struct CompletionPopup: View {
                     )
             }
             .buttonStyle(.plain)
+            .disabled(!isReady)
+            .opacity(isReady ? 1 : 0.4)
             .padding(12)
         }
         .frame(width: 520, height: 400)
@@ -986,6 +972,21 @@ private struct CompletionPopup: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(Color.black, lineWidth: 1.5)
         )
+        .onAppear {
+            countdown = 5
+            countdownTimer?.invalidate()
+            countdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+                if countdown > 0 { countdown -= 1 }
+                if countdown <= 0 {
+                    countdownTimer?.invalidate()
+                    countdownTimer = nil
+                }
+            }
+        }
+        .onDisappear {
+            countdownTimer?.invalidate()
+            countdownTimer = nil
+        }
     }
 }
 

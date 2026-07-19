@@ -134,6 +134,15 @@ func createAppDatabase() throws -> DatabaseQueue {
         }
     }
 
+    migrator.registerMigration("v8") { db in
+        try db.create(table: "knee_angle") { t in
+            t.autoIncrementedPrimaryKey("id")
+            t.column("device_id", .integer).notNull().references("device", onDelete: .cascade)
+            t.column("timestamp", .integer).notNull()
+            t.column("angle",     .double).notNull()
+        }
+    }
+
     try migrator.migrate(dbQueue)
     return dbQueue
 }

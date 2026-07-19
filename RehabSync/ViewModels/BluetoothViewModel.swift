@@ -494,6 +494,11 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         thighPeripheral: CBPeripheral, calfPeripheral: CBPeripheral, baseline: Double,
         posture: KneePosture = .sitting
     ) {
+        // 坐姿/站立即時預估目前只針對左大腿（side 0, limb 0）+ 左小腿（side 0, limb 1）設計，
+        // 配對狀態不是這個組合時不允許啟動。
+        let deviceVM = DeviceViewModel()
+        guard deviceVM.fetch(side: 0, limb: 0) != nil, deviceVM.fetch(side: 0, limb: 1) != nil else { return }
+
         let thighId = thighPeripheral.identifier
         let calfId  = calfPeripheral.identifier
 
@@ -631,6 +636,11 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     /// 差別是這裡把最新的膝角度（大腿傾角 - 小腿傾角）丟給 `detectStepStatus` 判斷登階狀態，
     /// 由 `stepTickTimer` 每 0.2 秒（5Hz）讀一次最新值並更新到畫面。
     func startStepStatusEstimation(thighPeripheral: CBPeripheral, calfPeripheral: CBPeripheral, baseline: Double) {
+        // 登階狀態預估目前只針對左大腿（side 0, limb 0）+ 左小腿（side 0, limb 1）設計，
+        // 配對狀態不是這個組合時不允許啟動。
+        let deviceVM = DeviceViewModel()
+        guard deviceVM.fetch(side: 0, limb: 0) != nil, deviceVM.fetch(side: 0, limb: 1) != nil else { return }
+
         let thighId = thighPeripheral.identifier
         let calfId  = calfPeripheral.identifier
 

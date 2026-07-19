@@ -608,7 +608,11 @@ private struct PreWorking2MotionTestAboutPanel: View {
                     .fill(Color(red: 0.90, green: 0.87, blue: 0.98))
                 Circle()
                     .strokeBorder(PreWorking_2.midPurple, lineWidth: 4)
-                if let angle = btVM.currentEstimatedRealAngle {
+                if side == 1 {
+                    Text("開發中")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(PreWorking_2.darkPurple.opacity(0.6))
+                } else if let angle = btVM.currentEstimatedRealAngle {
                     Text(String(format: "%.1f°", angle))
                         .font(.system(size: 36, weight: .bold))
                         .foregroundStyle(PreWorking_2.darkPurple)
@@ -620,7 +624,7 @@ private struct PreWorking2MotionTestAboutPanel: View {
             }
             .frame(width: 200, height: 200)
 
-            PreWorkingStepCapsuleButton(text: "遊戲", icon: "gamecontroller.fill", action: onPlayGame)
+            PreWorkingStepCapsuleButton(text: "遊戲", icon: "gamecontroller.fill", action: { if side != 1 { onPlayGame() } })
 
             Spacer()
         }
