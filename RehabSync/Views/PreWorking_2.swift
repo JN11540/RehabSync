@@ -1,5 +1,7 @@
 import SwiftUI
+import UIKit
 import CoreBluetooth
+import AVFoundation
 
 /// 訓練前的準備流程，依序為：確認裝備 → 準備椅子 → 放置平板 → 成果數據頁 → 校正 → 動作測試。
 private enum PreWorkingStep: Equatable {
@@ -181,9 +183,14 @@ private struct PreWorking2EquipmentPanel: View {
                     .frame(maxWidth: 500, maxHeight: 500)
                     .padding(40)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            case .numbers, .motionTest:
-                // 動作測試頁的左側欄先留空，之後再補要放的內容。
+            case .numbers:
                 EmptyView()
+            case .motionTest:
+                PreWorkingLoopingVideo(resourceName: side == 1 ? "2_right_video" : "2_left_video")
+                    .frame(maxWidth: 500, maxHeight: 500)
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .padding(40)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .calibration:
                 Image(calibrationImageName)
                     .resizable()
@@ -196,6 +203,68 @@ private struct PreWorking2EquipmentPanel: View {
         .onAppear {
             side = DeviceViewModel().fetchAnySide() ?? 0
         }
+    }
+}
+
+// MARK: - Looping Video
+
+/// 播放 bundle 裡的影片並自動循環（用 AVQueuePlayer + AVPlayerLooper 做無縫 loop），
+/// 目前給「動作測試」頁左側欄依 side 播放 2_left_video.mp4 / 2_right_video.mp4 用。
+private struct PreWorkingLoopingVideo: View {
+    let resourceName: String
+
+    var body: some View {
+        if let url = Bundle.main.url(forResource: resourceName, withExtension: "mp4") {
+            PreWorkingLoopingVideoPlayer(url: url)
+        } else {
+            Color.clear
+        }
+    }
+}
+
+private struct PreWorkingLoopingVideoPlayer: UIViewRepresentable {
+    let url: URL
+
+    func makeUIView(context: Context) -> PreWorkingLoopingVideoUIView {
+        PreWorkingLoopingVideoUIView(url: url)
+    }
+
+    func updateUIView(_ uiView: PreWorkingLoopingVideoUIView, context: Context) {
+        uiView.update(url: url)
+    }
+}
+
+private final class PreWorkingLoopingVideoUIView: UIView {
+    private let playerLayer = AVPlayerLayer()
+    private var queuePlayer: AVQueuePlayer?
+    private var playerLooper: AVPlayerLooper?
+    private var currentURL: URL?
+
+    init(url: URL) {
+        super.init(frame: .zero)
+        playerLayer.videoGravity = .resizeAspect
+        layer.addSublayer(playerLayer)
+        update(url: url)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        playerLayer.frame = bounds
+    }
+
+    func update(url: URL) {
+        guard url != currentURL else { return }
+        currentURL = url
+        let player = AVQueuePlayer()
+        player.isMuted = true
+        playerLooper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: url))
+        playerLayer.player = player
+        queuePlayer = player
+        player.play()
     }
 }
 
