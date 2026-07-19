@@ -24,9 +24,6 @@ struct PostWorking_2: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            PostWorking2Sidebar()
-                .frame(width: 220)
-
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 24) {
                     PostWorking2Header()
@@ -59,144 +56,16 @@ struct PostWorking_2: View {
     }
 }
 
-// MARK: - Sidebar
-
-private struct PostWorking2NavItem {
-    let icon: String
-    let title: String
-    var badge: Int? = nil
-}
-
-private struct PostWorking2Sidebar: View {
-    private let generalItems: [PostWorking2NavItem] = [
-        PostWorking2NavItem(icon: "square.grid.2x2.fill", title: "Dashboard"),
-        PostWorking2NavItem(icon: "megaphone.fill", title: "Campaigns"),
-        PostWorking2NavItem(icon: "person.2.fill", title: "Donors"),
-        PostWorking2NavItem(icon: "dollarsign.circle.fill", title: "Donations"),
-        PostWorking2NavItem(icon: "handshake.fill", title: "Pledges"),
-        PostWorking2NavItem(icon: "chart.bar.fill", title: "Reports"),
-        PostWorking2NavItem(icon: "envelope.fill", title: "Messages", badge: 3)
-    ]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 10) {
-                ZStack {
-                    Circle().fill(PostWorking_2.darkPurple)
-                    Image(systemName: "heart.fill")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.white)
-                }
-                .frame(width: 34, height: 34)
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("HOPEWAY")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(Color.black)
-                    Text("Making a difference,\ntogether.")
-                        .font(.system(size: 10))
-                        .foregroundStyle(PostWorking_2.mutedText)
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 24)
-            .padding(.bottom, 28)
-
-            VStack(spacing: 4) {
-                ForEach(generalItems, id: \.title) { item in
-                    PostWorking2SidebarRow(item: item, isSelected: item.title == "Dashboard")
-                }
-            }
-            .padding(.horizontal, 12)
-
-            Spacer()
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Upgrade to Pro")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(PostWorking_2.darkPurple)
-                Text("Unlock advanced reports, custom insights & more.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(PostWorking_2.mutedText)
-                Button {} label: {
-                    Text("Upgrade Now")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(PostWorking_2.darkPurple)
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(16)
-            .background(PostWorking_2.lightPurple)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .padding(.horizontal, 16)
-
-            HStack(spacing: 10) {
-                ZStack {
-                    Circle().fill(PostWorking_2.midPurple)
-                    Text("AJ")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(.white)
-                }
-                .frame(width: 36, height: 36)
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Andrew Johnson")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.black)
-                    Text("Admin")
-                        .font(.system(size: 11))
-                        .foregroundStyle(PostWorking_2.mutedText)
-                }
-                Spacer()
-            }
-            .padding(16)
-        }
-    }
-}
-
-private struct PostWorking2SidebarRow: View {
-    let item: PostWorking2NavItem
-    let isSelected: Bool
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: item.icon)
-                .font(.system(size: 14))
-                .frame(width: 18)
-            Text(item.title)
-                .font(.system(size: 14, weight: isSelected ? .semibold : .regular))
-            Spacer()
-            if let badge = item.badge {
-                Text("\(badge)")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 18, height: 18)
-                    .background(PostWorking_2.pink)
-                    .clipShape(Circle())
-            }
-        }
-        .foregroundStyle(isSelected ? .white : Color.black.opacity(0.7))
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(isSelected ? PostWorking_2.darkPurple : Color.clear)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-    }
-}
-
 // MARK: - Header
 
 private struct PostWorking2Header: View {
     var body: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Welcome back, Andrew!")
+                Text("你好棒！")
                     .font(.system(size: 24, weight: .bold))
                     .foregroundStyle(Color.black)
-                Text("Here's what's happening with HopeWay today.")
+                Text("來看看遊戲結果吧！")
                     .font(.system(size: 14))
                     .foregroundStyle(PostWorking_2.mutedText)
             }
