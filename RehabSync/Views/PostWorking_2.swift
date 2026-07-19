@@ -258,7 +258,7 @@ private struct PostWorking2DonationOverviewCard: View {
                 Chart(selectedGroup.data) { point in
                     BarMark(
                         x: .value("次數", point.attempt),
-                        y: .value("平均伸直時間（秒）", point.seconds),
+                        y: .value("單次伸直時間（秒）", point.seconds),
                         width: .fixed(22)
                     )
                     .foregroundStyle(PostWorking_2.darkPurple)
@@ -291,12 +291,12 @@ private struct PostWorking2DonationOverviewCard: View {
                         .font(.system(size: 18))
                 }
                 .chartYAxisLabel(position: .leading, alignment: .center) {
-                    Text("平均伸直時間（秒）")
+                    Text("單次伸直時間（秒）")
                         .font(.system(size: 18))
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 220, alignment: .leading)
-                .offset(y: 35)
+                .offset(y: 25)
             }
             .padding(.trailing, 20)
             .frame(height: 300)
