@@ -142,8 +142,6 @@ private struct PreWorking2EquipmentPanel: View {
                     )
                 )
 
-            PreWorking2CloudDecoration()
-
             switch step {
             case .equipment:
                 VStack(spacing: 40) {
@@ -189,33 +187,6 @@ private struct PreWorking2EquipmentPanel: View {
         .onAppear {
             side = DeviceViewModel().fetchAnySide() ?? 0
         }
-    }
-}
-
-private struct PreWorking2CloudDecoration: View {
-    var body: some View {
-        GeometryReader { geo in
-            ZStack {
-                Circle()
-                    .fill(Color.white.opacity(0.4))
-                    .frame(width: 140, height: 140)
-                    .position(x: geo.size.width * 0.15, y: geo.size.height * 0.12)
-                Circle()
-                    .fill(Color.white.opacity(0.3))
-                    .frame(width: 100, height: 100)
-                    .position(x: geo.size.width * 0.75, y: geo.size.height * 0.18)
-                Image(systemName: "sparkle")
-                    .font(.system(size: 18))
-                    .foregroundStyle(Color.white.opacity(0.8))
-                    .position(x: geo.size.width * 0.9, y: geo.size.height * 0.35)
-                Image(systemName: "sparkle")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.white.opacity(0.7))
-                    .position(x: geo.size.width * 0.1, y: geo.size.height * 0.45)
-            }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 32))
-        .allowsHitTesting(false)
     }
 }
 
@@ -279,14 +250,9 @@ private struct PreWorking2AboutPanel: View {
         VStack(alignment: .leading, spacing: 24) {
             Spacer()
 
-            HStack(spacing: 8) {
-                Text(title)
-                    .font(.system(size: 40, weight: .heavy))
-                    .foregroundStyle(PreWorking_2.darkPurple)
-                Image(systemName: "sparkle")
-                    .font(.system(size: 25))
-                    .foregroundStyle(Color(red: 0.7, green: 0.62, blue: 0.95))
-            }
+            Text(title)
+                .font(.system(size: 40, weight: .heavy))
+                .foregroundStyle(PreWorking_2.darkPurple)
 
             Text(subtitle)
                 .font(.system(size: 25))
@@ -410,14 +376,9 @@ private struct PreWorking2CalibrationAboutPanel: View {
         VStack(alignment: .leading, spacing: 24) {
             Spacer()
 
-            HStack(spacing: 8) {
-                Text(title)
-                    .font(.system(size: 40, weight: .heavy))
-                    .foregroundStyle(PreWorking_2.darkPurple)
-                Image(systemName: "sparkle")
-                    .font(.system(size: 25))
-                    .foregroundStyle(Color(red: 0.7, green: 0.62, blue: 0.95))
-            }
+            Text(title)
+                .font(.system(size: 40, weight: .heavy))
+                .foregroundStyle(PreWorking_2.darkPurple)
 
             HStack(alignment: .top, spacing: 16) {
                 Rectangle()
