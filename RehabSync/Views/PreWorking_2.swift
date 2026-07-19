@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreBluetooth
 
 /// 訓練前的準備流程，依序為：確認裝備 → 準備椅子 → 放置平板 → 成果數據頁 → 校正。
 private enum PreWorkingStep: Equatable {
@@ -76,13 +77,22 @@ struct PreWorking_2: View {
                         PreWorking2EquipmentPanel(step: step)
                             .frame(maxWidth: .infinity)
 
-                        PreWorking2AboutPanel(
-                            title: step.title,
-                            subtitle: step.subtitle,
-                            onPrevious: step.previous.map { previous in { step = previous } },
-                            onNext: { if let next = step.next { step = next } }
-                        )
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        if step == .calibration {
+                            PreWorking2CalibrationAboutPanel(
+                                title: step.title,
+                                subtitle: step.subtitle,
+                                onCalibrated: { if let next = step.next { step = next } }
+                            )
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        } else {
+                            PreWorking2AboutPanel(
+                                title: step.title,
+                                subtitle: step.subtitle,
+                                onPrevious: step.previous.map { previous in { step = previous } },
+                                onNext: { if let next = step.next { step = next } }
+                            )
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
                 }
             }
@@ -306,16 +316,16 @@ private struct PreWorking2AboutPanel: View {
 
 private struct PreWorkingStepCapsuleButton: View {
     let text: String
-    let icon: String
+    var icon: String? = nil
     var iconLeading: Bool = false
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
-                if iconLeading { Image(systemName: icon) }
+                if iconLeading, let icon { Image(systemName: icon) }
                 Text(text)
-                if !iconLeading { Image(systemName: icon) }
+                if !iconLeading, let icon { Image(systemName: icon) }
             }
             .font(.system(size: 25, weight: .semibold))
             .foregroundStyle(PreWorking_2.darkPurple)
@@ -325,6 +335,130 @@ private struct PreWorkingStepCapsuleButton: View {
             .clipShape(Capsule())
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Calibration About Panel
+
+private struct PreWorking2CalibrationAboutPanel: View {
+    let title: String
+    let subtitle: String
+    var onCalibrated: () -> Void = {}
+
+    @Environment(BluetoothViewModel.self) private var btVM
+    @State private var side: Int = 0
+    @State private var isCalibrating = false
+    @State private var calibrationCountdown = 5
+    @State private var countdownTimer: Timer?
+    @State private var calibrationSucceeded = false
+    @State private var calibrationFailed = false
+
+    private var thighAndCalfPeripherals: (thigh: CBPeripheral, calf: CBPeripheral)? {
+        let dvm = DeviceViewModel()
+        guard let thigh = dvm.fetch(side: side, limb: 0), let thighUUID = UUID(uuidString: thigh.device_uuid),
+              let calf  = dvm.fetch(side: side, limb: 1), let calfUUID  = UUID(uuidString: calf.device_uuid),
+              let thighPeripheral = btVM.connectedPeripherals[thighUUID],
+              let calfPeripheral  = btVM.connectedPeripherals[calfUUID]
+        else { return nil }
+        return (thighPeripheral, calfPeripheral)
+    }
+
+    private var buttonLabel: String {
+        if calibrationSucceeded { return "下一步" }
+        if isCalibrating { return "\(calibrationCountdown)" }
+        return "校正"
+    }
+
+    /// 按下「校正」開始 5 秒倒數，同時呼叫真正的校正演算法（收集 5 秒加速度計算基準角）；
+    /// 倒數結束後看 btVM.baselineResult 有沒有值決定成功或失敗，失敗要讓使用者能再按一次「校正」重試。
+    private func startCalibration() {
+        guard let pair = thighAndCalfPeripherals else { return }
+        calibrationFailed = false
+        isCalibrating = true
+        calibrationCountdown = 5
+        countdownTimer?.invalidate()
+        btVM.startBaselineCalibration(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
+            if calibrationCountdown > 1 {
+                calibrationCountdown -= 1
+            } else {
+                timer.invalidate()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    evaluateCalibrationResult()
+                }
+            }
+        }
+    }
+
+    private func evaluateCalibrationResult() {
+        isCalibrating = false
+        if btVM.baselineResult != nil {
+            calibrationSucceeded = true
+        } else {
+            calibrationFailed = true
+        }
+    }
+
+    private func handleButtonTap() {
+        if calibrationSucceeded {
+            onCalibrated()
+        } else if !isCalibrating {
+            startCalibration()
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            Spacer()
+
+            HStack(spacing: 8) {
+                Text(title)
+                    .font(.system(size: 40, weight: .heavy))
+                    .foregroundStyle(PreWorking_2.darkPurple)
+                Image(systemName: "sparkle")
+                    .font(.system(size: 25))
+                    .foregroundStyle(Color(red: 0.7, green: 0.62, blue: 0.95))
+            }
+
+            HStack(alignment: .center, spacing: 16) {
+                Rectangle()
+                    .fill(PreWorking_2.midPurple)
+                    .frame(width: 4, height: 24)
+                Text(subtitle)
+                    .font(.system(size: 25))
+                    .foregroundStyle(Color.black.opacity(0.75))
+                    .lineSpacing(8)
+            }
+
+            PreWorkingStepCapsuleButton(
+                text: buttonLabel,
+                icon: calibrationSucceeded ? "arrow.right" : nil,
+                action: handleButtonTap
+            )
+            .disabled(isCalibrating || (!calibrationSucceeded && thighAndCalfPeripherals == nil))
+            .opacity((!calibrationSucceeded && thighAndCalfPeripherals == nil) ? 0.4 : 1)
+
+            if calibrationFailed {
+                Text("校正失敗，請重新嘗試")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.red)
+            }
+
+            if !calibrationSucceeded && thighAndCalfPeripherals == nil {
+                Text("裝置未連線")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.red)
+            }
+
+            Spacer()
+        }
+        .padding(40)
+        .onAppear {
+            side = DeviceViewModel().fetchAnySide() ?? 0
+        }
+        .onDisappear {
+            countdownTimer?.invalidate()
+        }
     }
 }
 
