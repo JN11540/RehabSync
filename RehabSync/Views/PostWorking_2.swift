@@ -221,7 +221,11 @@ private struct PostWorking2DonationOverviewCard: View {
                         } label: {
                             Text(group.label)
                                 .font(.system(size: 20, weight: .semibold))
-                                .foregroundStyle(group == selectedGroup ? Color.black : PostWorking_2.mutedText)
+                                .foregroundStyle(group == selectedGroup ? Color.white : PostWorking_2.mutedText)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(group == selectedGroup ? PostWorking_2.darkPurple : Color.clear)
+                                .clipShape(Capsule())
                         }
                         .buttonStyle(.plain)
                     }
