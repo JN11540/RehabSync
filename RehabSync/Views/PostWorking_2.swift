@@ -313,7 +313,7 @@ private struct PostWorking2DonationOverviewCard: View {
                 .frame(height: 220, alignment: .leading)
                 .offset(y: 20)
 
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .center, spacing: 16) {
                     ZStack {
                         Chart(slices, id: \.label) { slice in
                             SectorMark(
@@ -332,7 +332,7 @@ private struct PostWorking2DonationOverviewCard: View {
                             .multilineTextAlignment(.center)
                             .frame(width: 90)
                     }
-                    .frame(maxWidth: .infinity)
+                    .frame(width: 200)
 
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(slices, id: \.label) { slice in
@@ -347,8 +347,10 @@ private struct PostWorking2DonationOverviewCard: View {
                             }
                         }
                     }
+                    .frame(width: 200)
                 }
-                .frame(width: contentWidth * 0.3)
+                .frame(width: contentWidth * 0.3, alignment: .center)
+                .offset(x: 20)
                 }
             }
             .frame(height: 300)
