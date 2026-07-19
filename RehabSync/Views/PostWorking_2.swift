@@ -145,7 +145,7 @@ private struct PostWorking2AttemptDuration: Identifiable {
     var id: Int { attempt }
 }
 
-private enum PostWorking2Group: CaseIterable {
+private enum PostWorking2Group: CaseIterable, Equatable {
     case first
     case second
     case third
@@ -214,9 +214,18 @@ private struct PostWorking2DonationOverviewCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 30) {
             HStack {
-                Text("\(selectedGroup.label)資訊")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(Color.black)
+                HStack(spacing: 16) {
+                    ForEach(PostWorking2Group.allCases, id: \.label) { group in
+                        Button {
+                            selectedGroup = group
+                        } label: {
+                            Text(group.label)
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(group == selectedGroup ? Color.black : PostWorking_2.mutedText)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
                 Spacer()
                 Button {
                     showRetentionDetail = true
@@ -226,18 +235,6 @@ private struct PostWorking2DonationOverviewCard: View {
                         .foregroundStyle(PostWorking_2.mutedText)
                 }
                 .buttonStyle(.plain)
-                Menu {
-                    ForEach(PostWorking2Group.allCases, id: \.label) { group in
-                        Button(group.label) { selectedGroup = group }
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text("選擇組數")
-                        Image(systemName: "chevron.down")
-                    }
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(PostWorking_2.mutedText)
-                }
             }
 
             HStack(alignment: .top, spacing: 56) {
@@ -271,7 +268,7 @@ private struct PostWorking2DonationOverviewCard: View {
                 Chart(selectedGroup.data) { point in
                     BarMark(
                         x: .value("次數", point.attempt),
-                        y: .value("時間（秒）", point.seconds),
+                        y: .value("平均伸直時間（秒）", point.seconds),
                         width: .fixed(22)
                     )
                     .foregroundStyle(PostWorking_2.darkPurple)
@@ -304,7 +301,7 @@ private struct PostWorking2DonationOverviewCard: View {
                         .font(.system(size: 18))
                 }
                 .chartYAxisLabel(position: .leading, alignment: .center) {
-                    Text("時間（秒）")
+                    Text("平均伸直時間（秒）")
                         .font(.system(size: 18))
                 }
                 .frame(maxWidth: .infinity)
