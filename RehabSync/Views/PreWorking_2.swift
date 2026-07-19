@@ -363,10 +363,9 @@ private struct PreWorking2CalibrationAboutPanel: View {
         return (thighPeripheral, calfPeripheral)
     }
 
-    private var buttonLabel: String {
-        if calibrationSucceeded { return "下一步" }
-        if isCalibrating { return "\(calibrationCountdown)" }
-        return "校正"
+    /// 圓形按鈕的文字：閒置時是「校正」，倒數中換成數字，成功後改用膠囊「下一步」不會用到這個。
+    private var circleButtonLabel: String {
+        isCalibrating ? "\(calibrationCountdown)" : "校正"
     }
 
     /// 按下「校正」開始 5 秒倒數，同時呼叫真正的校正演算法（收集 5 秒加速度計算基準角）；
@@ -430,13 +429,25 @@ private struct PreWorking2CalibrationAboutPanel: View {
                     .lineSpacing(8)
             }
 
-            PreWorkingStepCapsuleButton(
-                text: buttonLabel,
-                icon: calibrationSucceeded ? "arrow.right" : nil,
-                action: handleButtonTap
-            )
-            .disabled(isCalibrating || (!calibrationSucceeded && thighAndCalfPeripherals == nil))
-            .opacity((!calibrationSucceeded && thighAndCalfPeripherals == nil) ? 0.4 : 1)
+            if calibrationSucceeded {
+                PreWorkingStepCapsuleButton(text: "下一步", icon: "arrow.right", action: handleButtonTap)
+            } else {
+                Button(action: handleButtonTap) {
+                    ZStack {
+                        Circle()
+                            .fill(Color(red: 0.90, green: 0.87, blue: 0.98))
+                        Circle()
+                            .strokeBorder(PreWorking_2.midPurple, lineWidth: 4)
+                        Text(circleButtonLabel)
+                            .font(.system(size: isCalibrating ? 60 : 25, weight: .bold))
+                            .foregroundStyle(PreWorking_2.darkPurple)
+                    }
+                    .frame(width: 120, height: 120)
+                }
+                .buttonStyle(.plain)
+                .disabled(isCalibrating || thighAndCalfPeripherals == nil)
+                .opacity(thighAndCalfPeripherals == nil ? 0.4 : 1)
+            }
 
             if calibrationFailed {
                 Text("校正失敗，請重新嘗試")
