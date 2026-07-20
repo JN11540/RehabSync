@@ -613,7 +613,7 @@ private struct DeviceConnectionButtons: View {
 
     @State private var deviceVM = DeviceViewModel()
     @State private var resultVM = TreatmentResultViewModel()
-    @State private var counts: (acc: Int, gyro: Int, exg: Int) = (0, 0, 0)
+    @State private var counts: (acc: Int, gyro: Int, exg: Int, advancedStatistics: Int) = (0, 0, 0, 0)
     @State private var latestResult: TreatmentResult? = nil
 
     private func formatArray<T>(_ values: [T]) -> String {
@@ -633,6 +633,9 @@ private struct DeviceConnectionButtons: View {
                     .font(.system(size: 16))
                     .foregroundStyle(.white.opacity(0.8))
                 Text("exg：\(counts.exg) 筆")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.white.opacity(0.8))
+                Text("advanced_statistics：\(counts.advancedStatistics) 筆")
                     .font(.system(size: 16))
                     .foregroundStyle(.white.opacity(0.8))
 

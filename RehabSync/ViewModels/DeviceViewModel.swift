@@ -71,6 +71,13 @@ class DeviceViewModel {
         } completion: { _, _ in }
     }
 
+    func insertAdvancedStatistics(timestamp: Int64, angle: Double, treatmentResultId: Int64? = nil) {
+        db.asyncWrite { db in
+            var row = AdvancedStatistics(treatment_result_id: treatmentResultId, timestamp: timestamp, angle: angle)
+            try row.insert(db)
+        } completion: { _, _ in }
+    }
+
     func fetchACC(deviceId: Int64, from: Int64, to: Int64) -> [Acc] {
         (try? db.read { db in
             try Acc
@@ -143,12 +150,13 @@ class DeviceViewModel {
         }
     }
 
-    func fetchTableCounts() -> (acc: Int, gyro: Int, exg: Int) {
+    func fetchTableCounts() -> (acc: Int, gyro: Int, exg: Int, advancedStatistics: Int) {
         (try? db.read { db in (
             acc:  try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM acc")  ?? 0,
             gyro: try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM gyro") ?? 0,
-            exg:  try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM exg")  ?? 0
-        )}) ?? (0, 0, 0)
+            exg:  try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM exg")  ?? 0,
+            advancedStatistics: try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM advanced_statistics") ?? 0
+        )}) ?? (0, 0, 0, 0)
     }
 
     private func defaultBluetoothId() -> Int64? {

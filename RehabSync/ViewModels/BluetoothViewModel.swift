@@ -582,6 +582,14 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             let realAngle = Self.angleToReal(kneeAngle + liveShift, table: liveBaselineTable)
             let rounded = (realAngle * 10).rounded() / 10
             DispatchQueue.main.async { self.currentEstimatedRealAngle = rounded }
+
+            // 組間休息（未在記錄中）時暫停寫入，跟 acc/gyro/exg 的起訖規則一致。
+            let (recording, treatmentResultId) = DispatchQueue.main.sync {
+                (self.isRecording, self.currentTreatmentResultId)
+            }
+            guard recording else { return }
+            let ts = Int64(Date().timeIntervalSince1970 * 1000)
+            self.deviceVM.insertAdvancedStatistics(timestamp: ts, angle: rounded, treatmentResultId: treatmentResultId)
         }
     }
 

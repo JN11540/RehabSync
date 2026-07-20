@@ -84,8 +84,28 @@ struct Working2: View {
         resultVM.update(result)
     }
 
+    /// 一次動作（讀秒 > 1 秒才算數）＝一次伸展，把讀秒時長（毫秒整數）寫進 extension_length
+    /// 對應索引（索引 = (組序號-1)*目標次數 + (該組內第幾次-1)）。
+    private func recordExtensionLength(seconds: Double, repNumberInSet: Int) {
+        guard var result = treatmentResult else { return }
+        let index = (currentSet - 1) * content.reps + (repNumberInSet - 1)
+        guard result.extension_length.indices.contains(index) else { return }
+        result.extension_length[index] = Int((seconds * 1000).rounded())
+        treatmentResult = result
+        resultVM.update(result)
+    }
+
+    /// 「讀秒中被打斷」邊界情況：提前結束（結束鍵確定／3 分鐘倒數歸零）觸發當下，
+    /// 如果正卡在讀秒中（尚未超過 1 秒判定），直接取消，不計入 reps、也不寫入 extension_length。
+    private func cancelInProgressHoldWithoutCounting() {
+        holdTimer?.invalidate()
+        holdTimer = nil
+        holdElapsed = 0
+    }
+
     /// 3.3：從起始點起算倒數 3 分鐘歸零，視同該組提前結束。
     private func handleSetTimeLimitReached() {
+        cancelInProgressHoldWithoutCounting()
         finishSet(index: currentSet - 1, reps: currentRep)
         if currentSet < content.sets {
             startSetRestCountdown()
@@ -256,6 +276,7 @@ struct Working2: View {
         case .middle: middleFishCaught += 1
         case .small:  smallFishCaught += 1
         }
+        recordExtensionLength(seconds: holdElapsed, repNumberInSet: currentRep + 1)
         advanceWeightliftingProgress()
         showCatchAnimation = true
         catchProgress = 0
@@ -696,6 +717,7 @@ struct Working2: View {
                     },
                     onConfirm: {
                         showExitConfirmPopup = false
+                        cancelInProgressHoldWithoutCounting()
                         finishSet(index: currentSet - 1, reps: currentRep)
                         showCompletionPopup = true
                     }
