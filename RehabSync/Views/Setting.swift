@@ -237,6 +237,7 @@ private struct ExportSheet: View {
                     treatment_content_id: $0.treatment_content_id,
                     reps: $0.reps,
                     total_time: $0.total_time,
+                    extension_length: $0.extension_length,
                     date: $0.date
                 )
             }

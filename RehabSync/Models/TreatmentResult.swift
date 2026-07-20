@@ -7,8 +7,9 @@ struct TreatmentReportPayload: Encodable {
 
 struct TreatmentResultItem: Encodable {
     let treatment_content_id: Int
-    let reps: Int
-    let total_time: Int
+    let reps: [Int]
+    let total_time: [Int]
+    let extension_length: [Double]
     let date: Int
 }
 
@@ -16,8 +17,9 @@ struct TreatmentResultDTO: Decodable {
     let id: Int
     let treatment_id: Int
     let treatment_content_id: Int
-    let reps: Int
-    let total_time: Int
+    let reps: [Int]
+    let total_time: [Int]
+    let extension_length: [Double]
     let date: Int
 }
 
@@ -27,8 +29,9 @@ struct TreatmentResult: Codable, FetchableRecord, MutablePersistableRecord {
     var id: Int64?
     var treatment_id: Int
     var treatment_content_id: Int
-    var reps: Int
-    var total_time: Int
+    var reps: [Int]
+    var total_time: [Int]
+    var extension_length: [Double]
     var date: Int
 
     mutating func didInsert(_ inserted: InsertionSuccess) {
