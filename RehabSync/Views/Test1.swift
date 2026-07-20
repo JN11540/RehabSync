@@ -620,12 +620,29 @@ private struct DeviceConnectionButtons: View {
         "[" + values.map { "\($0)" }.joined(separator: ", ") + "]"
     }
 
+    private func refresh() {
+        counts = deviceVM.fetchTableCounts()
+        latestResult = resultVM.fetchLatest()
+    }
+
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 16) {
-                Text("資料表筆數")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(.white)
+                HStack(spacing: 12) {
+                    Text("資料表筆數")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Button(action: refresh) {
+                        Text("重新計算")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.white.opacity(0.15))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .buttonStyle(.plain)
+                }
                 Text("acc：\(counts.acc) 筆")
                     .font(.system(size: 16))
                     .foregroundStyle(.white.opacity(0.8))
@@ -670,8 +687,7 @@ private struct DeviceConnectionButtons: View {
         }
         .task {
             while !Task.isCancelled {
-                counts = deviceVM.fetchTableCounts()
-                latestResult = resultVM.fetchLatest()
+                refresh()
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
             }
         }
