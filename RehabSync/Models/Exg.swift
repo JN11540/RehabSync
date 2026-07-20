@@ -4,6 +4,7 @@ struct Exg: Codable, Identifiable, FetchableRecord, MutablePersistableRecord {
     static let databaseTableName = "exg"
 
     var id: Int64?
+    var treatment_result_id: Int64?
     var device_id: Int64
     var timestamp: Int64
     var channel: Int

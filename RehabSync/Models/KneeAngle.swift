@@ -4,7 +4,7 @@ struct KneeAngle: Codable, Identifiable, FetchableRecord, MutablePersistableReco
     static let databaseTableName = "knee_angle"
 
     var id: Int64?
-    var device_id: Int64
+    var treatment_result_id: Int64?
     var timestamp: Int64
     var angle: Double
 

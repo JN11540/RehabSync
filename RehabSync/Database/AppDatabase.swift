@@ -106,6 +106,7 @@ func createAppDatabase() throws -> DatabaseQueue {
     migrator.registerMigration("v6") { db in
         try db.create(table: "acc") { t in
             t.autoIncrementedPrimaryKey("id")
+            t.column("treatment_result_id", .integer)
             t.column("device_id",  .integer).notNull().references("device", onDelete: .cascade)
             t.column("timestamp", .integer).notNull()
             t.column("x",         .double).notNull()
@@ -114,6 +115,7 @@ func createAppDatabase() throws -> DatabaseQueue {
         }
         try db.create(table: "gyro") { t in
             t.autoIncrementedPrimaryKey("id")
+            t.column("treatment_result_id", .integer)
             t.column("device_id",  .integer).notNull().references("device", onDelete: .cascade)
             t.column("timestamp", .integer).notNull()
             t.column("pitch",     .double).notNull()
@@ -122,6 +124,7 @@ func createAppDatabase() throws -> DatabaseQueue {
         }
         try db.create(table: "exg") { t in
             t.autoIncrementedPrimaryKey("id")
+            t.column("treatment_result_id", .integer)
             t.column("device_id", .integer).notNull().references("device", onDelete: .cascade)
             t.column("timestamp", .integer).notNull()
             t.column("channel",   .integer).notNull()
@@ -138,7 +141,7 @@ func createAppDatabase() throws -> DatabaseQueue {
     migrator.registerMigration("v8") { db in
         try db.create(table: "knee_angle") { t in
             t.autoIncrementedPrimaryKey("id")
-            t.column("device_id", .integer).notNull().references("device", onDelete: .cascade)
+            t.column("treatment_result_id", .integer)
             t.column("timestamp", .integer).notNull()
             t.column("angle",     .double).notNull()
         }
