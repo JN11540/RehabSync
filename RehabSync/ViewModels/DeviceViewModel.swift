@@ -44,28 +44,28 @@ class DeviceViewModel {
         }
     }
 
-    func insertACC(deviceId: Int64, timestamp: Int64, samples: [(x: Double, y: Double, z: Double)]) {
+    func insertACC(deviceId: Int64, timestamp: Int64, treatmentResultId: Int64? = nil, samples: [(x: Double, y: Double, z: Double)]) {
         db.asyncWrite { db in
             for s in samples {
-                var row = Acc(device_id: deviceId, timestamp: timestamp, x: s.x, y: s.y, z: s.z)
+                var row = Acc(treatment_result_id: treatmentResultId, device_id: deviceId, timestamp: timestamp, x: s.x, y: s.y, z: s.z)
                 try row.insert(db)
             }
         } completion: { _, _ in }
     }
 
-    func insertGYRO(deviceId: Int64, timestamp: Int64, samples: [(pitch: Double, roll: Double, yaw: Double)]) {
+    func insertGYRO(deviceId: Int64, timestamp: Int64, treatmentResultId: Int64? = nil, samples: [(pitch: Double, roll: Double, yaw: Double)]) {
         db.asyncWrite { db in
             for s in samples {
-                var row = Gyro(device_id: deviceId, timestamp: timestamp, pitch: s.pitch, roll: s.roll, yaw: s.yaw)
+                var row = Gyro(treatment_result_id: treatmentResultId, device_id: deviceId, timestamp: timestamp, pitch: s.pitch, roll: s.roll, yaw: s.yaw)
                 try row.insert(db)
             }
         } completion: { _, _ in }
     }
 
-    func insertEXGBatch(deviceId: Int64, timestamp: Int64, channel: Int, values: [Int]) {
+    func insertEXGBatch(deviceId: Int64, timestamp: Int64, treatmentResultId: Int64? = nil, channel: Int, values: [Int]) {
         db.asyncWrite { db in
             for value in values {
-                var row = Exg(device_id: deviceId, timestamp: timestamp, channel: channel, value: value)
+                var row = Exg(treatment_result_id: treatmentResultId, device_id: deviceId, timestamp: timestamp, channel: channel, value: value)
                 try row.insert(db)
             }
         } completion: { _, _ in }
@@ -141,6 +141,14 @@ class DeviceViewModel {
         } completion: { _, _ in
             DispatchQueue.main.async { onFinish?() }
         }
+    }
+
+    func fetchTableCounts() -> (acc: Int, gyro: Int, exg: Int) {
+        (try? db.read { db in (
+            acc:  try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM acc")  ?? 0,
+            gyro: try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM gyro") ?? 0,
+            exg:  try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM exg")  ?? 0
+        )}) ?? (0, 0, 0)
     }
 
     private func defaultBluetoothId() -> Int64? {

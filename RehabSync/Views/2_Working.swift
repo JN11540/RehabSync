@@ -676,9 +676,13 @@ struct Working2: View {
                 pauseSession()
             }
         }
+        .onAppear {
+            btVM.startRecordingAll()
+        }
         .onDisappear {
             pauseSession()
             stopLiveTestIfNeeded()
+            btVM.stopRecordingAll()
         }
     }
 

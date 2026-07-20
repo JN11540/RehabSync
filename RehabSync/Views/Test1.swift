@@ -611,37 +611,33 @@ private struct DeviceConnectionButtons: View {
     var calfDevice: Device? = nil
     var onAddDeviceTap: (Int) -> Void = { _ in }
 
+    @State private var deviceVM = DeviceViewModel()
+    @State private var counts: (acc: Int, gyro: Int, exg: Int) = (0, 0, 0)
+
     var body: some View {
-        VStack(spacing: 24) {
-            HStack(spacing: 24) {
-                DeviceImageCard(
-                    imageName: thighDevice != nil ? "KneeThighConnectedIcon" : "KneeThighDisconnectedIcon",
-                    title: "大腿裝置",
-                    mint: mint,
-                    isConnected: thighDevice != nil,
-                    connectedInfo: thighDevice.map { "\($0.device_name) · \($0.device_uuid)" },
-                    dimWhenDisconnected: false
-                )
-                .frame(width: 220)
-                .contentShape(Rectangle())
-                .onTapGesture { onAddDeviceTap(0) }
-                DeviceImageCard(
-                    imageName: calfDevice != nil ? "KneeCalfConnectedIcon" : "KneeCalfDisconnectedIcon",
-                    title: "小腿裝置",
-                    mint: mint,
-                    isConnected: calfDevice != nil,
-                    connectedInfo: calfDevice.map { "\($0.device_name) · \($0.device_uuid)" },
-                    dimWhenDisconnected: false
-                )
-                .frame(width: 220)
-                .contentShape(Rectangle())
-                .onTapGesture { onAddDeviceTap(1) }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        VStack(alignment: .leading, spacing: 16) {
+            Text("資料表筆數")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(.white)
+            Text("acc：\(counts.acc) 筆")
+                .font(.system(size: 16))
+                .foregroundStyle(.white.opacity(0.8))
+            Text("gyro：\(counts.gyro) 筆")
+                .font(.system(size: 16))
+                .foregroundStyle(.white.opacity(0.8))
+            Text("exg：\(counts.exg) 筆")
+                .font(.system(size: 16))
+                .foregroundStyle(.white.opacity(0.8))
         }
         .padding(.horizontal, 40)
         .padding(.top, 72)
-        .padding(.bottom, 24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .task {
+            while !Task.isCancelled {
+                counts = deviceVM.fetchTableCounts()
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+            }
+        }
     }
 }
 

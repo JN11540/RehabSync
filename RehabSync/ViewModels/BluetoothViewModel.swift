@@ -29,6 +29,10 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     var recordingStartTime: Int64? = nil
     var recordingEndTime:   Int64? = nil
 
+    /// 目前這局遊戲的 treatment_result id，由呼叫端（如 2_Working.swift）在建立 treatment_result 那一刻設定，
+    /// 之後 acc/gyro/exg 每一筆寫入都會帶上這個值，藉此對應回是哪一局遊戲、哪一次訓練的資料。
+    var currentTreatmentResultId: Int64? = nil
+
     var onConnected: ((CBPeripheral) -> Void)?
     var onDisconnected: ((UUID) -> Void)?
 
@@ -207,6 +211,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
 
         let writeUUID = CBUUID(string: config.write_uuid)
         let accUUID   = CBUUID(string: config.sub_acc_uuid)
+        let gyroUUID  = CBUUID(string: config.sub_gyro_uuid)
         let exgUUID   = CBUUID(string: config.sub_exg_uuid)
 
         if let writeChar = map[writeUUID] {
@@ -215,6 +220,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         }
 
         if let c = map[accUUID]  { peripheral.setNotifyValue(true, for: c) }
+        if let c = map[gyroUUID] { peripheral.setNotifyValue(true, for: c) }
         if let c = map[exgUUID]  { peripheral.setNotifyValue(true, for: c) }
 
         DispatchQueue.main.async { self.isRecording = true }
@@ -225,9 +231,11 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
               let map = charMap[peripheral.identifier] else { return }
 
         let accUUID  = CBUUID(string: config.sub_acc_uuid)
+        let gyroUUID = CBUUID(string: config.sub_gyro_uuid)
         let exgUUID  = CBUUID(string: config.sub_exg_uuid)
 
         if let c = map[accUUID]  { peripheral.setNotifyValue(false, for: c) }
+        if let c = map[gyroUUID] { peripheral.setNotifyValue(false, for: c) }
         if let c = map[exgUUID]  { peripheral.setNotifyValue(false, for: c) }
 
         DispatchQueue.main.async { self.isRecording = false }
@@ -875,12 +883,12 @@ extension BluetoothViewModel: CBPeripheralDelegate {
             return
         }
 
-        // 即時預估真實角度：只更新最新值，不寫 DB
+        // 即時預估真實角度：更新最新值供 UI 顯示；不 return，讓封包繼續往下走
+        // 正常的 acc/gyro/exg 寫入資料庫流程，兩者同時進行。
         if liveEstimating.contains(peripheral.identifier) {
             if uuid == CBUUID(string: config.sub_acc_uuid) {
                 handleLiveAccPacket(data, id: peripheral.identifier, config: config)
             }
-            return
         }
 
         // 即時預估登階狀態：只更新最新值，不寫 DB
@@ -923,7 +931,8 @@ extension BluetoothViewModel: CBPeripheralDelegate {
             let z = Double(data.int16BE(at: offset + 4)) * config.acc_sensitivity
             samples.append((x, y, z))
         }
-        deviceVM.insertACC(deviceId: deviceId, timestamp: timestamp, samples: samples)
+        let treatmentResultId = DispatchQueue.main.sync { self.currentTreatmentResultId }
+        deviceVM.insertACC(deviceId: deviceId, timestamp: timestamp, treatmentResultId: treatmentResultId, samples: samples)
     }
 
     private func parseGYRO(_ data: Data, deviceId: Int64, timestamp: Int64, config: Bluetooth, peripheralId: UUID) {
@@ -937,7 +946,8 @@ extension BluetoothViewModel: CBPeripheralDelegate {
             let yaw   = Double(data.int16BE(at: offset + 4)) * config.gyro_sensitivity / 1000 - (bias?.biasZ ?? 0)
             samples.append((pitch, roll, yaw))
         }
-        deviceVM.insertGYRO(deviceId: deviceId, timestamp: timestamp, samples: samples)
+        let treatmentResultId = DispatchQueue.main.sync { self.currentTreatmentResultId }
+        deviceVM.insertGYRO(deviceId: deviceId, timestamp: timestamp, treatmentResultId: treatmentResultId, samples: samples)
     }
 
     private func collectCalibACC(_ data: Data, id: UUID, config: Bluetooth) {
@@ -996,7 +1006,8 @@ extension BluetoothViewModel: CBPeripheralDelegate {
         for i in 0..<64 {
             values.append(Int(data.int16BE(at: 3 + i * 2)))
         }
-        deviceVM.insertEXGBatch(deviceId: deviceId, timestamp: timestamp, channel: channel, values: values)
+        let treatmentResultId = DispatchQueue.main.sync { self.currentTreatmentResultId }
+        deviceVM.insertEXGBatch(deviceId: deviceId, timestamp: timestamp, treatmentResultId: treatmentResultId, channel: channel, values: values)
     }
 }
 
