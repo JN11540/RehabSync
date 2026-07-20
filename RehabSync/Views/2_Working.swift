@@ -30,13 +30,14 @@ struct Working2: View {
     // MARK: - treatment_result 建立與串接
 
     private let resultVM = TreatmentResultViewModel()
-    @State private var treatmentResultId: Int64?
+    @State private var treatmentResult: TreatmentResult?
 
     /// 遊戲一開始（畫面顯示的那一刻）先建立這局遊戲唯一一筆 treatment_result，
     /// 陣列長度依目標組數/目標次數計算、全部初始化為 0，再把 id 交給 btVM
     /// 讓之後 acc/gyro/exg/advanced_statistics 每一筆寫入都能帶上這個 treatment_result_id。
+    /// 建立完成後緊接著視同第一組的起始點，開始記錄。
     private func createTreatmentResultIfNeeded() {
-        guard treatmentResultId == nil else { return }
+        guard treatmentResult == nil else { return }
         var result = TreatmentResult(
             treatment_id: content.treatment_id,
             treatment_content_id: Int(content.id ?? 0),
@@ -47,8 +48,27 @@ struct Working2: View {
             date: Int(Date().timeIntervalSince1970 * 1000)
         )
         resultVM.insert(&result)
-        treatmentResultId = result.id
+        treatmentResult = result
         btVM.currentTreatmentResultId = result.id
+        markSetStart(index: 0)
+    }
+
+    /// 某一組的起始點：把當下毫秒時間戳記寫進 set_start_time[index]，並打開 acc/gyro/exg 的記錄。
+    private func markSetStart(index: Int) {
+        guard var result = treatmentResult, result.set_start_time.indices.contains(index) else { return }
+        result.set_start_time[index] = Int(Date().timeIntervalSince1970 * 1000)
+        treatmentResult = result
+        resultVM.update(result)
+        btVM.startRecordingAll()
+    }
+
+    /// 某一組的結束點：把當下毫秒時間戳記寫進 set_end_time[index]，並停止 acc/gyro/exg 的記錄。
+    private func markSetEnd(index: Int) {
+        guard var result = treatmentResult, result.set_end_time.indices.contains(index) else { return }
+        btVM.stopRecordingAll()
+        result.set_end_time[index] = Int(Date().timeIntervalSince1970 * 1000)
+        treatmentResult = result
+        resultVM.update(result)
     }
 
     @State private var holdElapsed: Double = 0
@@ -227,6 +247,7 @@ struct Working2: View {
     private func advanceWeightliftingProgress() {
         currentRep += 1
         if currentRep >= content.reps {
+            markSetEnd(index: currentSet - 1)
             if currentSet < content.sets {
                 startSetRestCountdown()
             } else {
@@ -255,6 +276,7 @@ struct Working2: View {
             currentSet += 1
         }
         currentRep = 0
+        markSetStart(index: currentSet - 1)
     }
 
     private func bounceBucket(for size: CaughtFishSize) {
@@ -703,7 +725,6 @@ struct Working2: View {
         }
         .onAppear {
             createTreatmentResultIfNeeded()
-            btVM.startRecordingAll()
         }
         .onDisappear {
             pauseSession()
