@@ -140,11 +140,12 @@ func createAppDatabase() throws -> DatabaseQueue {
     }
 
     migrator.registerMigration("v8") { db in
-        try db.create(table: "knee_angle") { t in
+        try db.create(table: "advanced_statistics") { t in
             t.autoIncrementedPrimaryKey("id")
             t.column("treatment_result_id", .integer)
             t.column("timestamp", .integer).notNull()
             t.column("angle",     .double).notNull()
+            t.column("emg",       .double)
         }
     }
 
