@@ -26,6 +26,31 @@ struct Working2: View {
         guard btVM.isLiveEstimating, let pair = thighAndCalfPeripherals else { return }
         btVM.stopLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
     }
+
+    // MARK: - treatment_result 建立與串接
+
+    private let resultVM = TreatmentResultViewModel()
+    @State private var treatmentResultId: Int64?
+
+    /// 遊戲一開始（畫面顯示的那一刻）先建立這局遊戲唯一一筆 treatment_result，
+    /// 陣列長度依目標組數/目標次數計算、全部初始化為 0，再把 id 交給 btVM
+    /// 讓之後 acc/gyro/exg/advanced_statistics 每一筆寫入都能帶上這個 treatment_result_id。
+    private func createTreatmentResultIfNeeded() {
+        guard treatmentResultId == nil else { return }
+        var result = TreatmentResult(
+            treatment_id: content.treatment_id,
+            treatment_content_id: Int(content.id ?? 0),
+            reps: Array(repeating: 0, count: content.sets),
+            extension_length: Array(repeating: 0, count: content.sets * content.reps),
+            set_start_time: Array(repeating: 0, count: content.sets),
+            set_end_time: Array(repeating: 0, count: content.sets),
+            date: Int(Date().timeIntervalSince1970 * 1000)
+        )
+        resultVM.insert(&result)
+        treatmentResultId = result.id
+        btVM.currentTreatmentResultId = result.id
+    }
+
     @State private var holdElapsed: Double = 0
     @State private var holdTimer: Timer?
     @State private var showCatchAnimation = false
@@ -677,12 +702,14 @@ struct Working2: View {
             }
         }
         .onAppear {
+            createTreatmentResultIfNeeded()
             btVM.startRecordingAll()
         }
         .onDisappear {
             pauseSession()
             stopLiveTestIfNeeded()
             btVM.stopRecordingAll()
+            btVM.currentTreatmentResultId = nil
         }
     }
 

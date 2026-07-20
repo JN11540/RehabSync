@@ -7,6 +7,12 @@ class TreatmentResultViewModel {
     private let db = DatabaseManager.shared.dbQueue
     var results: [TreatmentResult] = []
 
+    func fetchLatest() -> TreatmentResult? {
+        try? db.read { db in
+            try TreatmentResult.order(Column("id").desc).fetchOne(db)
+        }
+    }
+
     func fetchAll(for treatmentId: Int) {
         results = (try? db.read { db in
             try TreatmentResult

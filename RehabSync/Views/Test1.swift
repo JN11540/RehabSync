@@ -612,29 +612,63 @@ private struct DeviceConnectionButtons: View {
     var onAddDeviceTap: (Int) -> Void = { _ in }
 
     @State private var deviceVM = DeviceViewModel()
+    @State private var resultVM = TreatmentResultViewModel()
     @State private var counts: (acc: Int, gyro: Int, exg: Int) = (0, 0, 0)
+    @State private var latestResult: TreatmentResult? = nil
+
+    private func formatArray<T>(_ values: [T]) -> String {
+        "[" + values.map { "\($0)" }.joined(separator: ", ") + "]"
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("資料表筆數")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(.white)
-            Text("acc：\(counts.acc) 筆")
-                .font(.system(size: 16))
-                .foregroundStyle(.white.opacity(0.8))
-            Text("gyro：\(counts.gyro) 筆")
-                .font(.system(size: 16))
-                .foregroundStyle(.white.opacity(0.8))
-            Text("exg：\(counts.exg) 筆")
-                .font(.system(size: 16))
-                .foregroundStyle(.white.opacity(0.8))
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("資料表筆數")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text("acc：\(counts.acc) 筆")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.white.opacity(0.8))
+                Text("gyro：\(counts.gyro) 筆")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.white.opacity(0.8))
+                Text("exg：\(counts.exg) 筆")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.white.opacity(0.8))
+
+                Text("最新一筆 treatment_result")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.top, 12)
+
+                if let result = latestResult {
+                    Group {
+                        Text("id：\(result.id ?? -1)")
+                        Text("treatment_id：\(result.treatment_id)")
+                        Text("treatment_content_id：\(result.treatment_content_id)")
+                        Text("date：\(result.date)")
+                        Text("reps：\(formatArray(result.reps))")
+                        Text("extension_length：\(formatArray(result.extension_length))")
+                        Text("set_start_time：\(formatArray(result.set_start_time))")
+                        Text("set_end_time：\(formatArray(result.set_end_time))")
+                    }
+                    .font(.system(size: 16))
+                    .foregroundStyle(.white.opacity(0.8))
+                } else {
+                    Text("尚無資料")
+                        .font(.system(size: 16))
+                        .foregroundStyle(.white.opacity(0.5))
+                }
+            }
+            .padding(.horizontal, 40)
+            .padding(.top, 72)
+            .padding(.bottom, 40)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.horizontal, 40)
-        .padding(.top, 72)
-        .frame(maxWidth: .infinity, alignment: .leading)
         .task {
             while !Task.isCancelled {
                 counts = deviceVM.fetchTableCounts()
+                latestResult = resultVM.fetchLatest()
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
             }
         }
