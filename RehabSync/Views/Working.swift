@@ -212,6 +212,8 @@ struct Working: View {
                     reps: [content.sets * content.reps],
                     total_time: [state.totalElapsed],
                     extension_length: [],
+                    set_start_time: [],
+                    set_end_time: [],
                     date: Int(Date().timeIntervalSince1970)
                 )
                 resultVM.insert(&result)

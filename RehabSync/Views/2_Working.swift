@@ -894,11 +894,6 @@ private struct SetRestPopup: View {
 private struct CompletionPopup: View {
     let onComplete: () -> Void
 
-    @State private var countdown: Int = 5
-    @State private var countdownTimer: Timer?
-
-    private var isReady: Bool { countdown <= 0 }
-
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             VStack(spacing: 0) {
@@ -919,7 +914,7 @@ private struct CompletionPopup: View {
             }
 
             Button(action: onComplete) {
-                Text(isReady ? "完成" : "完成（\(countdown)）")
+                Text("完成")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.black)
                     .padding(.horizontal, 20)
@@ -934,8 +929,6 @@ private struct CompletionPopup: View {
                     )
             }
             .buttonStyle(.plain)
-            .disabled(!isReady)
-            .opacity(isReady ? 1 : 0.4)
             .padding(12)
         }
         .frame(width: 520, height: 400)
@@ -944,21 +937,6 @@ private struct CompletionPopup: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(Color.black, lineWidth: 1.5)
         )
-        .onAppear {
-            countdown = 5
-            countdownTimer?.invalidate()
-            countdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-                if countdown > 0 { countdown -= 1 }
-                if countdown <= 0 {
-                    countdownTimer?.invalidate()
-                    countdownTimer = nil
-                }
-            }
-        }
-        .onDisappear {
-            countdownTimer?.invalidate()
-            countdownTimer = nil
-        }
     }
 }
 

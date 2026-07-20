@@ -10,6 +10,8 @@ struct TreatmentResultItem: Encodable {
     let reps: [Int]
     let total_time: [Int]
     let extension_length: [Double]
+    let set_start_time: [Int]
+    let set_end_time: [Int]
     let date: Int
 }
 
@@ -20,6 +22,8 @@ struct TreatmentResultDTO: Decodable {
     let reps: [Int]
     let total_time: [Int]
     let extension_length: [Double]
+    let set_start_time: [Int]
+    let set_end_time: [Int]
     let date: Int
 }
 
@@ -32,6 +36,8 @@ struct TreatmentResult: Codable, FetchableRecord, MutablePersistableRecord {
     var reps: [Int]
     var total_time: [Int]
     var extension_length: [Double]
+    var set_start_time: [Int]
+    var set_end_time: [Int]
     var date: Int
 
     mutating func didInsert(_ inserted: InsertionSuccess) {

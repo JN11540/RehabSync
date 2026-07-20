@@ -238,6 +238,8 @@ private struct ExportSheet: View {
                     reps: $0.reps,
                     total_time: $0.total_time,
                     extension_length: $0.extension_length,
+                    set_start_time: $0.set_start_time,
+                    set_end_time: $0.set_end_time,
                     date: $0.date
                 )
             }
