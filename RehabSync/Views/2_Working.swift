@@ -53,22 +53,45 @@ struct Working2: View {
         markSetStart(index: 0)
     }
 
-    /// 某一組的起始點：把當下毫秒時間戳記寫進 set_start_time[index]，並打開 acc/gyro/exg 的記錄。
+    @State private var setTimeLimitTimer: Timer?
+
+    /// 某一組的起始點：把當下毫秒時間戳記寫進 set_start_time[index]、打開 acc/gyro/exg 的記錄，
+    /// 並啟動這一組的 3 分鐘倒數上限（見「3.3 從起始點起算倒數 3 分鐘歸零」）。
     private func markSetStart(index: Int) {
         guard var result = treatmentResult, result.set_start_time.indices.contains(index) else { return }
         result.set_start_time[index] = Int(Date().timeIntervalSince1970 * 1000)
         treatmentResult = result
         resultVM.update(result)
         btVM.startRecordingAll()
+
+        setTimeLimitTimer?.invalidate()
+        setTimeLimitTimer = Timer.scheduledTimer(withTimeInterval: Self.setTimeLimit, repeats: false) { _ in
+            handleSetTimeLimitReached()
+        }
     }
 
-    /// 某一組的結束點：把當下毫秒時間戳記寫進 set_end_time[index]，並停止 acc/gyro/exg 的記錄。
-    private func markSetEnd(index: Int) {
+    /// 某一組的結束點：停止 acc/gyro/exg 的記錄、取消該組的 3 分鐘倒數計時器，
+    /// 並把結束時間、實際完成次數一併寫回 treatment_result（reps 達標時傳目標次數，
+    /// 提前結束／倒數歸零時傳目前實際完成次數）。
+    private func finishSet(index: Int, reps: Int) {
         guard var result = treatmentResult, result.set_end_time.indices.contains(index) else { return }
+        setTimeLimitTimer?.invalidate()
+        setTimeLimitTimer = nil
         btVM.stopRecordingAll()
         result.set_end_time[index] = Int(Date().timeIntervalSince1970 * 1000)
+        result.reps[index] = reps
         treatmentResult = result
         resultVM.update(result)
+    }
+
+    /// 3.3：從起始點起算倒數 3 分鐘歸零，視同該組提前結束。
+    private func handleSetTimeLimitReached() {
+        finishSet(index: currentSet - 1, reps: currentRep)
+        if currentSet < content.sets {
+            startSetRestCountdown()
+        } else {
+            showCompletionPopup = true
+        }
     }
 
     @State private var holdElapsed: Double = 0
@@ -105,6 +128,8 @@ struct Working2: View {
     private static let holdDuration: Double = 5
     private static let catchQualifyDuration: Double = 1
     private static let catchAnimationDuration: Double = 1.5
+    /// 每組從起始點起算的時間上限：倒數 3 分鐘歸零視同該組提前結束。
+    private static let setTimeLimit: TimeInterval = 180
 
     // 這些滿版圖（背景/水桶/水花）都用同樣的 canvas 尺寸與 padding(48) + scaledToFill 處理，
     // 所以水花在原始圖片中的相對位置，套用同一個裁切公式，換算到任何裝置畫面都會對齊。
@@ -247,7 +272,7 @@ struct Working2: View {
     private func advanceWeightliftingProgress() {
         currentRep += 1
         if currentRep >= content.reps {
-            markSetEnd(index: currentSet - 1)
+            finishSet(index: currentSet - 1, reps: content.reps)
             if currentSet < content.sets {
                 startSetRestCountdown()
             } else {
@@ -671,6 +696,7 @@ struct Working2: View {
                     },
                     onConfirm: {
                         showExitConfirmPopup = false
+                        finishSet(index: currentSet - 1, reps: currentRep)
                         showCompletionPopup = true
                     }
                 )
@@ -729,6 +755,8 @@ struct Working2: View {
         .onDisappear {
             pauseSession()
             stopLiveTestIfNeeded()
+            setTimeLimitTimer?.invalidate()
+            setTimeLimitTimer = nil
             btVM.stopRecordingAll()
             btVM.currentTreatmentResultId = nil
         }
