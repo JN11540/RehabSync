@@ -9,7 +9,7 @@ struct TreatmentResultItem: Encodable {
     let treatment_content_id: Int
     let reps: [Int]
     let total_time: [Int]
-    let extension_length: [Double]
+    let extension_length: [Int]
     let set_start_time: [Int]
     let set_end_time: [Int]
     let date: Int
@@ -21,7 +21,7 @@ struct TreatmentResultDTO: Decodable {
     let treatment_content_id: Int
     let reps: [Int]
     let total_time: [Int]
-    let extension_length: [Double]
+    let extension_length: [Int]
     let set_start_time: [Int]
     let set_end_time: [Int]
     let date: Int
@@ -35,7 +35,7 @@ struct TreatmentResult: Codable, FetchableRecord, MutablePersistableRecord {
     var treatment_content_id: Int
     var reps: [Int]
     var total_time: [Int]
-    var extension_length: [Double]
+    var extension_length: [Int]
     var set_start_time: [Int]
     var set_end_time: [Int]
     var date: Int
