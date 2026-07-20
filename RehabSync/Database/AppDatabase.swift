@@ -43,7 +43,6 @@ func createAppDatabase() throws -> DatabaseQueue {
             t.column("treatment_content_id", .integer).notNull()
                 .references("treatment_content", onDelete: .cascade)
             t.column("reps", .text).notNull()
-            t.column("total_time", .text).notNull()
             t.column("extension_length", .text).notNull()
             t.column("set_start_time", .text).notNull()
             t.column("set_end_time", .text).notNull()
