@@ -37,7 +37,6 @@ struct Working2: View {
     @State private var bigBucketScale: CGFloat = 1
     @State private var middleBucketScale: CGFloat = 1
     @State private var smallBucketScale: CGFloat = 1
-    @State private var showRestPopup = false
     @State private var showExitConfirmPopup = false
     @State private var showSetRestPopup = false
     @State private var setRestCountdown: Int = 0
@@ -370,14 +369,6 @@ struct Working2: View {
                             .frame(width: 40, height: 40)
                         }
                         .buttonStyle(.plain)
-
-                        Button(action: { showRestPopup = true }) {
-                            Image("RestIcon")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 40, height: 40)
-                        }
-                        .buttonStyle(.plain)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.leading, 16)
@@ -620,25 +611,6 @@ struct Working2: View {
             }
             .padding(24)
             .offset(x: 25, y: -100)
-
-            if showRestPopup {
-                Color.black.opacity(0.3)
-                    .ignoresSafeArea()
-
-                ConfirmPopup(
-                    message: "您是否要直接跳過，進入組間休息？",
-                    onCancel: { showRestPopup = false },
-                    onConfirm: {
-                        showRestPopup = false
-                        if currentSet < content.sets {
-                            startSetRestCountdown()
-                        } else {
-                            showCompletionPopup = true
-                        }
-                    }
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-            }
 
             if showExitConfirmPopup {
                 Color.black.opacity(0.3)
