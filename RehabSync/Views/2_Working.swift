@@ -998,27 +998,27 @@ private struct CompletionPopup: View {
     let onComplete: () -> Void
 
     private enum ExportPhase: Equatable {
-        case buffering(secondsRemaining: Int)
         case ready
+        case counting(secondsRemaining: Int)
         case exporting
         case done
     }
 
-    @State private var phase: ExportPhase = .buffering(secondsRemaining: 5)
-    @State private var bufferTimer: Timer?
+    @State private var phase: ExportPhase = .ready
+    @State private var countdownTimer: Timer?
 
     private var exportButtonTitle: String {
         switch phase {
-        case .buffering(let remaining): return "整理遊戲數據 (\(remaining))"
         case .ready, .done: return "匯出JSON"
-        case .exporting: return "讀取中"
+        case .counting(let remaining): return "匯出JSON(\(remaining))"
+        case .exporting: return "匯出JSON(0)"
         }
     }
 
     private var isExportButtonEnabled: Bool {
         switch phase {
         case .ready, .done: return true
-        case .buffering, .exporting: return false
+        case .counting, .exporting: return false
         }
     }
 
@@ -1026,26 +1026,28 @@ private struct CompletionPopup: View {
         phase == .done
     }
 
-    private func startBufferCountdown() {
-        phase = .buffering(secondsRemaining: 5)
-        bufferTimer?.invalidate()
-        bufferTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
-            guard case .buffering(let remaining) = phase else { timer.invalidate(); return }
+    /// 點擊「匯出JSON」：畫面先倒數 5 秒（匯出JSON(5) → … → 匯出JSON(0)），
+    /// 緩衝非同步寫入的落地時間；倒數走完才真正組裝 5 個檔案內容並寫入暫存目錄，完成後跳出分享面板。
+    /// 查詢/組裝資料在背景執行緒進行，避免卡住主執行緒；「完成」按鈕解鎖只看檔案寫入呼叫是否都已執行過，
+    /// 不等待使用者在分享面板中實際完成儲存動作（見 database-update-plan.md「4. 完成視窗『匯出JSON』功能」）。
+    private func performExport() {
+        guard phase == .ready || phase == .done else { return }
+        phase = .counting(secondsRemaining: 5)
+        countdownTimer?.invalidate()
+        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
+            guard case .counting(let remaining) = phase else { timer.invalidate(); return }
             let next = remaining - 1
             if next <= 0 {
                 timer.invalidate()
-                bufferTimer = nil
-                phase = .ready
+                countdownTimer = nil
+                runExport()
             } else {
-                phase = .buffering(secondsRemaining: next)
+                phase = .counting(secondsRemaining: next)
             }
         }
     }
 
-    /// 點擊「匯出JSON」：組裝 5 個檔案內容並寫入暫存目錄，完成後跳出分享面板。
-    /// 查詢/組裝資料在背景執行緒進行，避免卡住主執行緒；「完成」按鈕解鎖只看檔案寫入呼叫是否都已執行過，
-    /// 不等待使用者在分享面板中實際完成儲存動作（見 database-update-plan.md「4. 完成視窗『匯出JSON』功能」）。
-    private func performExport() {
+    private func runExport() {
         guard let treatmentResult else { return }
         phase = .exporting
         DispatchQueue.global(qos: .userInitiated).async {
@@ -1150,12 +1152,9 @@ private struct CompletionPopup: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(Color.black, lineWidth: 1.5)
         )
-        .onAppear {
-            startBufferCountdown()
-        }
         .onDisappear {
-            bufferTimer?.invalidate()
-            bufferTimer = nil
+            countdownTimer?.invalidate()
+            countdownTimer = nil
         }
     }
 }
