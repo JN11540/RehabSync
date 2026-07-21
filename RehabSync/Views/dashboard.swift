@@ -668,7 +668,8 @@ private struct DashboardSchedulePanel: View {
 
     /// 以 exercise_id 對應要跳轉的訓練前置頁面，之後新增其他動作的頁面時直接在這裡加一筆對應即可。
     private static let trainingMenuDestinations: [Int: (TreatmentContent, Exercise?, @escaping () -> Void) -> AnyView] = [
-        2: { content, exercise, onReturnToDashboard in AnyView(PreWorking_2(content: content, exercise: exercise, onReturnToDashboard: onReturnToDashboard)) }
+        2: { content, exercise, onReturnToDashboard in AnyView(PreWorking_2(content: content, exercise: exercise, onReturnToDashboard: onReturnToDashboard)) },
+        9: { content, exercise, onReturnToDashboard in AnyView(PreWorking_9(content: content, exercise: exercise, onReturnToDashboard: onReturnToDashboard)) }
     ]
 
     /// 資料庫沒有治療計畫選擇 UI，比照 Test1 的作法，以第一個治療計畫代表「目前的訓練菜單」。
