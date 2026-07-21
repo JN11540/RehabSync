@@ -1063,16 +1063,27 @@ private struct CompletionPopup: View {
         }
     }
 
+    /// `Working2` 一定是疊在至少一層（常常是兩層）`.fullScreenCover` 之上顯示的，
+    /// 直接對 `rootViewController` 呼叫 `present` 會因為它已經有 `presentedViewController`
+    /// 而被 UIKit 忽略、分享面板根本不會跳出來。要往下找到目前真正最上層、還沒有 presentedViewController 的那個控制器再呈現。
+    private func topMostViewController(from base: UIViewController?) -> UIViewController? {
+        if let presented = base?.presentedViewController {
+            return topMostViewController(from: presented)
+        }
+        return base
+    }
+
     private func presentShareSheet(urls: [URL]) {
         let av = UIActivityViewController(activityItems: urls, applicationActivities: nil)
         if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let root = scene.windows.first?.rootViewController {
+           let root = scene.windows.first?.rootViewController,
+           let topMost = topMostViewController(from: root) {
             if let popover = av.popoverPresentationController {
-                popover.sourceView = root.view
-                popover.sourceRect = CGRect(x: root.view.bounds.midX, y: root.view.bounds.midY, width: 0, height: 0)
+                popover.sourceView = topMost.view
+                popover.sourceRect = CGRect(x: topMost.view.bounds.midX, y: topMost.view.bounds.midY, width: 0, height: 0)
                 popover.permittedArrowDirections = []
             }
-            root.present(av, animated: true)
+            topMost.present(av, animated: true)
         }
     }
 
