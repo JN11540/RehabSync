@@ -630,13 +630,13 @@ private struct PreWorking9MotionTestAboutPanel: View {
         return (thighPeripheral, calfPeripheral)
     }
 
-    /// 呼叫即時角度預估（坐姿），圓圈裡的數字就是靠 btVM.currentEstimatedRealAngle 即時更新。
+    /// 呼叫即時角度預估（站姿），圓圈裡的數字就是靠 btVM.currentEstimatedRealAngle 即時更新。
     private func startLiveTestIfNeeded() {
         guard !btVM.isLiveEstimating,
               let pair = thighAndCalfPeripherals,
               let baseline = btVM.baselineResult
         else { return }
-        btVM.startLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf, baseline: baseline, posture: .sitting)
+        btVM.startLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf, baseline: baseline, posture: .standing)
     }
 
     private func stopLiveTestIfNeeded() {
