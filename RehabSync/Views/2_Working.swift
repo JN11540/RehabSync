@@ -54,6 +54,9 @@ struct Working2: View {
     }
 
     @State private var setTimeLimitTimer: Timer?
+    /// 這一組 3 分鐘倒數的起訖區間，交給 `Text(timerInterval:)` 顯示畫面上的倒數數字，
+    /// 不需要另外自己寫一個每秒更新的 Timer。
+    @State private var setCountdownRange: ClosedRange<Date>?
 
     /// 某一組的起始點：把當下毫秒時間戳記寫進 set_start_time[index]、打開 acc/gyro/exg 的記錄，
     /// 並啟動這一組的 3 分鐘倒數上限（見「3.3 從起始點起算倒數 3 分鐘歸零」）。
@@ -63,6 +66,9 @@ struct Working2: View {
         treatmentResult = result
         resultVM.update(result)
         btVM.startRecordingAll()
+
+        let now = Date()
+        setCountdownRange = now...now.addingTimeInterval(Self.setTimeLimit)
 
         setTimeLimitTimer?.invalidate()
         setTimeLimitTimer = Timer.scheduledTimer(withTimeInterval: Self.setTimeLimit, repeats: false) { _ in
@@ -77,6 +83,7 @@ struct Working2: View {
         guard var result = treatmentResult, result.set_end_time.indices.contains(index) else { return }
         setTimeLimitTimer?.invalidate()
         setTimeLimitTimer = nil
+        setCountdownRange = nil
         btVM.stopRecordingAll()
         result.set_end_time[index] = Int(Date().timeIntervalSince1970 * 1000)
         result.reps[index] = reps
@@ -613,6 +620,16 @@ struct Working2: View {
             CoinBurstView(bucketFraction: CaughtFishSize.small.bucketTopFraction, centerFraction: CaughtFishSize.small.bucketFraction, count: CaughtFishSize.small.coinCount, elapsed: smallCoinElapsed)
 
             VStack(spacing: 12) {
+                if let setCountdownRange {
+                    Text(timerInterval: setCountdownRange, countsDown: true)
+                        .font(.system(size: 28, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.black.opacity(0.6))
+                        .clipShape(Capsule())
+                }
+
                 GeometryReader { geo in
                     let h = geo.size.height
 
@@ -779,6 +796,7 @@ struct Working2: View {
             stopLiveTestIfNeeded()
             setTimeLimitTimer?.invalidate()
             setTimeLimitTimer = nil
+            setCountdownRange = nil
             btVM.stopRecordingAll()
             btVM.currentTreatmentResultId = nil
         }
