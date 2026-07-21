@@ -144,20 +144,30 @@ class DeviceViewModel {
         }) ?? []
     }
 
+    /// `onFinish` 一定會被呼叫（不管這次有沒有真的清理），呼叫端可以用它當作「判斷／清理流程已結束」的統一訊號；
+    /// `onStart` 只有在真的需要清理、即將開始刪除時才會被呼叫（用來顯示「正在刪除舊資料」之類的提示）。
     func cleanupIfNeeded(onStart: (() -> Void)? = nil, onFinish: (() -> Void)? = nil) {
         let db = DatabaseManager.shared.dbQueue
 
         guard let counts = try? db.read({ db in (
             acc:  try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM acc")  ?? 0,
             gyro: try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM gyro") ?? 0,
-            exg:  try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM exg")  ?? 0
-        )}) else { return }
+            exg:  try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM exg")  ?? 0,
+            advancedStatistics: try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM advanced_statistics") ?? 0
+        )}) else {
+            DispatchQueue.main.async { onFinish?() }
+            return
+        }
 
         let shouldCleanAcc  = counts.acc  >= 17_280_000
         let shouldCleanGyro = counts.gyro >= 17_280_000
         let shouldCleanExg  = counts.exg  >= 17_280_000
+        let shouldCleanAdvancedStatistics = counts.advancedStatistics >= 432_000
 
-        guard shouldCleanAcc || shouldCleanGyro || shouldCleanExg else { return }
+        guard shouldCleanAcc || shouldCleanGyro || shouldCleanExg || shouldCleanAdvancedStatistics else {
+            DispatchQueue.main.async { onFinish?() }
+            return
+        }
 
         DispatchQueue.main.async { onStart?() }
 
@@ -188,6 +198,14 @@ class DeviceViewModel {
                         )
                     """, arguments: [id])
                 }
+            }
+            // advanced_statistics 沒有 device_id（大腿/小腿合併後的單一數值），不按裝置迴圈，直接砍 id 最小的 18,000 筆。
+            if shouldCleanAdvancedStatistics {
+                try db.execute(sql: """
+                    DELETE FROM advanced_statistics WHERE id IN (
+                        SELECT id FROM advanced_statistics ORDER BY id ASC LIMIT 18000
+                    )
+                """)
             }
         } completion: { _, _ in
             DispatchQueue.main.async { onFinish?() }

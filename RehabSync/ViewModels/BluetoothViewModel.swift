@@ -758,10 +758,23 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         for peripheral in connectedPeripherals.values {
             stopRecording(peripheral: peripheral)
         }
-        deviceVM.cleanupIfNeeded(
-            onStart:  { self.isCleaningUp = true },
-            onFinish: { self.isCleaningUp = false }
-        )
+    }
+
+    /// 開始新一局遊戲前的準備：花 3 秒判斷資料表是否需要清理，完成後呼叫 `completion()`。
+    /// 需要清理則等清理真正處理完成才呼叫 `completion`；不需要清理則 3 秒後直接呼叫。
+    /// 取代原本掛在 `stopRecordingAll()` 裡的清理時機，避免清理跟這局遊戲剛結束的資料寫入／匯出查詢搶同一個佇列
+    /// （見 database-update-plan.md「5. 資料清理機制（cleanupIfNeeded）觸發時機調整」）。
+    func prepareForNewGame(completion: @escaping () -> Void) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+            guard let self else { completion(); return }
+            self.deviceVM.cleanupIfNeeded(
+                onStart:  { self.isCleaningUp = true },
+                onFinish: {
+                    self.isCleaningUp = false
+                    completion()
+                }
+            )
+        }
     }
 
     // MARK: - DB Helpers
