@@ -98,11 +98,7 @@ struct PreWorking_2: View {
                             PreWorking2MotionTestAboutPanel(
                                 title: step.title,
                                 subtitle: step.subtitle,
-                                onPlayGame: {
-                                    btVM.prepareForNewGame {
-                                        navigateToWorking2 = true
-                                    }
-                                }
+                                onPlayGame: { navigateToWorking2 = true }
                             )
                             .frame(maxWidth: .infinity, alignment: .leading)
                         } else {
@@ -568,6 +564,55 @@ private struct PreWorking2MotionTestAboutPanel: View {
     @Environment(BluetoothViewModel.self) private var btVM
     @State private var side: Int = 0
 
+    private enum GamePrepPhase: Equatable {
+        case idle
+        case counting(secondsRemaining: Int)
+        case cleaning
+    }
+
+    @State private var prepPhase: GamePrepPhase = .idle
+    @State private var prepTimer: Timer?
+
+    private var playButtonText: String {
+        switch prepPhase {
+        case .idle: return "遊戲"
+        case .counting(let remaining): return "清理中(\(remaining))"
+        case .cleaning: return "清理中(0)"
+        }
+    }
+
+    /// 點擊「遊戲」後，先在畫面上顯示 3 秒的視覺倒數（清理中(3)→(2)→(1)→(0)），
+    /// 倒數走完才真正判斷／執行清理；不需要清理的話幾乎立刻接著跳轉，
+    /// 需要清理的話就停留在「清理中(0)」直到清理真正完成才跳轉。
+    private func startGamePreparation() {
+        guard prepPhase == .idle else { return }
+        prepPhase = .counting(secondsRemaining: 3)
+        prepTimer?.invalidate()
+        prepTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
+            guard case .counting(let remaining) = prepPhase else { timer.invalidate(); return }
+            let next = remaining - 1
+            if next <= 0 {
+                timer.invalidate()
+                prepTimer = nil
+                prepPhase = .cleaning
+                performCleanupThenPlay()
+            } else {
+                prepPhase = .counting(secondsRemaining: next)
+            }
+        }
+    }
+
+    private func performCleanupThenPlay() {
+        DeviceViewModel().cleanupIfNeeded(
+            onStart: { btVM.isCleaningUp = true },
+            onFinish: {
+                btVM.isCleaningUp = false
+                prepPhase = .idle
+                onPlayGame()
+            }
+        )
+    }
+
     private var thighAndCalfPeripherals: (thigh: CBPeripheral, calf: CBPeripheral)? {
         let dvm = DeviceViewModel()
         guard let thigh = dvm.fetch(side: side, limb: 0), let thighUUID = UUID(uuidString: thigh.device_uuid),
@@ -646,7 +691,9 @@ private struct PreWorking2MotionTestAboutPanel: View {
             }
             .frame(width: 200, height: 200)
 
-            PreWorkingStepCapsuleButton(text: "遊戲", icon: "gamecontroller.fill", action: { if side != 1 { onPlayGame() } })
+            PreWorkingStepCapsuleButton(text: playButtonText, icon: "arrow.right", action: {
+                if side != 1 { startGamePreparation() }
+            })
 
             Spacer()
         }
@@ -657,6 +704,8 @@ private struct PreWorking2MotionTestAboutPanel: View {
         }
         .onDisappear {
             stopLiveTestIfNeeded()
+            prepTimer?.invalidate()
+            prepTimer = nil
         }
     }
 }

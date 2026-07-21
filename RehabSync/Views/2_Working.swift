@@ -1098,12 +1098,9 @@ private struct CompletionPopup: View {
                         .padding(12)
                 }
 
-                Text("恭喜完成！")
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(.black)
+                Color(red: 0.86, green: 0.90, blue: 0.94)
                     .frame(maxWidth: .infinity)
                     .frame(height: 56)
-                    .background(Color(red: 0.86, green: 0.90, blue: 0.94))
             }
 
             HStack(spacing: 12) {
