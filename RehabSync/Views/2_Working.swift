@@ -1000,7 +1000,7 @@ private struct CompletionPopup: View {
     private enum ExportPhase: Equatable {
         case ready
         case counting(secondsRemaining: Int)
-        case exporting
+        case waiting
         case done
     }
 
@@ -1011,14 +1011,14 @@ private struct CompletionPopup: View {
         switch phase {
         case .ready, .done: return "匯出JSON"
         case .counting(let remaining): return "匯出JSON(\(remaining))"
-        case .exporting: return "匯出JSON(0)"
+        case .waiting: return "再等待一下..."
         }
     }
 
     private var isExportButtonEnabled: Bool {
         switch phase {
         case .ready, .done: return true
-        case .counting, .exporting: return false
+        case .counting, .waiting: return false
         }
     }
 
@@ -1026,30 +1026,35 @@ private struct CompletionPopup: View {
         phase == .done
     }
 
-    /// 點擊「匯出JSON」：畫面先倒數 5 秒（匯出JSON(5) → … → 匯出JSON(0)），
-    /// 緩衝非同步寫入的落地時間；倒數走完才真正組裝 5 個檔案內容並寫入暫存目錄，完成後跳出分享面板。
-    /// 查詢/組裝資料在背景執行緒進行，避免卡住主執行緒；「完成」按鈕解鎖只看檔案寫入呼叫是否都已執行過，
-    /// 不等待使用者在分享面板中實際完成儲存動作（見 database-update-plan.md「4. 完成視窗『匯出JSON』功能」）。
+    /// 點擊「匯出JSON」：畫面先倒數 5 秒（匯出JSON(5) → … → 匯出JSON(0)），緩衝非同步寫入的落地時間；
+    /// 倒數顯示到 0 的同時就在背景開始真正組裝檔案，如果又過了 1 秒還沒處理完，文字才改成「再等待一下...」，
+    /// 避免卡在「匯出JSON(0)」不動看起來像當掉了。查詢/組裝資料全程在背景執行緒進行，不卡住主執行緒；
+    /// 「完成」按鈕解鎖只看檔案寫入呼叫是否都已執行過，不等待使用者在分享面板中實際完成儲存動作
+    /// （見 database-update-plan.md「4. 完成視窗『匯出JSON』功能」）。
     private func performExport() {
         guard phase == .ready || phase == .done else { return }
         phase = .counting(secondsRemaining: 5)
         countdownTimer?.invalidate()
         countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
-            guard case .counting(let remaining) = phase else { timer.invalidate(); return }
-            let next = remaining - 1
-            if next <= 0 {
+            switch phase {
+            case .counting(let remaining) where remaining > 0:
+                let next = remaining - 1
+                phase = .counting(secondsRemaining: next)
+                if next == 0 { runExport() }
+            case .counting:
+                // 顯示「匯出JSON(0)」又過了 1 秒，背景作業還沒完成。
+                phase = .waiting
+            case .waiting:
+                break
+            case .ready, .done:
                 timer.invalidate()
                 countdownTimer = nil
-                runExport()
-            } else {
-                phase = .counting(secondsRemaining: next)
             }
         }
     }
 
     private func runExport() {
         guard let treatmentResult else { return }
-        phase = .exporting
         DispatchQueue.global(qos: .userInitiated).async {
             let deviceVM = DeviceViewModel()
             let files = GameDataExporter.export(treatmentResult: treatmentResult, deviceVM: deviceVM)

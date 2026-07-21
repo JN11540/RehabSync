@@ -567,7 +567,7 @@ private struct PreWorking2MotionTestAboutPanel: View {
     private enum GamePrepPhase: Equatable {
         case idle
         case counting(secondsRemaining: Int)
-        case cleaning
+        case waiting
     }
 
     @State private var prepPhase: GamePrepPhase = .idle
@@ -577,27 +577,32 @@ private struct PreWorking2MotionTestAboutPanel: View {
         switch prepPhase {
         case .idle: return "遊戲"
         case .counting(let remaining): return "清理中(\(remaining))"
-        case .cleaning: return "清理中(0)"
+        case .waiting: return "再等待一下..."
         }
     }
 
-    /// 點擊「遊戲」後，先在畫面上顯示 3 秒的視覺倒數（清理中(3)→(2)→(1)→(0)），
-    /// 倒數走完才真正判斷／執行清理；不需要清理的話幾乎立刻接著跳轉，
-    /// 需要清理的話就停留在「清理中(0)」直到清理真正完成才跳轉。
+    /// 點擊「遊戲」後，先在畫面上顯示 3 秒的視覺倒數（清理中(3)→(2)→(1)→(0)）；
+    /// 倒數顯示到 0 的同時就在背景開始真正判斷／執行清理，如果又過了 1 秒還沒處理完，
+    /// 文字才改成「再等待一下...」，避免卡在「清理中(0)」不動看起來像當掉了。
+    /// 不需要清理的話幾乎立刻接著跳轉；需要清理的話就停留在等待文字直到清理真正完成才跳轉。
     private func startGamePreparation() {
         guard prepPhase == .idle else { return }
         prepPhase = .counting(secondsRemaining: 3)
         prepTimer?.invalidate()
         prepTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
-            guard case .counting(let remaining) = prepPhase else { timer.invalidate(); return }
-            let next = remaining - 1
-            if next <= 0 {
+            switch prepPhase {
+            case .counting(let remaining) where remaining > 0:
+                let next = remaining - 1
+                prepPhase = .counting(secondsRemaining: next)
+                if next == 0 { performCleanupThenPlay() }
+            case .counting:
+                // 顯示「清理中(0)」又過了 1 秒，清理判斷／處理還沒完成。
+                prepPhase = .waiting
+            case .waiting:
+                break
+            case .idle:
                 timer.invalidate()
                 prepTimer = nil
-                prepPhase = .cleaning
-                performCleanupThenPlay()
-            } else {
-                prepPhase = .counting(secondsRemaining: next)
             }
         }
     }
@@ -607,6 +612,8 @@ private struct PreWorking2MotionTestAboutPanel: View {
             onStart: { btVM.isCleaningUp = true },
             onFinish: {
                 btVM.isCleaningUp = false
+                prepTimer?.invalidate()
+                prepTimer = nil
                 prepPhase = .idle
                 onPlayGame()
             }
