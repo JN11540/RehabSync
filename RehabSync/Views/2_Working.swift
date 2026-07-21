@@ -737,7 +737,7 @@ struct Working2: View {
                 Color.black.opacity(0.3)
                     .ignoresSafeArea()
 
-                CompletionPopup(onComplete: {
+                CompletionPopup(treatmentResult: treatmentResult, onComplete: {
                     showCompletionPopup = false
                     finalElapsedSeconds = Int(Date().timeIntervalSince(sessionStartDate))
                     navigateToPostWorking2 = true
@@ -994,7 +994,87 @@ private struct SetRestPopup: View {
 // MARK: - CompletionPopup
 
 private struct CompletionPopup: View {
+    let treatmentResult: TreatmentResult?
     let onComplete: () -> Void
+
+    private enum ExportPhase: Equatable {
+        case buffering(secondsRemaining: Int)
+        case ready
+        case exporting
+        case done
+    }
+
+    @State private var phase: ExportPhase = .buffering(secondsRemaining: 5)
+    @State private var bufferTimer: Timer?
+
+    private var exportButtonTitle: String {
+        switch phase {
+        case .buffering(let remaining): return "整理遊戲數據 (\(remaining))"
+        case .ready, .done: return "匯出JSON"
+        case .exporting: return "讀取中"
+        }
+    }
+
+    private var isExportButtonEnabled: Bool {
+        switch phase {
+        case .ready, .done: return true
+        case .buffering, .exporting: return false
+        }
+    }
+
+    private var isCompleteButtonEnabled: Bool {
+        phase == .done
+    }
+
+    private func startBufferCountdown() {
+        phase = .buffering(secondsRemaining: 5)
+        bufferTimer?.invalidate()
+        bufferTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
+            guard case .buffering(let remaining) = phase else { timer.invalidate(); return }
+            let next = remaining - 1
+            if next <= 0 {
+                timer.invalidate()
+                bufferTimer = nil
+                phase = .ready
+            } else {
+                phase = .buffering(secondsRemaining: next)
+            }
+        }
+    }
+
+    /// 點擊「匯出JSON」：組裝 5 個檔案內容並寫入暫存目錄，完成後跳出分享面板。
+    /// 查詢/組裝資料在背景執行緒進行，避免卡住主執行緒；「完成」按鈕解鎖只看檔案寫入呼叫是否都已執行過，
+    /// 不等待使用者在分享面板中實際完成儲存動作（見 database-update-plan.md「4. 完成視窗『匯出JSON』功能」）。
+    private func performExport() {
+        guard let treatmentResult else { return }
+        phase = .exporting
+        DispatchQueue.global(qos: .userInitiated).async {
+            let deviceVM = DeviceViewModel()
+            let files = GameDataExporter.export(treatmentResult: treatmentResult, deviceVM: deviceVM)
+            let urls: [URL] = files.map { file in
+                let url = FileManager.default.temporaryDirectory.appendingPathComponent(file.filename)
+                try? file.content.write(to: url, atomically: true, encoding: .utf8)
+                return url
+            }
+            DispatchQueue.main.async {
+                phase = .done
+                presentShareSheet(urls: urls)
+            }
+        }
+    }
+
+    private func presentShareSheet(urls: [URL]) {
+        let av = UIActivityViewController(activityItems: urls, applicationActivities: nil)
+        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let root = scene.windows.first?.rootViewController {
+            if let popover = av.popoverPresentationController {
+                popover.sourceView = root.view
+                popover.sourceRect = CGRect(x: root.view.bounds.midX, y: root.view.bounds.midY, width: 0, height: 0)
+                popover.permittedArrowDirections = []
+            }
+            root.present(av, animated: true)
+        }
+    }
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -1015,22 +1095,45 @@ private struct CompletionPopup: View {
                     .background(Color(red: 0.86, green: 0.90, blue: 0.94))
             }
 
-            Button(action: onComplete) {
-                Text("完成")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.black)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(Color.white)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(Color.black, lineWidth: 1.5)
-                            )
-                    )
+            HStack(spacing: 12) {
+                Button(action: performExport) {
+                    Text(exportButtonTitle)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.white)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(Color.black, lineWidth: 1.5)
+                                )
+                        )
+                }
+                .buttonStyle(.plain)
+                .disabled(!isExportButtonEnabled)
+                .opacity(isExportButtonEnabled ? 1 : 0.5)
+
+                Button(action: onComplete) {
+                    Text("完成")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.white)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(Color.black, lineWidth: 1.5)
+                                )
+                        )
+                }
+                .buttonStyle(.plain)
+                .disabled(!isCompleteButtonEnabled)
+                .opacity(isCompleteButtonEnabled ? 1 : 0.5)
             }
-            .buttonStyle(.plain)
             .padding(12)
         }
         .frame(width: 520, height: 400)
@@ -1039,6 +1142,13 @@ private struct CompletionPopup: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(Color.black, lineWidth: 1.5)
         )
+        .onAppear {
+            startBufferCountdown()
+        }
+        .onDisappear {
+            bufferTimer?.invalidate()
+            bufferTimer = nil
+        }
     }
 }
 
