@@ -469,6 +469,12 @@ struct Working2: View {
                             .frame(width: 40, height: 40)
                         }
                         .buttonStyle(.plain)
+
+                        if let setCountdownRange {
+                            Text(timerInterval: setCountdownRange, countsDown: true)
+                                .font(.system(size: 24, weight: .bold, design: .monospaced))
+                                .foregroundStyle(.black)
+                        }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.leading, 16)
@@ -620,16 +626,6 @@ struct Working2: View {
             CoinBurstView(bucketFraction: CaughtFishSize.small.bucketTopFraction, centerFraction: CaughtFishSize.small.bucketFraction, count: CaughtFishSize.small.coinCount, elapsed: smallCoinElapsed)
 
             VStack(spacing: 12) {
-                if let setCountdownRange {
-                    Text(timerInterval: setCountdownRange, countsDown: true)
-                        .font(.system(size: 28, weight: .bold, design: .monospaced))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.black.opacity(0.6))
-                        .clipShape(Capsule())
-                }
-
                 GeometryReader { geo in
                     let h = geo.size.height
 
