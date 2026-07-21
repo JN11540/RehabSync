@@ -615,6 +615,8 @@ private struct DeviceConnectionButtons: View {
     @State private var resultVM = TreatmentResultViewModel()
     @State private var counts: (acc: Int, gyro: Int, exg: Int, advancedStatistics: Int) = (0, 0, 0, 0)
     @State private var latestResult: TreatmentResult? = nil
+    @State private var countdown: Int? = nil
+    @State private var countdownTimer: Timer? = nil
 
     private func formatArray<T>(_ values: [T]) -> String {
         "[" + values.map { "\($0)" }.joined(separator: ", ") + "]"
@@ -625,15 +627,33 @@ private struct DeviceConnectionButtons: View {
         latestResult = resultVM.fetchLatest()
     }
 
+    private func startRefreshCountdown() {
+        guard countdown == nil else { return }
+        countdown = 10
+        countdownTimer?.invalidate()
+        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
+            guard var remaining = countdown else { timer.invalidate(); return }
+            remaining -= 1
+            if remaining <= 0 {
+                timer.invalidate()
+                countdownTimer = nil
+                countdown = nil
+                refresh()
+            } else {
+                countdown = remaining
+            }
+        }
+    }
+
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 16) {
                 HStack(spacing: 12) {
-                    Text("資料表筆數")
+                    Text("資料表最大 id")
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(.white)
-                    Button(action: refresh) {
-                        Text("重新計算")
+                    Button(action: startRefreshCountdown) {
+                        Text(countdown != nil ? "重新計算中…\(countdown!)" : "重新計算")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 12)
@@ -642,17 +662,18 @@ private struct DeviceConnectionButtons: View {
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                     .buttonStyle(.plain)
+                    .disabled(countdown != nil)
                 }
-                Text("acc：\(counts.acc) 筆")
+                Text("acc 最大 id：\(counts.acc)")
                     .font(.system(size: 16))
                     .foregroundStyle(.white.opacity(0.8))
-                Text("gyro：\(counts.gyro) 筆")
+                Text("gyro 最大 id：\(counts.gyro)")
                     .font(.system(size: 16))
                     .foregroundStyle(.white.opacity(0.8))
-                Text("exg：\(counts.exg) 筆")
+                Text("exg 最大 id：\(counts.exg)")
                     .font(.system(size: 16))
                     .foregroundStyle(.white.opacity(0.8))
-                Text("advanced_statistics：\(counts.advancedStatistics) 筆")
+                Text("advanced_statistics 最大 id：\(counts.advancedStatistics)")
                     .font(.system(size: 16))
                     .foregroundStyle(.white.opacity(0.8))
 
@@ -685,11 +706,11 @@ private struct DeviceConnectionButtons: View {
             .padding(.bottom, 40)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .task {
-            while !Task.isCancelled {
-                refresh()
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
-            }
+        .onAppear { refresh() }
+        .onDisappear {
+            countdownTimer?.invalidate()
+            countdownTimer = nil
+            countdown = nil
         }
     }
 }

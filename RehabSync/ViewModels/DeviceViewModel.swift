@@ -152,10 +152,10 @@ class DeviceViewModel {
 
     func fetchTableCounts() -> (acc: Int, gyro: Int, exg: Int, advancedStatistics: Int) {
         (try? db.read { db in (
-            acc:  try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM acc")  ?? 0,
-            gyro: try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM gyro") ?? 0,
-            exg:  try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM exg")  ?? 0,
-            advancedStatistics: try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM advanced_statistics") ?? 0
+            acc:  try Int.fetchOne(db, sql: "SELECT MAX(id) FROM acc")  ?? 0,
+            gyro: try Int.fetchOne(db, sql: "SELECT MAX(id) FROM gyro") ?? 0,
+            exg:  try Int.fetchOne(db, sql: "SELECT MAX(id) FROM exg")  ?? 0,
+            advancedStatistics: try Int.fetchOne(db, sql: "SELECT MAX(id) FROM advanced_statistics") ?? 0
         )}) ?? (0, 0, 0, 0)
     }
 
