@@ -100,6 +100,50 @@ class DeviceViewModel {
         }) ?? []
     }
 
+    /// 匯出功能專用：以 `treatment_result_id`（＋`device_id`）過濾，取這局遊戲、這個裝置的全部 acc 資料。
+    func fetchACC(treatmentResultId: Int64, deviceId: Int64) -> [Acc] {
+        (try? db.read { db in
+            try Acc
+                .filter(Column("treatment_result_id") == treatmentResultId
+                     && Column("device_id") == deviceId)
+                .order(Column("id").asc)
+                .fetchAll(db)
+        }) ?? []
+    }
+
+    /// 匯出功能專用：以 `treatment_result_id`（＋`device_id`）過濾，取這局遊戲、這個裝置的全部 gyro 資料。
+    func fetchGYRO(treatmentResultId: Int64, deviceId: Int64) -> [Gyro] {
+        (try? db.read { db in
+            try Gyro
+                .filter(Column("treatment_result_id") == treatmentResultId
+                     && Column("device_id") == deviceId)
+                .order(Column("id").asc)
+                .fetchAll(db)
+        }) ?? []
+    }
+
+    /// 匯出功能專用：以 `treatment_result_id`（＋`device_id`＋`channel`）過濾，取這局遊戲、這個裝置、這個 channel 的全部 exg 資料。
+    func fetchEXG(treatmentResultId: Int64, deviceId: Int64, channel: Int) -> [Exg] {
+        (try? db.read { db in
+            try Exg
+                .filter(Column("treatment_result_id") == treatmentResultId
+                     && Column("device_id") == deviceId
+                     && Column("channel") == channel)
+                .order(Column("id").asc)
+                .fetchAll(db)
+        }) ?? []
+    }
+
+    /// 匯出功能專用：以 `treatment_result_id` 過濾，取這局遊戲的全部 advanced_statistics 資料（沒有裝置區分）。
+    func fetchAdvancedStatistics(treatmentResultId: Int64) -> [AdvancedStatistics] {
+        (try? db.read { db in
+            try AdvancedStatistics
+                .filter(Column("treatment_result_id") == treatmentResultId)
+                .order(Column("id").asc)
+                .fetchAll(db)
+        }) ?? []
+    }
+
     func cleanupIfNeeded(onStart: (() -> Void)? = nil, onFinish: (() -> Void)? = nil) {
         let db = DatabaseManager.shared.dbQueue
 
