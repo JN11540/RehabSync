@@ -144,6 +144,19 @@ class DeviceViewModel {
         }) ?? []
     }
 
+    /// 結果頁「即時膝角度」詳細圖表專用：以 `treatment_result_id` ＋ 時間範圍過濾，只查某一組的區間，
+    /// 不會把其他組別的資料一起撈進記憶體（見 postworking2-realdata-plan.md「4. 即時膝角度圖表」）。
+    func fetchAdvancedStatistics(treatmentResultId: Int64, from: Int64, to: Int64) -> [AdvancedStatistics] {
+        (try? db.read { db in
+            try AdvancedStatistics
+                .filter(Column("treatment_result_id") == treatmentResultId
+                     && Column("timestamp") >= from
+                     && Column("timestamp") <= to)
+                .order(Column("id").asc)
+                .fetchAll(db)
+        }) ?? []
+    }
+
     /// `onFinish` 一定會被呼叫（不管這次有沒有真的清理），呼叫端可以用它當作「判斷／清理流程已結束」的統一訊號；
     /// `onStart` 只有在真的需要清理、即將開始刪除時才會被呼叫（用來顯示「正在刪除舊資料」之類的提示）。
     func cleanupIfNeeded(onStart: (() -> Void)? = nil, onFinish: (() -> Void)? = nil) {

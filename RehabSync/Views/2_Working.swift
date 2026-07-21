@@ -759,17 +759,20 @@ struct Working2: View {
             }
         }
         .fullScreenCover(isPresented: $navigateToPostWorking2) {
-            PostWorking_2(
-                content: content,
-                exercise: exercise,
-                totalCoins: totalCoins,
-                totalReps: bigFishCaught + middleFishCaught + smallFishCaught,
-                totalElapsedSeconds: finalElapsedSeconds,
-                bigFishCaught: bigFishCaught,
-                middleFishCaught: middleFishCaught,
-                smallFishCaught: smallFishCaught,
-                onReturnToDashboard: onReturnToDashboard
-            )
+            if let treatmentResult {
+                PostWorking_2(
+                    content: content,
+                    exercise: exercise,
+                    totalCoins: totalCoins,
+                    totalReps: bigFishCaught + middleFishCaught + smallFishCaught,
+                    totalElapsedSeconds: finalElapsedSeconds,
+                    bigFishCaught: bigFishCaught,
+                    middleFishCaught: middleFishCaught,
+                    smallFishCaught: smallFishCaught,
+                    treatmentResult: treatmentResult,
+                    onReturnToDashboard: onReturnToDashboard
+                )
+            }
         }
         .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
             guard !isSessionPaused else { return }

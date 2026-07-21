@@ -10,7 +10,20 @@ struct PostWorking_2: View {
     let bigFishCaught: Int
     let middleFishCaught: Int
     let smallFishCaught: Int
+    let treatmentResult: TreatmentResult
     let onReturnToDashboard: () -> Void
+
+    /// 毫秒轉成「X 分 YY 秒」，`ms <= 0` 一律視為沒有資料。
+    fileprivate static func formatMinutesSeconds(ms: Int) -> String {
+        guard ms > 0 else { return "－" }
+        let totalSeconds = ms / 1000
+        return String(format: "%d 分 %02d 秒", totalSeconds / 60, totalSeconds % 60)
+    }
+
+    /// 毫秒轉成「X.X 秒」。
+    fileprivate static func formatSeconds(ms: Double) -> String {
+        String(format: "%.1f 秒", ms / 1000.0)
+    }
 
     fileprivate static let darkPurple = Color(red: 0.30, green: 0.16, blue: 0.65)
     fileprivate static let midPurple = Color(red: 0.45, green: 0.35, blue: 0.85)
@@ -33,9 +46,9 @@ struct PostWorking_2: View {
                     ScrollView(showsIndicators: false) {
                         VStack(alignment: .leading, spacing: 24) {
                             PostWorking2Header()
-                            PostWorking2StatRow(onRequestReturn: { showReturnConfirm = true })
+                            PostWorking2StatRow(treatmentResult: treatmentResult, onRequestReturn: { showReturnConfirm = true })
 
-                            PostWorking2DonationOverviewCard()
+                            PostWorking2DonationOverviewCard(content: content, treatmentResult: treatmentResult)
                                 .frame(maxHeight: .infinity)
                         }
                         .padding(28)
@@ -92,13 +105,34 @@ private struct PostWorking2Stat {
 }
 
 private struct PostWorking2StatRow: View {
+    let treatmentResult: TreatmentResult
     let onRequestReturn: () -> Void
 
-    private let stats: [PostWorking2Stat] = [
-        PostWorking2Stat(icon: "clock.fill", color: PostWorking_2.midPurple, label: "總時間", value: "10 分 00 秒", change: "", isPositive: true, note: ""),
-        PostWorking2Stat(icon: "repeat.circle.fill", color: PostWorking_2.blue, label: "總次數", value: "30 次", change: "", isPositive: true, note: ""),
-        PostWorking2Stat(icon: "figure.flexibility", color: PostWorking_2.green, label: "平均伸展時長", value: "4.5 秒", change: "", isPositive: true, note: "")
-    ]
+    /// 「第一組開始」到「最後一組結束」的絕對時間差（毫秒），天然包含組間休息時間。
+    private var totalTimeText: String {
+        let firstStart = treatmentResult.set_start_time.first(where: { $0 > 0 }) ?? 0
+        let lastEnd = treatmentResult.set_end_time.last(where: { $0 > 0 }) ?? 0
+        return PostWorking_2.formatMinutesSeconds(ms: max(0, lastEnd - firstStart))
+    }
+
+    private var totalReps: Int {
+        treatmentResult.reps.reduce(0, +)
+    }
+
+    /// sum(extension_length) / sum(reps)：未完成的次數固定補 0，不會影響平均值。
+    private var averageExtensionText: String {
+        guard totalReps > 0 else { return "－" }
+        let totalMs = treatmentResult.extension_length.reduce(0, +)
+        return PostWorking_2.formatSeconds(ms: Double(totalMs) / Double(totalReps))
+    }
+
+    private var stats: [PostWorking2Stat] {
+        [
+            PostWorking2Stat(icon: "clock.fill", color: PostWorking_2.midPurple, label: "總時間", value: totalTimeText, change: "", isPositive: true, note: ""),
+            PostWorking2Stat(icon: "repeat.circle.fill", color: PostWorking_2.blue, label: "總次數", value: "\(totalReps) 次", change: "", isPositive: true, note: ""),
+            PostWorking2Stat(icon: "figure.flexibility", color: PostWorking_2.green, label: "平均伸展時長", value: averageExtensionText, change: "", isPositive: true, note: "")
+        ]
+    }
 
     var body: some View {
         HStack(spacing: 16) {
@@ -228,72 +262,77 @@ private struct PostWorking2AttemptDuration: Identifiable {
     var id: Int { attempt }
 }
 
-private enum PostWorking2Group: CaseIterable, Equatable {
-    case first
-    case second
-    case third
+/// 一組的統計資料，從 `treatmentResult` 依索引現算，取代原本寫死在 enum 裡的假資料。
+private struct PostWorking2GroupStats {
+    let index: Int
+    let reps: Int
+    let setStartTimeMs: Int
+    let setEndTimeMs: Int
+    let barData: [PostWorking2AttemptDuration]
 
-    var label: String {
-        switch self {
-        case .first: "第一組"
-        case .second: "第二組"
-        case .third: "第三組"
-        }
+    /// 「這組從未開始」跟「這組有開始／結束但 0 次動作完成」視為同一種狀況，統一用這個判斷。
+    var hasData: Bool { reps > 0 }
+
+    var label: String { "第 \(index + 1) 組" }
+
+    var totalTimeText: String {
+        guard hasData else { return "－" }
+        return PostWorking_2.formatMinutesSeconds(ms: setEndTimeMs - setStartTimeMs)
     }
 
-    var totalTime: String {
-        switch self {
-        case .first: "3 分 00 秒"
-        case .second: "2 分 45 秒"
-        case .third: "3 分 20 秒"
-        }
+    var averageDurationText: String {
+        guard hasData else { return "－" }
+        let totalMs = barData.reduce(0.0) { $0 + $1.seconds * 1000 }
+        return PostWorking_2.formatSeconds(ms: totalMs / Double(reps))
     }
 
-    var totalCount: String {
-        "10 次"
-    }
+    static func compute(index: Int, treatmentResult: TreatmentResult, repsPerSet: Int) -> PostWorking2GroupStats {
+        let reps = treatmentResult.reps.indices.contains(index) ? treatmentResult.reps[index] : 0
+        let startMs = treatmentResult.set_start_time.indices.contains(index) ? treatmentResult.set_start_time[index] : 0
+        let endMs = treatmentResult.set_end_time.indices.contains(index) ? treatmentResult.set_end_time[index] : 0
 
-    var averageDuration: String {
-        switch self {
-        case .first: "5.5 秒"
-        case .second: "5.0 秒"
-        case .third: "6.0 秒"
+        let sliceStart = index * repsPerSet
+        let sliceEnd = min(sliceStart + repsPerSet, treatmentResult.extension_length.count)
+        let slice = sliceStart < sliceEnd ? Array(treatmentResult.extension_length[sliceStart..<sliceEnd]) : []
+        // 只取前 reps 個（實際完成的次數），其餘是 0 補值，不應該畫出來。
+        let realValues = Array(slice.prefix(reps))
+        let barData = realValues.enumerated().map { i, ms in
+            PostWorking2AttemptDuration(attempt: i + 1, seconds: Double(ms) / 1000.0)
         }
-    }
 
-    var durations: [Double] {
-        switch self {
-        case .first: [5, 5, 5, 5, 5, 5, 5, 5, 5, 4]
-        case .second: [5, 5, 4, 5, 6, 5, 4, 5, 5, 6]
-        case .third: [6, 6, 7, 6, 5, 6, 7, 6, 6, 5]
-        }
-    }
-
-    var data: [PostWorking2AttemptDuration] {
-        durations.enumerated().map { index, seconds in
-            PostWorking2AttemptDuration(attempt: index + 1, seconds: seconds)
-        }
+        return PostWorking2GroupStats(index: index, reps: reps, setStartTimeMs: startMs, setEndTimeMs: endMs, barData: barData)
     }
 }
 
 private struct PostWorking2DonationOverviewCard: View {
-    @State private var selectedGroup: PostWorking2Group = .first
+    let content: TreatmentContent
+    let treatmentResult: TreatmentResult
+
+    @State private var selectedIndex: Int = 0
     @State private var showRetentionDetail = false
+
+    private var groups: [PostWorking2GroupStats] {
+        (0..<content.sets).map { PostWorking2GroupStats.compute(index: $0, treatmentResult: treatmentResult, repsPerSet: content.reps) }
+    }
+
+    private var selected: PostWorking2GroupStats {
+        groups.first(where: { $0.index == selectedIndex }) ?? PostWorking2GroupStats.compute(index: 0, treatmentResult: treatmentResult, repsPerSet: content.reps)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 30) {
             HStack {
                 HStack(spacing: 16) {
-                    ForEach(PostWorking2Group.allCases, id: \.label) { group in
+                    ForEach(groups, id: \.index) { group in
                         Button {
-                            selectedGroup = group
+                            selectedIndex = group.index
                         } label: {
                             Text(group.label)
                                 .font(.system(size: 20, weight: .semibold))
-                                .foregroundStyle(group == selectedGroup ? Color.white : PostWorking_2.mutedText)
+                                .foregroundStyle(group.index == selectedIndex ? Color.white : PostWorking_2.mutedText)
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 8)
-                                .background(group == selectedGroup ? PostWorking_2.darkPurple : Color.clear)
+                                .background(group.index == selectedIndex ? PostWorking_2.darkPurple : Color.clear)
                                 .clipShape(Capsule())
                         }
                         .buttonStyle(.plain)
@@ -308,6 +347,8 @@ private struct PostWorking2DonationOverviewCard: View {
                         .foregroundStyle(PostWorking_2.mutedText)
                 }
                 .buttonStyle(.plain)
+                .disabled(!selected.hasData)
+                .opacity(selected.hasData ? 1 : 0.4)
             }
 
             HStack(alignment: .top, spacing: 56) {
@@ -315,7 +356,7 @@ private struct PostWorking2DonationOverviewCard: View {
                     Text("總時間")
                         .font(.system(size: 20))
                         .foregroundStyle(PostWorking_2.mutedText)
-                    Text(selectedGroup.totalTime)
+                    Text(selected.totalTimeText)
                         .font(.system(size: 30, weight: .bold))
                         .foregroundStyle(Color.black)
                 }
@@ -323,7 +364,7 @@ private struct PostWorking2DonationOverviewCard: View {
                     Text("次數")
                         .font(.system(size: 20))
                         .foregroundStyle(PostWorking_2.mutedText)
-                    Text(selectedGroup.totalCount)
+                    Text("\(selected.reps) 次")
                         .font(.system(size: 30, weight: .bold))
                         .foregroundStyle(Color.black)
                 }
@@ -331,14 +372,14 @@ private struct PostWorking2DonationOverviewCard: View {
                     Text("平均伸直時間")
                         .font(.system(size: 20))
                         .foregroundStyle(PostWorking_2.mutedText)
-                    Text(selectedGroup.averageDuration)
+                    Text(selected.averageDurationText)
                         .font(.system(size: 30, weight: .bold))
                         .foregroundStyle(Color.black)
                 }
             }
 
             HStack(alignment: .top, spacing: 20) {
-                Chart(selectedGroup.data) { point in
+                Chart(selected.barData) { point in
                     BarMark(
                         x: .value("次數", point.attempt),
                         y: .value("單次伸直時間（秒）", point.seconds),
@@ -347,10 +388,10 @@ private struct PostWorking2DonationOverviewCard: View {
                     .foregroundStyle(PostWorking_2.darkPurple)
                     .cornerRadius(2)
                 }
-                .chartXScale(domain: 0.5...10.5)
+                .chartXScale(domain: 0.5...(Double(content.reps) + 0.5))
                 .chartYScale(domain: 0...7)
                 .chartXAxis {
-                    AxisMarks(values: Array(1...10)) { value in
+                    AxisMarks(values: Array(1...content.reps)) { value in
                         AxisGridLine()
                         AxisTick()
                         AxisValueLabel {
@@ -391,7 +432,11 @@ private struct PostWorking2DonationOverviewCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black.opacity(0.05)))
         .fullScreenCover(isPresented: $showRetentionDetail) {
-            PostWorking2RetentionDetailSheet()
+            PostWorking2RetentionDetailSheet(
+                treatmentResultId: treatmentResult.id ?? 0,
+                setStartTimeMs: selected.setStartTimeMs,
+                setEndTimeMs: selected.setEndTimeMs
+            )
         }
     }
 }
@@ -405,19 +450,17 @@ private struct PostWorking2KneeAnglePoint: Identifiable {
 }
 
 private struct PostWorking2RetentionCard: View {
-    private let dataPoints: [PostWorking2KneeAnglePoint] = {
-        let sampleInterval = 0.2 // 每秒 5 筆
-        let totalSeconds = 180.0 // 3 分鐘
-        var points: [PostWorking2KneeAnglePoint] = []
-        var time = 0.0
-        while time <= totalSeconds {
-            let cycle = sin(time * 0.3)
-            let angle = min(90, max(0, 45 + 40 * cycle + Double.random(in: -3...3)))
-            points.append(PostWorking2KneeAnglePoint(time: time, angle: angle))
-            time += sampleInterval
-        }
-        return points
-    }()
+    let treatmentResultId: Int64
+    let setStartTimeMs: Int
+    let setEndTimeMs: Int
+
+    /// 不預先讀取進記憶體：只有這個畫面真的顯示出來（也就是使用者點了「檢視」）才查詢，
+    /// 用帶時間範圍的查詢函式只查當下這一組，不會撈其他組別的資料。
+    @State private var dataPoints: [PostWorking2KneeAnglePoint] = []
+
+    private var durationSeconds: Double {
+        max(0.001, Double(setEndTimeMs - setStartTimeMs) / 1000.0)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -436,7 +479,7 @@ private struct PostWorking2RetentionCard: View {
                 .foregroundStyle(PostWorking_2.darkPurple)
                 .interpolationMethod(.catmullRom)
             }
-            .chartXScale(domain: 0...180)
+            .chartXScale(domain: 0...durationSeconds)
             .chartYScale(domain: 0...90)
             .chartXAxisLabel("時間（秒）", alignment: .center)
             .chartYAxisLabel("膝角度（度）", position: .leading, alignment: .center)
@@ -446,17 +489,31 @@ private struct PostWorking2RetentionCard: View {
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black.opacity(0.05)))
+        .onAppear {
+            let rows = DeviceViewModel().fetchAdvancedStatistics(
+                treatmentResultId: treatmentResultId,
+                from: Int64(setStartTimeMs),
+                to: Int64(setEndTimeMs)
+            )
+            dataPoints = rows.map { row in
+                PostWorking2KneeAnglePoint(time: Double(row.timestamp - Int64(setStartTimeMs)) / 1000.0, angle: row.angle)
+            }
+        }
     }
 }
 
 private struct PostWorking2RetentionDetailSheet: View {
+    let treatmentResultId: Int64
+    let setStartTimeMs: Int
+    let setEndTimeMs: Int
+
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         ZStack(alignment: .topLeading) {
             PostWorking_2.panelBackground.ignoresSafeArea()
 
-            PostWorking2RetentionCard()
+            PostWorking2RetentionCard(treatmentResultId: treatmentResultId, setStartTimeMs: setStartTimeMs, setEndTimeMs: setEndTimeMs)
                 .padding(28)
                 .padding(.top, 60)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -479,6 +536,7 @@ private struct PostWorking2RetentionDetailSheet: View {
 }
 
 #Preview {
+    let now = Int(Date().timeIntervalSince1970 * 1000)
     PostWorking_2(
         content: TreatmentContent(treatment_id: 1, exercise_id: 2, sets: 3, set_rest_time: 30, reps: 10, date: Int(Date().timeIntervalSince1970)),
         exercise: nil,
@@ -488,6 +546,15 @@ private struct PostWorking2RetentionDetailSheet: View {
         bigFishCaught: 5,
         middleFishCaught: 10,
         smallFishCaught: 15,
+        treatmentResult: TreatmentResult(
+            treatment_id: 1,
+            treatment_content_id: 2,
+            reps: [10, 10, 10],
+            extension_length: Array(repeating: 5000, count: 30),
+            set_start_time: [now, now + 200_000, now + 400_000],
+            set_end_time: [now + 180_000, now + 380_000, now + 580_000],
+            date: now
+        ),
         onReturnToDashboard: {}
     )
 }
