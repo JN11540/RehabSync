@@ -193,8 +193,6 @@ private struct DashboardSidebar: View {
             DashboardSidebarSectionLabel(text: "一般")
             DashboardSidebarItem(item: .overview, selectedNav: $selectedNav)
             DashboardSidebarItem(item: .training, selectedNav: $selectedNav)
-            DashboardSidebarItem(item: .test, selectedNav: $selectedNav, action: onNavigateToTest)
-            DashboardSidebarItem(item: .test1, selectedNav: $selectedNav, action: onNavigateToTest1)
 
             DashboardSidebarSectionLabel(text: "工具")
                 .padding(.top, 24)
