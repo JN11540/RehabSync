@@ -26,6 +26,92 @@ struct Working9: View {
         guard btVM.isLiveEstimating, let pair = thighAndCalfPeripherals else { return }
         btVM.stopLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
     }
+
+    // MARK: - treatment_result 建立與串接
+
+    private let resultVM = TreatmentResultViewModel()
+    @State private var treatmentResult: TreatmentResult?
+
+    /// 遊戲一開始（畫面顯示的那一刻）先建立這局遊戲唯一一筆 treatment_result，
+    /// 陣列長度依目標組數/目標次數計算、全部初始化為 0，再把 id 交給 btVM
+    /// 讓之後 acc/gyro/exg/advanced_statistics 每一筆寫入都能帶上這個 treatment_result_id。
+    /// 建立完成後緊接著視同第一組的起始點，開始記錄。
+    private func createTreatmentResultIfNeeded() {
+        guard treatmentResult == nil else { return }
+        var result = TreatmentResult(
+            treatment_id: content.treatment_id,
+            treatment_content_id: Int(content.id ?? 0),
+            reps: Array(repeating: 0, count: content.sets),
+            extension_length: Array(repeating: 0, count: content.sets * content.reps),
+            set_start_time: Array(repeating: 0, count: content.sets),
+            set_end_time: Array(repeating: 0, count: content.sets),
+            date: Int(Date().timeIntervalSince1970 * 1000)
+        )
+        resultVM.insert(&result)
+        treatmentResult = result
+        btVM.currentTreatmentResultId = result.id
+        markSetStart(index: 0)
+    }
+
+    @State private var setTimeLimitTimer: Timer?
+    /// 這一組 3 分鐘倒數的起訖區間，交給 `Text(timerInterval:)` 顯示畫面上的倒數數字。
+    @State private var setCountdownRange: ClosedRange<Date>?
+
+    /// 某一組的起始點：把當下毫秒時間戳記寫進 set_start_time[index]、打開 acc/gyro/exg 的記錄，
+    /// 並啟動這一組的 3 分鐘倒數上限。
+    private func markSetStart(index: Int) {
+        guard var result = treatmentResult, result.set_start_time.indices.contains(index) else { return }
+        result.set_start_time[index] = Int(Date().timeIntervalSince1970 * 1000)
+        treatmentResult = result
+        resultVM.update(result)
+        btVM.startRecordingAll()
+
+        let now = Date()
+        setCountdownRange = now...now.addingTimeInterval(Self.setTimeLimit)
+
+        setTimeLimitTimer?.invalidate()
+        setTimeLimitTimer = Timer.scheduledTimer(withTimeInterval: Self.setTimeLimit, repeats: false) { _ in
+            handleSetTimeLimitReached()
+        }
+    }
+
+    /// 某一組的結束點：停止 acc/gyro/exg 的記錄、取消該組的 3 分鐘倒數計時器，
+    /// 並把結束時間、實際完成次數一併寫回 treatment_result（reps 達標時傳目標次數，
+    /// 提前結束／倒數歸零時傳目前實際完成次數）。
+    private func finishSet(index: Int, reps: Int) {
+        guard var result = treatmentResult, result.set_end_time.indices.contains(index) else { return }
+        setTimeLimitTimer?.invalidate()
+        setTimeLimitTimer = nil
+        setCountdownRange = nil
+        btVM.stopRecordingAll()
+        result.set_end_time[index] = Int(Date().timeIntervalSince1970 * 1000)
+        result.reps[index] = reps
+        treatmentResult = result
+        resultVM.update(result)
+    }
+
+    /// 從起始點起算倒數 3 分鐘歸零，視同該組提前結束。
+    private func handleSetTimeLimitReached() {
+        finishSet(index: currentSet - 1, reps: currentRep)
+        if currentSet < content.sets {
+            startSetRestCountdown()
+        } else {
+            finalElapsedSeconds = Int(Date().timeIntervalSince(sessionStartDate))
+            navigateToPostWorking9 = true
+        }
+    }
+
+    /// 一次動作（讀秒 > 1 秒才算數）＝一次伸展，把讀秒時長（毫秒整數）寫進 extension_length
+    /// 對應索引（索引 = (組序號-1)*目標次數 + (該組內第幾次-1)）。
+    private func recordExtensionLength(seconds: Double, repNumberInSet: Int) {
+        guard var result = treatmentResult else { return }
+        let index = (currentSet - 1) * content.reps + (repNumberInSet - 1)
+        guard result.extension_length.indices.contains(index) else { return }
+        result.extension_length[index] = Int((seconds * 1000).rounded())
+        treatmentResult = result
+        resultVM.update(result)
+    }
+
     @State private var totalCoins = 0
     @State private var currentSet = 1
     @State private var currentRep = 0
@@ -52,7 +138,6 @@ struct Working9: View {
     @State private var scoreElapsed: Double = -1
     @State private var scoreTimer: Timer?
     @State private var showExitConfirmPopup = false
-    @State private var showRestPopup = false
     @State private var showSetRestPopup = false
     @State private var setRestCountdown: Int = 0
     @State private var setRestTimer: Timer?
@@ -62,6 +147,8 @@ struct Working9: View {
 
     private static let holdThreshold: Double = 45
     private static let holdDuration: Double = 5
+    /// 每組從起始點起算的時間上限：倒數 3 分鐘歸零視同該組提前結束。
+    private static let setTimeLimit: TimeInterval = 180
     private static let outIconDuration: Double = 1.5
     private static let pulseStepDuration: Double = 0.3
     private static let pulseScale: CGFloat = 1.15
@@ -143,11 +230,13 @@ struct Working9: View {
             currentSet += 1
         }
         currentRep = 0
+        markSetStart(index: currentSet - 1)
     }
 
     private func advanceProgress() {
         currentRep += 1
         if currentRep >= content.reps {
+            finishSet(index: currentSet - 1, reps: content.reps)
             if currentSet < content.sets {
                 startSetRestCountdown()
             } else {
@@ -242,6 +331,7 @@ struct Working9: View {
             }
 
             if pulseTimes != nil {
+                recordExtensionLength(seconds: heldSeconds, repNumberInSet: currentRep + 1)
                 advanceProgress()
             }
 
@@ -367,13 +457,11 @@ struct Working9: View {
                         }
                         .buttonStyle(.plain)
 
-                        Button(action: { showRestPopup = true }) {
-                            Image("RestIcon")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 40, height: 40)
+                        if let setCountdownRange {
+                            Text(timerInterval: setCountdownRange, countsDown: true)
+                                .font(.system(size: 24, weight: .bold, design: .monospaced))
+                                .foregroundStyle(.black)
                         }
-                        .buttonStyle(.plain)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.leading, 16)
@@ -627,29 +715,6 @@ struct Working9: View {
             .padding(24)
             .offset(x: 25, y: -100)
 
-            if showRestPopup {
-                Color.black.opacity(0.3)
-                    .ignoresSafeArea()
-
-                ConfirmPopup(
-                    message: "您是否要直接跳過，進入組間休息？",
-                    onCancel: {
-                        showRestPopup = false
-                        startHoldTimer()
-                    },
-                    onConfirm: {
-                        showRestPopup = false
-                        if currentSet < content.sets {
-                            startSetRestCountdown()
-                        } else {
-                            finalElapsedSeconds = Int(Date().timeIntervalSince(sessionStartDate))
-                            navigateToPostWorking9 = true
-                        }
-                    }
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-            }
-
             if showSetRestPopup {
                 Color.black.opacity(0.3)
                     .ignoresSafeArea()
@@ -673,6 +738,7 @@ struct Working9: View {
                     },
                     onConfirm: {
                         showExitConfirmPopup = false
+                        finishSet(index: currentSet - 1, reps: currentRep)
                         finalElapsedSeconds = Int(Date().timeIntervalSince(sessionStartDate))
                         navigateToPostWorking9 = true
                     }
@@ -698,6 +764,9 @@ struct Working9: View {
             } else {
                 stopHoldTimer()
             }
+        }
+        .onAppear {
+            createTreatmentResultIfNeeded()
         }
         .onDisappear {
             holdTimer?.invalidate()
