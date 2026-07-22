@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 // MARK: - Dashboard Palette
 
@@ -107,6 +108,11 @@ struct Dashboard: View {
                     DashboardSchedulePanel(weekOffset: $weekOffset, selectedWeekdayIndex: $selectedWeekdayIndex)
                         .frame(width: 420)
                         .background(DashboardPalette.panelBackground)
+                } else if selectedNav == .exportData {
+                    DashboardExportFolderPanel()
+                        .padding(28)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color.white)
                 } else {
                     DashboardPlaceholderCard(title: selectedNav.title)
                         .padding(28)
@@ -264,6 +270,89 @@ private struct DashboardPlaceholderCard: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+// MARK: - Export Folder Panel（database-export-implementation-steps.md 階段 7）
+
+/// 接住 UIDocumentPickerViewController 的選取結果，橋接回 SwiftUI；
+/// 呼叫端要在選取完成前一直持有這個物件，picker 才不會在使用者選定資料夾前就被釋放掉。
+private final class ExportFolderPickerDelegate: NSObject, UIDocumentPickerDelegate {
+    let onPick: (URL) -> Void
+
+    init(onPick: @escaping (URL) -> Void) {
+        self.onPick = onPick
+    }
+
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        if let url = urls.first {
+            onPick(url)
+        }
+    }
+}
+
+private struct DashboardExportFolderPanel: View {
+    @State private var folderName: String? = nil
+    @State private var pickerDelegate: ExportFolderPickerDelegate?
+
+    private func topMostViewController(from base: UIViewController?) -> UIViewController? {
+        if let presented = base?.presentedViewController {
+            return topMostViewController(from: presented)
+        }
+        return base
+    }
+
+    private func presentFolderPicker() {
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder])
+        let delegate = ExportFolderPickerDelegate { url in
+            ExportDestinationStore.save(folderURL: url)
+            folderName = url.lastPathComponent
+            pickerDelegate = nil
+        }
+        pickerDelegate = delegate
+        picker.delegate = delegate
+
+        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let root = scene.windows.first?.rootViewController,
+           let topMost = topMostViewController(from: root) {
+            topMost.present(picker, animated: true)
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("匯出")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(Color.black)
+
+            if let folderName {
+                Text("目前指定資料夾：\(folderName)")
+                    .font(.system(size: 16))
+                    .foregroundStyle(DashboardPalette.mutedText)
+            } else {
+                Text("請選擇一個資料夾，之後遊戲匯出的 JSON／CSV 會自動存到這裡。")
+                    .font(.system(size: 16))
+                    .foregroundStyle(DashboardPalette.mutedText)
+            }
+
+            Button(action: presentFolderPicker) {
+                Text(folderName == nil ? "選擇資料夾" : "重新選擇")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+                    .background(DashboardPalette.indigo)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onAppear {
+            folderName = ExportDestinationStore.resolveDesignatedFolder()?.lastPathComponent
+        }
     }
 }
 

@@ -1050,21 +1050,23 @@ private struct CompletionPopup: View {
         phase == .done
     }
 
-    /// 點擊「匯出JSON」：畫面先倒數 5 秒（匯出JSON(5) → … → 匯出JSON(0)），緩衝非同步寫入的落地時間；
-    /// 倒數顯示到 0 的同時就在背景開始真正組裝檔案，如果又過了 1 秒還沒處理完，文字才改成「再等待一下...」，
-    /// 避免卡在「匯出JSON(0)」不動看起來像當掉了。查詢/組裝資料全程在背景執行緒進行，不卡住主執行緒；
-    /// 「完成」按鈕解鎖只看檔案寫入呼叫是否都已執行過，不等待使用者在分享面板中實際完成儲存動作
-    /// （見 database-update-plan.md「4. 完成視窗『匯出JSON』功能」）。
+    /// 點擊「匯出JSON」：畫面倒數 10 秒（匯出JSON(10) → … → 匯出JSON(0)）。前 5 秒（10→…→5）純粹是寫入緩衝，
+    /// 讓遊戲結束當下還在飛行中的非同步資料庫寫入有時間落地；倒數到剛好顯示「匯出JSON(5)」那一次遞減，
+    /// 才在背景真正開始查詢資料庫、組裝檔案、寫進使用者在「匯出」設定頁指定好的資料夾——這是全流程唯一
+    /// 呼叫 runExport() 的地方，不會因為倒數到 0 又重複觸發一次。後 5 秒（5→0）只是給使用者看的可視倒數：
+    /// 背景作業比較快完成就直接切到 .done，不必等文字倒數到 0；倒數到 0 又過了 1 秒背景作業還沒完成，
+    /// 文字才改成「再等待一下...」。查詢/組裝/寫檔全程在背景執行緒進行，不卡住主執行緒；沒有分享面板這一步，
+    /// 「完成」按鈕解鎖只看檔案寫入呼叫是否都已執行過（見 database-export-implementation-steps.md 階段 4、5）。
     private func performExport() {
         guard phase == .ready || phase == .done else { return }
-        phase = .counting(secondsRemaining: 5)
+        phase = .counting(secondsRemaining: 10)
         countdownTimer?.invalidate()
         countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
             switch phase {
             case .counting(let remaining) where remaining > 0:
                 let next = remaining - 1
                 phase = .counting(secondsRemaining: next)
-                if next == 0 { runExport() }
+                if next == 5 { runExport() }
             case .counting:
                 // 顯示「匯出JSON(0)」又過了 1 秒，背景作業還沒完成。
                 phase = .waiting
@@ -1082,39 +1084,17 @@ private struct CompletionPopup: View {
         DispatchQueue.global(qos: .userInitiated).async {
             let deviceVM = DeviceViewModel()
             let files = GameDataExporter.export(treatmentResult: treatmentResult, deviceVM: deviceVM)
-            let urls: [URL] = files.map { file in
-                let url = FileManager.default.temporaryDirectory.appendingPathComponent(file.filename)
-                try? file.content.write(to: url, atomically: true, encoding: .utf8)
-                return url
+            if let folderURL = ExportDestinationStore.resolveDesignatedFolder(),
+               folderURL.startAccessingSecurityScopedResource() {
+                for file in files {
+                    let url = folderURL.appendingPathComponent(file.filename)
+                    try? file.content.write(to: url, atomically: true, encoding: .utf8)
+                }
+                folderURL.stopAccessingSecurityScopedResource()
             }
             DispatchQueue.main.async {
                 phase = .done
-                presentShareSheet(urls: urls)
             }
-        }
-    }
-
-    /// `Working9` 一定是疊在至少一層（常常是兩層）`.fullScreenCover` 之上顯示的，
-    /// 直接對 `rootViewController` 呼叫 `present` 會因為它已經有 `presentedViewController`
-    /// 而被 UIKit 忽略、分享面板根本不會跳出來。要往下找到目前真正最上層、還沒有 presentedViewController 的那個控制器再呈現。
-    private func topMostViewController(from base: UIViewController?) -> UIViewController? {
-        if let presented = base?.presentedViewController {
-            return topMostViewController(from: presented)
-        }
-        return base
-    }
-
-    private func presentShareSheet(urls: [URL]) {
-        let av = UIActivityViewController(activityItems: urls, applicationActivities: nil)
-        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let root = scene.windows.first?.rootViewController,
-           let topMost = topMostViewController(from: root) {
-            if let popover = av.popoverPresentationController {
-                popover.sourceView = topMost.view
-                popover.sourceRect = CGRect(x: topMost.view.bounds.midX, y: topMost.view.bounds.midY, width: 0, height: 0)
-                popover.permittedArrowDirections = []
-            }
-            topMost.present(av, animated: true)
         }
     }
 
