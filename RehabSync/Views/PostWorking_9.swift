@@ -1,8 +1,6 @@
 import SwiftUI
 import Charts
 
-// MARK: - PostWorking_9
-
 struct PostWorking_9: View {
     let content: TreatmentContent
     let exercise: Exercise?
@@ -14,6 +12,18 @@ struct PostWorking_9: View {
     let yellowHitCount: Int
     let treatmentResult: TreatmentResult
     @Environment(\.goHome) private var goHome
+
+    fileprivate static let darkPurple = Color(red: 0.30, green: 0.16, blue: 0.65)
+    fileprivate static let midPurple = Color(red: 0.45, green: 0.35, blue: 0.85)
+    fileprivate static let lightPurple = Color(red: 0.94, green: 0.92, blue: 0.99)
+    fileprivate static let panelBackground = Color(red: 0.97, green: 0.97, blue: 0.99)
+    fileprivate static let mutedText = Color(red: 0.55, green: 0.56, blue: 0.62)
+    fileprivate static let green = Color(red: 0.20, green: 0.70, blue: 0.45)
+    fileprivate static let blue = Color(red: 0.25, green: 0.55, blue: 0.95)
+    fileprivate static let orange = Color(red: 0.95, green: 0.65, blue: 0.20)
+    fileprivate static let pink = Color(red: 0.90, green: 0.30, blue: 0.45)
+    fileprivate static let teal = Color(red: 0.35, green: 0.80, blue: 0.75)
+    fileprivate static let yellow = Color(red: 0.95, green: 0.75, blue: 0.30)
 
     /// 毫秒轉成「X 分 YY 秒」，`ms <= 0` 一律視為沒有資料。
     fileprivate static func formatMinutesSeconds(ms: Int) -> String {
@@ -27,49 +37,57 @@ struct PostWorking_9: View {
         String(format: "%.1f 秒", ms / 1000.0)
     }
 
+    @State private var showReturnConfirm = false
+
     var body: some View {
         ZStack {
-            Color.black.opacity(0.8).ignoresSafeArea()
+            HStack(spacing: 0) {
+                GeometryReader { geo in
+                    ScrollView(showsIndicators: false) {
+                        VStack(alignment: .leading, spacing: 24) {
+                            PostWorking9Header()
+                            PostWorking9StatRow(treatmentResult: treatmentResult, onRequestReturn: { showReturnConfirm = true })
 
-            VStack {
-                HStack(alignment: .bottom, spacing: 60) {
-                    Image("FinishGameLeftIcon")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 150, height: 150)
-
-                    Image("FinishGameRightIcon")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 150, height: 150)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.top, 16)
-
-                ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 20) {
-                        PostWorking9StatRow(treatmentResult: treatmentResult)
-                        PostWorking9DonationOverviewCard(content: content, treatmentResult: treatmentResult)
+                            PostWorking9DonationOverviewCard(content: content, treatmentResult: treatmentResult)
+                                .frame(maxHeight: .infinity)
+                        }
+                        .padding(28)
+                        .frame(minHeight: geo.size.height)
                     }
-                    .padding(.horizontal, 32)
-                    .padding(.top, 8)
                 }
+                .background(Self.panelBackground)
             }
-            .padding(.top, 40)
-            .padding(.bottom, 40)
-            .padding(.leading, 60)
-            .padding(.trailing, 60)
+            .background(Color.white)
 
-            Button(action: { goHome() }) {
-                Image("ArrowIcon")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 120, height: 120)
+            if showReturnConfirm {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+
+                PostWorking9ReturnConfirmDialog(
+                    onCancel: { showReturnConfirm = false },
+                    onConfirm: { goHome() }
+                )
             }
-            .buttonStyle(.plain)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-            .padding(24)
-            .offset(y: 50)
+        }
+        .ignoresSafeArea()
+    }
+}
+
+// MARK: - Header
+
+private struct PostWorking9Header: View {
+    var body: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("你好棒！")
+                    .font(.system(size: 36, weight: .bold))
+                    .foregroundStyle(Color.black)
+                Text("來看看遊戲結果吧！")
+                    .font(.system(size: 20))
+                    .foregroundStyle(PostWorking_9.mutedText)
+            }
+
+            Spacer()
         }
     }
 }
@@ -81,10 +99,14 @@ private struct PostWorking9Stat {
     let color: Color
     let label: String
     let value: String
+    let change: String
+    let isPositive: Bool
+    let note: String
 }
 
 private struct PostWorking9StatRow: View {
     let treatmentResult: TreatmentResult
+    let onRequestReturn: () -> Void
 
     /// 「第一組開始」到「最後一組結束」的絕對時間差（毫秒），天然包含組間休息時間。
     private var totalTimeText: String {
@@ -106,9 +128,9 @@ private struct PostWorking9StatRow: View {
 
     private var stats: [PostWorking9Stat] {
         [
-            PostWorking9Stat(icon: "clock.fill", color: Color(red: 0.275, green: 0.706, blue: 0.831), label: "總時間", value: totalTimeText),
-            PostWorking9Stat(icon: "repeat.circle.fill", color: Color(red: 0.369, green: 0.690, blue: 0.824), label: "總次數", value: "\(totalReps) 次"),
-            PostWorking9Stat(icon: "figure.strengthtraining.functional", color: Color(red: 0.35, green: 0.75, blue: 0.50), label: "整局平均部分蹲時長", value: averageExtensionText)
+            PostWorking9Stat(icon: "clock.fill", color: PostWorking_9.midPurple, label: "總時間", value: totalTimeText, change: "", isPositive: true, note: ""),
+            PostWorking9Stat(icon: "repeat.circle.fill", color: PostWorking_9.blue, label: "總次數", value: "\(totalReps) 次", change: "", isPositive: true, note: ""),
+            PostWorking9Stat(icon: "figure.strengthtraining.functional", color: PostWorking_9.green, label: "整局平均部分蹲時長", value: averageExtensionText, change: "", isPositive: true, note: "")
         ]
     }
 
@@ -117,6 +139,72 @@ private struct PostWorking9StatRow: View {
             ForEach(stats, id: \.label) { stat in
                 PostWorking9StatCard(stat: stat)
             }
+
+            Button {
+                onRequestReturn()
+            } label: {
+                Text("回到總覽")
+                    .font(.system(size: 30, weight: .semibold))
+                    .foregroundStyle(Color.black)
+                    .multilineTextAlignment(.center)
+                    .padding(16)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    .background(Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black.opacity(0.05)))
+            }
+            .buttonStyle(.plain)
+        }
+    }
+}
+
+/// 「回到總覽」的確認視窗：以小視窗疊在目前這頁上面顯示，比照 `PostWorking_2` 的做法，
+/// 不用 `.fullScreenCover` 另外跳出一個全白頁面。
+private struct PostWorking9ReturnConfirmDialog: View {
+    let onCancel: () -> Void
+    let onConfirm: () -> Void
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            VStack(spacing: 24) {
+                Text("確定要回到總覽嗎？")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(Color.black)
+                    .multilineTextAlignment(.center)
+
+                Button {
+                    onConfirm()
+                } label: {
+                    Text("確定")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(Color.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(PostWorking_9.darkPurple)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(28)
+            .padding(.top, 12)
+            .frame(width: 320)
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 20))
+            .shadow(color: .black.opacity(0.1), radius: 12, y: 4)
+
+            Button {
+                onCancel()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(PostWorking_9.darkPurple)
+                    .frame(width: 32, height: 32)
+                    .background(Color.white)
+                    .clipShape(Circle())
+                    .shadow(color: .black.opacity(0.1), radius: 3, y: 1)
+            }
+            .buttonStyle(.plain)
+            .offset(x: 8, y: -8)
         }
     }
 }
@@ -128,7 +216,7 @@ private struct PostWorking9StatCard: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 ZStack {
-                    Circle().fill(stat.color.opacity(0.2))
+                    Circle().fill(stat.color.opacity(0.15))
                     Image(systemName: stat.icon)
                         .font(.system(size: 14))
                         .foregroundStyle(stat.color)
@@ -137,17 +225,32 @@ private struct PostWorking9StatCard: View {
                 Spacer()
             }
             Text(stat.label)
-                .font(.system(size: 15))
-                .foregroundStyle(.white.opacity(0.65))
+                .font(.system(size: 20))
+                .foregroundStyle(PostWorking_9.mutedText)
             Text(stat.value)
-                .font(.system(size: 24, weight: .bold))
-                .foregroundStyle(.white)
+                .font(.system(size: 30, weight: .bold))
+                .foregroundStyle(Color.black)
+
+            if !stat.change.isEmpty {
+                HStack(spacing: 4) {
+                    Image(systemName: stat.isPositive ? "arrow.up" : "arrow.down")
+                    Text(stat.change)
+                    Text(stat.note)
+                        .foregroundStyle(PostWorking_9.mutedText)
+                }
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(stat.isPositive ? PostWorking_9.green : PostWorking_9.pink)
+            } else if !stat.note.isEmpty {
+                Text(stat.note)
+                    .font(.system(size: 11))
+                    .foregroundStyle(PostWorking_9.mutedText)
+            }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.08))
+        .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.15)))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black.opacity(0.05)))
     }
 }
 
@@ -217,19 +320,19 @@ private struct PostWorking9DonationOverviewCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: 30) {
             HStack {
-                HStack(spacing: 12) {
+                HStack(spacing: 16) {
                     ForEach(groups, id: \.index) { group in
                         Button {
                             selectedIndex = group.index
                         } label: {
                             Text(group.label)
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(group.index == selectedIndex ? Color.black : Color.white.opacity(0.7))
-                                .padding(.horizontal, 14)
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(group.index == selectedIndex ? Color.white : PostWorking_9.mutedText)
+                                .padding(.horizontal, 16)
                                 .padding(.vertical, 8)
-                                .background(group.index == selectedIndex ? Color.white : Color.clear)
+                                .background(group.index == selectedIndex ? PostWorking_9.darkPurple : Color.clear)
                                 .clipShape(Capsule())
                         }
                         .buttonStyle(.plain)
@@ -240,90 +343,94 @@ private struct PostWorking9DonationOverviewCard: View {
                     showRetentionDetail = true
                 } label: {
                     Text("檢視")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(PostWorking_9.mutedText)
                 }
                 .buttonStyle(.plain)
                 .disabled(!selected.hasData)
                 .opacity(selected.hasData ? 1 : 0.4)
             }
 
-            HStack(alignment: .top, spacing: 40) {
+            HStack(alignment: .top, spacing: 56) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("總時間")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .font(.system(size: 20))
+                        .foregroundStyle(PostWorking_9.mutedText)
                     Text(selected.totalTimeText)
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundStyle(.white)
+                        .font(.system(size: 30, weight: .bold))
+                        .foregroundStyle(Color.black)
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text("次數")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .font(.system(size: 20))
+                        .foregroundStyle(PostWorking_9.mutedText)
                     Text("\(selected.reps) 次")
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundStyle(.white)
+                        .font(.system(size: 30, weight: .bold))
+                        .foregroundStyle(Color.black)
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text("本組平均部分蹲時長")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .font(.system(size: 20))
+                        .foregroundStyle(PostWorking_9.mutedText)
                     Text(selected.averageDurationText)
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundStyle(.white)
+                        .font(.system(size: 30, weight: .bold))
+                        .foregroundStyle(Color.black)
                 }
             }
 
-            Chart(selected.barData) { point in
-                BarMark(
-                    x: .value("次數", point.attempt),
-                    y: .value("單次部分蹲時長（秒）", point.seconds),
-                    width: .fixed(20)
-                )
-                .foregroundStyle(Color.white.opacity(0.85))
-                .cornerRadius(2)
-            }
-            .chartXScale(domain: 0.5...(Double(content.reps) + 0.5))
-            .chartYScale(domain: 0...7)
-            .chartXAxis {
-                AxisMarks(values: Array(1...content.reps)) { value in
-                    AxisGridLine().foregroundStyle(Color.white.opacity(0.2))
-                    AxisTick().foregroundStyle(Color.white.opacity(0.4))
-                    AxisValueLabel {
-                        if let count = value.as(Int.self) {
-                            Text("\(count)")
-                                .font(.system(size: 12))
-                                .foregroundStyle(.white.opacity(0.7))
+            HStack(alignment: .top, spacing: 20) {
+                Chart(selected.barData) { point in
+                    BarMark(
+                        x: .value("次數", point.attempt),
+                        y: .value("單次部分蹲時長（秒）", point.seconds),
+                        width: .fixed(22)
+                    )
+                    .foregroundStyle(PostWorking_9.darkPurple)
+                    .cornerRadius(2)
+                }
+                .chartXScale(domain: 0.5...(Double(content.reps) + 0.5))
+                .chartYScale(domain: 0...7)
+                .chartXAxis {
+                    AxisMarks(values: Array(1...content.reps)) { value in
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel {
+                            if let count = value.as(Int.self) {
+                                Text("\(count)")
+                                    .font(.system(size: 16))
+                            }
                         }
                     }
                 }
-            }
-            .chartYAxis {
-                AxisMarks(position: .leading, values: Array(0...7)) { value in
-                    AxisGridLine().foregroundStyle(Color.white.opacity(0.2))
-                    AxisTick().foregroundStyle(Color.white.opacity(0.4))
-                    AxisValueLabel()
-                        .font(.system(size: 12))
-                        .foregroundStyle(.white.opacity(0.7))
+                .chartYAxis {
+                    AxisMarks(position: .leading, values: Array(0...7)) { value in
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel()
+                            .font(.system(size: 16))
+                    }
                 }
+                .chartXAxisLabel(alignment: .center) {
+                    Text("次數")
+                        .font(.system(size: 18))
+                }
+                .chartYAxisLabel(position: .leading, alignment: .center) {
+                    Text("單次部分蹲時長（秒）")
+                        .font(.system(size: 18))
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 220, alignment: .leading)
+                .offset(y: 15)
             }
-            .chartXAxisLabel(alignment: .center) {
-                Text("次數")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.7))
-            }
-            .chartYAxisLabel(position: .leading, alignment: .center) {
-                Text("單次部分蹲時長（秒）")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.7))
-            }
-            .frame(height: 200)
+            .padding(.trailing, 20)
+            .frame(height: 300)
         }
         .padding(20)
-        .background(Color.white.opacity(0.08))
+        .padding(.top, 20)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.15)))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black.opacity(0.05)))
         .fullScreenCover(isPresented: $showRetentionDetail) {
             PostWorking9RetentionDetailSheet(
                 treatmentResultId: treatmentResult.id ?? 0,
@@ -369,7 +476,7 @@ private struct PostWorking9RetentionCard: View {
                     x: .value("時間（秒）", point.time),
                     y: .value("膝角度", point.angle)
                 )
-                .foregroundStyle(Color.black)
+                .foregroundStyle(PostWorking_9.darkPurple)
                 .interpolationMethod(.catmullRom)
             }
             .chartXScale(domain: 0...durationSeconds)
@@ -404,7 +511,7 @@ private struct PostWorking9RetentionDetailSheet: View {
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            Color(red: 0.97, green: 0.97, blue: 0.99).ignoresSafeArea()
+            PostWorking_9.panelBackground.ignoresSafeArea()
 
             PostWorking9RetentionCard(treatmentResultId: treatmentResultId, setStartTimeMs: setStartTimeMs, setEndTimeMs: setEndTimeMs)
                 .padding(28)
@@ -416,7 +523,7 @@ private struct PostWorking9RetentionDetailSheet: View {
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(Color.black)
+                    .foregroundStyle(PostWorking_9.darkPurple)
                     .frame(width: 44, height: 44)
                     .background(Color.white)
                     .clipShape(Circle())
