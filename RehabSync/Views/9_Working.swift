@@ -1106,7 +1106,7 @@ private struct CompletionPopup: View {
                     Image("ArrowTheEndIcon")
                         .resizable()
                         .scaledToFit()
-                        .padding(12)
+                        .padding(4)
                 }
 
                 Color(red: 0.86, green: 0.90, blue: 0.94)
