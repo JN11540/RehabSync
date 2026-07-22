@@ -133,6 +133,7 @@ struct PreWorking_9: View {
             .offset(x: 20, y: 20)
         }
         .ignoresSafeArea()
+        .environment(\.goHome, onReturnToDashboard)
         .fullScreenCover(isPresented: $navigateToWorking9) {
             Working9(content: content, exercise: exercise)
         }
