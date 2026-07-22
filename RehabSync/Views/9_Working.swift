@@ -1101,13 +1101,16 @@ private struct CompletionPopup: View {
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             VStack(spacing: 0) {
-                ZStack {
+                ZStack(alignment: .top) {
                     Color.white
                     Image("ArrowTheEndIcon")
                         .resizable()
                         .scaledToFit()
                         .frame(width: 400, height: 400)
                 }
+                .frame(maxWidth: .infinity)
+                .frame(height: 344)
+                .clipped()
 
                 Color(red: 0.86, green: 0.90, blue: 0.94)
                     .frame(maxWidth: .infinity)
