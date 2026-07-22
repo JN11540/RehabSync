@@ -732,11 +732,8 @@ struct Working9: View {
                 Color.black.opacity(0.3)
                     .ignoresSafeArea()
 
-                SetRestPopup(
-                    secondsRemaining: setRestCountdown,
-                    onSkip: { closeSetRestPopup() }
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                SetRestPopup(secondsRemaining: setRestCountdown)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             }
 
             if showExitConfirmPopup {
@@ -984,44 +981,37 @@ private struct ConfirmPopup: View {
 
 private struct SetRestPopup: View {
     let secondsRemaining: Int
-    let onSkip: () -> Void
 
     var body: some View {
         ZStack {
             Color.white
+
             VStack(spacing: 24) {
                 Text("組間休息時間")
                     .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(.black)
-                HStack(spacing: 32) {
-                    ZStack {
-                        Circle().fill(Color.white)
-                        Circle().strokeBorder(Color.black, lineWidth: 1.5)
-                        Text("\(max(secondsRemaining, 0))")
-                            .font(.system(size: 32, weight: .bold))
-                            .foregroundStyle(.black)
-                            .minimumScaleFactor(0.5)
-                            .lineLimit(1)
-                            .padding(8)
-                    }
-                    .frame(width: 90, height: 90)
-                    Button(action: onSkip) {
-                        ZStack {
-                            Circle().fill(Color.white)
-                            Circle().strokeBorder(Color.black, lineWidth: 1.5)
-                            Text("跳過")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundStyle(.black)
-                        }
-                        .frame(width: 90, height: 90)
-                    }
-                    .buttonStyle(.plain)
+
+                ZStack {
+                    Circle()
+                        .fill(Color.white)
+                    Circle()
+                        .strokeBorder(Color.black, lineWidth: 1.5)
+                    Text("\(max(secondsRemaining, 0))")
+                        .font(.system(size: 32, weight: .bold))
+                        .foregroundStyle(.black)
+                        .minimumScaleFactor(0.5)
+                        .lineLimit(1)
+                        .padding(8)
                 }
+                .frame(width: 90, height: 90)
             }
         }
         .frame(width: 320, height: 220)
         .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 1.5))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.black, lineWidth: 1.5)
+        )
     }
 }
 
