@@ -754,6 +754,7 @@ private struct DashboardSchedulePanel: View {
     @State private var showTrainingDestination = false
     @State private var destinationContent: TreatmentContent? = nil
     @State private var destinationExercise: Exercise? = nil
+    @State private var showExportFolderNotSetAlert = false
 
     /// 以 exercise_id 對應要跳轉的訓練前置頁面，之後新增其他動作的頁面時直接在這裡加一筆對應即可。
     private static let trainingMenuDestinations: [Int: (TreatmentContent, Exercise?, @escaping () -> Void) -> AnyView] = [
@@ -817,6 +818,10 @@ private struct DashboardSchedulePanel: View {
                                 isInteractive: isSelectedDayToday,
                                 onTap: {
                                     guard Self.trainingMenuDestinations[content.exercise_id] != nil else { return }
+                                    guard ExportDestinationStore.hasDesignatedFolder() else {
+                                        showExportFolderNotSetAlert = true
+                                        return
+                                    }
                                     destinationContent = content
                                     destinationExercise = exercise
                                     showTrainingDestination = true
@@ -835,6 +840,11 @@ private struct DashboardSchedulePanel: View {
                let build = Self.trainingMenuDestinations[destinationContent.exercise_id] {
                 build(destinationContent, destinationExercise, { showTrainingDestination = false })
             }
+        }
+        .alert("尚未設定匯出資料夾", isPresented: $showExportFolderNotSetAlert) {
+            Button("好", role: .cancel) {}
+        } message: {
+            Text("請先到側邊欄「匯出」分頁設定指定資料夾，才能開始這個動作。")
         }
     }
 }
