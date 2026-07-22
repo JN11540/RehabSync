@@ -1108,24 +1108,26 @@ private struct CompletionPopup: View {
             }
 
             HStack(spacing: 12) {
-                Button(action: performExport) {
-                    Text(exportButtonTitle)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.black)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 10)
-                        .background(
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(Color.white)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .stroke(Color.black, lineWidth: 1.5)
-                                )
-                        )
+                if phase != .done {
+                    Button(action: performExport) {
+                        Text(exportButtonTitle)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(Color.white)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .stroke(Color.black, lineWidth: 1.5)
+                                    )
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!isExportButtonEnabled)
+                    .opacity(isExportButtonEnabled ? 1 : 0.5)
                 }
-                .buttonStyle(.plain)
-                .disabled(!isExportButtonEnabled)
-                .opacity(isExportButtonEnabled ? 1 : 0.5)
 
                 Button(action: onComplete) {
                     Text("完成")
