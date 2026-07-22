@@ -772,16 +772,19 @@ struct Working9: View {
             }
         }
         .fullScreenCover(isPresented: $navigateToPostWorking9) {
-            PostWorking9(
-                content: content,
-                exercise: exercise,
-                totalCoins: totalCoins,
-                totalReps: blueHitCount + redHitCount + yellowHitCount,
-                totalElapsedSeconds: finalElapsedSeconds,
-                blueHitCount: blueHitCount,
-                redHitCount: redHitCount,
-                yellowHitCount: yellowHitCount
-            )
+            if let treatmentResult {
+                PostWorking_9(
+                    content: content,
+                    exercise: exercise,
+                    totalCoins: totalCoins,
+                    totalReps: blueHitCount + redHitCount + yellowHitCount,
+                    totalElapsedSeconds: finalElapsedSeconds,
+                    blueHitCount: blueHitCount,
+                    redHitCount: redHitCount,
+                    yellowHitCount: yellowHitCount,
+                    treatmentResult: treatmentResult
+                )
+            }
         }
         .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
             guard !isSessionPaused else { return }

@@ -130,7 +130,7 @@ private struct PostWorking2StatRow: View {
         [
             PostWorking2Stat(icon: "clock.fill", color: PostWorking_2.midPurple, label: "總時間", value: totalTimeText, change: "", isPositive: true, note: ""),
             PostWorking2Stat(icon: "repeat.circle.fill", color: PostWorking_2.blue, label: "總次數", value: "\(totalReps) 次", change: "", isPositive: true, note: ""),
-            PostWorking2Stat(icon: "figure.flexibility", color: PostWorking_2.green, label: "平均伸展時長", value: averageExtensionText, change: "", isPositive: true, note: "")
+            PostWorking2Stat(icon: "figure.flexibility", color: PostWorking_2.green, label: "整局平均伸展時長", value: averageExtensionText, change: "", isPositive: true, note: "")
         ]
     }
 
@@ -369,7 +369,7 @@ private struct PostWorking2DonationOverviewCard: View {
                         .foregroundStyle(Color.black)
                 }
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("平均伸直時間")
+                    Text("本組平均伸直時長")
                         .font(.system(size: 20))
                         .foregroundStyle(PostWorking_2.mutedText)
                     Text(selected.averageDurationText)
