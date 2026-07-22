@@ -92,12 +92,12 @@ struct Working9: View {
 
     /// 從起始點起算倒數 3 分鐘歸零，視同該組提前結束。
     private func handleSetTimeLimitReached() {
+        cancelInProgressHoldWithoutCounting()
         finishSet(index: currentSet - 1, reps: currentRep)
         if currentSet < content.sets {
             startSetRestCountdown()
         } else {
-            finalElapsedSeconds = Int(Date().timeIntervalSince(sessionStartDate))
-            navigateToPostWorking9 = true
+            showCompletionPopup = true
         }
     }
 
@@ -110,6 +110,13 @@ struct Working9: View {
         result.extension_length[index] = Int((seconds * 1000).rounded())
         treatmentResult = result
         resultVM.update(result)
+    }
+
+    /// 「提前結束觸發當下正卡在讀秒中」的邊界情況：直接取消，不計入 reps、也不寫入 extension_length。
+    private func cancelInProgressHoldWithoutCounting() {
+        holdTimer?.invalidate()
+        holdTimer = nil
+        holdElapsed = 0
     }
 
     @State private var totalCoins = 0
@@ -144,6 +151,8 @@ struct Working9: View {
     @State private var navigateToPostWorking9 = false
     @State private var sessionStartDate = Date()
     @State private var finalElapsedSeconds = 0
+    @State private var isSessionPaused = false
+    @State private var showCompletionPopup = false
 
     private static let holdThreshold: Double = 45
     private static let holdDuration: Double = 5
@@ -202,12 +211,17 @@ struct Working9: View {
     }
 
     private func pauseSession() {
+        isSessionPaused = true
         holdTimer?.invalidate()
         holdTimer = nil
         scoreTimer?.invalidate()
         scoreTimer = nil
         setRestTimer?.invalidate()
         setRestTimer = nil
+    }
+
+    private func resumeSession() {
+        isSessionPaused = false
     }
 
     private func startSetRestCountdown() {
@@ -240,8 +254,7 @@ struct Working9: View {
             if currentSet < content.sets {
                 startSetRestCountdown()
             } else {
-                finalElapsedSeconds = Int(Date().timeIntervalSince(sessionStartDate))
-                navigateToPostWorking9 = true
+                showCompletionPopup = true
             }
         }
     }
@@ -734,16 +747,28 @@ struct Working9: View {
                     message: "您確定要結束遊戲嗎？",
                     onCancel: {
                         showExitConfirmPopup = false
-                        startHoldTimer()
+                        resumeSession()
                     },
                     onConfirm: {
                         showExitConfirmPopup = false
+                        cancelInProgressHoldWithoutCounting()
                         finishSet(index: currentSet - 1, reps: currentRep)
-                        finalElapsedSeconds = Int(Date().timeIntervalSince(sessionStartDate))
-                        navigateToPostWorking9 = true
+                        showCompletionPopup = true
                     }
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            }
+
+            if showCompletionPopup {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+
+                CompletionPopup(treatmentResult: treatmentResult, onComplete: {
+                    showCompletionPopup = false
+                    finalElapsedSeconds = Int(Date().timeIntervalSince(sessionStartDate))
+                    navigateToPostWorking9 = true
+                })
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             }
         }
         .fullScreenCover(isPresented: $navigateToPostWorking9) {
@@ -759,19 +784,31 @@ struct Working9: View {
             )
         }
         .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
+            guard !isSessionPaused else { return }
             if let angle = newValue, angle >= Self.holdThreshold {
                 startHoldTimer()
             } else {
                 stopHoldTimer()
             }
         }
+        .onChange(of: navigateToPostWorking9) { _, newValue in
+            if newValue {
+                pauseSession()
+            }
+        }
         .onAppear {
             createTreatmentResultIfNeeded()
         }
         .onDisappear {
+            pauseSession()
             holdTimer?.invalidate()
             scoreTimer?.invalidate()
             setRestTimer?.invalidate()
+            setTimeLimitTimer?.invalidate()
+            setTimeLimitTimer = nil
+            setCountdownRange = nil
+            btVM.stopRecordingAll()
+            btVM.currentTreatmentResultId = nil
             stopLiveTestIfNeeded()
         }
     }
@@ -981,6 +1018,179 @@ private struct SetRestPopup: View {
         .frame(width: 320, height: 220)
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 1.5))
+    }
+}
+
+// MARK: - CompletionPopup
+
+private struct CompletionPopup: View {
+    let treatmentResult: TreatmentResult?
+    let onComplete: () -> Void
+
+    private enum ExportPhase: Equatable {
+        case ready
+        case counting(secondsRemaining: Int)
+        case waiting
+        case done
+    }
+
+    @State private var phase: ExportPhase = .ready
+    @State private var countdownTimer: Timer?
+
+    private var exportButtonTitle: String {
+        switch phase {
+        case .ready, .done: return "匯出JSON"
+        case .counting(let remaining): return "匯出JSON(\(remaining))"
+        case .waiting: return "再等待一下..."
+        }
+    }
+
+    private var isExportButtonEnabled: Bool {
+        switch phase {
+        case .ready, .done: return true
+        case .counting, .waiting: return false
+        }
+    }
+
+    private var isCompleteButtonEnabled: Bool {
+        phase == .done
+    }
+
+    /// 點擊「匯出JSON」：畫面先倒數 5 秒（匯出JSON(5) → … → 匯出JSON(0)），緩衝非同步寫入的落地時間；
+    /// 倒數顯示到 0 的同時就在背景開始真正組裝檔案，如果又過了 1 秒還沒處理完，文字才改成「再等待一下...」，
+    /// 避免卡在「匯出JSON(0)」不動看起來像當掉了。查詢/組裝資料全程在背景執行緒進行，不卡住主執行緒；
+    /// 「完成」按鈕解鎖只看檔案寫入呼叫是否都已執行過，不等待使用者在分享面板中實際完成儲存動作
+    /// （見 database-update-plan.md「4. 完成視窗『匯出JSON』功能」）。
+    private func performExport() {
+        guard phase == .ready || phase == .done else { return }
+        phase = .counting(secondsRemaining: 5)
+        countdownTimer?.invalidate()
+        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
+            switch phase {
+            case .counting(let remaining) where remaining > 0:
+                let next = remaining - 1
+                phase = .counting(secondsRemaining: next)
+                if next == 0 { runExport() }
+            case .counting:
+                // 顯示「匯出JSON(0)」又過了 1 秒，背景作業還沒完成。
+                phase = .waiting
+            case .waiting:
+                break
+            case .ready, .done:
+                timer.invalidate()
+                countdownTimer = nil
+            }
+        }
+    }
+
+    private func runExport() {
+        guard let treatmentResult else { return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let deviceVM = DeviceViewModel()
+            let files = GameDataExporter.export(treatmentResult: treatmentResult, deviceVM: deviceVM)
+            let urls: [URL] = files.map { file in
+                let url = FileManager.default.temporaryDirectory.appendingPathComponent(file.filename)
+                try? file.content.write(to: url, atomically: true, encoding: .utf8)
+                return url
+            }
+            DispatchQueue.main.async {
+                phase = .done
+                presentShareSheet(urls: urls)
+            }
+        }
+    }
+
+    /// `Working9` 一定是疊在至少一層（常常是兩層）`.fullScreenCover` 之上顯示的，
+    /// 直接對 `rootViewController` 呼叫 `present` 會因為它已經有 `presentedViewController`
+    /// 而被 UIKit 忽略、分享面板根本不會跳出來。要往下找到目前真正最上層、還沒有 presentedViewController 的那個控制器再呈現。
+    private func topMostViewController(from base: UIViewController?) -> UIViewController? {
+        if let presented = base?.presentedViewController {
+            return topMostViewController(from: presented)
+        }
+        return base
+    }
+
+    private func presentShareSheet(urls: [URL]) {
+        let av = UIActivityViewController(activityItems: urls, applicationActivities: nil)
+        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let root = scene.windows.first?.rootViewController,
+           let topMost = topMostViewController(from: root) {
+            if let popover = av.popoverPresentationController {
+                popover.sourceView = topMost.view
+                popover.sourceRect = CGRect(x: topMost.view.bounds.midX, y: topMost.view.bounds.midY, width: 0, height: 0)
+                popover.permittedArrowDirections = []
+            }
+            topMost.present(av, animated: true)
+        }
+    }
+
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            VStack(spacing: 0) {
+                ZStack {
+                    Color.white
+                    Image("FishingEndIcon")
+                        .resizable()
+                        .scaledToFit()
+                        .padding(12)
+                }
+
+                Color(red: 0.86, green: 0.90, blue: 0.94)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+            }
+
+            HStack(spacing: 12) {
+                Button(action: performExport) {
+                    Text(exportButtonTitle)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.white)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(Color.black, lineWidth: 1.5)
+                                )
+                        )
+                }
+                .buttonStyle(.plain)
+                .disabled(!isExportButtonEnabled)
+                .opacity(isExportButtonEnabled ? 1 : 0.5)
+
+                Button(action: onComplete) {
+                    Text("完成")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.white)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(Color.black, lineWidth: 1.5)
+                                )
+                        )
+                }
+                .buttonStyle(.plain)
+                .disabled(!isCompleteButtonEnabled)
+                .opacity(isCompleteButtonEnabled ? 1 : 0.5)
+            }
+            .padding(12)
+        }
+        .frame(width: 520, height: 400)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.black, lineWidth: 1.5)
+        )
+        .onDisappear {
+            countdownTimer?.invalidate()
+            countdownTimer = nil
+        }
     }
 }
 
