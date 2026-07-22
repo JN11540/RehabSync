@@ -11,7 +11,7 @@ struct PostWorking_9: View {
     let redHitCount: Int
     let yellowHitCount: Int
     let treatmentResult: TreatmentResult
-    @Environment(\.goHome) private var goHome
+    let onReturnToDashboard: () -> Void
 
     fileprivate static let darkPurple = Color(red: 0.30, green: 0.16, blue: 0.65)
     fileprivate static let midPurple = Color(red: 0.45, green: 0.35, blue: 0.85)
@@ -65,7 +65,7 @@ struct PostWorking_9: View {
 
                 PostWorking9ReturnConfirmDialog(
                     onCancel: { showReturnConfirm = false },
-                    onConfirm: { goHome() }
+                    onConfirm: onReturnToDashboard
                 )
             }
         }
@@ -559,6 +559,7 @@ private struct PostWorking9RetentionDetailSheet: View {
             set_start_time: [now, now + 200_000],
             set_end_time: [now + 180_000, now + 380_000],
             date: now
-        )
+        ),
+        onReturnToDashboard: {}
     )
 }

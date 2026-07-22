@@ -6,8 +6,8 @@ import CoreBluetooth
 struct Working9: View {
     let content: TreatmentContent
     let exercise: Exercise?
+    let onReturnToDashboard: () -> Void
     @Environment(BluetoothViewModel.self) private var btVM
-    @Environment(\.goHome) private var goHome
 
     // 校正/測試階段在 PreWorking 啟動的即時角度預估，離開這裡時必須主動停止，
     // 否則 btVM.isLiveEstimating 會卡在 true，導致下次（不管同動作或別的動作）
@@ -782,7 +782,8 @@ struct Working9: View {
                     blueHitCount: blueHitCount,
                     redHitCount: redHitCount,
                     yellowHitCount: yellowHitCount,
-                    treatmentResult: treatmentResult
+                    treatmentResult: treatmentResult,
+                    onReturnToDashboard: onReturnToDashboard
                 )
             }
         }
@@ -1205,7 +1206,8 @@ private struct CompletionPopup: View {
             reps: 2,
             date: Int(Date().timeIntervalSince1970)
         ),
-        exercise: nil
+        exercise: nil,
+        onReturnToDashboard: {}
     )
     .environment(BluetoothViewModel())
 }
