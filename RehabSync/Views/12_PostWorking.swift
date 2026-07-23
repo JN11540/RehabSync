@@ -11,7 +11,7 @@ struct PostWorking12: View {
     let comingMoodCount: Int
     let badMoodCount: Int
     let angryMoodCount: Int
-    @Environment(\.goHome) private var goHome
+    let onReturnToDashboard: () -> Void
     @State private var barGrowProgress: Double = 0
 
     private func comparisonMessage(_ value: Int) -> String {
@@ -415,7 +415,7 @@ struct PostWorking12: View {
             .padding(.leading, 60)
             .padding(.trailing, 60)
 
-            Button(action: { goHome() }) {
+            Button(action: { onReturnToDashboard() }) {
                 Image("ArrowIcon")
                     .resizable()
                     .scaledToFit()
@@ -467,6 +467,7 @@ private struct BarValueText: View, Animatable {
         totalElapsedSeconds: 245,
         comingMoodCount: 3,
         badMoodCount: 2,
-        angryMoodCount: 1
+        angryMoodCount: 1,
+        onReturnToDashboard: {}
     )
 }

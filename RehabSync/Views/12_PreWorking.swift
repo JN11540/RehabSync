@@ -7,6 +7,7 @@ struct PreWorking12: View {
     let content: TreatmentContent
     let exercise: Exercise?
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.goHome) private var goHome
     @Environment(BluetoothViewModel.self) private var btVM
     @State private var step = 0
     @State private var calibrationPhase: CalibrationPhase = .idle
@@ -429,7 +430,7 @@ struct PreWorking12: View {
             handleStepStatusChange(newValue)
         }
         .fullScreenCover(isPresented: $navigateToWorking12) {
-            Working12(content: content, exercise: exercise)
+            Working12(content: content, exercise: exercise, onReturnToDashboard: goHome)
         }
         .overlay {
             if btVM.isCleaningUp {

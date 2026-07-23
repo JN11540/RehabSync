@@ -6,8 +6,8 @@ import CoreBluetooth
 struct Working12: View {
     let content: TreatmentContent
     let exercise: Exercise?
+    let onReturnToDashboard: () -> Void
     @Environment(BluetoothViewModel.self) private var btVM
-    @Environment(\.goHome) private var goHome
 
     // 校正/測試階段在 PreWorking 啟動的登階狀態估計，離開這裡時必須主動停止，
     // 否則 btVM.isEstimatingStepStatus 會卡在 true，導致下次進測試頁時
@@ -611,7 +611,8 @@ struct Working12: View {
                 totalElapsedSeconds: finalElapsedSeconds,
                 comingMoodCount: comingMoodCount,
                 badMoodCount: badMoodCount,
-                angryMoodCount: angryMoodCount
+                angryMoodCount: angryMoodCount,
+                onReturnToDashboard: onReturnToDashboard
             )
         }
         .onChange(of: btVM.currentStepStatus) { oldValue, newValue in
@@ -833,7 +834,8 @@ private struct SetRestPopup: View {
             reps: 2,
             date: Int(Date().timeIntervalSince1970)
         ),
-        exercise: nil
+        exercise: nil,
+        onReturnToDashboard: {}
     )
     .environment(BluetoothViewModel())
 }
