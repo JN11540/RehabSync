@@ -612,40 +612,39 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
 
     // MARK: - Step Detection（登階運動）
 
-    /// 登階運動狀態機：0=站立、1=上階、2=下階。
-    /// 用一個最多容納 1 筆記錄的 queue Q 追蹤「是否已經上階過」，每次收到新的膝角度 y 時呼叫一次：
-    /// - Q 為空：y >= x+40 視為上階（push 1 到 Q，status=1）；否則（含 x+40>y>x-15 與 y<=x-15）status=0。
-    /// - Q=|1|：y <= x-15 視為下階（push 2 到 Q，status=2），並持續 1.5 秒；否則（含 x+40>y>x-15 與 y>=x+40）status 維持 1。
-    /// - status=2 持續滿 1.5 秒後，Q pop all（清空），回到 Q 為空的判斷邏輯。
-    @ObservationIgnored private var stepQueue: [Int] = []
-    @ObservationIgnored private var stepDownHoldUntil: Date?
+    /// 登階運動狀態機：0=站立（預設）、1=上階、2=下階。
+    /// 觸發後改為純時間驅動，不再依賴下階當下的感測角度：
+    /// - 預設狀態（站立）：y >= x+40 觸發上階，記錄上階結束時間 = now + 3 秒。
+    /// - 上階期間（未滿 3 秒）：固定回傳 1。
+    /// - 上階滿 3 秒：轉入下階，記錄下階結束時間 = now + 3 秒，回傳 2。
+    /// - 下階期間（未滿 3 秒）：固定回傳 2。
+    /// - 下階滿 3 秒：整個週期結束，重置狀態機，回到預設站立（0），等待下一次 y >= x+40 觸發。
+    @ObservationIgnored private var stepUpUntil: Date?
+    @ObservationIgnored private var stepDownUntil: Date?
 
     func detectStepStatus(kneeAngle y: Double, baseline x: Double) -> Int {
-        if let holdUntil = stepDownHoldUntil {
-            if Date() < holdUntil {
-                return 2
-            }
-            stepQueue.removeAll()
-            stepDownHoldUntil = nil
+        if let downUntil = stepDownUntil {
+            if Date() < downUntil { return 2 }
+            stepUpUntil = nil
+            stepDownUntil = nil
+            return 0
         }
 
-        if stepQueue.isEmpty {
-            guard y >= x + 40 else { return 0 }
-            stepQueue.append(1)
-            return 1
+        if let upUntil = stepUpUntil {
+            if Date() < upUntil { return 1 }
+            stepDownUntil = Date().addingTimeInterval(3)
+            return 2
         }
 
-        // stepQueue == [1]
-        guard y <= x - 15 else { return 1 }
-        stepQueue.append(2)
-        stepDownHoldUntil = Date().addingTimeInterval(1.5)
-        return 2
+        guard y >= x + 40 else { return 0 }
+        stepUpUntil = Date().addingTimeInterval(3)
+        return 1
     }
 
     /// 重置登階狀態機（例如重新開始一輪錄製時呼叫）
     func resetStepStatus() {
-        stepQueue.removeAll()
-        stepDownHoldUntil = nil
+        stepUpUntil = nil
+        stepDownUntil = nil
     }
 
     /// 開始持續錄製大腿與小腿加速度計，收集期間不寫入資料庫。跟「即時預估真實角度」相同的收集機制，
