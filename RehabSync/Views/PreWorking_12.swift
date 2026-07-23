@@ -628,16 +628,7 @@ private struct PreWorking12MotionTestAboutPanel: View {
         return (thighPeripheral, calfPeripheral)
     }
 
-    /// 上階（status 1）／下階（status 2）／站立（其餘）文字對應，跟 Working12 的 stepStatusLabel 一致。
-    private var stepStatusLabel: String {
-        switch btVM.currentStepStatus {
-        case 1: return "上階"
-        case 2: return "下階"
-        default: return "站立"
-        }
-    }
-
-    /// 呼叫即時登階狀態估計，圓圈裡的文字就是靠 btVM.currentStepStatus 即時更新。
+    /// 呼叫即時登階狀態估計，讓感測管線在進入遊戲前先暖機。
     private func startLiveTestIfNeeded() {
         guard !btVM.isEstimatingStepStatus,
               let pair = thighAndCalfPeripherals,
@@ -684,23 +675,6 @@ private struct PreWorking12MotionTestAboutPanel: View {
             }
             .fixedSize(horizontal: false, vertical: true)
 
-            ZStack {
-                Circle()
-                    .fill(Color(red: 0.90, green: 0.87, blue: 0.98))
-                Circle()
-                    .strokeBorder(PreWorking_12.midPurple, lineWidth: 4)
-                if btVM.currentStepStatus != nil {
-                    Text(stepStatusLabel)
-                        .font(.system(size: 32, weight: .bold))
-                        .foregroundStyle(PreWorking_12.darkPurple)
-                } else {
-                    Text("等待資料…")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(PreWorking_12.darkPurple.opacity(0.6))
-                }
-            }
-            .frame(width: 200, height: 200)
-
             PreWorking12StepCapsuleButton(text: playButtonText, icon: "arrow.right", action: startGamePreparation)
 
             Spacer()
@@ -728,20 +702,20 @@ private enum PreWorking12GuideStep {
 
     var title: String {
         switch self {
-        case .ready: "動作逐步指南\n1. 準備站立"
-        case .ing: "動作逐步指南\n2. 踏上踏板"
-        case .stair: "動作逐步指南\n3. 站穩後下階"
+        case .ready: "動作逐步指南\n1. 準備姿勢"
+        case .ing: "動作逐步指南\n2. 向上登階"
+        case .stair: "動作逐步指南\n3. 下降回到起始位置"
         }
     }
 
     var bodyText: String {
         switch self {
         case .ready:
-            "站立於踏板前方，雙腳與髖部同寬，視線平視前方，準備以慣用腳踏上踏板。"
+            "雙腳站立於台階前，約與髖部同寬，腳尖朝向正前方，與台階保持數吋距離。抬起一腳，將整隻腳掌完全踏上台階，確保腳跟沒有懸空。從正面觀察，髖、膝、腳踝應呈一直線對齊。"
         case .ing:
-            "以慣用腳踩上踏板，膝蓋朝正前方施力向上站起，過程中保持軀幹直立，避免用力甩動身體借力。"
+            "利用前腳（踏在台階上的那隻腳）發力，將身體驅動向上，同時保持軀幹直立、姿勢良好，避免身體前傾。"
         case .stair:
-            "雙腳站穩在踏板上後，再依原步伐緩慢下階回到地面，重複此動作，完成所需的組數與次數。"
+            "登上台階後，將剛抬起的那隻腳放下，並以受控的方式緩慢下降，全程維持良好姿勢。重複此動作，換腿進行，完成所需的組數與次數。"
         }
     }
 
