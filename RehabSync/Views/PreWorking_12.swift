@@ -26,7 +26,7 @@ private enum PreWorking12Step: Equatable {
     var subtitle: String {
         switch self {
         case .equipment: "請確認是否都已準備就緒"
-        case .stool: "請先準備一階穩固、小腿一半高度的踏板或凳子\n並確保踩踏處平整、不濕滑"
+        case .stool: "請先準備一階穩固的踏板或凳子"
         case .tablet: "請將平板放置於桌面上"
         case .guide: ""
         case .calibration: "請先擺出圖片中的姿勢，點擊『校正』後保持不動，等待系統完成校正。"
