@@ -26,8 +26,8 @@ struct Working12: View {
         guard btVM.isEstimatingStepStatus, let pair = thighAndCalfPeripherals else { return }
         btVM.stopStepStatusEstimation(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
     }
-    @State private var holdElapsed: Double = 0
-    @State private var holdTimer: Timer?
+    @State private var standingElapsed: Double = 0
+    @State private var standingTimer: Timer?
     @State private var showGiveFood = false
     @State private var showReceive = false
     @State private var showCoinRain = false
@@ -53,7 +53,7 @@ struct Working12: View {
     @State private var sessionStartDate = Date()
     @State private var finalElapsedSeconds = 0
 
-    private static let holdDuration: Double = 9
+    private static let standingDuration: Double = 9
     private static let giveFoodDuration: Double = 1.5
     private static let foodPulseStepDuration: Double = 0.25
     private static let foodPulseScale: CGFloat = 1.3
@@ -100,31 +100,31 @@ struct Working12: View {
     }
 
     private var capsuleFillColor: Color {
-        if holdElapsed >= 7 { return .red }
-        if holdElapsed >= 5 { return .orange }
+        if standingElapsed >= 7 { return .red }
+        if standingElapsed >= 5 { return .orange }
         return .yellow
     }
 
     private var customerImageName: String {
         if showReceive { return "TakoyakiCustomerReceiveIcon" }
-        if holdElapsed >= 7 { return "TakoyakiCustomerAngryIcon" }
-        if holdElapsed >= 5 { return "TakoyakiCustomerBadIcon" }
+        if standingElapsed >= 7 { return "TakoyakiCustomerAngryIcon" }
+        if standingElapsed >= 5 { return "TakoyakiCustomerBadIcon" }
         return "TakoyakiCustomerComingIcon"
     }
 
-    private func startHoldTimer() {
-        guard holdTimer == nil else { return }
-        holdElapsed = 0
-        holdTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
-            guard holdElapsed < Self.holdDuration else { return }
-            holdElapsed = min(holdElapsed + 0.1, Self.holdDuration)
+    private func startStandingTimer() {
+        guard standingTimer == nil else { return }
+        standingElapsed = 0
+        standingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+            guard standingElapsed < Self.standingDuration else { return }
+            standingElapsed = min(standingElapsed + 0.1, Self.standingDuration)
         }
     }
 
-    private func stopHoldTimer() {
-        holdTimer?.invalidate()
-        holdTimer = nil
-        holdElapsed = 0
+    private func stopStandingTimer() {
+        standingTimer?.invalidate()
+        standingTimer = nil
+        standingElapsed = 0
     }
 
     // takoyaki_food.png 只在 showReceive 的 1.5 秒視窗內出現，期間「放大＋變亮」再「回到原狀」共 3 次，
@@ -193,8 +193,8 @@ struct Working12: View {
     }
 
     private func pauseSession() {
-        holdTimer?.invalidate()
-        holdTimer = nil
+        standingTimer?.invalidate()
+        standingTimer = nil
         coinRainTimer?.invalidate()
         coinRainTimer = nil
         scoreTimer?.invalidate()
@@ -225,7 +225,7 @@ struct Working12: View {
         currentRep = 0
     }
 
-    // 每完成一次完整的上階→下階週期即視為完成一「次」：依這次讀秒落在哪個檔位累計對應的心情次數，
+    // 每次結束站立等待、開始下一次上階時即視為完成一「次」：依這次站立等待了幾秒落在哪個檔位累計對應的心情次數，
     // 次數集滿 content.reps 才算完成一組，這時再判斷是否還有下一組（進組間休息）或已經是最後一組（直接前往 PostWorking12）。
     private func advanceProgress(coinCount: Int) {
         switch coinCount {
@@ -484,7 +484,7 @@ struct Working12: View {
                                     .fill(Color.blue)
                                 Rectangle()
                                     .fill(capsuleFillColor)
-                                    .frame(height: fillGeo.size.height * CGFloat(holdElapsed / Self.holdDuration))
+                                    .frame(height: fillGeo.size.height * CGFloat(standingElapsed / Self.standingDuration))
                             }
                             .clipShape(Capsule())
                         }
@@ -557,7 +557,7 @@ struct Working12: View {
                     message: "您是否要直接跳過，進入組間休息？",
                     onCancel: {
                         showRestPopup = false
-                        startHoldTimer()
+                        if btVM.currentStepStatus == 0 { startStandingTimer() }
                     },
                     onConfirm: {
                         showRestPopup = false
@@ -591,7 +591,7 @@ struct Working12: View {
                     message: "您確定要結束遊戲嗎？",
                     onCancel: {
                         showExitConfirmPopup = false
-                        startHoldTimer()
+                        if btVM.currentStepStatus == 0 { startStandingTimer() }
                     },
                     onConfirm: {
                         showExitConfirmPopup = false
@@ -616,12 +616,14 @@ struct Working12: View {
             )
         }
         .onChange(of: btVM.currentStepStatus) { oldValue, newValue in
-            if oldValue == 0 && newValue == 1 {
-                startHoldTimer()
+            // 只有站立狀態才計時：一回到站立（含一開始拿到第一筆資料）就開始計時，
+            // 上階／下階全程不計時，離開站立時停止並依累計秒數評分。
+            if newValue == 0 {
+                startStandingTimer()
             }
-            if oldValue == 2 && newValue == 0 {
-                let finishedHoldSeconds = holdElapsed
-                stopHoldTimer()
+            if oldValue == 0 && newValue == 1 {
+                let finishedStandingSeconds = standingElapsed
+                stopStandingTimer()
                 showGiveFood = true
                 showReceive = true
                 startFoodPulse()
@@ -629,9 +631,9 @@ struct Working12: View {
                     showGiveFood = false
                     showReceive = false
                     let coinCount: Int
-                    if finishedHoldSeconds >= 7 {
+                    if finishedStandingSeconds >= 7 {
                         coinCount = 3
-                    } else if finishedHoldSeconds >= 5 {
+                    } else if finishedStandingSeconds >= 5 {
                         coinCount = 9
                     } else {
                         coinCount = 15
@@ -643,7 +645,7 @@ struct Working12: View {
             }
         }
         .onDisappear {
-            holdTimer?.invalidate()
+            standingTimer?.invalidate()
             coinRainTimer?.invalidate()
             scoreTimer?.invalidate()
             setRestTimer?.invalidate()
