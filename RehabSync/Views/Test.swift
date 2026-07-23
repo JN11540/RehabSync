@@ -1,15 +1,12 @@
 import SwiftUI
 import GRDB
 import CoreBluetooth
-import Charts
+import UIKit
 
 // MARK: - TestPage
 
 struct TestPage: View {
     let btVM: BluetoothViewModel
-
-    @State private var showAngleChart = false
-    @State private var angleDataPoints: [TestKneeAnglePoint] = []
 
     private var bothConnected: Bool {
         let dvm = DeviceViewModel()
@@ -20,7 +17,7 @@ struct TestPage: View {
                btVM.connectedPeripherals[calfUUID]  != nil
     }
 
-    private var canViewAngleChart: Bool {
+    private var canExport: Bool {
         btVM.recordingStartTime != nil && btVM.recordingEndTime != nil
     }
 
@@ -63,14 +60,14 @@ struct TestPage: View {
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                         .disabled(!btVM.isRecording)
 
-                    Button("檢視") { presentAngleChart() }
+                    Button("匯出") { exportCSV() }
                         .font(.system(size: 15, weight: .medium))
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
-                        .background(canViewAngleChart ? Color.blue.opacity(0.85) : Color.gray.opacity(0.3))
+                        .background(canExport ? Color.blue.opacity(0.85) : Color.gray.opacity(0.3))
                         .foregroundStyle(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .disabled(!canViewAngleChart)
+                        .disabled(!canExport)
 
                     Button("校正") {
                         if let pair = thighAndCalfPeripherals {
@@ -170,12 +167,6 @@ struct TestPage: View {
             }
             .padding(.top, 20)
         }
-        .sheet(isPresented: $showAngleChart) {
-            TestKneeAngleChartSheet(
-                dataPoints: angleDataPoints,
-                durationSeconds: Double((btVM.recordingEndTime ?? 0) - (btVM.recordingStartTime ?? 0)) / 1000.0
-            )
-        }
     }
 
     private func stepStatusText(_ status: Int) -> String {
@@ -187,59 +178,49 @@ struct TestPage: View {
         }
     }
 
-    /// 「檢視」：查這段錄製期間（`recordingStartTime`～`recordingEndTime`）寫入的 `advanced_statistics`
-    /// （`treatment_result_id` 是 NULL，因為 Test.swift 不屬於任何一局遊戲），畫成膝角度／時間的折線圖，
-    /// 參考 PostWorking_2.swift／PostWorking_9.swift 的「即時膝角度」圖表做法。
-    private func presentAngleChart() {
+    private func exportCSV() {
         guard let from = btVM.recordingStartTime,
               let to   = btVM.recordingEndTime else { return }
 
-        let rows = DeviceViewModel().fetchAdvancedStatistics(from: from, to: to)
-        angleDataPoints = rows.map { row in
-            TestKneeAnglePoint(time: Double(row.timestamp - from) / 1000.0, angle: row.angle)
+        let dvm = DeviceViewModel()
+        var thighAcc  = dvm.fetchACC(deviceId: 0, from: from, to: to)
+        var calfAcc   = dvm.fetchACC(deviceId: 1, from: from, to: to)
+
+        guard !thighAcc.isEmpty, !calfAcc.isEmpty else { return }
+
+        let windowStart = max(thighAcc.first!.timestamp, calfAcc.first!.timestamp)
+        let windowEnd   = min(thighAcc.last!.timestamp,  calfAcc.last!.timestamp)
+
+        guard windowStart <= windowEnd else { return }
+
+        thighAcc  = thighAcc.filter  { $0.timestamp >= windowStart && $0.timestamp <= windowEnd }
+        calfAcc   = calfAcc.filter   { $0.timestamp >= windowStart && $0.timestamp <= windowEnd }
+
+        let count = min(thighAcc.count, calfAcc.count)
+        guard count > 0 else { return }
+
+        var lines = ["timestamp,thigh_ax,thigh_ay,thigh_az,calf_ax,calf_ay,calf_az"]
+        for i in 0..<count {
+            let ts = thighAcc[i].timestamp
+            let ta = thighAcc[i]
+            let ca = calfAcc[i]
+            lines.append("\(ts),\(ta.x),\(ta.y),\(ta.z),\(ca.x),\(ca.y),\(ca.z)")
         }
-        showAngleChart = true
-    }
-}
 
-// MARK: - TestKneeAngleChartSheet
+        let csv = lines.joined(separator: "\n")
+        let filename = "rehabsync_\(from).csv"
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+        try? csv.write(to: url, atomically: true, encoding: .utf8)
 
-private struct TestKneeAnglePoint: Identifiable {
-    let time: Double
-    let angle: Double
-    var id: Double { time }
-}
-
-private struct TestKneeAngleChartSheet: View {
-    let dataPoints: [TestKneeAnglePoint]
-    let durationSeconds: Double
-
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("膝角度")
-                    .font(.system(size: 18, weight: .semibold))
-                Spacer()
-                Button("關閉") { dismiss() }
+        let av = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let root  = scene.windows.first?.rootViewController {
+            if let popover = av.popoverPresentationController {
+                popover.sourceView = root.view
+                popover.sourceRect = CGRect(x: root.view.bounds.midX, y: root.view.bounds.midY, width: 0, height: 0)
+                popover.permittedArrowDirections = []
             }
-
-            Chart(dataPoints) { point in
-                LineMark(
-                    x: .value("時間（秒）", point.time),
-                    y: .value("膝角度", point.angle)
-                )
-                .interpolationMethod(.catmullRom)
-            }
-            .chartXScale(domain: 0...max(0.001, durationSeconds))
-            .chartYScale(domain: 0...90)
-            .chartXAxisLabel("時間（秒）", alignment: .center)
-            .chartYAxisLabel("膝角度（度）", position: .leading, alignment: .center)
-            .frame(height: 300)
-
-            Spacer()
+            root.present(av, animated: true)
         }
-        .padding(24)
     }
 }
