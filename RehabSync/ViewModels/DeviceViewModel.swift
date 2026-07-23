@@ -157,6 +157,19 @@ class DeviceViewModel {
         }) ?? []
     }
 
+    /// `Test.swift` 測試頁專用：這裡的即時預估寫入時沒有帶 `treatment_result_id`（不屬於任何一局遊戲），
+    /// 只能用「時間範圍」過濾，撈出 `treatment_result_id` 是 NULL 的資料列。
+    func fetchAdvancedStatistics(from: Int64, to: Int64) -> [AdvancedStatistics] {
+        (try? db.read { db in
+            try AdvancedStatistics
+                .filter(Column("treatment_result_id") == nil
+                     && Column("timestamp") >= from
+                     && Column("timestamp") <= to)
+                .order(Column("id").asc)
+                .fetchAll(db)
+        }) ?? []
+    }
+
     /// `onFinish` 一定會被呼叫（不管這次有沒有真的清理），呼叫端可以用它當作「判斷／清理流程已結束」的統一訊號；
     /// `onStart` 只有在真的需要清理、即將開始刪除時才會被呼叫（用來顯示「正在刪除舊資料」之類的提示）。
     func cleanupIfNeeded(onStart: (() -> Void)? = nil, onFinish: (() -> Void)? = nil) {
