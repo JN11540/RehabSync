@@ -28,6 +28,9 @@ struct Working12: View {
     }
     @State private var standingElapsed: Double = 0
     @State private var standingTimer: Timer?
+    /// 離開站立（開始上階）當下先依站立等待秒數評好分，暫存起來，
+    /// 等到下階回到站立那一瞬間才實際觸發送餐／硬幣獎勵動畫。
+    @State private var pendingCoinCount: Int?
     @State private var showGiveFood = false
     @State private var showReceive = false
     @State private var showCoinRain = false
@@ -225,7 +228,7 @@ struct Working12: View {
         currentRep = 0
     }
 
-    // 每次結束站立等待、開始下一次上階時即視為完成一「次」：依這次站立等待了幾秒落在哪個檔位累計對應的心情次數，
+    // 每次下階回到站立、送餐動畫觸發時即視為完成一「次」：依這次上階前站立等待了幾秒落在哪個檔位累計對應的心情次數，
     // 次數集滿 content.reps 才算完成一組，這時再判斷是否還有下一組（進組間休息）或已經是最後一組（直接前往 PostWorking12）。
     private func advanceProgress(coinCount: Int) {
         switch coinCount {
@@ -617,30 +620,33 @@ struct Working12: View {
         }
         .onChange(of: btVM.currentStepStatus) { oldValue, newValue in
             // 只有站立狀態才計時：一回到站立（含一開始拿到第一筆資料）就開始計時，
-            // 上階／下階全程不計時，離開站立時停止並依累計秒數評分。
+            // 上階／下階全程不計時，離開站立時停止並依累計秒數先評好分（存到 pendingCoinCount，
+            // 這時角色圖示是 TakoyakiMakeFoodIcon「做食物中」），
+            // 等下階回到站立那一瞬間（TakoyakiGiveFoodIcon「送餐」）才真正同時觸發送餐與硬幣獎勵動畫。
             if newValue == 0 {
                 startStandingTimer()
             }
             if oldValue == 0 && newValue == 1 {
-                let finishedStandingSeconds = standingElapsed
+                if standingElapsed >= 7 {
+                    pendingCoinCount = 3
+                } else if standingElapsed >= 5 {
+                    pendingCoinCount = 9
+                } else {
+                    pendingCoinCount = 15
+                }
                 stopStandingTimer()
+            }
+            if oldValue == 2 && newValue == 0, let coinCount = pendingCoinCount {
+                pendingCoinCount = nil
                 showGiveFood = true
                 showReceive = true
                 startFoodPulse()
+                startCoinRain(count: coinCount)
+                startScoreSequence(count: coinCount)
+                advanceProgress(coinCount: coinCount)
                 DispatchQueue.main.asyncAfter(deadline: .now() + Self.giveFoodDuration) {
                     showGiveFood = false
                     showReceive = false
-                    let coinCount: Int
-                    if finishedStandingSeconds >= 7 {
-                        coinCount = 3
-                    } else if finishedStandingSeconds >= 5 {
-                        coinCount = 9
-                    } else {
-                        coinCount = 15
-                    }
-                    startCoinRain(count: coinCount)
-                    startScoreSequence(count: coinCount)
-                    advanceProgress(coinCount: coinCount)
                 }
             }
         }
