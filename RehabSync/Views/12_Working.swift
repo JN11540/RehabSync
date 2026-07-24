@@ -299,6 +299,7 @@ struct Working12: View {
     }
 
     private func startSetRestCountdown() {
+        cancelInProgressStepCycleWithoutCounting()
         setRestTimer?.invalidate()
         setRestCountdown = content.set_rest_time
         showSetRestPopup = true
