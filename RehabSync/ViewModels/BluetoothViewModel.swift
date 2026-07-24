@@ -911,12 +911,12 @@ extension BluetoothViewModel: CBPeripheralDelegate {
             }
         }
 
-        // 即時預估登階狀態：只更新最新值，不寫 DB
+        // 即時預估登階狀態：更新最新值供畫面顯示；不 return，讓封包繼續往下走
+        // 正常的 acc/gyro/exg 寫入資料庫流程，兩者同時進行（比照即時預估真實角度的做法）。
         if stepEstimating.contains(peripheral.identifier) {
             if uuid == CBUUID(string: config.sub_acc_uuid) {
                 handleStepAccPacket(data, id: peripheral.identifier, config: config)
             }
-            return
         }
 
         // 首次通知時 onConnected 已執行完畢，DB 已有裝置，lazy load device_id
