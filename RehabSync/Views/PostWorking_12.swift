@@ -127,6 +127,12 @@ private struct PostWorking12StatRow: View {
                 PostWorking12StatCard(stat: stat)
             }
 
+            // `Working12` 沒有「單次時長」可顯示的第三張統計卡，但為了讓「總時間」「總次數」跟「回到總覽」
+            // 這三格的寬度跟 `PostWorking_9`（4 格：3 張統計卡＋回到總覽）算出來的寬度一致，這裡用一個完全透明、
+            // 不畫任何背景／邊框的空格占住原本第三張卡的寬度，讓 HStack 依然是 4 等分。
+            Color.clear
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
             Button {
                 onRequestReturn()
             } label: {
