@@ -26,6 +26,84 @@ struct Working12: View {
         guard btVM.isEstimatingStepStatus, let pair = thighAndCalfPeripherals else { return }
         btVM.stopStepStatusEstimation(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
     }
+
+    // MARK: - treatment_result 建立與串接
+
+    private let resultVM = TreatmentResultViewModel()
+    @State private var treatmentResult: TreatmentResult?
+
+    /// 遊戲一開始（畫面顯示的那一刻）先建立這局遊戲唯一一筆 treatment_result，
+    /// 陣列長度依目標組數/目標次數計算、全部初始化為 0，再把 id 交給 btVM
+    /// 讓之後 acc/gyro/exg/advanced_statistics 每一筆寫入都能帶上這個 treatment_result_id。
+    /// 建立完成後緊接著視同第一組的起始點，開始記錄。
+    /// `extension_length` 這個動作不計算（登階沒有天然對應的「伸展時長」），陣列維持全 0，不再另外更新。
+    private func createTreatmentResultIfNeeded() {
+        guard treatmentResult == nil else { return }
+        var result = TreatmentResult(
+            treatment_id: content.treatment_id,
+            treatment_content_id: Int(content.id ?? 0),
+            reps: Array(repeating: 0, count: content.sets),
+            extension_length: Array(repeating: 0, count: content.sets * content.reps),
+            set_start_time: Array(repeating: 0, count: content.sets),
+            set_end_time: Array(repeating: 0, count: content.sets),
+            date: Int(Date().timeIntervalSince1970 * 1000)
+        )
+        resultVM.insert(&result)
+        treatmentResult = result
+        btVM.currentTreatmentResultId = result.id
+        markSetStart(index: 0)
+    }
+
+    @State private var setTimeLimitTimer: Timer?
+    /// 這一組 3 分鐘倒數的起訖區間，交給 `Text(timerInterval:)` 顯示畫面上的倒數數字。
+    @State private var setCountdownRange: ClosedRange<Date>?
+
+    private static let setTimeLimit: TimeInterval = 180
+
+    /// 某一組的起始點：把當下毫秒時間戳記寫進 set_start_time[index]、打開 acc/gyro/exg 的記錄，
+    /// 並啟動這一組的 3 分鐘倒數上限。
+    private func markSetStart(index: Int) {
+        guard var result = treatmentResult, result.set_start_time.indices.contains(index) else { return }
+        result.set_start_time[index] = Int(Date().timeIntervalSince1970 * 1000)
+        treatmentResult = result
+        resultVM.update(result)
+        btVM.startRecordingAll()
+
+        let now = Date()
+        setCountdownRange = now...now.addingTimeInterval(Self.setTimeLimit)
+
+        setTimeLimitTimer?.invalidate()
+        setTimeLimitTimer = Timer.scheduledTimer(withTimeInterval: Self.setTimeLimit, repeats: false) { _ in
+            handleSetTimeLimitReached()
+        }
+    }
+
+    /// 某一組的結束點：停止 acc/gyro/exg 的記錄、取消該組的 3 分鐘倒數計時器，
+    /// 並把結束時間、實際完成次數一併寫回 treatment_result（reps 達標時傳目標次數，
+    /// 提前結束／倒數歸零時傳目前實際完成次數）。
+    private func finishSet(index: Int, reps: Int) {
+        guard var result = treatmentResult, result.set_end_time.indices.contains(index) else { return }
+        setTimeLimitTimer?.invalidate()
+        setTimeLimitTimer = nil
+        setCountdownRange = nil
+        btVM.stopRecordingAll()
+        result.set_end_time[index] = Int(Date().timeIntervalSince1970 * 1000)
+        result.reps[index] = reps
+        treatmentResult = result
+        resultVM.update(result)
+    }
+
+    /// 從起始點起算倒數 3 分鐘歸零，視同該組提前結束。
+    private func handleSetTimeLimitReached() {
+        finishSet(index: currentSet - 1, reps: currentRep)
+        if currentSet < content.sets {
+            startSetRestCountdown()
+        } else {
+            finalElapsedSeconds = Int(Date().timeIntervalSince(sessionStartDate))
+            navigateToPostWorking12 = true
+        }
+    }
+
     @State private var standingElapsed: Double = 0
     @State private var standingTimer: Timer?
     /// 離開站立（開始上階）當下先依站立等待秒數評好分，暫存起來，
@@ -48,7 +126,6 @@ struct Working12: View {
     @State private var badMoodCount = 0
     @State private var angryMoodCount = 0
     @State private var showExitConfirmPopup = false
-    @State private var showRestPopup = false
     @State private var showSetRestPopup = false
     @State private var setRestCountdown: Int = 0
     @State private var setRestTimer: Timer?
@@ -226,6 +303,7 @@ struct Working12: View {
             currentSet += 1
         }
         currentRep = 0
+        markSetStart(index: currentSet - 1)
     }
 
     // 每次下階回到站立、送餐動畫觸發時即視為完成一「次」：依這次上階前站立等待了幾秒落在哪個檔位累計對應的心情次數，
@@ -238,6 +316,7 @@ struct Working12: View {
         }
         currentRep += 1
         if currentRep >= content.reps {
+            finishSet(index: currentSet - 1, reps: content.reps)
             if currentSet < content.sets {
                 startSetRestCountdown()
             } else {
@@ -333,16 +412,11 @@ struct Working12: View {
                         }
                         .buttonStyle(.plain)
 
-                        Button(action: {
-                            showRestPopup = true
-                            pauseSession()
-                        }) {
-                            Image("RestIcon")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 40, height: 40)
+                        if let setCountdownRange {
+                            Text(timerInterval: setCountdownRange, countsDown: true)
+                                .font(.system(size: 24, weight: .bold, design: .monospaced))
+                                .foregroundStyle(.black)
                         }
-                        .buttonStyle(.plain)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.leading, 16)
@@ -552,37 +626,11 @@ struct Working12: View {
             .padding(24)
             .offset(x: 25, y: -100)
 
-            if showRestPopup {
-                Color.black.opacity(0.3)
-                    .ignoresSafeArea()
-
-                ConfirmPopup(
-                    message: "您是否要直接跳過，進入組間休息？",
-                    onCancel: {
-                        showRestPopup = false
-                        if btVM.currentStepStatus == 0 { startStandingTimer() }
-                    },
-                    onConfirm: {
-                        showRestPopup = false
-                        if currentSet < content.sets {
-                            startSetRestCountdown()
-                        } else {
-                            finalElapsedSeconds = Int(Date().timeIntervalSince(sessionStartDate))
-                            navigateToPostWorking12 = true
-                        }
-                    }
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-            }
-
             if showSetRestPopup {
                 Color.black.opacity(0.3)
                     .ignoresSafeArea()
 
-                SetRestPopup(
-                    secondsRemaining: setRestCountdown,
-                    onSkip: { closeSetRestPopup() }
-                )
+                SetRestPopup(secondsRemaining: setRestCountdown)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             }
 
@@ -598,12 +646,16 @@ struct Working12: View {
                     },
                     onConfirm: {
                         showExitConfirmPopup = false
+                        finishSet(index: currentSet - 1, reps: currentRep)
                         finalElapsedSeconds = Int(Date().timeIntervalSince(sessionStartDate))
                         navigateToPostWorking12 = true
                     }
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             }
+        }
+        .onAppear {
+            createTreatmentResultIfNeeded()
         }
         .fullScreenCover(isPresented: $navigateToPostWorking12) {
             PostWorking12(
@@ -793,7 +845,6 @@ private struct ConfirmPopup: View {
 
 private struct SetRestPopup: View {
     let secondsRemaining: Int
-    let onSkip: () -> Void
 
     var body: some View {
         ZStack {
@@ -802,30 +853,17 @@ private struct SetRestPopup: View {
                 Text("組間休息時間")
                     .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(.black)
-                HStack(spacing: 32) {
-                    ZStack {
-                        Circle().fill(Color.white)
-                        Circle().strokeBorder(Color.black, lineWidth: 1.5)
-                        Text("\(max(secondsRemaining, 0))")
-                            .font(.system(size: 32, weight: .bold))
-                            .foregroundStyle(.black)
-                            .minimumScaleFactor(0.5)
-                            .lineLimit(1)
-                            .padding(8)
-                    }
-                    .frame(width: 90, height: 90)
-                    Button(action: onSkip) {
-                        ZStack {
-                            Circle().fill(Color.white)
-                            Circle().strokeBorder(Color.black, lineWidth: 1.5)
-                            Text("跳過")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundStyle(.black)
-                        }
-                        .frame(width: 90, height: 90)
-                    }
-                    .buttonStyle(.plain)
+                ZStack {
+                    Circle().fill(Color.white)
+                    Circle().strokeBorder(Color.black, lineWidth: 1.5)
+                    Text("\(max(secondsRemaining, 0))")
+                        .font(.system(size: 32, weight: .bold))
+                        .foregroundStyle(.black)
+                        .minimumScaleFactor(0.5)
+                        .lineLimit(1)
+                        .padding(8)
                 }
+                .frame(width: 90, height: 90)
             }
         }
         .frame(width: 320, height: 220)
