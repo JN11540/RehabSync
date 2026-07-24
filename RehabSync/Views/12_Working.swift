@@ -686,17 +686,20 @@ struct Working12: View {
             createTreatmentResultIfNeeded()
         }
         .fullScreenCover(isPresented: $navigateToPostWorking12) {
-            PostWorking12(
-                content: content,
-                exercise: exercise,
-                totalCoins: totalCoins,
-                totalSets: currentSet,
-                totalElapsedSeconds: finalElapsedSeconds,
-                comingMoodCount: comingMoodCount,
-                badMoodCount: badMoodCount,
-                angryMoodCount: angryMoodCount,
-                onReturnToDashboard: onReturnToDashboard
-            )
+            if let treatmentResult {
+                PostWorking_12(
+                    content: content,
+                    exercise: exercise,
+                    totalCoins: totalCoins,
+                    totalSets: currentSet,
+                    totalElapsedSeconds: finalElapsedSeconds,
+                    comingMoodCount: comingMoodCount,
+                    badMoodCount: badMoodCount,
+                    angryMoodCount: angryMoodCount,
+                    treatmentResult: treatmentResult,
+                    onReturnToDashboard: onReturnToDashboard
+                )
+            }
         }
         .onChange(of: btVM.currentStepStatus) { oldValue, newValue in
             guard !isSessionPaused else { return }
