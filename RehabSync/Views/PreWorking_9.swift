@@ -574,6 +574,7 @@ private struct PreWorking9MotionTestAboutPanel: View {
     @State private var prepTimer: Timer?
 
     private var playButtonText: String {
+        if side == 1 { return "開發中" }
         switch prepPhase {
         case .idle: return "遊戲"
         case .counting(let remaining): return "清理中(\(remaining))"
@@ -682,11 +683,7 @@ private struct PreWorking9MotionTestAboutPanel: View {
                     .fill(Color(red: 0.90, green: 0.87, blue: 0.98))
                 Circle()
                     .strokeBorder(PreWorking_9.midPurple, lineWidth: 4)
-                if side == 1 {
-                    Text("開發中")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(PreWorking_9.darkPurple.opacity(0.6))
-                } else if let angle = btVM.currentEstimatedRealAngle {
+                if let angle = btVM.currentEstimatedRealAngle {
                     Text(String(format: "%.1f°", angle))
                         .font(.system(size: 36, weight: .bold))
                         .foregroundStyle(PreWorking_9.darkPurple)
