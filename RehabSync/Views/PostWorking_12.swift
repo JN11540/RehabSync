@@ -127,11 +127,12 @@ private struct PostWorking12StatRow: View {
                 PostWorking12StatCard(stat: stat)
             }
 
-            // `Working12` 沒有「單次時長」可顯示的第三張統計卡，但為了讓「總時間」「總次數」跟「回到總覽」
-            // 這三格的寬度跟 `PostWorking_9`（4 格：3 張統計卡＋回到總覽）算出來的寬度一致，這裡用一個完全透明、
-            // 不畫任何背景／邊框的空格占住原本第三張卡的寬度，讓 HStack 依然是 4 等分。
-            Color.clear
+            // `Working12` 沒有「單次時長」可顯示的第三張統計卡，但版面上仍要湊滿 4 張卡（跟 `PostWorking_9`
+            // 一樣的卡片大小／排版），所以放一張外觀跟其他卡片一致（白底、圓角、邊框）但內容空白的卡片。
+            Color.white
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black.opacity(0.05)))
 
             Button {
                 onRequestReturn()
@@ -249,14 +250,22 @@ private struct PostWorking12StatCard: View {
 
 // MARK: - Group Stats (Set Tabs)
 
-/// 一組的統計資料，從 `treatmentResult` 依索引現算。**不含任何「單次時長」欄位**——
-/// `Working12` 的 `extension_length` 永遠是 0（不計算），沒有 `barData`／`averageDurationText`，
-/// 比照 `postworking12-realdata-plan.md` 第 3 節的決定，這兩項直接省略，不用其他數字頂替。
+private struct PostWorking12AttemptDuration: Identifiable {
+    let attempt: Int
+    let seconds: Double
+    var id: Int { attempt }
+}
+
+/// 一組的統計資料，從 `treatmentResult` 依索引現算。**不做「本組平均部分蹲時長」文字**（`Working12` 的
+/// `extension_length` 永遠是 0，沒有真實數字可以顯示這個平均值），但 `barData` 保留、邏輯逐字比照
+/// `PostWorking9GroupStats.compute`——柱狀圖只是版面上的裝飾用途，不顯示座標軸名稱，見
+/// `PostWorking12DonationOverviewCard` 的 `Chart`。
 private struct PostWorking12GroupStats {
     let index: Int
     let reps: Int
     let setStartTimeMs: Int
     let setEndTimeMs: Int
+    let barData: [PostWorking12AttemptDuration]
 
     /// 「這組從未開始」跟「這組有開始／結束但 0 次完成」視為同一種狀況。
     var hasData: Bool { reps > 0 }
@@ -273,7 +282,16 @@ private struct PostWorking12GroupStats {
         let startMs = treatmentResult.set_start_time.indices.contains(index) ? treatmentResult.set_start_time[index] : 0
         let endMs = treatmentResult.set_end_time.indices.contains(index) ? treatmentResult.set_end_time[index] : 0
 
-        return PostWorking12GroupStats(index: index, reps: reps, setStartTimeMs: startMs, setEndTimeMs: endMs)
+        let sliceStart = index * repsPerSet
+        let sliceEnd = min(sliceStart + repsPerSet, treatmentResult.extension_length.count)
+        let slice = sliceStart < sliceEnd ? Array(treatmentResult.extension_length[sliceStart..<sliceEnd]) : []
+        // 只取前 reps 個（實際完成的次數），其餘是 0 補值，不應該畫出來。
+        let realValues = Array(slice.prefix(reps))
+        let barData = realValues.enumerated().map { i, ms in
+            PostWorking12AttemptDuration(attempt: i + 1, seconds: Double(ms) / 1000.0)
+        }
+
+        return PostWorking12GroupStats(index: index, reps: reps, setStartTimeMs: startMs, setEndTimeMs: endMs, barData: barData)
     }
 }
 
@@ -342,6 +360,46 @@ private struct PostWorking12DonationOverviewCard: View {
                         .foregroundStyle(Color.black)
                 }
             }
+
+            // 柱狀圖只是版面裝飾，不顯示縱軸／橫軸名稱（`Working12` 沒有可標示單位的「單次時長」數據）。
+            HStack(alignment: .top, spacing: 20) {
+                Chart(selected.barData) { point in
+                    BarMark(
+                        x: .value("次數", point.attempt),
+                        y: .value("秒數", point.seconds),
+                        width: .fixed(22)
+                    )
+                    .foregroundStyle(PostWorking_12.darkPurple)
+                    .cornerRadius(2)
+                }
+                .chartXScale(domain: 0.5...(Double(content.reps) + 0.5))
+                .chartYScale(domain: 0...7)
+                .chartXAxis {
+                    AxisMarks(values: Array(1...content.reps)) { value in
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel {
+                            if let count = value.as(Int.self) {
+                                Text("\(count)")
+                                    .font(.system(size: 16))
+                            }
+                        }
+                    }
+                }
+                .chartYAxis {
+                    AxisMarks(position: .leading, values: Array(0...7)) { value in
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel()
+                            .font(.system(size: 16))
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 220, alignment: .leading)
+                .offset(y: 15)
+            }
+            .padding(.trailing, 20)
+            .frame(height: 300)
         }
         .padding(20)
         .padding(.top, 20)
