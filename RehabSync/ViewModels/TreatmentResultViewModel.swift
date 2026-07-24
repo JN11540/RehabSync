@@ -142,8 +142,9 @@ enum GameDataExporter {
     static func export(treatmentResult: TreatmentResult, deviceVM: DeviceViewModel) -> [ExportFile] {
         guard let treatmentResultId = treatmentResult.id else { return [] }
 
-        let thighDeviceId = deviceVM.fetch(limb: 0)?.id
-        let calfDeviceId = deviceVM.fetch(limb: 1)?.id
+        let side = deviceVM.fetchAnySide() ?? 0
+        let thighDeviceId = deviceVM.fetch(side: side, limb: 0)?.id
+        let calfDeviceId = deviceVM.fetch(side: side, limb: 1)?.id
         let date = treatmentResult.date
         let setStartTimes = treatmentResult.set_start_time
         let setEndTimes = treatmentResult.set_end_time
@@ -161,7 +162,7 @@ enum GameDataExporter {
             setStartTimes: setStartTimes, setEndTimes: setEndTimes, deviceVM: deviceVM
         )
         let statsCSV = buildAdvancedStatisticsCSV(treatmentResultId: treatmentResultId, deviceVM: deviceVM)
-        let resultJSON = buildTreatmentResultJSON(treatmentResult)
+        let resultJSON = buildTreatmentResultJSON(treatmentResult, side: side)
 
         return [
             ExportFile(filename: "acc_\(date).csv", content: accCSV),
@@ -277,9 +278,11 @@ enum GameDataExporter {
         let extension_length: [Int]
         let set_start_time: [Int]
         let set_end_time: [Int]
+        /// 0 = 左腳、1 = 右腳；只存在於匯出的 JSON，不落地到 `treatment_result` 表（schema 不變）。
+        let side: Int
     }
 
-    private static func buildTreatmentResultJSON(_ result: TreatmentResult) -> String {
+    private static func buildTreatmentResultJSON(_ result: TreatmentResult, side: Int) -> String {
         let export = TreatmentResultExport(
             id: result.id,
             treatment_id: result.treatment_id,
@@ -287,7 +290,8 @@ enum GameDataExporter {
             reps: result.reps,
             extension_length: result.extension_length,
             set_start_time: result.set_start_time,
-            set_end_time: result.set_end_time
+            set_end_time: result.set_end_time,
+            side: side
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted]
