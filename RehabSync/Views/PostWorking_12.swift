@@ -122,7 +122,7 @@ private struct PostWorking12StatRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 16) {
+        HStack(alignment: .top, spacing: 16) {
             ForEach(stats, id: \.label) { stat in
                 PostWorking12StatCard(stat: stat)
             }
@@ -234,7 +234,7 @@ private struct PostWorking12StatCard: View {
             }
         }
         .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black.opacity(0.05)))
