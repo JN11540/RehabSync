@@ -84,6 +84,10 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     @ObservationIgnored private var stepThighIncline: Double?
     @ObservationIgnored private var stepCalfIncline: Double?
     @ObservationIgnored private var stepBaseline: Double = 0
+    /// 供 `advanced_statistics` 記錄用：跟「站立即時預估真實角度」同一套換算（`standingMappingTable`／`angleToReal`），
+    /// 跟 `detectStepStatus` 拿 `stepBaseline` 直接比較的登階狀態機邏輯完全獨立，不影響既有的登階判定。
+    @ObservationIgnored private var stepShift: Double = 0
+    @ObservationIgnored private var stepBaselineTable: [(measured: Double, realAngle: Double)] = []
     @ObservationIgnored private var stepTickTimer: Timer?
 
     override init() {
@@ -677,6 +681,9 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             stepThighIncline = nil
             stepCalfIncline  = nil
             stepBaseline = baseline
+            // advanced_statistics 記錄用的換算表，比照「站立即時預估」的站姿版做法（見 startLiveEstimateRealAngle 的 .standing 分支）。
+            stepShift = baseline < 0 ? (abs(baseline) + 10) : 0
+            stepBaselineTable = Self.standingMappingTable(baseline: baseline + stepShift, maxStep: 55, maxRealAngleDeg: 90)
             resetStepStatus()
             stepEstimating = [thighId, calfId]
 
@@ -725,13 +732,18 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             let status = detectStepStatus(kneeAngle: kneeAngle, baseline: stepBaseline)
             DispatchQueue.main.async { self.currentStepStatus = status }
 
+            // 寫進 advanced_statistics 的角度比照「站立即時預估真實角度」的換算方式（angleToReal + 站姿對應表），
+            // 不是直接寫 detectStepStatus 用的原始 kneeAngle，兩者計算目的不同、互不影響。
+            let realAngle = Self.angleToReal(kneeAngle + stepShift, table: stepBaselineTable)
+            let rounded = (realAngle * 10).rounded() / 10
+
             // 組間休息（未在記錄中）時暫停寫入，跟 acc/gyro/exg 的起訖規則一致。
             let (recording, treatmentResultId) = DispatchQueue.main.sync {
                 (self.isRecording, self.currentTreatmentResultId)
             }
             guard recording else { return }
             let ts = Int64(Date().timeIntervalSince1970 * 1000)
-            self.deviceVM.insertAdvancedStatistics(timestamp: ts, angle: kneeAngle, treatmentResultId: treatmentResultId)
+            self.deviceVM.insertAdvancedStatistics(timestamp: ts, angle: rounded, treatmentResultId: treatmentResultId)
         }
     }
 
