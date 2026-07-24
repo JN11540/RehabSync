@@ -1000,7 +1000,7 @@ private struct CompletionPopup: View {
             VStack(spacing: 0) {
                 ZStack {
                     Color.white
-                    Image("FishingEndIcon")
+                    Image("TakoyakiTheEndIcon")
                         .resizable()
                         .scaledToFit()
                         .padding(12)
