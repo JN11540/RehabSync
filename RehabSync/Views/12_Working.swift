@@ -95,13 +95,21 @@ struct Working12: View {
 
     /// 從起始點起算倒數 3 分鐘歸零，視同該組提前結束。
     private func handleSetTimeLimitReached() {
+        cancelInProgressStepCycleWithoutCounting()
         finishSet(index: currentSet - 1, reps: currentRep)
         if currentSet < content.sets {
             startSetRestCountdown()
         } else {
-            finalElapsedSeconds = Int(Date().timeIntervalSince(sessionStartDate))
-            navigateToPostWorking12 = true
+            showCompletionPopup = true
         }
+    }
+
+    /// 「提前結束觸發當下正卡在半途的登階循環」的邊界情況：直接取消，不計入 reps。
+    private func cancelInProgressStepCycleWithoutCounting() {
+        standingTimer?.invalidate()
+        standingTimer = nil
+        standingElapsed = 0
+        pendingCoinCount = nil
     }
 
     @State private var standingElapsed: Double = 0
@@ -132,6 +140,8 @@ struct Working12: View {
     @State private var navigateToPostWorking12 = false
     @State private var sessionStartDate = Date()
     @State private var finalElapsedSeconds = 0
+    @State private var isSessionPaused = false
+    @State private var showCompletionPopup = false
 
     private static let standingDuration: Double = 9
     private static let giveFoodDuration: Double = 1.5
@@ -273,6 +283,7 @@ struct Working12: View {
     }
 
     private func pauseSession() {
+        isSessionPaused = true
         standingTimer?.invalidate()
         standingTimer = nil
         coinRainTimer?.invalidate()
@@ -281,6 +292,10 @@ struct Working12: View {
         scoreTimer = nil
         setRestTimer?.invalidate()
         setRestTimer = nil
+    }
+
+    private func resumeSession() {
+        isSessionPaused = false
     }
 
     private func startSetRestCountdown() {
@@ -320,8 +335,7 @@ struct Working12: View {
             if currentSet < content.sets {
                 startSetRestCountdown()
             } else {
-                finalElapsedSeconds = Int(Date().timeIntervalSince(sessionStartDate))
-                navigateToPostWorking12 = true
+                showCompletionPopup = true
             }
         }
     }
@@ -642,15 +656,28 @@ struct Working12: View {
                     message: "您確定要結束遊戲嗎？",
                     onCancel: {
                         showExitConfirmPopup = false
+                        resumeSession()
                         if btVM.currentStepStatus == 0 { startStandingTimer() }
                     },
                     onConfirm: {
                         showExitConfirmPopup = false
+                        cancelInProgressStepCycleWithoutCounting()
                         finishSet(index: currentSet - 1, reps: currentRep)
-                        finalElapsedSeconds = Int(Date().timeIntervalSince(sessionStartDate))
-                        navigateToPostWorking12 = true
+                        showCompletionPopup = true
                     }
                 )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            }
+
+            if showCompletionPopup {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+
+                CompletionPopup(treatmentResult: treatmentResult, onComplete: {
+                    showCompletionPopup = false
+                    finalElapsedSeconds = Int(Date().timeIntervalSince(sessionStartDate))
+                    navigateToPostWorking12 = true
+                })
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             }
         }
@@ -671,6 +698,7 @@ struct Working12: View {
             )
         }
         .onChange(of: btVM.currentStepStatus) { oldValue, newValue in
+            guard !isSessionPaused else { return }
             // 只有站立狀態才計時：一回到站立（含一開始拿到第一筆資料）就開始計時，
             // 上階／下階全程不計時，離開站立時停止並依累計秒數先評好分（存到 pendingCoinCount，
             // 這時角色圖示是 TakoyakiMakeFoodIcon「做食物中」），
@@ -702,11 +730,22 @@ struct Working12: View {
                 }
             }
         }
+        .onChange(of: navigateToPostWorking12) { _, newValue in
+            if newValue {
+                pauseSession()
+            }
+        }
         .onDisappear {
+            pauseSession()
             standingTimer?.invalidate()
             coinRainTimer?.invalidate()
             scoreTimer?.invalidate()
             setRestTimer?.invalidate()
+            setTimeLimitTimer?.invalidate()
+            setTimeLimitTimer = nil
+            setCountdownRange = nil
+            btVM.stopRecordingAll()
+            btVM.currentTreatmentResultId = nil
             stopStepStatusIfNeeded()
         }
     }
@@ -869,6 +908,161 @@ private struct SetRestPopup: View {
         .frame(width: 320, height: 220)
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 1.5))
+    }
+}
+
+// MARK: - CompletionPopup
+
+private struct CompletionPopup: View {
+    let treatmentResult: TreatmentResult?
+    let onComplete: () -> Void
+
+    private enum ExportPhase: Equatable {
+        case ready
+        case counting(secondsRemaining: Int)
+        case waiting
+        case done
+    }
+
+    @State private var phase: ExportPhase = .ready
+    @State private var countdownTimer: Timer?
+
+    private var exportButtonTitle: String {
+        switch phase {
+        case .ready, .done: return "匯出JSON"
+        case .counting(let remaining): return "匯出JSON(\(remaining))"
+        case .waiting: return "再等待一下..."
+        }
+    }
+
+    private var isExportButtonEnabled: Bool {
+        switch phase {
+        case .ready, .done: return true
+        case .counting, .waiting: return false
+        }
+    }
+
+    private var isCompleteButtonEnabled: Bool {
+        phase == .done
+    }
+
+    /// 點擊「匯出JSON」：畫面倒數 10 秒（匯出JSON(10) → … → 匯出JSON(0)）。前 5 秒（10→…→5）純粹是寫入緩衝，
+    /// 讓遊戲結束當下還在飛行中的非同步資料庫寫入有時間落地；倒數到剛好顯示「匯出JSON(5)」那一次遞減，
+    /// 才在背景真正開始查詢資料庫、組裝檔案、寫進使用者在「匯出」設定頁指定好的資料夾——這是全流程唯一
+    /// 呼叫 runExport() 的地方，不會因為倒數到 0 又重複觸發一次。後 5 秒（5→0）只是給使用者看的可視倒數：
+    /// 背景作業比較快完成就直接切到 .done，不必等文字倒數到 0；倒數到 0 又過了 1 秒背景作業還沒完成，
+    /// 文字才改成「再等待一下...」。查詢/組裝/寫檔全程在背景執行緒進行，不卡住主執行緒；沒有分享面板這一步，
+    /// 「完成」按鈕解鎖只看檔案寫入呼叫是否都已執行過（見 database-export-implementation-steps.md 階段 4、5）。
+    private func performExport() {
+        guard phase == .ready || phase == .done else { return }
+        phase = .counting(secondsRemaining: 10)
+        countdownTimer?.invalidate()
+        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
+            switch phase {
+            case .counting(let remaining) where remaining > 0:
+                let next = remaining - 1
+                phase = .counting(secondsRemaining: next)
+                if next == 5 { runExport() }
+            case .counting:
+                // 顯示「匯出JSON(0)」又過了 1 秒，背景作業還沒完成。
+                phase = .waiting
+            case .waiting:
+                break
+            case .ready, .done:
+                timer.invalidate()
+                countdownTimer = nil
+            }
+        }
+    }
+
+    private func runExport() {
+        guard let treatmentResult else { return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let deviceVM = DeviceViewModel()
+            let files = GameDataExporter.export(treatmentResult: treatmentResult, deviceVM: deviceVM)
+            if let folderURL = ExportDestinationStore.resolveDesignatedFolder(),
+               folderURL.startAccessingSecurityScopedResource() {
+                for file in files {
+                    let url = folderURL.appendingPathComponent(file.filename)
+                    try? file.content.write(to: url, atomically: true, encoding: .utf8)
+                }
+                folderURL.stopAccessingSecurityScopedResource()
+            }
+            DispatchQueue.main.async {
+                phase = .done
+            }
+        }
+    }
+
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            VStack(spacing: 0) {
+                ZStack {
+                    Color.white
+                    Image("FishingEndIcon")
+                        .resizable()
+                        .scaledToFit()
+                        .padding(12)
+                }
+
+                Color(red: 0.86, green: 0.90, blue: 0.94)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+            }
+
+            HStack(spacing: 12) {
+                if phase != .done {
+                    Button(action: performExport) {
+                        Text(exportButtonTitle)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(Color.white)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .stroke(Color.black, lineWidth: 1.5)
+                                    )
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!isExportButtonEnabled)
+                    .opacity(isExportButtonEnabled ? 1 : 0.5)
+                }
+
+                Button(action: onComplete) {
+                    Text("完成")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.white)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(Color.black, lineWidth: 1.5)
+                                )
+                        )
+                }
+                .buttonStyle(.plain)
+                .disabled(!isCompleteButtonEnabled)
+                .opacity(isCompleteButtonEnabled ? 1 : 0.5)
+            }
+            .padding(12)
+        }
+        .frame(width: 520, height: 400)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.black, lineWidth: 1.5)
+        )
+        .onDisappear {
+            countdownTimer?.invalidate()
+            countdownTimer = nil
+        }
     }
 }
 
