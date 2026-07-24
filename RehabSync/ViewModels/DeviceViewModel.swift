@@ -134,6 +134,40 @@ class DeviceViewModel {
         }) ?? []
     }
 
+    /// `Test.swift` 除錯用：只用 `treatment_result_id` 過濾（不分裝置），最多回傳 `limit` 筆，
+    /// 方便直接確認這局遊戲底下資料庫裡到底有沒有任何原始 acc 資料，不受匯出查詢（需要先查到 device_id）影響。
+    func fetchACC(treatmentResultId: Int64, limit: Int) -> [Acc] {
+        (try? db.read { db in
+            try Acc
+                .filter(Column("treatment_result_id") == treatmentResultId)
+                .order(Column("id").asc)
+                .limit(limit)
+                .fetchAll(db)
+        }) ?? []
+    }
+
+    /// `Test.swift` 除錯用：同 `fetchACC(treatmentResultId:limit:)`，改查 gyro 表。
+    func fetchGYRO(treatmentResultId: Int64, limit: Int) -> [Gyro] {
+        (try? db.read { db in
+            try Gyro
+                .filter(Column("treatment_result_id") == treatmentResultId)
+                .order(Column("id").asc)
+                .limit(limit)
+                .fetchAll(db)
+        }) ?? []
+    }
+
+    /// `Test.swift` 除錯用：同 `fetchACC(treatmentResultId:limit:)`，改查 exg 表。
+    func fetchEXG(treatmentResultId: Int64, limit: Int) -> [Exg] {
+        (try? db.read { db in
+            try Exg
+                .filter(Column("treatment_result_id") == treatmentResultId)
+                .order(Column("id").asc)
+                .limit(limit)
+                .fetchAll(db)
+        }) ?? []
+    }
+
     /// 匯出功能專用：以 `treatment_result_id` 過濾，取這局遊戲的全部 advanced_statistics 資料（沒有裝置區分）。
     func fetchAdvancedStatistics(treatmentResultId: Int64) -> [AdvancedStatistics] {
         (try? db.read { db in

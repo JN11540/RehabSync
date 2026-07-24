@@ -8,6 +8,12 @@ import UIKit
 struct TestPage: View {
     let btVM: BluetoothViewModel
 
+    @State private var treatmentResultIdInput: String = ""
+    @State private var debugAccRows: [Acc] = []
+    @State private var debugGyroRows: [Gyro] = []
+    @State private var debugExgRows: [Exg] = []
+    @State private var hasQueriedDebugRows = false
+
     private var bothConnected: Bool {
         let dvm = DeviceViewModel()
         guard let thigh = dvm.fetch(limb: 0), let thighUUID = UUID(uuidString: thigh.device_uuid),
@@ -164,9 +170,72 @@ struct TestPage: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 24)
+
+                // 除錯用：輸入 treatment_result_id，查 acc/gyro/exg 三張表各 10 筆原始資料，
+                // 不經過匯出查詢（不需要先查到 device_id），方便直接確認資料庫裡到底有沒有資料。
+                HStack(spacing: 12) {
+                    TextField("輸入 treatment_result_id", text: $treatmentResultIdInput)
+                        .keyboardType(.numberPad)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 220)
+
+                    Button("查詢") { queryDebugRows() }
+                        .font(.system(size: 15, weight: .medium))
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(Int64(treatmentResultIdInput) != nil ? Color.blue.opacity(0.85) : Color.gray.opacity(0.3))
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .disabled(Int64(treatmentResultIdInput) == nil)
+                }
+                .padding(.horizontal, 24)
+
+                if hasQueriedDebugRows {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 16) {
+                            debugRowsSection(title: "acc（\(debugAccRows.count) 筆）") {
+                                ForEach(debugAccRows) { row in
+                                    Text("id:\(row.id ?? -1) device:\(row.device_id) ts:\(row.timestamp) x:\(row.x) y:\(row.y) z:\(row.z)")
+                                }
+                            }
+                            debugRowsSection(title: "gyro（\(debugGyroRows.count) 筆）") {
+                                ForEach(debugGyroRows) { row in
+                                    Text("id:\(row.id ?? -1) device:\(row.device_id) ts:\(row.timestamp) pitch:\(row.pitch) roll:\(row.roll) yaw:\(row.yaw)")
+                                }
+                            }
+                            debugRowsSection(title: "exg（\(debugExgRows.count) 筆）") {
+                                ForEach(debugExgRows) { row in
+                                    Text("id:\(row.id ?? -1) device:\(row.device_id) ts:\(row.timestamp) ch:\(row.channel) value:\(row.value)")
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 24)
+                    }
+                }
             }
             .padding(.top, 20)
         }
+    }
+
+    @ViewBuilder
+    private func debugRowsSection<Content: View>(title: String, @ViewBuilder rows: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.system(size: 15, weight: .semibold))
+            rows()
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func queryDebugRows() {
+        guard let treatmentResultId = Int64(treatmentResultIdInput) else { return }
+        let dvm = DeviceViewModel()
+        debugAccRows = dvm.fetchACC(treatmentResultId: treatmentResultId, limit: 10)
+        debugGyroRows = dvm.fetchGYRO(treatmentResultId: treatmentResultId, limit: 10)
+        debugExgRows = dvm.fetchEXG(treatmentResultId: treatmentResultId, limit: 10)
+        hasQueriedDebugRows = true
     }
 
     private func stepStatusText(_ status: Int) -> String {
