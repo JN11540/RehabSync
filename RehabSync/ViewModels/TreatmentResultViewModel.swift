@@ -129,8 +129,9 @@ enum ExportDestinationStore {
 
 // MARK: - GameDataExporter（database-update-plan.md「4. 完成視窗『匯出JSON』功能」）
 
-/// 匯出功能專用：組裝「4 個 CSV 檔 + 1 個 JSON 檔」的內容，對應 database-update-plan.md
-/// 「4. 完成視窗『匯出JSON』功能」的規劃。只負責產生檔名＋內容字串，不負責寫檔／分享（見階段 4、5）。
+/// 匯出功能專用：組裝「7 個 CSV 檔 + 1 個 JSON 檔」的內容，對應 database-update-plan.md
+/// 「4. 完成視窗『匯出JSON』功能」的規劃（exg 依 exg-csv-split-plan.md 拆成 4 個檔案）。
+/// 只負責產生檔名＋內容字串，不負責寫檔／分享（見階段 4、5）。
 enum GameDataExporter {
 
     struct ExportFile {
@@ -138,7 +139,7 @@ enum GameDataExporter {
         let content: String
     }
 
-    /// 產生這局遊戲（`treatmentResult`）對應的 5 個匯出檔案。
+    /// 產生這局遊戲（`treatmentResult`）對應的 8 個匯出檔案。
     static func export(treatmentResult: TreatmentResult, deviceVM: DeviceViewModel) -> [ExportFile] {
         guard let treatmentResultId = treatmentResult.id else { return [] }
 
@@ -157,8 +158,20 @@ enum GameDataExporter {
             treatmentResultId: treatmentResultId, thighDeviceId: thighDeviceId, calfDeviceId: calfDeviceId,
             setStartTimes: setStartTimes, setEndTimes: setEndTimes, deviceVM: deviceVM
         )
-        let exgCSV = buildExgCSV(
-            treatmentResultId: treatmentResultId, thighDeviceId: thighDeviceId, calfDeviceId: calfDeviceId,
+        let exgThighCh0CSV = buildExgChannelCSV(
+            treatmentResultId: treatmentResultId, deviceId: thighDeviceId, channel: 0,
+            setStartTimes: setStartTimes, setEndTimes: setEndTimes, deviceVM: deviceVM
+        )
+        let exgThighCh1CSV = buildExgChannelCSV(
+            treatmentResultId: treatmentResultId, deviceId: thighDeviceId, channel: 1,
+            setStartTimes: setStartTimes, setEndTimes: setEndTimes, deviceVM: deviceVM
+        )
+        let exgCalfCh0CSV = buildExgChannelCSV(
+            treatmentResultId: treatmentResultId, deviceId: calfDeviceId, channel: 0,
+            setStartTimes: setStartTimes, setEndTimes: setEndTimes, deviceVM: deviceVM
+        )
+        let exgCalfCh1CSV = buildExgChannelCSV(
+            treatmentResultId: treatmentResultId, deviceId: calfDeviceId, channel: 1,
             setStartTimes: setStartTimes, setEndTimes: setEndTimes, deviceVM: deviceVM
         )
         let statsCSV = buildAdvancedStatisticsCSV(treatmentResultId: treatmentResultId, deviceVM: deviceVM)
@@ -167,7 +180,10 @@ enum GameDataExporter {
         return [
             ExportFile(filename: "acc_\(date).csv", content: accCSV),
             ExportFile(filename: "gyro_\(date).csv", content: gyroCSV),
-            ExportFile(filename: "exg_\(date).csv", content: exgCSV),
+            ExportFile(filename: "exg_thigh_ch0_\(date).csv", content: exgThighCh0CSV),
+            ExportFile(filename: "exg_thigh_ch1_\(date).csv", content: exgThighCh1CSV),
+            ExportFile(filename: "exg_calf_ch0_\(date).csv", content: exgCalfCh0CSV),
+            ExportFile(filename: "exg_calf_ch1_\(date).csv", content: exgCalfCh1CSV),
             ExportFile(filename: "advanced_statistics_\(date).csv", content: statsCSV),
             ExportFile(filename: "treatment_result_\(date).json", content: resultJSON)
         ]
@@ -227,29 +243,28 @@ enum GameDataExporter {
 
     // MARK: - exg
 
-    private static func buildExgCSV(
-        treatmentResultId: Int64, thighDeviceId: Int64?, calfDeviceId: Int64?,
+    /// μV 換算係數：實驗校正得出的數值，不是感測器規格書上標示的 LSB 大小（見 exg-csv-split-plan.md）。
+    private static let exgMicrovoltScale = 0.00003
+
+    /// 單一裝置＋單一 channel 的 exg 匯出，欄位固定只有 `timestamp,uv`（見 exg-csv-split-plan.md）。
+    private static func buildExgChannelCSV(
+        treatmentResultId: Int64, deviceId: Int64?, channel: Int,
         setStartTimes: [Int], setEndTimes: [Int], deviceVM: DeviceViewModel
     ) -> String {
-        let header = "timestamp,thigh_channel0,thigh_channel1,calf_channel0,calf_channel1"
-        guard let thighDeviceId, let calfDeviceId else { return header }
+        let header = "timestamp,uv"
+        guard let deviceId else { return header }
 
-        let thighCh0 = deviceVM.fetchEXG(treatmentResultId: treatmentResultId, deviceId: thighDeviceId, channel: 0)
-        let thighCh1 = deviceVM.fetchEXG(treatmentResultId: treatmentResultId, deviceId: thighDeviceId, channel: 1)
-        let calfCh0 = deviceVM.fetchEXG(treatmentResultId: treatmentResultId, deviceId: calfDeviceId, channel: 0)
-        let calfCh1 = deviceVM.fetchEXG(treatmentResultId: treatmentResultId, deviceId: calfDeviceId, channel: 1)
-
+        let rows: [Exg] = deviceVM.fetchEXG(treatmentResultId: treatmentResultId, deviceId: deviceId, channel: channel)
         let merged = GameDataMerger.mergeByIndexPerSet(
-            sequences: [thighCh0, thighCh1, calfCh0, calfCh1], setStartTimes: setStartTimes, setEndTimes: setEndTimes,
+            sequences: [rows], setStartTimes: setStartTimes, setEndTimes: setEndTimes,
             timestamp: { $0.timestamp }
         )
-        guard merged.count == 4 else { return header }
-        let mThighCh0 = merged[0], mThighCh1 = merged[1], mCalfCh0 = merged[2], mCalfCh1 = merged[3]
+        guard merged.count == 1 else { return header }
+        let filtered: [Exg] = merged[0]
 
         var lines = [header]
-        for i in 0..<mThighCh0.count {
-            let a = mThighCh0[i], b = mThighCh1[i], c = mCalfCh0[i], d = mCalfCh1[i]
-            lines.append("\(a.timestamp),\(a.value),\(b.value),\(c.value),\(d.value)")
+        for row in filtered {
+            lines.append("\(row.timestamp),\(Double(row.value) * exgMicrovoltScale)")
         }
         return lines.joined(separator: "\n")
     }
