@@ -244,7 +244,9 @@ enum GameDataExporter {
     // MARK: - exg
 
     /// μV 換算係數：實驗校正得出的數值，不是感測器規格書上標示的 LSB 大小（見 exg-csv-split-plan.md）。
-    private static let exgMicrovoltScale = 0.00003
+    /// 內部可見度（不是 private）：結果頁 EXG 趨勢圖（`PostWorking_2`/`PostWorking_9`/`PostWorking_12`）
+    /// 也要用同一個係數換算 μV，數值才會跟匯出 CSV 一致。
+    static let exgMicrovoltScale = 0.00003
 
     /// 單一裝置＋單一 channel 的 exg 匯出，欄位固定只有 `timestamp,uv`（見 exg-csv-split-plan.md）。
     private static func buildExgChannelCSV(

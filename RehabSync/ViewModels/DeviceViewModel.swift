@@ -134,6 +134,21 @@ class DeviceViewModel {
         }) ?? []
     }
 
+    /// 結果頁 EXG 趨勢圖專用：以 `treatment_result_id`＋`device_id`＋`channel`＋時間範圍過濾，只查某一組的區間，
+    /// 不會把其他組別的資料一起撈進記憶體（見 postworking9-realdata-plan.md「6. EXG 趨勢圖」）。
+    func fetchEXG(treatmentResultId: Int64, deviceId: Int64, channel: Int, from: Int64, to: Int64) -> [Exg] {
+        (try? db.read { db in
+            try Exg
+                .filter(Column("treatment_result_id") == treatmentResultId
+                     && Column("device_id") == deviceId
+                     && Column("channel") == channel
+                     && Column("timestamp") >= from
+                     && Column("timestamp") <= to)
+                .order(Column("id").asc)
+                .fetchAll(db)
+        }) ?? []
+    }
+
     /// `Test.swift` 除錯用：只用 `treatment_result_id` 過濾（不分裝置），最多回傳 `limit` 筆，
     /// 方便直接確認這局遊戲底下資料庫裡到底有沒有任何原始 acc 資料，不受匯出查詢（需要先查到 device_id）影響。
     func fetchACC(treatmentResultId: Int64, limit: Int) -> [Acc] {

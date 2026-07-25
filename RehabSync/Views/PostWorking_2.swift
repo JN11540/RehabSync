@@ -502,21 +502,94 @@ private struct PostWorking2RetentionCard: View {
     }
 }
 
+// MARK: - EXG Trend Charts
+
+private struct PostWorking2ExgPoint: Identifiable {
+    let time: Double
+    let uv: Double
+    var id: Double { time }
+}
+
+/// 大腿／小腿、channel 0／1 共用的 EXG 趨勢圖卡片：不預先讀取進記憶體，只有卡片真的顯示出來
+/// （`.onAppear`）才用時間範圍查這一組的區間，換算 μV 的係數跟匯出 CSV（`GameDataExporter`）用同一個常數。
+private struct PostWorking2ExgCard: View {
+    let title: String
+    let treatmentResultId: Int64
+    let deviceId: Int64?
+    let channel: Int
+    let setStartTimeMs: Int
+    let setEndTimeMs: Int
+
+    @State private var dataPoints: [PostWorking2ExgPoint] = []
+
+    private var durationSeconds: Double {
+        max(0.001, Double(setEndTimeMs - setStartTimeMs) / 1000.0)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text(title)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Color.black)
+                Spacer()
+            }
+
+            Chart(dataPoints) { point in
+                LineMark(
+                    x: .value("時間（秒）", point.time),
+                    y: .value("μV", point.uv)
+                )
+                .foregroundStyle(PostWorking_2.darkPurple)
+                .interpolationMethod(.catmullRom)
+            }
+            .chartXScale(domain: 0...durationSeconds)
+            .chartXAxisLabel("時間（秒）", alignment: .center)
+            .chartYAxisLabel("μV", position: .leading, alignment: .center)
+            .frame(height: 220)
+        }
+        .padding(20)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black.opacity(0.05)))
+        .onAppear {
+            guard let deviceId else { return }
+            let rows = DeviceViewModel().fetchEXG(
+                treatmentResultId: treatmentResultId, deviceId: deviceId, channel: channel,
+                from: Int64(setStartTimeMs), to: Int64(setEndTimeMs)
+            )
+            dataPoints = rows.map { row in
+                PostWorking2ExgPoint(time: Double(row.timestamp - Int64(setStartTimeMs)) / 1000.0, uv: Double(row.value) * GameDataExporter.exgMicrovoltScale)
+            }
+        }
+    }
+}
+
 private struct PostWorking2RetentionDetailSheet: View {
     let treatmentResultId: Int64
     let setStartTimeMs: Int
     let setEndTimeMs: Int
 
     @Environment(\.dismiss) private var dismiss
+    @State private var thighDeviceId: Int64?
+    @State private var calfDeviceId: Int64?
 
     var body: some View {
         ZStack(alignment: .topLeading) {
             PostWorking_2.panelBackground.ignoresSafeArea()
 
-            PostWorking2RetentionCard(treatmentResultId: treatmentResultId, setStartTimeMs: setStartTimeMs, setEndTimeMs: setEndTimeMs)
+            ScrollView {
+                VStack(spacing: 20) {
+                    PostWorking2RetentionCard(treatmentResultId: treatmentResultId, setStartTimeMs: setStartTimeMs, setEndTimeMs: setEndTimeMs)
+                    PostWorking2ExgCard(title: "大腿 Channel 0", treatmentResultId: treatmentResultId, deviceId: thighDeviceId, channel: 0, setStartTimeMs: setStartTimeMs, setEndTimeMs: setEndTimeMs)
+                    PostWorking2ExgCard(title: "大腿 Channel 1", treatmentResultId: treatmentResultId, deviceId: thighDeviceId, channel: 1, setStartTimeMs: setStartTimeMs, setEndTimeMs: setEndTimeMs)
+                    PostWorking2ExgCard(title: "小腿 Channel 0", treatmentResultId: treatmentResultId, deviceId: calfDeviceId, channel: 0, setStartTimeMs: setStartTimeMs, setEndTimeMs: setEndTimeMs)
+                    PostWorking2ExgCard(title: "小腿 Channel 1", treatmentResultId: treatmentResultId, deviceId: calfDeviceId, channel: 1, setStartTimeMs: setStartTimeMs, setEndTimeMs: setEndTimeMs)
+                }
                 .padding(28)
                 .padding(.top, 60)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .frame(maxWidth: .infinity, alignment: .top)
+            }
 
             Button {
                 dismiss()
@@ -531,6 +604,12 @@ private struct PostWorking2RetentionDetailSheet: View {
             }
             .buttonStyle(.plain)
             .padding(20)
+        }
+        .onAppear {
+            let deviceVM = DeviceViewModel()
+            let side = deviceVM.fetchAnySide() ?? 0
+            thighDeviceId = deviceVM.fetch(side: side, limb: 0)?.id
+            calfDeviceId = deviceVM.fetch(side: side, limb: 1)?.id
         }
     }
 }
