@@ -225,6 +225,7 @@ struct Working9: View {
     }
 
     private func startSetRestCountdown() {
+        cancelInProgressHoldWithoutCounting()
         setRestTimer?.invalidate()
         setRestCountdown = content.set_rest_time
         showSetRestPopup = true
@@ -785,7 +786,7 @@ struct Working9: View {
             }
         }
         .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
-            guard !isSessionPaused else { return }
+            guard !isSessionPaused, btVM.isRecording else { return }
             if let angle = newValue, angle >= Self.holdThreshold {
                 startHoldTimer()
             } else {

@@ -702,7 +702,7 @@ struct Working12: View {
             }
         }
         .onChange(of: btVM.currentStepStatus) { oldValue, newValue in
-            guard !isSessionPaused else { return }
+            guard !isSessionPaused, btVM.isRecording else { return }
             // 只有站立狀態才計時：一回到站立（含一開始拿到第一筆資料）就開始計時，
             // 上階／下階全程不計時，離開站立時停止並依累計秒數先評好分（存到 pendingCoinCount，
             // 這時角色圖示是 TakoyakiMakeFoodIcon「做食物中」），
