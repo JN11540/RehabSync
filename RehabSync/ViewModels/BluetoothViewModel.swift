@@ -897,6 +897,27 @@ extension BluetoothViewModel: CBPeripheralDelegate {
         charMap[peripheral.identifier] = map
     }
 
+    /// 除錯用：只印 exg 特徵值的訂閱結果，並標出是大腿還是小腿裝置，
+    /// 用來排查「大腿 exg 兩個 channel 都沒資料」是不是訂閱本身就失敗（見 exg-2ch-packet-verification-plan.md）。
+    func peripheral(_ peripheral: CBPeripheral,
+                    didUpdateNotificationStateFor characteristic: CBCharacteristic,
+                    error: Error?) {
+        #if DEBUG
+        guard let config = bluetoothConfig, characteristic.uuid == CBUUID(string: config.sub_exg_uuid) else { return }
+        let dvm = DeviceViewModel()
+        let side = dvm.fetchAnySide() ?? 0
+        let limbLabel: String
+        if peripheral.identifier.uuidString == dvm.fetch(side: side, limb: 0)?.device_uuid {
+            limbLabel = "大腿"
+        } else if peripheral.identifier.uuidString == dvm.fetch(side: side, limb: 1)?.device_uuid {
+            limbLabel = "小腿"
+        } else {
+            limbLabel = "未知(\(peripheral.identifier))"
+        }
+        print("[BLE-EXG] limb=\(limbLabel) isNotifying=\(characteristic.isNotifying) error=\(String(describing: error))")
+        #endif
+    }
+
     func peripheral(_ peripheral: CBPeripheral,
                     didUpdateValueFor characteristic: CBCharacteristic,
                     error: Error?) {
