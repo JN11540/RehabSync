@@ -552,7 +552,10 @@ private struct PostWorking9ExgCard: View {
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black.opacity(0.05)))
-        .onAppear {
+        // `deviceId` 是父層 `RetentionDetailSheet` 自己 `.onAppear` 非同步查出來才設定的，第一次渲染時是 nil；
+        // 用 `.task(id: deviceId)` 而不是 `.onAppear`，才會在 `deviceId` 從 nil 變成真正的值時重新查一次，
+        // 不然 `.onAppear` 只在畫面第一次出現時觸發一次，會永遠卡在「deviceId 還是 nil」那次查詢結果。
+        .task(id: deviceId) {
             guard let deviceId else { return }
             let rows = DeviceViewModel().fetchEXG(
                 treatmentResultId: treatmentResultId, deviceId: deviceId, channel: channel,
