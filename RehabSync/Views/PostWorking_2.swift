@@ -510,8 +510,9 @@ private struct PostWorking2ExgPoint: Identifiable {
     var id: Double { time }
 }
 
-/// 大腿／小腿、channel 0／1 共用的 EXG 趨勢圖卡片：不預先讀取進記憶體，只有卡片真的顯示出來
-/// （`.onAppear`）才用時間範圍查這一組的區間，換算 μV 的係數跟匯出 CSV（`GameDataExporter`）用同一個常數。
+/// 大腿／小腿、channel 0／1 共用的 EXG 趨勢圖卡片：不預先讀取進記憶體，只有使用者在「檢視」視窗點選
+/// 對應分頁、這張卡片才會被建立出來（見 `PostWorking2RetentionDetailSheet`），建立後才用時間範圍查這一組
+/// 的區間，換算 μV 的係數跟匯出 CSV（`GameDataExporter`）用同一個常數。
 private struct PostWorking2ExgCard: View {
     let title: String
     let treatmentResultId: Int64
@@ -525,6 +526,10 @@ private struct PostWorking2ExgCard: View {
     private var durationSeconds: Double {
         max(0.001, Double(setEndTimeMs - setStartTimeMs) / 1000.0)
     }
+
+    /// 分頁切換時（例如大腿 Ch0 → 大腿 Ch1）`deviceId` 可能不變，只有 `channel` 變了；
+    /// `.task(id:)` 一定要同時綁 `deviceId` 跟 `channel`，只綁 `deviceId` 會漏掉「同裝置換 channel」這個情境。
+    private var queryKey: String { "\(deviceId?.description ?? "nil")-\(channel)" }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -552,10 +557,8 @@ private struct PostWorking2ExgCard: View {
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black.opacity(0.05)))
-        // `deviceId` 是父層 `RetentionDetailSheet` 自己 `.onAppear` 非同步查出來才設定的，第一次渲染時是 nil；
-        // 用 `.task(id: deviceId)` 而不是 `.onAppear`，才會在 `deviceId` 從 nil 變成真正的值時重新查一次，
-        // 不然 `.onAppear` 只在畫面第一次出現時觸發一次，會永遠卡在「deviceId 還是 nil」那次查詢結果。
-        .task(id: deviceId) {
+        .task(id: queryKey) {
+            dataPoints = []
             guard let deviceId else { return }
             let rows = DeviceViewModel().fetchEXG(
                 treatmentResultId: treatmentResultId, deviceId: deviceId, channel: channel,
@@ -576,6 +579,17 @@ private struct PostWorking2RetentionDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var thighDeviceId: Int64?
     @State private var calfDeviceId: Int64?
+    /// `nil` = 沒有任何分頁被選中（預設狀態，底下完全空白，不查詢任何 EXG 資料）。
+    @State private var selectedExgChannel: Int? = nil
+
+    private var exgTabs: [(title: String, deviceId: Int64?, channel: Int)] {
+        [
+            ("大腿 Channel 0", thighDeviceId, 0),
+            ("大腿 Channel 1", thighDeviceId, 1),
+            ("小腿 Channel 0", calfDeviceId, 0),
+            ("小腿 Channel 1", calfDeviceId, 1)
+        ]
+    }
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -584,10 +598,29 @@ private struct PostWorking2RetentionDetailSheet: View {
             ScrollView {
                 VStack(spacing: 20) {
                     PostWorking2RetentionCard(treatmentResultId: treatmentResultId, setStartTimeMs: setStartTimeMs, setEndTimeMs: setEndTimeMs)
-                    PostWorking2ExgCard(title: "大腿 Channel 0", treatmentResultId: treatmentResultId, deviceId: thighDeviceId, channel: 0, setStartTimeMs: setStartTimeMs, setEndTimeMs: setEndTimeMs)
-                    PostWorking2ExgCard(title: "大腿 Channel 1", treatmentResultId: treatmentResultId, deviceId: thighDeviceId, channel: 1, setStartTimeMs: setStartTimeMs, setEndTimeMs: setEndTimeMs)
-                    PostWorking2ExgCard(title: "小腿 Channel 0", treatmentResultId: treatmentResultId, deviceId: calfDeviceId, channel: 0, setStartTimeMs: setStartTimeMs, setEndTimeMs: setEndTimeMs)
-                    PostWorking2ExgCard(title: "小腿 Channel 1", treatmentResultId: treatmentResultId, deviceId: calfDeviceId, channel: 1, setStartTimeMs: setStartTimeMs, setEndTimeMs: setEndTimeMs)
+
+                    HStack(spacing: 12) {
+                        ForEach(exgTabs.indices, id: \.self) { index in
+                            Button {
+                                selectedExgChannel = index
+                            } label: {
+                                Text(exgTabs[index].title)
+                                    .font(.system(size: 20, weight: .semibold))
+                                    .foregroundStyle(selectedExgChannel == index ? Color.white : PostWorking_2.mutedText)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
+                                    .background(selectedExgChannel == index ? PostWorking_2.darkPurple : Color.clear)
+                                    .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        Spacer()
+                    }
+
+                    if let selectedExgChannel, exgTabs.indices.contains(selectedExgChannel) {
+                        let tab = exgTabs[selectedExgChannel]
+                        PostWorking2ExgCard(title: tab.title, treatmentResultId: treatmentResultId, deviceId: tab.deviceId, channel: tab.channel, setStartTimeMs: setStartTimeMs, setEndTimeMs: setEndTimeMs)
+                    }
                 }
                 .padding(28)
                 .padding(.top, 60)
