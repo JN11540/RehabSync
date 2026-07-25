@@ -1098,6 +1098,11 @@ extension BluetoothViewModel: CBPeripheralDelegate {
         }
         let treatmentResultId = DispatchQueue.main.sync { self.currentTreatmentResultId }
         deviceVM.insertEXGBatch(deviceId: deviceId, timestamp: timestamp, treatmentResultId: treatmentResultId, channel: channel, values: values)
+
+        #if DEBUG
+        // 除錯用：確認這筆 exg 資料有成功寫進資料庫，用來測試「只連一個裝置」時 exg 資料是否正常。
+        print("[EXG-WRITE] deviceId=\(deviceId) channel=\(channel) timestamp=\(timestamp)")
+        #endif
     }
 }
 

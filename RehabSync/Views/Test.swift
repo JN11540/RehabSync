@@ -23,6 +23,13 @@ struct TestPage: View {
                btVM.connectedPeripherals[calfUUID]  != nil
     }
 
+    /// 除錯用：只要求至少一個裝置有連線，不像 `bothConnected` 要求兩個都連——
+    /// 用來測試「只連大腿（或只連小腿）」單一裝置時的記錄行為，正常遊戲流程（PreWorking／Working）
+    /// 需要兩個裝置都配對才能進去，這裡繞過這個限制方便單獨測試。
+    private var anyConnected: Bool {
+        !btVM.connectedPeripherals.isEmpty
+    }
+
     private var canExport: Bool {
         btVM.recordingStartTime != nil && btVM.recordingEndTime != nil
     }
@@ -51,11 +58,11 @@ struct TestPage: View {
                         .font(.system(size: 15, weight: .medium))
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
-                        .background(bothConnected && !btVM.isRecording
+                        .background(anyConnected && !btVM.isRecording
                             ? Color.green.opacity(0.85) : Color.gray.opacity(0.3))
                         .foregroundStyle(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .disabled(!bothConnected || btVM.isRecording)
+                        .disabled(!anyConnected || btVM.isRecording)
 
                     Button("停止收集") { btVM.stopRecordingAll() }
                         .font(.system(size: 15, weight: .medium))
