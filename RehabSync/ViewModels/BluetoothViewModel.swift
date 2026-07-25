@@ -44,6 +44,10 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     @ObservationIgnored private var bluetoothConfig: Bluetooth?
     @ObservationIgnored private var charMap: [UUID: [CBUUID: CBCharacteristic]] = [:]
     @ObservationIgnored private var deviceIdMap: [UUID: Int64] = [:]
+    #if DEBUG
+    // 除錯用：定時讀取大腿／小腿裝置的 RSSI，比較兩個位置的訊號強度（見 exg-2ch-packet-verification-plan.md）。
+    @ObservationIgnored private var rssiDebugTimers: [UUID: Timer] = [:]
+    #endif
 
     // Calibration — UI state (main thread)
     var gyroBiases: [UUID: GyroBias] = [:]
@@ -227,6 +231,14 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         if let c = map[gyroUUID] { peripheral.setNotifyValue(true, for: c) }
         if let c = map[exgUUID]  { peripheral.setNotifyValue(true, for: c) }
 
+        #if DEBUG
+        // 除錯用：每 2 秒讀一次這個裝置的 RSSI，比較大腿／小腿兩個位置的訊號強度。
+        rssiDebugTimers[peripheral.identifier]?.invalidate()
+        rssiDebugTimers[peripheral.identifier] = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak peripheral] _ in
+            peripheral?.readRSSI()
+        }
+        #endif
+
         DispatchQueue.main.async { self.isRecording = true }
     }
 
@@ -242,8 +254,29 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         if let c = map[gyroUUID] { peripheral.setNotifyValue(false, for: c) }
         if let c = map[exgUUID]  { peripheral.setNotifyValue(false, for: c) }
 
+        #if DEBUG
+        rssiDebugTimers[peripheral.identifier]?.invalidate()
+        rssiDebugTimers[peripheral.identifier] = nil
+        #endif
+
         DispatchQueue.main.async { self.isRecording = false }
     }
+
+    #if DEBUG
+    /// 除錯用：印出大腿／小腿裝置的 RSSI，用來比較兩個位置的訊號強度是否有明顯差距
+    /// （見 exg-2ch-packet-verification-plan.md）。
+    private func limbLabel(for peripheral: CBPeripheral) -> String {
+        let dvm = DeviceViewModel()
+        let side = dvm.fetchAnySide() ?? 0
+        if peripheral.identifier.uuidString == dvm.fetch(side: side, limb: 0)?.device_uuid {
+            return "大腿"
+        } else if peripheral.identifier.uuidString == dvm.fetch(side: side, limb: 1)?.device_uuid {
+            return "小腿"
+        } else {
+            return "未知(\(peripheral.identifier))"
+        }
+    }
+    #endif
 
     // MARK: - Calibration
 
@@ -904,19 +937,15 @@ extension BluetoothViewModel: CBPeripheralDelegate {
                     error: Error?) {
         #if DEBUG
         guard let config = bluetoothConfig, characteristic.uuid == CBUUID(string: config.sub_exg_uuid) else { return }
-        let dvm = DeviceViewModel()
-        let side = dvm.fetchAnySide() ?? 0
-        let limbLabel: String
-        if peripheral.identifier.uuidString == dvm.fetch(side: side, limb: 0)?.device_uuid {
-            limbLabel = "大腿"
-        } else if peripheral.identifier.uuidString == dvm.fetch(side: side, limb: 1)?.device_uuid {
-            limbLabel = "小腿"
-        } else {
-            limbLabel = "未知(\(peripheral.identifier))"
-        }
-        print("[BLE-EXG] limb=\(limbLabel) isNotifying=\(characteristic.isNotifying) error=\(String(describing: error))")
+        print("[BLE-EXG] limb=\(limbLabel(for: peripheral)) isNotifying=\(characteristic.isNotifying) error=\(String(describing: error))")
         #endif
     }
+
+    #if DEBUG
+    func peripheral(_ peripheral: CBPeripheral, didReadRSSI RSSI: NSNumber, error: Error?) {
+        print("[BLE-RSSI] limb=\(limbLabel(for: peripheral)) rssi=\(RSSI) error=\(String(describing: error))")
+    }
+    #endif
 
     func peripheral(_ peripheral: CBPeripheral,
                     didUpdateValueFor characteristic: CBCharacteristic,
