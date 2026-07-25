@@ -223,9 +223,21 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             peripheral.writeValue(config.cmd_a1, for: writeChar, type: .withResponse)
         }
 
+        #if DEBUG
+        // 除錯用：確認 exg 特徵值是否真的有在 charMap 裡被找到（探索階段有沒有發現這個特徵值），
+        // 以及呼叫 setNotifyValue 當下的 isNotifying（注意這是非同步操作，這裡讀到的很可能還是
+        // 舊狀態，真正的訂閱結果要看 didUpdateNotificationStateFor 的回呼）。
+        print("[BLE] map[exgUUID] exists=\(map[exgUUID] != nil)")
+        #endif
+
         if let c = map[accUUID]  { peripheral.setNotifyValue(true, for: c) }
         if let c = map[gyroUUID] { peripheral.setNotifyValue(true, for: c) }
-        if let c = map[exgUUID]  { peripheral.setNotifyValue(true, for: c) }
+        if let c = map[exgUUID]  {
+            peripheral.setNotifyValue(true, for: c)
+            #if DEBUG
+            print("[BLE] setNotifyValue(exg) requested, isNotifying=\(c.isNotifying)")
+            #endif
+        }
 
         DispatchQueue.main.async { self.isRecording = true }
     }
@@ -895,6 +907,17 @@ extension BluetoothViewModel: CBPeripheralDelegate {
         var map = charMap[peripheral.identifier] ?? [:]
         for char in chars { map[char.uuid] = char }
         charMap[peripheral.identifier] = map
+    }
+
+    /// 除錯用：`setNotifyValue` 是非同步操作，真正「訂閱有沒有成功」要看這個回呼。
+    /// acc／gyro／exg 三個特徵值各自呼叫一次 `setNotifyValue`，就會各自觸發一次這個回呼，
+    /// 可以清楚看到哪一個特徵值訂閱失敗、報什麼錯誤（見 exg-2ch-packet-verification-plan.md）。
+    func peripheral(_ peripheral: CBPeripheral,
+                    didUpdateNotificationStateFor characteristic: CBCharacteristic,
+                    error: Error?) {
+        #if DEBUG
+        print("[BLE] didUpdateNotificationStateFor uuid=\(characteristic.uuid) isNotifying=\(characteristic.isNotifying) error=\(String(describing: error))")
+        #endif
     }
 
     func peripheral(_ peripheral: CBPeripheral,
