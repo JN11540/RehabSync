@@ -223,21 +223,9 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             peripheral.writeValue(config.cmd_a1, for: writeChar, type: .withResponse)
         }
 
-        #if DEBUG
-        // 除錯用：確認 exg 特徵值是否真的有在 charMap 裡被找到（探索階段有沒有發現這個特徵值），
-        // 以及呼叫 setNotifyValue 當下的 isNotifying（注意這是非同步操作，這裡讀到的很可能還是
-        // 舊狀態，真正的訂閱結果要看 didUpdateNotificationStateFor 的回呼）。
-        print("[BLE] map[exgUUID] exists=\(map[exgUUID] != nil)")
-        #endif
-
         if let c = map[accUUID]  { peripheral.setNotifyValue(true, for: c) }
         if let c = map[gyroUUID] { peripheral.setNotifyValue(true, for: c) }
-        if let c = map[exgUUID]  {
-            peripheral.setNotifyValue(true, for: c)
-            #if DEBUG
-            print("[BLE] setNotifyValue(exg) requested, isNotifying=\(c.isNotifying)")
-            #endif
-        }
+        if let c = map[exgUUID]  { peripheral.setNotifyValue(true, for: c) }
 
         DispatchQueue.main.async { self.isRecording = true }
     }
@@ -909,17 +897,6 @@ extension BluetoothViewModel: CBPeripheralDelegate {
         charMap[peripheral.identifier] = map
     }
 
-    /// 除錯用：`setNotifyValue` 是非同步操作，真正「訂閱有沒有成功」要看這個回呼。
-    /// acc／gyro／exg 三個特徵值各自呼叫一次 `setNotifyValue`，就會各自觸發一次這個回呼，
-    /// 可以清楚看到哪一個特徵值訂閱失敗、報什麼錯誤（見 exg-2ch-packet-verification-plan.md）。
-    func peripheral(_ peripheral: CBPeripheral,
-                    didUpdateNotificationStateFor characteristic: CBCharacteristic,
-                    error: Error?) {
-        #if DEBUG
-        print("[BLE] didUpdateNotificationStateFor uuid=\(characteristic.uuid) isNotifying=\(characteristic.isNotifying) error=\(String(describing: error))")
-        #endif
-    }
-
     func peripheral(_ peripheral: CBPeripheral,
                     didUpdateValueFor characteristic: CBCharacteristic,
                     error: Error?) {
@@ -1060,15 +1037,6 @@ extension BluetoothViewModel: CBPeripheralDelegate {
     private func parseEXG(_ data: Data, deviceId: Int64, timestamp: Int64) {
         guard !data.isEmpty else { return }
         let flag = data[0]
-
-        #if DEBUG
-        // 除錯用：印出原始封包完整 hex，用來實機抓包驗證 2CH 模式下 128 bytes 的兩個 channel 到底怎麼排列
-        // （交錯排列 vs 前後分段，見 exg-2ch-packet-verification-plan.md）。放在 guard 之前，
-        // 即使實機封包的 flag／長度跟規格書預期不同，也看得到原始資料。確認排列方式、
-        // 修正好下面的拆分邏輯之後，這段 print 要記得移除。
-        let hex = data.map { String(format: "%02X", $0) }.joined()
-        print("[EXG] deviceId=\(deviceId) flag=0x\(String(format: "%02X", flag)) len=\(data.count) hex=\(hex)")
-        #endif
 
         guard flag == 0xE0 || flag == 0xE1 else { return }
         guard data.count >= 131 else { return }
