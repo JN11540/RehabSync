@@ -149,6 +149,15 @@ func createAppDatabase() throws -> DatabaseQueue {
         }
     }
 
+    // 匯出功能專用查詢（GameDataExporter.export）原本是全表掃描，這幾張表的清理門檻高達
+    // 1,728 萬筆（見 DeviceViewModel.swift 的 shouldCleanAcc/Gyro/Exg），全表掃描會很慢。
+    migrator.registerMigration("v9") { db in
+        try db.create(index: "idx_acc_treatment_result_id", on: "acc", columns: ["treatment_result_id"])
+        try db.create(index: "idx_gyro_treatment_result_id", on: "gyro", columns: ["treatment_result_id"])
+        try db.create(index: "idx_exg_treatment_result_id_device_id_channel", on: "exg", columns: ["treatment_result_id", "device_id", "channel"])
+        try db.create(index: "idx_advanced_statistics_treatment_result_id", on: "advanced_statistics", columns: ["treatment_result_id"])
+    }
+
     try migrator.migrate(dbQueue)
     return dbQueue
 }
