@@ -44,10 +44,6 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     @ObservationIgnored private var bluetoothConfig: Bluetooth?
     @ObservationIgnored private var charMap: [UUID: [CBUUID: CBCharacteristic]] = [:]
     @ObservationIgnored private var deviceIdMap: [UUID: Int64] = [:]
-    #if DEBUG
-    // 除錯用：定時讀取大腿／小腿裝置的 RSSI，比較兩個位置的訊號強度（見 exg-2ch-packet-verification-plan.md）。
-    @ObservationIgnored private var rssiDebugTimers: [UUID: Timer] = [:]
-    #endif
 
     // Calibration — UI state (main thread)
     var gyroBiases: [UUID: GyroBias] = [:]
@@ -113,6 +109,10 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             return
         }
 
+        insertBluetoothFromJSON(db: db)
+    }
+
+    private func insertBluetoothFromJSON(db: DatabaseQueue) {
         guard let url = Bundle.main.url(forResource: "bluetooth", withExtension: "json") else {
             print("[seed] ❌ 找不到 bluetooth.json")
             return
@@ -231,14 +231,6 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         if let c = map[gyroUUID] { peripheral.setNotifyValue(true, for: c) }
         if let c = map[exgUUID]  { peripheral.setNotifyValue(true, for: c) }
 
-        #if DEBUG
-        // 除錯用：每 2 秒讀一次這個裝置的 RSSI，比較大腿／小腿兩個位置的訊號強度。
-        rssiDebugTimers[peripheral.identifier]?.invalidate()
-        rssiDebugTimers[peripheral.identifier] = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak peripheral] _ in
-            peripheral?.readRSSI()
-        }
-        #endif
-
         DispatchQueue.main.async { self.isRecording = true }
     }
 
@@ -254,29 +246,8 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         if let c = map[gyroUUID] { peripheral.setNotifyValue(false, for: c) }
         if let c = map[exgUUID]  { peripheral.setNotifyValue(false, for: c) }
 
-        #if DEBUG
-        rssiDebugTimers[peripheral.identifier]?.invalidate()
-        rssiDebugTimers[peripheral.identifier] = nil
-        #endif
-
         DispatchQueue.main.async { self.isRecording = false }
     }
-
-    #if DEBUG
-    /// 除錯用：印出大腿／小腿裝置的 RSSI，用來比較兩個位置的訊號強度是否有明顯差距
-    /// （見 exg-2ch-packet-verification-plan.md）。
-    private func limbLabel(for peripheral: CBPeripheral) -> String {
-        let dvm = DeviceViewModel()
-        let side = dvm.fetchAnySide() ?? 0
-        if peripheral.identifier.uuidString == dvm.fetch(side: side, limb: 0)?.device_uuid {
-            return "大腿"
-        } else if peripheral.identifier.uuidString == dvm.fetch(side: side, limb: 1)?.device_uuid {
-            return "小腿"
-        } else {
-            return "未知(\(peripheral.identifier))"
-        }
-    }
-    #endif
 
     // MARK: - Calibration
 
@@ -930,23 +901,6 @@ extension BluetoothViewModel: CBPeripheralDelegate {
         charMap[peripheral.identifier] = map
     }
 
-    /// 除錯用：只印 exg 特徵值的訂閱結果，並標出是大腿還是小腿裝置，
-    /// 用來排查「大腿 exg 兩個 channel 都沒資料」是不是訂閱本身就失敗（見 exg-2ch-packet-verification-plan.md）。
-    func peripheral(_ peripheral: CBPeripheral,
-                    didUpdateNotificationStateFor characteristic: CBCharacteristic,
-                    error: Error?) {
-        #if DEBUG
-        guard let config = bluetoothConfig, characteristic.uuid == CBUUID(string: config.sub_exg_uuid) else { return }
-        print("[BLE-EXG] limb=\(limbLabel(for: peripheral)) isNotifying=\(characteristic.isNotifying) error=\(String(describing: error))")
-        #endif
-    }
-
-    #if DEBUG
-    func peripheral(_ peripheral: CBPeripheral, didReadRSSI RSSI: NSNumber, error: Error?) {
-        print("[BLE-RSSI] limb=\(limbLabel(for: peripheral)) rssi=\(RSSI) error=\(String(describing: error))")
-    }
-    #endif
-
     func peripheral(_ peripheral: CBPeripheral,
                     didUpdateValueFor characteristic: CBCharacteristic,
                     error: Error?) {
@@ -1098,11 +1052,6 @@ extension BluetoothViewModel: CBPeripheralDelegate {
         }
         let treatmentResultId = DispatchQueue.main.sync { self.currentTreatmentResultId }
         deviceVM.insertEXGBatch(deviceId: deviceId, timestamp: timestamp, treatmentResultId: treatmentResultId, channel: channel, values: values)
-
-        #if DEBUG
-        // 除錯用：確認這筆 exg 資料有成功寫進資料庫，用來測試「只連一個裝置」時 exg 資料是否正常。
-        print("[EXG-WRITE] deviceId=\(deviceId) channel=\(channel) timestamp=\(timestamp)")
-        #endif
     }
 }
 

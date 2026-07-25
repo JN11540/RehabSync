@@ -146,12 +146,6 @@ enum GameDataExporter {
         let side = deviceVM.fetchAnySide() ?? 0
         let thighDeviceId = deviceVM.fetch(side: side, limb: 0)?.id
         let calfDeviceId = deviceVM.fetch(side: side, limb: 1)?.id
-        #if DEBUG
-        // 除錯用：確認匯出查詢時解析出來的 thighDeviceId／calfDeviceId 是否為 nil，
-        // 用來排查「大腿 exg 兩個 channel 都只有表頭」是查不到裝置 id，還是資料庫裡這個
-        // deviceId 真的沒有 exg 資料（見 game-data-flow.md／exg-csv-split-plan.md）。
-        print("[EXG-EXPORT] side=\(side) thighDeviceId=\(String(describing: thighDeviceId)) calfDeviceId=\(String(describing: calfDeviceId))")
-        #endif
         let date = treatmentResult.date
         let setStartTimes = treatmentResult.set_start_time
         let setEndTimes = treatmentResult.set_end_time
