@@ -1038,6 +1038,15 @@ extension BluetoothViewModel: CBPeripheralDelegate {
         guard !data.isEmpty else { return }
         let flag = data[0]
 
+        #if DEBUG
+        // 除錯用：印出原始封包完整 hex，用來實機抓包驗證 2CH 模式下 128 bytes 的兩個 channel 到底怎麼排列
+        // （交錯排列 vs 前後分段，見 exg-2ch-packet-verification-plan.md）。放在 guard 之前，
+        // 即使實機封包的 flag／長度跟規格書預期不同，也看得到原始資料。確認排列方式、
+        // 修正好下面的拆分邏輯之後，這段 print 要記得移除。
+        let hex = data.map { String(format: "%02X", $0) }.joined()
+        print("[EXG] deviceId=\(deviceId) flag=0x\(String(format: "%02X", flag)) len=\(data.count) hex=\(hex)")
+        #endif
+
         guard flag == 0xE0 || flag == 0xE1 else { return }
         guard data.count >= 131 else { return }
 
