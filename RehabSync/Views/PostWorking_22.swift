@@ -496,14 +496,94 @@ private struct PostWorking22RetentionCard: View {
     }
 }
 
-// 分頁式 EXG 趨勢圖（比照 PostWorking_2／PostWorking_9／PostWorking_12 已完成的做法）
-// 是 working22-database-port-plan.md 明確列為之後才評估的範圍，這個畫面先只顯示膝角度。
+// MARK: - EXG Trend Charts
+
+private struct PostWorking22ExgPoint: Identifiable {
+    let time: Double
+    let uv: Double
+    var id: Double { time }
+}
+
+/// 大腿／小腿、channel 0／1 共用的 EXG 趨勢圖卡片：不預先讀取進記憶體，只有使用者在「檢視」視窗點選
+/// 對應分頁、這張卡片才會被建立出來（見 `PostWorking22RetentionDetailSheet`），建立後才用時間範圍查這一組
+/// 的區間，換算 μV 的係數跟匯出 CSV（`GameDataExporter`）用同一個常數。
+private struct PostWorking22ExgCard: View {
+    let title: String
+    let treatmentResultId: Int64
+    let deviceId: Int64?
+    let channel: Int
+    let setStartTimeMs: Int
+    let setEndTimeMs: Int
+
+    @State private var dataPoints: [PostWorking22ExgPoint] = []
+
+    private var durationSeconds: Double {
+        max(0.001, Double(setEndTimeMs - setStartTimeMs) / 1000.0)
+    }
+
+    /// 分頁切換時（例如大腿 Ch0 → 大腿 Ch1）`deviceId` 可能不變，只有 `channel` 變了；
+    /// `.task(id:)` 一定要同時綁 `deviceId` 跟 `channel`，只綁 `deviceId` 會漏掉「同裝置換 channel」這個情境。
+    private var queryKey: String { "\(deviceId?.description ?? "nil")-\(channel)" }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text(title)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Color.black)
+                Spacer()
+            }
+
+            Chart(dataPoints) { point in
+                LineMark(
+                    x: .value("時間（秒）", point.time),
+                    y: .value("μV", point.uv)
+                )
+                .foregroundStyle(PostWorking_22.darkPurple)
+                .interpolationMethod(.catmullRom)
+            }
+            .chartXScale(domain: 0...durationSeconds)
+            .chartXAxisLabel("時間（秒）", alignment: .center)
+            .chartYAxisLabel("μV", position: .leading, alignment: .center)
+            .frame(height: 220)
+        }
+        .padding(20)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black.opacity(0.05)))
+        .task(id: queryKey) {
+            dataPoints = []
+            guard let deviceId else { return }
+            let rows = DeviceViewModel().fetchEXG(
+                treatmentResultId: treatmentResultId, deviceId: deviceId, channel: channel,
+                from: Int64(setStartTimeMs), to: Int64(setEndTimeMs)
+            )
+            dataPoints = rows.map { row in
+                PostWorking22ExgPoint(time: Double(row.timestamp - Int64(setStartTimeMs)) / 1000.0, uv: Double(row.value) * GameDataExporter.exgMicrovoltScale)
+            }
+        }
+    }
+}
+
 private struct PostWorking22RetentionDetailSheet: View {
     let treatmentResultId: Int64
     let setStartTimeMs: Int
     let setEndTimeMs: Int
 
     @Environment(\.dismiss) private var dismiss
+    @State private var thighDeviceId: Int64?
+    @State private var calfDeviceId: Int64?
+    /// `nil` = 沒有任何分頁被選中（預設狀態，底下完全空白，不查詢任何 EXG 資料）。
+    @State private var selectedExgChannel: Int? = nil
+
+    private var exgTabs: [(title: String, deviceId: Int64?, channel: Int)] {
+        [
+            ("大腿 Channel 0", thighDeviceId, 0),
+            ("大腿 Channel 1", thighDeviceId, 1),
+            ("小腿 Channel 0", calfDeviceId, 0),
+            ("小腿 Channel 1", calfDeviceId, 1)
+        ]
+    }
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -512,6 +592,29 @@ private struct PostWorking22RetentionDetailSheet: View {
             ScrollView {
                 VStack(spacing: 20) {
                     PostWorking22RetentionCard(treatmentResultId: treatmentResultId, setStartTimeMs: setStartTimeMs, setEndTimeMs: setEndTimeMs)
+
+                    HStack(spacing: 12) {
+                        ForEach(exgTabs.indices, id: \.self) { index in
+                            Button {
+                                selectedExgChannel = index
+                            } label: {
+                                Text(exgTabs[index].title)
+                                    .font(.system(size: 20, weight: .semibold))
+                                    .foregroundStyle(selectedExgChannel == index ? Color.white : PostWorking_22.mutedText)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
+                                    .background(selectedExgChannel == index ? PostWorking_22.darkPurple : Color.clear)
+                                    .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        Spacer()
+                    }
+
+                    if let selectedExgChannel, exgTabs.indices.contains(selectedExgChannel) {
+                        let tab = exgTabs[selectedExgChannel]
+                        PostWorking22ExgCard(title: tab.title, treatmentResultId: treatmentResultId, deviceId: tab.deviceId, channel: tab.channel, setStartTimeMs: setStartTimeMs, setEndTimeMs: setEndTimeMs)
+                    }
                 }
                 .padding(28)
                 .padding(.top, 60)
@@ -531,6 +634,12 @@ private struct PostWorking22RetentionDetailSheet: View {
             }
             .buttonStyle(.plain)
             .padding(20)
+        }
+        .onAppear {
+            let deviceVM = DeviceViewModel()
+            let side = deviceVM.fetchAnySide() ?? 0
+            thighDeviceId = deviceVM.fetch(side: side, limb: 0)?.id
+            calfDeviceId = deviceVM.fetch(side: side, limb: 1)?.id
         }
     }
 }
