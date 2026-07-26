@@ -8,8 +8,9 @@ import CoreBluetooth
 /// 同時 astronaut_fuel.png 從雙手位置飛進火箭燃料艙口（同樣 1.5 秒），燃料箱抵達的瞬間
 /// astronaut_space_shuttle.png 會連續放大＋變亮再變回原狀 3 次；不論是否達到 1 秒，
 /// 只要回落到 < 25° 直式膠囊水位都會歸零；讀秒不足 1 秒時不計入 currentRep／評語次數／金錢，
-/// 也不觸發 release/燃料箱/pulse 動畫，讀秒門檻跟 9_Working.swift／2_Working.swift 一樣是
-/// 1/3/5 秒對應 好/棒/優、3/9/15 元。
+/// 也不觸發 release/燃料箱/pulse/金錢動畫，讀秒門檻跟 9_Working.swift／2_Working.swift 一樣是
+/// 1/3/5 秒對應 好/棒/優、3/9/15 個 coin.png；燃料箱抵達的同時，3/9/15 個 coin.png 也各自
+/// 從固定起點拋物線飛到燃料艙口，並在右側依序顯示 +100/+200/... 累計金額（totalCoins 逐一累加）。
 /// 頂部矩形匡顯示目標組次數、實際組次數、好/棒/優各自次數、累積金錢；左側圓圈顯示即時角度數字。
 /// 組間休息、完成彈窗等其餘遊戲機制尚未實作，等後續確認規則後再依 9_Working.swift 的骨架補上。
 struct Working22: View {
@@ -197,6 +198,39 @@ struct Working22: View {
         }
     }
 
+    // MARK: - 右側金錢累計數字（跟 coin.png 抵達同步，+100 → +200 → +300...）
+
+    @State private var scoreElapsed: Double = -1
+    @State private var scoreTimer: Timer?
+    private static let scoreHoldAfterLast: Double = 0.6
+
+    /// delay 秒後（跟 triggerCoinBurst 同一個時間點）開始跑右側的「+100/+200/+300...」累計數字：
+    /// 數字累加跟硬幣飛行動畫脫鉤，用自己的 Timer 依固定節奏（CoinBurstScoreLabel.stagger）逐一往上跳，
+    /// 確保無論硬幣數量多少，一定會完整跑完第一個數字到最後一個數字，寫法跟 9_Working.swift 的
+    /// startScoreSequence 完全相同；totalCoins 也是在這裡（而不是 recordHoldResult）逐一 +100 累加。
+    private func startScoreSequence(count: Int, delay: Double) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            scoreTimer?.invalidate()
+            let start = Date()
+            scoreElapsed = 0
+            var lastAppeared = 0
+            let totalDuration = Double(count) * CoinBurstScoreLabel.stagger + Self.scoreHoldAfterLast
+            scoreTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { t in
+                let e = Date().timeIntervalSince(start)
+                scoreElapsed = e
+                let currentAppeared = e >= 0 ? min(count, Int(e / CoinBurstScoreLabel.stagger) + 1) : 0
+                if currentAppeared > lastAppeared {
+                    totalCoins += (currentAppeared - lastAppeared) * 100
+                    lastAppeared = currentAppeared
+                }
+                if e >= totalDuration {
+                    t.invalidate()
+                    scoreElapsed = -1
+                }
+            }
+        }
+    }
+
     /// 進入 holding 狀態時開始讓 astronaut_holding.png 的內容物持續微微抖動，
     /// 用 Timer 每 0.08 秒隨機挑一個小幅偏移，模擬用力撐住時的顫抖感。
     private func startTremble() {
@@ -233,8 +267,9 @@ struct Working22: View {
     @State private var okCount = 0
     @State private var totalCoins = 0
 
-    // 評語對應的讀秒門檻跟 9_Working.swift／2_Working.swift 的 1/3/5 秒完全相同，
-    // 金錢獎勵也沿用同一套 3／9／15 的數字；回傳值同時也是 coin.png 拋物線動畫要飛幾個。
+    // 評語對應的讀秒門檻跟 9_Working.swift／2_Working.swift 的 1/3/5 秒完全相同；回傳值
+    // 同時是 coin.png 拋物線動畫要飛幾個、右側「+100/+200/...」數字要跑幾個 stagger。
+    // totalCoins 不在這裡加，改成跟 9_Working.swift 一樣交給 startScoreSequence 逐一 +100 累加。
     @discardableResult
     private func recordHoldResult(heldSeconds: Double) -> Int {
         let coinCount: Int
@@ -248,7 +283,6 @@ struct Working22: View {
             okCount += 1
             coinCount = 3
         }
-        totalCoins += coinCount
         currentRep += 1
         return coinCount
     }
@@ -276,6 +310,7 @@ struct Working22: View {
                 triggerFuelFlight()
                 startSpaceShuttlePulse(times: 3, delay: Self.releaseAnimationDuration)
                 triggerCoinBurst(count: coinCount, delay: Self.releaseAnimationDuration)
+                startScoreSequence(count: coinCount, delay: Self.releaseAnimationDuration)
             } else {
                 astronautState = .idle
             }
@@ -359,6 +394,17 @@ struct Working22: View {
                         count: coinBurstCount,
                         start: Self.overlayPosition(for: Self.canvasFraction(x: Self.coinStartPixel.x, y: Self.coinStartPixel.y), in: geo.size),
                         end: Self.overlayPosition(for: Self.canvasFraction(x: Self.coinEndPixel.x, y: Self.coinEndPixel.y), in: geo.size)
+                    )
+                }
+                .allowsHitTesting(false)
+            }
+
+            if scoreElapsed >= 0 {
+                GeometryReader { geo in
+                    CoinBurstScoreLabel(
+                        elapsed: scoreElapsed,
+                        count: coinBurstCount,
+                        position: Self.overlayPosition(for: Self.canvasFraction(x: 950, y: 600), in: geo.size)
                     )
                 }
                 .allowsHitTesting(false)
@@ -563,18 +609,24 @@ struct Working22: View {
                                 .position(x: -20, y: h * CGFloat(i) / 5)
                         }
 
-                        // 右側評語：讀秒 1/3/5 秒對應「好」／「棒」／「優」。
-                        Text("好")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundStyle(.black)
+                        // 右側評語：讀秒 1/3/5 秒對應「好」／「棒」／「優」，跟頂部矩形匡同樣的圈圈樣式。
+                        Circle()
+                            .fill(Color(red: 0.369, green: 0.690, blue: 0.824))
+                            .overlay(Circle().stroke(Color.black, lineWidth: 1.5))
+                            .frame(width: 32, height: 32)
+                            .overlay(Text("好").font(.system(size: 14, weight: .bold)).foregroundStyle(.white))
                             .position(x: 60, y: h * 4 / 5)
-                        Text("棒")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundStyle(.black)
+                        Circle()
+                            .fill(Color(red: 0.910, green: 0.306, blue: 0.290))
+                            .overlay(Circle().stroke(Color.black, lineWidth: 1.5))
+                            .frame(width: 32, height: 32)
+                            .overlay(Text("棒").font(.system(size: 14, weight: .bold)).foregroundStyle(.white))
                             .position(x: 60, y: h * 2 / 5)
-                        Text("優")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundStyle(.black)
+                        Circle()
+                            .fill(Color(red: 0.957, green: 0.871, blue: 0.235))
+                            .overlay(Circle().stroke(Color.black, lineWidth: 1.5))
+                            .frame(width: 32, height: 32)
+                            .overlay(Text("優").font(.system(size: 14, weight: .bold)).foregroundStyle(.black))
                             .position(x: 60, y: 0)
                     }
                 }
@@ -613,6 +665,7 @@ struct Working22: View {
             holdTimer?.invalidate()
             releaseWorkItem?.cancel()
             fuelHideWorkItem?.cancel()
+            scoreTimer?.invalidate()
         }
     }
 }
@@ -687,6 +740,50 @@ private struct CoinFlightBurst: View, Animatable {
                         .position(x: x, y: y)
                 }
             }
+        }
+    }
+}
+
+// MARK: - CoinBurstScoreLabel
+
+// 累計金額顯示完全參考 9_Working.swift 的 CoinBurstScoreLabel：黑色描邊 + 金黃色文字，
+// 用自己的 elapsed（由 Timer 驅動，見 Working22.startScoreSequence）逐一往上跳
+// （+100 → +200 → +300...），跟硬幣飛行動畫的 1 秒視覺效果脫鉤，確保無論硬幣數量多少
+// 都能完整跑完全部數字。
+private struct CoinBurstScoreLabel: View {
+    let elapsed: Double
+    let count: Int
+    let position: CGPoint
+
+    fileprivate static let stagger = 0.2
+    private static let pulseDuration = 0.15
+    private static let baseFontSize: CGFloat = 100
+
+    var body: some View {
+        let appearedCount = elapsed >= 0 ? min(count, Int(elapsed / Self.stagger) + 1) : 0
+        if appearedCount > 0 {
+            let label = "+\(appearedCount * 100)"
+            let lastSpawnTime = Double(appearedCount - 1) * Self.stagger
+            let timeSincePulse = elapsed - lastSpawnTime
+            let pulseProgress = min(max(timeSincePulse / Self.pulseDuration, 0), 1)
+            let pulseFactor = sin(pulseProgress * .pi)
+            let fontSize = Self.baseFontSize + 20 * CGFloat(pulseFactor)
+            let outlineOffsets: [CGSize] = [
+                CGSize(width: -2, height: -2), CGSize(width: 2, height: -2),
+                CGSize(width: -2, height: 2), CGSize(width: 2, height: 2)
+            ]
+            ZStack {
+                ForEach(0..<outlineOffsets.count, id: \.self) { i in
+                    Text(label)
+                        .font(.system(size: fontSize, weight: .bold))
+                        .foregroundStyle(Color(red: 0.93, green: 0.75, blue: 0.22))
+                        .offset(outlineOffsets[i])
+                }
+                Text(label)
+                    .font(.system(size: fontSize, weight: .bold))
+                    .foregroundStyle(Color(red: 0.933, green: 0.933, blue: 0.0))
+            }
+            .position(position)
         }
     }
 }
