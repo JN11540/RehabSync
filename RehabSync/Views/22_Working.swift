@@ -5,8 +5,9 @@ import CoreBluetooth
 /// 背景固定疊 earth／landing／space_shuttle 三張圖（不隨角度變化）；
 /// 前景太空人角度 < 70° 顯示 get.png，>= 70° 換成 holding.png（微微抖動，同時直式膠囊水位隨秒數上漲），
 /// 曾經達到 70° 後又回落到 < 25° 且讀秒超過 1 秒時，短暫換成 release.png（1.5 秒後切回預設），
-/// 同時 astronaut_fuel.png 從雙手位置飛進火箭燃料艙口（同樣 1.5 秒）；不論是否達到 1 秒，
-/// 只要回落到 < 25° 直式膠囊水位都會歸零（讀秒不足 1 秒時只是不觸發 release/燃料箱動畫）。
+/// 同時 astronaut_fuel.png 從雙手位置飛進火箭燃料艙口（同樣 1.5 秒），燃料箱抵達的瞬間
+/// astronaut_space_shuttle.png 會連續放大＋變亮再變回原狀 3 次；不論是否達到 1 秒，
+/// 只要回落到 < 25° 直式膠囊水位都會歸零（讀秒不足 1 秒時只是不觸發 release/燃料箱/pulse 動畫）。
 /// 左側圓圈顯示即時角度數字。組數/次數計分等遊戲機制尚未實作，等後續確認規則後再依 9_Working.swift 的骨架補上。
 struct Working22: View {
     let content: TreatmentContent
@@ -136,6 +137,37 @@ struct Working22: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.releaseAnimationDuration, execute: workItem)
     }
 
+    // MARK: - 火箭 pulse（燃料箱抵達後，astronaut_space_shuttle.png 放大＋變亮 3 次）
+
+    @State private var spaceShuttleScale: CGFloat = 1
+    @State private var spaceShuttleBrightness: Double = 0
+
+    private static let pulseStepDuration: Double = 0.3
+    private static let pulseScale: CGFloat = 1.15
+    private static let pulseBrightness: Double = 0.3
+
+    // 讓 space_shuttle 在 delay 之後（燃料箱剛好飛抵艙口那一刻）連續 pulse 幾次：
+    // 每次 pulse 都是「放大＋變亮」再「回到原狀」，用 asyncAfter 依序排時間，
+    // 寫法跟 9_Working.swift 的 startPulse 完全相同。
+    private func startSpaceShuttlePulse(times: Int, delay: Double) {
+        for i in 0..<times {
+            let upTime = delay + Double(i) * Self.pulseStepDuration * 2
+            let downTime = upTime + Self.pulseStepDuration
+            DispatchQueue.main.asyncAfter(deadline: .now() + upTime) {
+                withAnimation(.easeInOut(duration: Self.pulseStepDuration)) {
+                    spaceShuttleScale = Self.pulseScale
+                    spaceShuttleBrightness = Self.pulseBrightness
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + downTime) {
+                withAnimation(.easeInOut(duration: Self.pulseStepDuration)) {
+                    spaceShuttleScale = 1
+                    spaceShuttleBrightness = 0
+                }
+            }
+        }
+    }
+
     /// 進入 holding 狀態時開始讓 astronaut_holding.png 的內容物持續微微抖動，
     /// 用 Timer 每 0.08 秒隨機挑一個小幅偏移，模擬用力撐住時的顫抖感。
     private func startTremble() {
@@ -183,6 +215,7 @@ struct Working22: View {
             if qualified {
                 triggerReleaseAnimation()
                 triggerFuelFlight()
+                startSpaceShuttlePulse(times: 3, delay: Self.releaseAnimationDuration)
             } else {
                 astronautState = .idle
             }
@@ -198,7 +231,7 @@ struct Working22: View {
             Color.white
                 .ignoresSafeArea()
 
-            // 背景：astronaut_earth／landing／space_shuttle 三張固定疊在一起，不隨角度變化。
+            // 背景：astronaut_earth／landing 固定疊在一起，不隨角度變化。
             ZStack {
                 Image("AstronautEarthIcon")
                     .resizable()
@@ -207,13 +240,21 @@ struct Working22: View {
                 Image("AstronautLandingIcon")
                     .resizable()
                     .scaledToFill()
-                Image("AstronautSpaceShuttleIcon")
-                    .resizable()
-                    .scaledToFill()
             }
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .padding(48)
             .allowsHitTesting(false)
+
+            // space_shuttle 獨立成一層（跟 9_Working.swift 的靶心疊圖同樣做法），
+            // 燃料箱抵達艙口後才能單獨對它 scaleEffect／brightness 做 pulse，不影響其他背景圖。
+            Image("AstronautSpaceShuttleIcon")
+                .resizable()
+                .scaledToFill()
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .scaleEffect(spaceShuttleScale)
+                .brightness(spaceShuttleBrightness)
+                .padding(48)
+                .allowsHitTesting(false)
 
             // 前景太空人：角度 < 70° 顯示 astronaut_get.png；角度 >= 70° 換成 astronaut_holding.png 並持續微微抖動；
             // 曾經達到 70° 之後又回落到 < 25° 時，短暫換成 astronaut_release.png（1.5 秒後自動切回預設）。
