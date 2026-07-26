@@ -1147,7 +1147,7 @@ private struct CompletionPopup: View {
             VStack(spacing: 0) {
                 ZStack(alignment: .top) {
                     Color.white
-                    Image("AstronautGetIcon")
+                    Image("AstronautTheEndIcon")
                         .resizable()
                         .scaledToFit()
                         .frame(width: 400, height: 400)
