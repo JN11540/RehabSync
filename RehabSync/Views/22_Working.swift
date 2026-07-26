@@ -384,7 +384,7 @@ private struct MovingFuelIcon: View, Animatable {
         Image("AstronautFuelIcon")
             .resizable()
             .scaledToFit()
-            .frame(width: 350, height: 350)
+            .frame(width: 420, height: 420)
             .position(x: x, y: y)
     }
 }
