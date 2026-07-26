@@ -7,8 +7,11 @@ import CoreBluetooth
 /// 曾經達到 70° 後又回落到 < 25° 且讀秒超過 1 秒時，短暫換成 release.png（1.5 秒後切回預設），
 /// 同時 astronaut_fuel.png 從雙手位置飛進火箭燃料艙口（同樣 1.5 秒），燃料箱抵達的瞬間
 /// astronaut_space_shuttle.png 會連續放大＋變亮再變回原狀 3 次；不論是否達到 1 秒，
-/// 只要回落到 < 25° 直式膠囊水位都會歸零（讀秒不足 1 秒時只是不觸發 release/燃料箱/pulse 動畫）。
-/// 左側圓圈顯示即時角度數字。組數/次數計分等遊戲機制尚未實作，等後續確認規則後再依 9_Working.swift 的骨架補上。
+/// 只要回落到 < 25° 直式膠囊水位都會歸零；讀秒不足 1 秒時不計入 currentRep／評語次數／金錢，
+/// 也不觸發 release/燃料箱/pulse 動畫，讀秒門檻跟 9_Working.swift／2_Working.swift 一樣是
+/// 1/3/5 秒對應 好/棒/優、3/9/15 元。
+/// 頂部矩形匡顯示目標組次數、實際組次數、好/棒/優各自次數、累積金錢；左側圓圈顯示即時角度數字。
+/// 組間休息、完成彈窗等其餘遊戲機制尚未實作，等後續確認規則後再依 9_Working.swift 的骨架補上。
 struct Working22: View {
     let content: TreatmentContent
     let exercise: Exercise?
@@ -168,6 +171,32 @@ struct Working22: View {
         }
     }
 
+    // MARK: - 金錢拋物線動畫（跟 space_shuttle pulse 同時觸發，coin.png 一個一個從固定起點飛到燃料艙口）
+
+    private static let coinStartPixel = CGPoint(x: 864, y: 620)
+    private static let coinEndPixel = CGPoint(x: 612, y: 514)
+    private static let coinBurstDuration: Double = 1.0
+
+    @State private var showCoinBurst = false
+    @State private var coinBurstProgress: Double = 0
+    @State private var coinBurstCount = 0
+
+    /// delay 秒後（跟 startSpaceShuttlePulse 同一個時間點），讓 count 個 coin.png
+    /// 依序（一個接一個）從 coinStartPixel 拋物線飛到 coinEndPixel。
+    private func triggerCoinBurst(count: Int, delay: Double) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            coinBurstCount = count
+            coinBurstProgress = 0
+            showCoinBurst = true
+            withAnimation(.linear(duration: Self.coinBurstDuration)) {
+                coinBurstProgress = 1
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.coinBurstDuration) {
+                showCoinBurst = false
+            }
+        }
+    }
+
     /// 進入 holding 狀態時開始讓 astronaut_holding.png 的內容物持續微微抖動，
     /// 用 Timer 每 0.08 秒隨機挑一個小幅偏移，模擬用力撐住時的顫抖感。
     private func startTremble() {
@@ -196,6 +225,34 @@ struct Working22: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.releaseAnimationDuration, execute: workItem)
     }
 
+    // 目標組次數（content.sets/content.reps）之外，實際完成的組次數與各評語次數、累積金錢。
+    @State private var currentSet = 1
+    @State private var currentRep = 0
+    @State private var excellentCount = 0
+    @State private var goodCount = 0
+    @State private var okCount = 0
+    @State private var totalCoins = 0
+
+    // 評語對應的讀秒門檻跟 9_Working.swift／2_Working.swift 的 1/3/5 秒完全相同，
+    // 金錢獎勵也沿用同一套 3／9／15 的數字；回傳值同時也是 coin.png 拋物線動畫要飛幾個。
+    @discardableResult
+    private func recordHoldResult(heldSeconds: Double) -> Int {
+        let coinCount: Int
+        if heldSeconds >= 5 {
+            excellentCount += 1
+            coinCount = 15
+        } else if heldSeconds >= 3 {
+            goodCount += 1
+            coinCount = 9
+        } else {
+            okCount += 1
+            coinCount = 3
+        }
+        totalCoins += coinCount
+        currentRep += 1
+        return coinCount
+    }
+
     private func handleAngleChange(_ angle: Double?) {
         guard let angle else { return }
         if angle >= Self.holdAngleThreshold {
@@ -206,16 +263,19 @@ struct Working22: View {
             startHoldTimer()
         } else if angle < Self.releaseAngleThreshold && hasReachedHoldThreshold {
             hasReachedHoldThreshold = false
-            let qualified = holdElapsed > Self.holdQualifyDuration
+            let heldSeconds = holdElapsed
+            let qualified = heldSeconds > Self.holdQualifyDuration
             stopTremble()
             stopHoldTimer()
             withAnimation(.easeOut(duration: 0.2)) {
                 holdElapsed = 0
             }
             if qualified {
+                let coinCount = recordHoldResult(heldSeconds: heldSeconds)
                 triggerReleaseAnimation()
                 triggerFuelFlight()
                 startSpaceShuttlePulse(times: 3, delay: Self.releaseAnimationDuration)
+                triggerCoinBurst(count: coinCount, delay: Self.releaseAnimationDuration)
             } else {
                 astronautState = .idle
             }
@@ -292,6 +352,18 @@ struct Working22: View {
                 .allowsHitTesting(false)
             }
 
+            if showCoinBurst {
+                GeometryReader { geo in
+                    CoinFlightBurst(
+                        progress: coinBurstProgress,
+                        count: coinBurstCount,
+                        start: Self.overlayPosition(for: Self.canvasFraction(x: Self.coinStartPixel.x, y: Self.coinStartPixel.y), in: geo.size),
+                        end: Self.overlayPosition(for: Self.canvasFraction(x: Self.coinEndPixel.x, y: Self.coinEndPixel.y), in: geo.size)
+                    )
+                }
+                .allowsHitTesting(false)
+            }
+
             // 頂部矩形匡：跟 9_Working.swift 同樣的淺色矩形條 + 底下深色分隔線，
             // 寬度對齊下方遊戲畫面（同樣 padding(.horizontal, 48) + padding(.top, 48)）。
             VStack(spacing: 0) {
@@ -323,14 +395,112 @@ struct Working22: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.leading, 16)
 
-                    HStack(spacing: 4) {
-                        Image("TargetIcon")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 48, height: 48)
-                        Text("\(content.sets) 組 × \(content.reps) 次")
-                            .font(.system(size: 24, weight: .bold))
-                            .foregroundStyle(.black)
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color(red: 1.0, green: 0.85, blue: 0.35))
+                            .overlay(
+                                HStack(spacing: 10) {
+                                    Rectangle()
+                                        .fill(Color.white.opacity(0.5))
+                                        .frame(width: 10, height: 80)
+                                        .rotationEffect(.degrees(20))
+                                        .offset(x: 6)
+                                    Rectangle()
+                                        .fill(Color.white.opacity(0.5))
+                                        .frame(width: 5, height: 80)
+                                        .rotationEffect(.degrees(20))
+                                }
+                            )
+                            .frame(width: 115, height: 40)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .stroke(Color(red: 0.70, green: 0.52, blue: 0.10), lineWidth: 3)
+                            )
+
+                        ZStack(alignment: .leading) {
+                            Image("CoinIcon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 48, height: 48)
+                                .offset(x: -16)
+
+                            Text("\(totalCoins)")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.5)
+                                .frame(width: 115 - 38, height: 48)
+                                .offset(x: 38)
+                        }
+                        .frame(width: 115, height: 48)
+                        .offset(x: -24)
+                    }
+                    .frame(width: 115, height: 48)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.trailing, 16)
+
+                    HStack(spacing: 20) {
+                        HStack(spacing: 4) {
+                            Image("TargetIcon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 48, height: 48)
+                            Text("\(content.sets) 組 × \(content.reps) 次")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+
+                        Rectangle()
+                            .fill(Color(white: 0.35))
+                            .frame(width: 2, height: 40)
+
+                        HStack(spacing: 4) {
+                            Image("WeightliftingIcon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 48, height: 48)
+                            Text("第 \(currentSet) 組．第 \(currentRep) 次")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+
+                        Rectangle()
+                            .fill(Color(white: 0.35))
+                            .frame(width: 2, height: 40)
+
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color(red: 0.369, green: 0.690, blue: 0.824))
+                                .overlay(Circle().stroke(Color.black, lineWidth: 1.5))
+                                .frame(width: 40, height: 40)
+                                .overlay(Text("好").font(.system(size: 16, weight: .bold)).foregroundStyle(.white))
+                            Text("\(okCount)")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color(red: 0.910, green: 0.306, blue: 0.290))
+                                .overlay(Circle().stroke(Color.black, lineWidth: 1.5))
+                                .frame(width: 40, height: 40)
+                                .overlay(Text("棒").font(.system(size: 16, weight: .bold)).foregroundStyle(.white))
+                            Text("\(goodCount)")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color(red: 0.957, green: 0.871, blue: 0.235))
+                                .overlay(Circle().stroke(Color.black, lineWidth: 1.5))
+                                .frame(width: 40, height: 40)
+                                .overlay(Text("優").font(.system(size: 16, weight: .bold)).foregroundStyle(.black))
+                            Text("\(excellentCount)")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
                     }
                     .frame(maxWidth: .infinity, alignment: .center)
                 }
@@ -473,6 +643,51 @@ private struct MovingFuelIcon: View, Animatable {
             .scaledToFit()
             .frame(width: size, height: size)
             .position(x: x, y: y)
+    }
+}
+
+// MARK: - CoinFlightBurst
+
+// count 個 coin.png 從同一個固定起點依序（stagger）出發，各自沿拋物線飛向同一個終點後消失；
+// 全部硬幣共用同一個 0→1 的 progress（由外部 withAnimation 在 coinBurstDuration 秒內跑完），
+// 每顆硬幣依自己的出發時間換算出區間內的 localT，寫法跟 9_Working.swift 的 CoinConvergeBurst 相同，
+// 差別只在起點是同一個固定座標，不是繞著終點隨機散開。
+private struct CoinFlightBurst: View, Animatable {
+    var progress: Double
+    let count: Int
+    let start: CGPoint
+    let end: CGPoint
+
+    var animatableData: Double {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    private static let flightFraction = 0.5
+    private static let arcHeight: CGFloat = 40
+    private static let coinSize: CGFloat = 40
+
+    var body: some View {
+        let staggerFraction = count > 1 ? (1 - Self.flightFraction) / Double(count - 1) : 0
+
+        ZStack {
+            ForEach(0..<count, id: \.self) { i in
+                let startFraction = Double(i) * staggerFraction
+                let localT = min(max((progress - startFraction) / Self.flightFraction, 0), 1)
+
+                if progress >= startFraction && localT < 1 {
+                    let t = CGFloat(localT)
+                    let x = start.x + (end.x - start.x) * t
+                    let y = start.y + (end.y - start.y) * t - Self.arcHeight * 4 * t * (1 - t)
+
+                    Image("CoinIcon")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: Self.coinSize, height: Self.coinSize)
+                        .position(x: x, y: y)
+                }
+            }
+        }
     }
 }
 
