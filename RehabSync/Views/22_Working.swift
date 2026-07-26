@@ -55,13 +55,13 @@ struct Working22: View {
     @State private var holdTimer: Timer?
     private static let holdDuration: Double = 5
 
+    // 用 60Hz 直接改數值（不包 withAnimation），避免每 0.1 秒重啟一次動畫曲線
+    // 造成的頓挫感，改成每禎微小增量、視覺上才會是真正連續的水位上升。
     private func startHoldTimer() {
         guard holdTimer == nil else { return }
-        holdTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+        holdTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { _ in
             guard holdElapsed < Self.holdDuration else { return }
-            withAnimation(.linear(duration: 0.1)) {
-                holdElapsed = min(holdElapsed + 0.1, Self.holdDuration)
-            }
+            holdElapsed = min(holdElapsed + 1.0 / 60.0, Self.holdDuration)
         }
     }
 
