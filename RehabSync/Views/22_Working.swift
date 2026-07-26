@@ -59,6 +59,7 @@ struct Working22: View {
                 Image("AstronautEarthIcon")
                     .resizable()
                     .scaledToFill()
+                    .opacity(0.4)
                 Image("AstronautLandingIcon")
                     .resizable()
                     .scaledToFill()
