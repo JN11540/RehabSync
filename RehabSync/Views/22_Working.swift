@@ -2,8 +2,9 @@ import SwiftUI
 import CoreBluetooth
 
 /// 弓步遊戲畫面（exercise_id 22）目前只做出「即時視覺回饋」的部分：
-/// 背景太空人依「站姿即時預估角度」分成四個層級（earth 最低 → get 最高），
-/// 左側圓圈顯示即時角度數字。組數/次數計分、直式膠囊（進度條）等遊戲機制
+/// 背景太空人預設顯示 get.png，角度 >= 70° 換成 holding.png（微微抖動），
+/// 曾經達到 70° 後又回落到 < 15° 時短暫換成 release.png（1.5 秒後切回預設）。
+/// 左側圓圈顯示即時角度數字、直式膠囊目前只是靜態外觀。組數/次數計分等遊戲機制
 /// 尚未實作，等後續確認規則後再依 9_Working.swift 的骨架補上。
 struct Working22: View {
     let content: TreatmentContent
@@ -53,27 +54,92 @@ struct Working22: View {
     @State private var holdElapsed: Double = 0
     private static let holdDuration: Double = 5
 
+    // MARK: - 太空人狀態機（get 預設 → holding 深蹲維持 → release 放開瞬間）
+
+    private enum AstronautState: Equatable {
+        case idle
+        case holding
+        case releasing
+    }
+
+    @State private var astronautState: AstronautState = .idle
+    @State private var hasReachedHoldThreshold = false
+    @State private var releaseWorkItem: DispatchWorkItem?
+    @State private var trembleTimer: Timer?
+    @State private var trembleOffset: CGSize = .zero
+
+    private static let holdAngleThreshold: Double = 70
+    private static let releaseAngleThreshold: Double = 15
+    private static let releaseAnimationDuration: Double = 1.5
+
+    /// 進入 holding 狀態時開始讓 astronaut_holding.png 的內容物持續微微抖動，
+    /// 用 Timer 每 0.08 秒隨機挑一個小幅偏移，模擬用力撐住時的顫抖感。
+    private func startTremble() {
+        guard trembleTimer == nil else { return }
+        trembleTimer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { _ in
+            withAnimation(.easeInOut(duration: 0.08)) {
+                trembleOffset = CGSize(width: CGFloat.random(in: -2...2), height: CGFloat.random(in: 1...4))
+            }
+        }
+    }
+
+    private func stopTremble() {
+        trembleTimer?.invalidate()
+        trembleTimer = nil
+        withAnimation(.easeOut(duration: 0.1)) {
+            trembleOffset = .zero
+        }
+    }
+
+    /// 顯示 astronaut_release.png 1.5 秒後，自動切回預設的 astronaut_get.png。
+    private func triggerReleaseAnimation() {
+        astronautState = .releasing
+        releaseWorkItem?.cancel()
+        let workItem = DispatchWorkItem { astronautState = .idle }
+        releaseWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.releaseAnimationDuration, execute: workItem)
+    }
+
+    private func handleAngleChange(_ angle: Double?) {
+        guard let angle else { return }
+        if angle >= Self.holdAngleThreshold {
+            hasReachedHoldThreshold = true
+            releaseWorkItem?.cancel()
+            astronautState = .holding
+            startTremble()
+        } else if angle < Self.releaseAngleThreshold && hasReachedHoldThreshold {
+            hasReachedHoldThreshold = false
+            stopTremble()
+            triggerReleaseAnimation()
+        } else if astronautState == .holding {
+            stopTremble()
+            astronautState = .idle
+        }
+    }
+
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             Color.white
                 .ignoresSafeArea()
 
-            // 預設狀態：四張太空人圖層直接疊在一起（earth 最底層 → get 最上層），
-            // 等角度門檻規則確認後再改回依 btVM.currentEstimatedRealAngle 切換。
-            ZStack {
-                Image("AstronautEarthIcon")
-                    .resizable()
-                    .scaledToFill()
-                    .opacity(0.4)
-                Image("AstronautLandingIcon")
-                    .resizable()
-                    .scaledToFill()
-                Image("AstronautSpaceShuttleIcon")
-                    .resizable()
-                    .scaledToFill()
-                Image("AstronautGetIcon")
-                    .resizable()
-                    .scaledToFill()
+            // 預設顯示 astronaut_get.png；角度 >= 70° 時換成 astronaut_holding.png 並持續微微抖動；
+            // 曾經達到 70° 之後又回落到 < 15° 時，短暫換成 astronaut_release.png（1.5 秒後自動切回預設）。
+            Group {
+                switch astronautState {
+                case .idle:
+                    Image("AstronautGetIcon")
+                        .resizable()
+                        .scaledToFill()
+                case .holding:
+                    Image("AstronautHoldingIcon")
+                        .resizable()
+                        .scaledToFill()
+                        .offset(trembleOffset)
+                case .releasing:
+                    Image("AstronautReleaseIcon")
+                        .resizable()
+                        .scaledToFill()
+                }
             }
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .padding(48)
@@ -180,8 +246,13 @@ struct Working22: View {
             .padding(24)
             .offset(x: 25, y: -100)
         }
+        .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
+            handleAngleChange(newValue)
+        }
         .onDisappear {
             stopLiveTestIfNeeded()
+            trembleTimer?.invalidate()
+            releaseWorkItem?.cancel()
         }
     }
 }
