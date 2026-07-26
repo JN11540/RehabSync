@@ -243,7 +243,9 @@ struct Working22: View {
                     MovingFuelIcon(
                         progress: fuelProgress,
                         start: Self.overlayPosition(for: Self.canvasFraction(x: Self.fuelStartPixel.x, y: Self.fuelStartPixel.y), in: geo.size),
-                        end: Self.overlayPosition(for: Self.canvasFraction(x: Self.fuelEndPixel.x, y: Self.fuelEndPixel.y), in: geo.size)
+                        end: Self.overlayPosition(for: Self.canvasFraction(x: Self.fuelEndPixel.x, y: Self.fuelEndPixel.y), in: geo.size),
+                        startSize: 450,
+                        endSize: 200
                     )
                 }
                 .allowsHitTesting(false)
@@ -372,6 +374,8 @@ private struct MovingFuelIcon: View, Animatable {
     var progress: Double
     let start: CGPoint
     let end: CGPoint
+    let startSize: CGFloat
+    let endSize: CGFloat
 
     var animatableData: Double {
         get { progress }
@@ -381,10 +385,11 @@ private struct MovingFuelIcon: View, Animatable {
     var body: some View {
         let x = start.x + (end.x - start.x) * progress
         let y = start.y + (end.y - start.y) * progress
+        let size = startSize + (endSize - startSize) * progress
         Image("AstronautFuelIcon")
             .resizable()
             .scaledToFit()
-            .frame(width: 420, height: 420)
+            .frame(width: size, height: size)
             .position(x: x, y: y)
     }
 }
