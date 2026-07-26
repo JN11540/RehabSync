@@ -2,7 +2,9 @@ import SwiftUI
 import CoreBluetooth
 
 /// 弓步遊戲畫面（exercise_id 22）目前只做出「即時視覺回饋」的部分：
-/// 背景固定疊 earth／landing／space_shuttle 三張圖（不隨角度變化）；
+/// 背景底層圖依 totalCoins 里程碑切換：< 2400 是 earth，>= 2400 換成 moon，>= 7500 換成
+/// new_world；astronaut_landing.png 固定疊在底層圖上方，不隨里程碑改變；space_shuttle 是
+/// 獨立的一層，不受背景切換影響；
 /// 前景太空人角度 < 70° 顯示 get.png，>= 70° 換成 holding.png（微微抖動，同時直式膠囊水位隨秒數上漲），
 /// 曾經達到 70° 後又回落到 < 25° 且讀秒超過 1 秒時，短暫換成 release.png（1.5 秒後切回預設），
 /// 同時 astronaut_fuel.png 從雙手位置飛進火箭燃料艙口（同樣 1.5 秒），燃料箱抵達的瞬間
@@ -11,7 +13,9 @@ import CoreBluetooth
 /// 也不觸發 release/燃料箱/pulse/金錢動畫，讀秒門檻跟 9_Working.swift／2_Working.swift 一樣是
 /// 1/3/5 秒對應 好/棒/優、3/9/15 個 coin.png；燃料箱抵達的同時，3/9/15 個 coin.png 也各自
 /// 從固定起點拋物線飛到燃料艙口，並在右側依序顯示 +100/+200/... 累計金額（totalCoins 逐一累加）。
-/// 頂部矩形匡顯示目標組次數、實際組次數、好/棒/優各自次數、累積金錢；左側圓圈顯示即時角度數字。
+/// 頂部矩形匡顯示目標組次數、實際組次數、好/棒/優各自次數、累積金錢；左側圓圈顯示即時角度數字；
+/// 太空梭右側另有一個總金幣直式膠囊（中心點固定在畫布座標 (760, 394)），只有 0／2400／7500
+/// 三個刻度，水位跟著 totalCoins 即時更新，也是背景里程碑判斷的同一個數字來源。
 /// 組間休息、完成彈窗等其餘遊戲機制尚未實作，等後續確認規則後再依 9_Working.swift 的骨架補上。
 struct Working22: View {
     let content: TreatmentContent
@@ -178,6 +182,18 @@ struct Working22: View {
     private static let coinEndPixel = CGPoint(x: 612, y: 514)
     private static let coinBurstDuration: Double = 1.0
 
+    // 總金幣直式膠囊（太空梭右側）的刻度：0／2400／7500，水位 = totalCoins / coinCapsuleMaxValue。
+    private static let coinCapsuleMaxValue: Double = 7500
+    private static let coinCapsuleMidValue: Double = 2400
+
+    // 背景依 totalCoins 里程碑切換底層圖（層級最低）：< 2400 是 earth，>= 2400 換成 moon，
+    // >= 7500 換成 new_world；astronaut_landing.png（層級第二低）維持疊在底層圖上方，不隨里程碑改變。
+    private var backgroundBaseImageName: String {
+        if Double(totalCoins) >= Self.coinCapsuleMaxValue { return "AstronautNewWorldIcon" }
+        if Double(totalCoins) >= Self.coinCapsuleMidValue { return "AstronautMoonIcon" }
+        return "AstronautEarthIcon"
+    }
+
     @State private var showCoinBurst = false
     @State private var coinBurstProgress: Double = 0
     @State private var coinBurstCount = 0
@@ -326,9 +342,10 @@ struct Working22: View {
             Color.white
                 .ignoresSafeArea()
 
-            // 背景：astronaut_earth／landing 固定疊在一起，不隨角度變化。
+            // 背景：底層圖依 totalCoins 里程碑切換（< 2400 是 earth，>= 2400 換成 moon，
+            // >= 7500 換成 new_world），astronaut_landing.png 固定疊在底層圖上方，不隨里程碑改變。
             ZStack {
-                Image("AstronautEarthIcon")
+                Image(backgroundBaseImageName)
                     .resizable()
                     .scaledToFill()
                     .opacity(0.4)
@@ -655,6 +672,58 @@ struct Working22: View {
             }
             .padding(24)
             .offset(x: 25, y: -100)
+
+            // 總金幣直式膠囊（中心點對齊 space_shuttle 畫布座標 (760, 394)）：
+            // 只有 0／2400／7500 三個刻度，水位跟著 totalCoins 即時更新。
+            GeometryReader { geo in
+                let capsuleCenter = Self.overlayPosition(for: Self.canvasFraction(x: 760, y: 394), in: geo.size)
+
+                GeometryReader { innerGeo in
+                    let h = innerGeo.size.height
+                    let fillFraction = min(CGFloat(totalCoins) / CGFloat(Self.coinCapsuleMaxValue), 1)
+                    let midY = h * (1 - CGFloat(Self.coinCapsuleMidValue / Self.coinCapsuleMaxValue))
+
+                    ZStack {
+                        Capsule()
+                            .fill(Color(white: 0.35))
+                        Capsule()
+                            .fill(Color.white)
+                            .padding(3)
+                        Capsule()
+                            .strokeBorder(Color.black, lineWidth: 1.5)
+                            .padding(3)
+                        GeometryReader { fillGeo in
+                            ZStack(alignment: .bottom) {
+                                Capsule()
+                                    .fill(Color.blue)
+                                Rectangle()
+                                    .fill(Color.yellow)
+                                    .frame(height: fillGeo.size.height * fillFraction)
+                            }
+                            .clipShape(Capsule())
+                        }
+                        .padding(6)
+                        .clipShape(Capsule())
+                        Capsule()
+                            .strokeBorder(Color.black, lineWidth: 1.5)
+                            .padding(6)
+
+                        Rectangle()
+                            .fill(Color.black)
+                            .frame(width: 18, height: 1.5)
+                            .position(x: 12.5, y: midY)
+
+                        Image("CoinIcon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 20, height: 20)
+                            .position(x: 12.5, y: -18)
+                    }
+                }
+                .frame(width: 25, height: 250)
+                .position(capsuleCenter)
+            }
+            .allowsHitTesting(false)
         }
         .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
             handleAngleChange(newValue)
