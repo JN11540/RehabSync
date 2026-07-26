@@ -14,7 +14,7 @@ import CoreBluetooth
 /// 1/3/5 秒對應 好/棒/優、3/9/15 個 coin.png；燃料箱抵達的同時，3/9/15 個 coin.png 也各自
 /// 從固定起點拋物線飛到燃料艙口，並在右側依序顯示 +100/+200/... 累計金額（totalCoins 逐一累加）。
 /// 頂部矩形匡顯示目標組次數、實際組次數、好/棒/優各自次數、累積金錢；左側圓圈顯示即時角度數字；
-/// 太空梭右側另有一個總金幣直式膠囊（中心點固定在畫布座標 (550, 270)），只有 0／2400／7500
+/// 太空梭右側另有一個總金幣直式膠囊（中心點固定在畫布座標 (620, 350)），只有 0／2400／7500
 /// 三個刻度，水位跟著 totalCoins 即時更新，也是背景里程碑判斷的同一個數字來源。
 /// 組間休息、完成彈窗等其餘遊戲機制尚未實作，等後續確認規則後再依 9_Working.swift 的骨架補上。
 struct Working22: View {
@@ -673,10 +673,10 @@ struct Working22: View {
             .padding(24)
             .offset(x: 25, y: -100)
 
-            // 總金幣直式膠囊（中心點對齊 space_shuttle 畫布座標 (550, 270)）：
+            // 總金幣直式膠囊（中心點對齊 space_shuttle 畫布座標 (620, 350)）：
             // 只有 0／2400／7500 三個刻度，水位跟著 totalCoins 即時更新。
             GeometryReader { geo in
-                let capsuleCenter = Self.overlayPosition(for: Self.canvasFraction(x: 550, y: 270), in: geo.size)
+                let capsuleCenter = Self.overlayPosition(for: Self.canvasFraction(x: 620, y: 350), in: geo.size)
 
                 GeometryReader { innerGeo in
                     let h = innerGeo.size.height
@@ -714,7 +714,7 @@ struct Working22: View {
                             .position(x: 20, y: midY)
                     }
                 }
-                .frame(width: 40, height: 200)
+                .frame(width: 40, height: 170)
                 .position(capsuleCenter)
             }
             .allowsHitTesting(false)
