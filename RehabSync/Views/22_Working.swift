@@ -48,6 +48,11 @@ struct Working22: View {
         btVM.stopLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
     }
 
+    // 直式膠囊的讀秒進度，先給預設值讓膠囊能顯示出來；實際驅動 holdElapsed 累加的
+    // hold timer 邏輯等角度門檻規則確認後再補上。
+    @State private var holdElapsed: Double = 0
+    private static let holdDuration: Double = 5
+
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             Color.white
@@ -100,26 +105,78 @@ struct Working22: View {
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .topLeading)
 
-            ZStack {
-                Circle()
-                    .fill(Color(white: 0.35))
-                Circle()
-                    .fill(Color.white)
-                    .padding(4)
-                Circle()
-                    .strokeBorder(Color.black, lineWidth: 1.5)
-                    .padding(4)
+            VStack(spacing: 12) {
+                GeometryReader { geo in
+                    let h = geo.size.height
 
-                if let angle = btVM.currentEstimatedRealAngle {
-                    Text(String(format: "%.0f°", angle))
-                        .font(.system(size: 50, weight: .bold))
-                        .foregroundStyle(.black)
-                        .minimumScaleFactor(0.3)
-                        .lineLimit(1)
-                        .padding(12)
+                    ZStack {
+                        Capsule()
+                            .fill(Color(white: 0.35))
+                        Capsule()
+                            .fill(Color.white)
+                            .padding(3)
+                        Capsule()
+                            .strokeBorder(Color.black, lineWidth: 1.5)
+                            .padding(3)
+                        GeometryReader { fillGeo in
+                            ZStack(alignment: .bottom) {
+                                Capsule()
+                                    .fill(Color.blue)
+                                Rectangle()
+                                    .fill(Color.yellow)
+                                    .frame(height: fillGeo.size.height * CGFloat(holdElapsed / Self.holdDuration))
+                            }
+                            .clipShape(Capsule())
+                        }
+                        .padding(6)
+                        .clipShape(Capsule())
+                        Capsule()
+                            .strokeBorder(Color.black, lineWidth: 1.5)
+                            .padding(6)
+
+                        ForEach(1..<5) { i in
+                            Rectangle()
+                                .fill(Color.black)
+                                .frame(width: 28, height: 1.5)
+                                .position(x: 20, y: h * CGFloat(i) / 5)
+                        }
+
+                        Text("5")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(.black)
+                            .position(x: -20, y: 0)
+
+                        ForEach(1..<5) { i in
+                            Text("\(5 - i)")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(.black)
+                                .position(x: -20, y: h * CGFloat(i) / 5)
+                        }
+                    }
                 }
+                .frame(width: 40, height: 400)
+
+                ZStack {
+                    Circle()
+                        .fill(Color(white: 0.35))
+                    Circle()
+                        .fill(Color.white)
+                        .padding(4)
+                    Circle()
+                        .strokeBorder(Color.black, lineWidth: 1.5)
+                        .padding(4)
+
+                    if let angle = btVM.currentEstimatedRealAngle {
+                        Text(String(format: "%.0f°", angle))
+                            .font(.system(size: 50, weight: .bold))
+                            .foregroundStyle(.black)
+                            .minimumScaleFactor(0.3)
+                            .lineLimit(1)
+                            .padding(12)
+                    }
+                }
+                .frame(width: 130, height: 130)
             }
-            .frame(width: 130, height: 130)
             .padding(24)
             .offset(x: 25, y: -100)
         }
