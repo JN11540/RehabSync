@@ -292,31 +292,58 @@ struct Working22: View {
                 .allowsHitTesting(false)
             }
 
-            HStack {
-                Button {
-                    onReturnToDashboard()
-                    dismiss()
-                } label: {
-                    ZStack {
-                        Circle()
-                            .fill(Color.white)
-                        Circle()
-                            .strokeBorder(Color.black, lineWidth: 1.5)
-                        Circle()
-                            .strokeBorder(Color.black, lineWidth: 1.5)
-                            .padding(4)
-                        Image(systemName: "xmark")
-                            .font(.system(size: 16, weight: .bold))
+            // 頂部矩形匡：跟 9_Working.swift 同樣的淺色矩形條 + 底下深色分隔線，
+            // 寬度對齊下方遊戲畫面（同樣 padding(.horizontal, 48) + padding(.top, 48)）。
+            VStack(spacing: 0) {
+                ZStack {
+                    Rectangle()
+                        .fill(Color(red: 0.72, green: 0.82, blue: 0.82))
+
+                    HStack(spacing: 12) {
+                        Button {
+                            onReturnToDashboard()
+                            dismiss()
+                        } label: {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.white)
+                                Circle()
+                                    .strokeBorder(Color.black, lineWidth: 1.5)
+                                Circle()
+                                    .strokeBorder(Color.black, lineWidth: 1.5)
+                                    .padding(4)
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundStyle(.black)
+                            }
+                            .frame(width: 40, height: 40)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 16)
+
+                    HStack(spacing: 4) {
+                        Image("TargetIcon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 48, height: 48)
+                        Text("\(content.sets) 組 × \(content.reps) 次")
+                            .font(.system(size: 24, weight: .bold))
                             .foregroundStyle(.black)
                     }
-                    .frame(width: 40, height: 40)
+                    .frame(maxWidth: .infinity, alignment: .center)
                 }
-                .buttonStyle(.plain)
-
-                Spacer()
+                .frame(height: 60)
+                Rectangle()
+                    .fill(Color(white: 0.35))
+                    .frame(height: 4)
+                    .offset(y: -5)
             }
-            .padding(24)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding(.horizontal, 48)
+            .padding(.top, 48)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
             VStack(spacing: 12) {
                 GeometryReader { geo in
@@ -365,6 +392,20 @@ struct Working22: View {
                                 .foregroundStyle(.black)
                                 .position(x: -20, y: h * CGFloat(i) / 5)
                         }
+
+                        // 右側評語：讀秒 1/3/5 秒對應「好」／「棒」／「優」。
+                        Text("好")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(.black)
+                            .position(x: 60, y: h * 4 / 5)
+                        Text("棒")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(.black)
+                            .position(x: 60, y: h * 2 / 5)
+                        Text("優")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(.black)
+                            .position(x: 60, y: 0)
                     }
                 }
                 .frame(width: 40, height: 400)
