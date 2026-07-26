@@ -17,10 +17,10 @@ import CoreBluetooth
 /// 太空梭右側另有一個總金幣直式膠囊（中心點固定在畫布座標 (620, 350)），只有 0／2400／7500
 /// 三個刻度，水位跟著 totalCoins 即時更新，也是背景里程碑判斷的同一個數字來源。
 /// treatment_result 記錄（建立／markSetStart／finishSet／advanceProgress／recordExtensionLength）
-/// 已依 working22-database-port-plan.md 批次 1 完成；組間休息目前是「達標立刻進下一組、沒有
-/// 視覺倒數」的暫時版本（批次 2 補上 SetRestPopup／3 分鐘倒數），結束鍵確認、暫停/繼續、
-/// 正式完成視窗＋匯出JSON、PostWorking_22 都還沒實作，等後續批次依 working9-database-port-plan.md
-/// 的骨架補上。
+/// 已依 working22-database-port-plan.md 批次 1 完成；3 分鐘組別倒數計時＋真正的組間休息
+/// （SetRestPopup／setRestTimer）已依批次 2 完成。結束鍵確認、暫停/繼續（`cancelInProgressHoldWithoutCounting`／
+/// `isSessionPaused`）、正式完成視窗＋匯出JSON、PostWorking_22 都還沒實作，等後續批次依
+/// working9-database-port-plan.md 的骨架補上。
 struct Working22: View {
     let content: TreatmentContent
     let exercise: Exercise?
@@ -91,20 +91,31 @@ struct Working22: View {
         markSetStart(index: 0)
     }
 
-    /// 某一組的起始點：把當下毫秒時間戳記寫進 set_start_time[index]、打開 acc/gyro/exg 的記錄。
-    /// 3 分鐘組別倒數計時是批次 2 的範圍，這裡先不處理。
+    /// 某一組的起始點：把當下毫秒時間戳記寫進 set_start_time[index]、打開 acc/gyro/exg 的記錄，
+    /// 並啟動這一組的 3 分鐘倒數上限。
     private func markSetStart(index: Int) {
         guard var result = treatmentResult, result.set_start_time.indices.contains(index) else { return }
         result.set_start_time[index] = Int(Date().timeIntervalSince1970 * 1000)
         treatmentResult = result
         resultVM.update(result)
         btVM.startRecordingAll()
+
+        let now = Date()
+        setCountdownRange = now...now.addingTimeInterval(Self.setTimeLimit)
+        setTimeLimitTimer?.invalidate()
+        setTimeLimitTimer = Timer.scheduledTimer(withTimeInterval: Self.setTimeLimit, repeats: false) { _ in
+            handleSetTimeLimitReached()
+        }
     }
 
-    /// 某一組的結束點：停止 acc/gyro/exg 的記錄，並把結束時間、實際完成次數一併寫回 treatment_result
+    /// 某一組的結束點：停止 acc/gyro/exg 的記錄、取消該組的 3 分鐘倒數計時器，
+    /// 並把結束時間、實際完成次數一併寫回 treatment_result
     /// （reps 達標時傳目標次數，提前結束時傳目前實際完成次數）。
     private func finishSet(index: Int, reps: Int) {
         guard var result = treatmentResult, result.set_end_time.indices.contains(index) else { return }
+        setTimeLimitTimer?.invalidate()
+        setTimeLimitTimer = nil
+        setCountdownRange = nil
         btVM.stopRecordingAll()
         result.set_end_time[index] = Int(Date().timeIntervalSince1970 * 1000)
         result.reps[index] = reps
@@ -123,9 +134,57 @@ struct Working22: View {
         resultVM.update(result)
     }
 
-    /// 批次 1 暫時版本：批次 2 會換成真正的組間休息 UI／倒數，這裡先直接進下一組，
-    /// 確保 currentSet／treatment_result 記錄邏輯正確。
+    // MARK: - 3 分鐘組別倒數計時（working22-database-port-plan.md 批次 2）
+
+    @State private var setTimeLimitTimer: Timer?
+    @State private var setCountdownRange: ClosedRange<Date>?
+    private static let setTimeLimit: TimeInterval = 180
+
+    /// 從起始點起算倒數 3 分鐘歸零，視同該組提前結束。取消進行中讀秒的邏輯先直接內聯
+    /// （`holdTimer?.invalidate()`／`holdElapsed = 0`），等批次 3 新增
+    /// `cancelInProgressHoldWithoutCounting()` 後再換成呼叫該函式。
+    private func handleSetTimeLimitReached() {
+        holdTimer?.invalidate()
+        holdTimer = nil
+        holdElapsed = 0
+        finishSet(index: currentSet - 1, reps: currentRep)
+        if currentSet < content.sets {
+            startSetRestCountdown()
+        } else {
+            showCompletionPopup = true
+        }
+    }
+
+    // MARK: - 組間休息（working22-database-port-plan.md 批次 2）
+
+    @State private var showSetRestPopup = false
+    @State private var setRestCountdown: Int = 0
+    @State private var setRestTimer: Timer?
+
+    /// 進入組間休息：取消進行中讀秒（同 handleSetTimeLimitReached 的內聯版本，
+    /// 批次 3 加入 cancelInProgressHoldWithoutCounting() 後改成呼叫該函式）、
+    /// 設定倒數秒數、顯示休息彈窗，倒數到 0 呼叫 closeSetRestPopup()。
     private func startSetRestCountdown() {
+        holdTimer?.invalidate()
+        holdTimer = nil
+        holdElapsed = 0
+        setRestTimer?.invalidate()
+        setRestCountdown = content.set_rest_time
+        showSetRestPopup = true
+        setRestTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            setRestCountdown -= 1
+            if setRestCountdown <= 0 {
+                closeSetRestPopup()
+            }
+        }
+    }
+
+    /// 組間休息結束、下一組開始：取消休息計時器、遞增 currentSet、currentRep 歸零，
+    /// 再呼叫 markSetStart 開始記錄下一組。
+    private func closeSetRestPopup() {
+        setRestTimer?.invalidate()
+        setRestTimer = nil
+        showSetRestPopup = false
         if currentSet < content.sets {
             currentSet += 1
         }
@@ -542,6 +601,12 @@ struct Working22: View {
                             .frame(width: 40, height: 40)
                         }
                         .buttonStyle(.plain)
+
+                        if let setCountdownRange {
+                            Text(timerInterval: setCountdownRange, countsDown: true)
+                                .font(.system(size: 24, weight: .bold, design: .monospaced))
+                                .foregroundStyle(.black)
+                        }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.leading, 16)
@@ -807,6 +872,14 @@ struct Working22: View {
             }
             .allowsHitTesting(false)
 
+            if showSetRestPopup {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+
+                SetRestPopup(secondsRemaining: setRestCountdown)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            }
+
             // 批次 1 佔位完成視窗：真正的 CompletionPopup（含匯出JSON）跟 PostWorking_22
             // 是批次 5 的範圍，這裡先確保 treatment_result 記錄流程能跑完、能離開畫面。
             if showCompletionPopup {
@@ -846,9 +919,51 @@ struct Working22: View {
             releaseWorkItem?.cancel()
             fuelHideWorkItem?.cancel()
             scoreTimer?.invalidate()
+            setTimeLimitTimer?.invalidate()
+            setCountdownRange = nil
+            setRestTimer?.invalidate()
             btVM.stopRecordingAll()
             btVM.currentTreatmentResultId = nil
         }
+    }
+}
+
+// MARK: - SetRestPopup
+
+// 組間休息倒數彈窗，逐字比照 9_Working.swift／2_Working.swift 的 SetRestPopup。
+private struct SetRestPopup: View {
+    let secondsRemaining: Int
+
+    var body: some View {
+        ZStack {
+            Color.white
+
+            VStack(spacing: 24) {
+                Text("組間休息時間")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(.black)
+
+                ZStack {
+                    Circle()
+                        .fill(Color.white)
+                    Circle()
+                        .strokeBorder(Color.black, lineWidth: 1.5)
+                    Text("\(max(secondsRemaining, 0))")
+                        .font(.system(size: 32, weight: .bold))
+                        .foregroundStyle(.black)
+                        .minimumScaleFactor(0.5)
+                        .lineLimit(1)
+                        .padding(8)
+                }
+                .frame(width: 90, height: 90)
+            }
+        }
+        .frame(width: 320, height: 220)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.black, lineWidth: 1.5)
+        )
     }
 }
 
