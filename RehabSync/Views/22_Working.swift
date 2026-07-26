@@ -2,8 +2,9 @@ import SwiftUI
 import CoreBluetooth
 
 /// 弓步遊戲畫面（exercise_id 22）目前只做出「即時視覺回饋」的部分：
-/// 背景太空人預設顯示 get.png，角度 >= 70° 換成 holding.png（微微抖動），
-/// 曾經達到 70° 後又回落到 < 15° 時短暫換成 release.png（1.5 秒後切回預設）。
+/// 背景固定疊 earth／landing／space_shuttle 三張圖（不隨角度變化）；
+/// 前景太空人角度 < 70° 顯示 get.png，>= 70° 換成 holding.png（微微抖動），
+/// 曾經達到 70° 後又回落到 < 70° 時短暫換成 release.png（1.5 秒後切回預設）。
 /// 左側圓圈顯示即時角度數字、直式膠囊目前只是靜態外觀。組數/次數計分等遊戲機制
 /// 尚未實作，等後續確認規則後再依 9_Working.swift 的骨架補上。
 struct Working22: View {
@@ -69,7 +70,7 @@ struct Working22: View {
     @State private var trembleOffset: CGSize = .zero
 
     private static let holdAngleThreshold: Double = 70
-    private static let releaseAngleThreshold: Double = 15
+    private static let releaseAngleThreshold: Double = 70
     private static let releaseAnimationDuration: Double = 1.5
 
     /// 進入 holding 狀態時開始讓 astronaut_holding.png 的內容物持續微微抖動，
@@ -122,8 +123,25 @@ struct Working22: View {
             Color.white
                 .ignoresSafeArea()
 
-            // 預設顯示 astronaut_get.png；角度 >= 70° 時換成 astronaut_holding.png 並持續微微抖動；
-            // 曾經達到 70° 之後又回落到 < 15° 時，短暫換成 astronaut_release.png（1.5 秒後自動切回預設）。
+            // 背景：astronaut_earth／landing／space_shuttle 三張固定疊在一起，不隨角度變化。
+            ZStack {
+                Image("AstronautEarthIcon")
+                    .resizable()
+                    .scaledToFill()
+                    .opacity(0.4)
+                Image("AstronautLandingIcon")
+                    .resizable()
+                    .scaledToFill()
+                Image("AstronautSpaceShuttleIcon")
+                    .resizable()
+                    .scaledToFill()
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding(48)
+            .allowsHitTesting(false)
+
+            // 前景太空人：角度 < 70° 顯示 astronaut_get.png；角度 >= 70° 換成 astronaut_holding.png 並持續微微抖動；
+            // 曾經達到 70° 之後又回落到 < 70° 時，短暫換成 astronaut_release.png（1.5 秒後自動切回預設）。
             Group {
                 switch astronautState {
                 case .idle:
