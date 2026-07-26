@@ -4,7 +4,8 @@ import CoreBluetooth
 /// 弓步遊戲畫面（exercise_id 22）目前只做出「即時視覺回饋」的部分：
 /// 背景固定疊 earth／landing／space_shuttle 三張圖（不隨角度變化）；
 /// 前景太空人角度 < 70° 顯示 get.png，>= 70° 換成 holding.png（微微抖動，同時直式膠囊水位隨秒數上漲），
-/// 曾經達到 70° 後又回落到 < 25° 時短暫換成 release.png（1.5 秒後切回預設，直式膠囊水位歸零）。
+/// 曾經達到 70° 後又回落到 < 25° 時短暫換成 release.png（1.5 秒後切回預設，直式膠囊水位歸零），
+/// 同時 astronaut_fuel.png 從雙手位置飛進火箭燃料艙口（同樣 1.5 秒）。
 /// 左側圓圈顯示即時角度數字。組數/次數計分等遊戲機制尚未實作，等後續確認規則後再依 9_Working.swift 的骨架補上。
 struct Working22: View {
     let content: TreatmentContent
@@ -88,6 +89,50 @@ struct Working22: View {
     private static let releaseAngleThreshold: Double = 25
     private static let releaseAnimationDuration: Double = 1.5
 
+    // MARK: - 燃料箱飛行動畫（release 當下，astronaut_fuel.png 從雙手位置飛進火箭艙口）
+
+    // 這些滿版疊圖都用同樣的 canvas 尺寸與 padding(48) + scaledToFill 處理，
+    // 座標換算公式跟 9_Working.swift／2_Working.swift 的 overlayPosition 完全相同。
+    private static let overlayCanvasSize = CGSize(width: 1232, height: 864)
+    private static let fuelStartPixel = CGPoint(x: 360, y: 620)
+    private static let fuelEndPixel = CGPoint(x: 612, y: 514)
+
+    private static func overlayPosition(for fraction: CGPoint, in size: CGSize, padding: CGFloat = 48) -> CGPoint {
+        let frameW = size.width - padding * 2
+        let frameH = size.height - padding * 2
+        guard frameW > 0, frameH > 0 else { return CGPoint(x: size.width / 2, y: size.height / 2) }
+        let scale = max(frameW / overlayCanvasSize.width, frameH / overlayCanvasSize.height)
+        let visibleW = frameW / scale
+        let visibleH = frameH / scale
+        let cropX = (overlayCanvasSize.width - visibleW) / 2
+        let cropY = (overlayCanvasSize.height - visibleH) / 2
+        let relX = (fraction.x * overlayCanvasSize.width - cropX) / visibleW
+        let relY = (fraction.y * overlayCanvasSize.height - cropY) / visibleH
+        return CGPoint(x: padding + relX * frameW, y: padding + relY * frameH)
+    }
+
+    private static func canvasFraction(x: CGFloat, y: CGFloat) -> CGPoint {
+        CGPoint(x: x / overlayCanvasSize.width, y: y / overlayCanvasSize.height)
+    }
+
+    @State private var showFuelAnimation = false
+    @State private var fuelProgress: Double = 0
+    @State private var fuelHideWorkItem: DispatchWorkItem?
+
+    /// release 觸發的同時，讓 astronaut_fuel.png 在 releaseAnimationDuration 秒內
+    /// 從 fuelStartPixel（雙手位置）飛到 fuelEndPixel（火箭燃料艙口）。
+    private func triggerFuelFlight() {
+        fuelHideWorkItem?.cancel()
+        fuelProgress = 0
+        showFuelAnimation = true
+        withAnimation(.linear(duration: Self.releaseAnimationDuration)) {
+            fuelProgress = 1
+        }
+        let workItem = DispatchWorkItem { showFuelAnimation = false }
+        fuelHideWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.releaseAnimationDuration, execute: workItem)
+    }
+
     /// 進入 holding 狀態時開始讓 astronaut_holding.png 的內容物持續微微抖動，
     /// 用 Timer 每 0.08 秒隨機挑一個小幅偏移，模擬用力撐住時的顫抖感。
     private func startTremble() {
@@ -132,6 +177,7 @@ struct Working22: View {
                 holdElapsed = 0
             }
             triggerReleaseAnimation()
+            triggerFuelFlight()
         } else if astronautState == .holding {
             stopTremble()
             stopHoldTimer()
@@ -183,6 +229,17 @@ struct Working22: View {
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .padding(48)
             .allowsHitTesting(false)
+
+            if showFuelAnimation {
+                GeometryReader { geo in
+                    MovingFuelIcon(
+                        progress: fuelProgress,
+                        start: Self.overlayPosition(for: Self.canvasFraction(x: Self.fuelStartPixel.x, y: Self.fuelStartPixel.y), in: geo.size),
+                        end: Self.overlayPosition(for: Self.canvasFraction(x: Self.fuelEndPixel.x, y: Self.fuelEndPixel.y), in: geo.size)
+                    )
+                }
+                .allowsHitTesting(false)
+            }
 
             HStack {
                 Button {
@@ -293,7 +350,34 @@ struct Working22: View {
             trembleTimer?.invalidate()
             holdTimer?.invalidate()
             releaseWorkItem?.cancel()
+            fuelHideWorkItem?.cancel()
         }
+    }
+}
+
+// MARK: - MovingFuelIcon
+
+// 讓燃料箱從起點直線飛向終點：progress 是唯一會被 SwiftUI 動畫插值的值，
+// x/y 在每個插值後的 progress 當下重新計算，才能跟著 withAnimation 平滑移動
+// （寫法跟 9_Working.swift 的 MovingArrow 完全相同）。
+private struct MovingFuelIcon: View, Animatable {
+    var progress: Double
+    let start: CGPoint
+    let end: CGPoint
+
+    var animatableData: Double {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    var body: some View {
+        let x = start.x + (end.x - start.x) * progress
+        let y = start.y + (end.y - start.y) * progress
+        Image("AstronautFuelIcon")
+            .resizable()
+            .scaledToFit()
+            .frame(width: 200, height: 200)
+            .position(x: x, y: y)
     }
 }
 
