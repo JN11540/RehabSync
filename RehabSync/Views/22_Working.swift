@@ -13,17 +13,22 @@ struct Working22: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(BluetoothViewModel.self) private var btVM
 
-    /// 太空人四個層級對應的角度區間（0°～90° 平均分成四段），
-    /// 之後如果確認了實際的判斷規則（例如跟直式膠囊的握持門檻綁定），這裡要跟著調整。
-    private static let angleTierBoundaries: [Double] = [22.5, 45, 67.5]
-
-    private func astronautImageName(for angle: Double?) -> String {
-        guard let angle else { return "AstronautEarthIcon" }
-        if angle < Self.angleTierBoundaries[0] { return "AstronautEarthIcon" }
-        if angle < Self.angleTierBoundaries[1] { return "AstronautLandingIcon" }
-        if angle < Self.angleTierBoundaries[2] { return "AstronautSpaceShuttleIcon" }
-        return "AstronautGetIcon"
-    }
+    // 角度門檻判斷邏輯先註解掉，等後續確認實際規則後再打開。
+    // /// 太空人四個層級對應的角度區間（0°～90° 平均分成四段），
+    // /// 之後如果確認了實際的判斷規則（例如跟直式膠囊的握持門檻綁定），這裡要跟著調整。
+    // private static let angleTierBoundaries: [Double] = [22.5, 45, 67.5]
+    //
+    // private enum AstronautTier {
+    //     case earth, landing, spaceShuttle, get
+    // }
+    //
+    // private func astronautTier(for angle: Double?) -> AstronautTier {
+    //     guard let angle else { return .earth }
+    //     if angle < Self.angleTierBoundaries[0] { return .earth }
+    //     if angle < Self.angleTierBoundaries[1] { return .landing }
+    //     if angle < Self.angleTierBoundaries[2] { return .spaceShuttle }
+    //     return .get
+    // }
 
     // 校正/測試階段在 PreWorking 啟動的即時角度預估，離開這裡時必須主動停止，
     // 否則 btVM.isLiveEstimating 會卡在 true，導致下次（不管同動作或別的動作）
@@ -48,12 +53,25 @@ struct Working22: View {
             Color.white
                 .ignoresSafeArea()
 
-            Image(astronautImageName(for: btVM.currentEstimatedRealAngle))
-                .resizable()
-                .scaledToFill()
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .padding(48)
-                .allowsHitTesting(false)
+            // 預設狀態：四張太空人圖層直接疊在一起（earth 最底層 → get 最上層），
+            // 等角度門檻規則確認後再改回依 btVM.currentEstimatedRealAngle 切換。
+            ZStack {
+                Image("AstronautEarthIcon")
+                    .resizable()
+                    .scaledToFill()
+                Image("AstronautLandingIcon")
+                    .resizable()
+                    .scaledToFill()
+                Image("AstronautSpaceShuttleIcon")
+                    .resizable()
+                    .scaledToFill()
+                Image("AstronautGetIcon")
+                    .resizable()
+                    .scaledToFill()
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding(48)
+            .allowsHitTesting(false)
 
             HStack {
                 Button {
