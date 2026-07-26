@@ -760,7 +760,8 @@ private struct DashboardSchedulePanel: View {
     private static let trainingMenuDestinations: [Int: (TreatmentContent, Exercise?, @escaping () -> Void) -> AnyView] = [
         2: { content, exercise, onReturnToDashboard in AnyView(PreWorking_2(content: content, exercise: exercise, onReturnToDashboard: onReturnToDashboard)) },
         9: { content, exercise, onReturnToDashboard in AnyView(PreWorking_9(content: content, exercise: exercise, onReturnToDashboard: onReturnToDashboard)) },
-        12: { content, exercise, onReturnToDashboard in AnyView(PreWorking_12(content: content, exercise: exercise, onReturnToDashboard: onReturnToDashboard)) }
+        12: { content, exercise, onReturnToDashboard in AnyView(PreWorking_12(content: content, exercise: exercise, onReturnToDashboard: onReturnToDashboard)) },
+        22: { content, exercise, onReturnToDashboard in AnyView(PreWorking_22(content: content, exercise: exercise, onReturnToDashboard: onReturnToDashboard)) }
     ]
 
     /// 資料庫沒有治療計畫選擇 UI，比照 Test1 的作法，以第一個治療計畫代表「目前的訓練菜單」。
