@@ -578,10 +578,10 @@ private struct PostWorking22RetentionDetailSheet: View {
 
     private var exgTabs: [(title: String, deviceId: Int64?, channel: Int)] {
         [
-            ("大腿 Channel 0", thighDeviceId, 0),
-            ("大腿 Channel 1", thighDeviceId, 1),
-            ("小腿 Channel 0", calfDeviceId, 0),
-            ("小腿 Channel 1", calfDeviceId, 1)
+            ("大腿通道 0", thighDeviceId, 0),
+            ("大腿通道 1", thighDeviceId, 1),
+            ("小腿通道 0", calfDeviceId, 0),
+            ("小腿通道 1", calfDeviceId, 1)
         ]
     }
 
