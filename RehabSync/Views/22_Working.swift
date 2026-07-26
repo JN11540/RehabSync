@@ -4,8 +4,9 @@ import CoreBluetooth
 /// 弓步遊戲畫面（exercise_id 22）目前只做出「即時視覺回饋」的部分：
 /// 背景固定疊 earth／landing／space_shuttle 三張圖（不隨角度變化）；
 /// 前景太空人角度 < 70° 顯示 get.png，>= 70° 換成 holding.png（微微抖動，同時直式膠囊水位隨秒數上漲），
-/// 曾經達到 70° 後又回落到 < 25° 時短暫換成 release.png（1.5 秒後切回預設，直式膠囊水位歸零），
-/// 同時 astronaut_fuel.png 從雙手位置飛進火箭燃料艙口（同樣 1.5 秒）。
+/// 曾經達到 70° 後又回落到 < 25° 且讀秒超過 1 秒時，短暫換成 release.png（1.5 秒後切回預設），
+/// 同時 astronaut_fuel.png 從雙手位置飛進火箭燃料艙口（同樣 1.5 秒）；不論是否達到 1 秒，
+/// 只要回落到 < 25° 直式膠囊水位都會歸零（讀秒不足 1 秒時只是不觸發 release/燃料箱動畫）。
 /// 左側圓圈顯示即時角度數字。組數/次數計分等遊戲機制尚未實作，等後續確認規則後再依 9_Working.swift 的骨架補上。
 struct Working22: View {
     let content: TreatmentContent
@@ -88,6 +89,8 @@ struct Working22: View {
     private static let holdAngleThreshold: Double = 70
     private static let releaseAngleThreshold: Double = 25
     private static let releaseAnimationDuration: Double = 1.5
+    // 讀秒（holdElapsed）要超過這個秒數，回落到 releaseAngleThreshold 以下才算一次有效的 release。
+    private static let holdQualifyDuration: Double = 1
 
     // MARK: - 燃料箱飛行動畫（release 當下，astronaut_fuel.png 從雙手位置飛進火箭艙口）
 
@@ -171,13 +174,18 @@ struct Working22: View {
             startHoldTimer()
         } else if angle < Self.releaseAngleThreshold && hasReachedHoldThreshold {
             hasReachedHoldThreshold = false
+            let qualified = holdElapsed > Self.holdQualifyDuration
             stopTremble()
             stopHoldTimer()
             withAnimation(.easeOut(duration: 0.2)) {
                 holdElapsed = 0
             }
-            triggerReleaseAnimation()
-            triggerFuelFlight()
+            if qualified {
+                triggerReleaseAnimation()
+                triggerFuelFlight()
+            } else {
+                astronautState = .idle
+            }
         } else if astronautState == .holding {
             stopTremble()
             stopHoldTimer()
