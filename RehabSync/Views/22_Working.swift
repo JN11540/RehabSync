@@ -20,8 +20,9 @@ import CoreBluetooth
 /// 已依 working22-database-port-plan.md 批次 1 完成；3 分鐘組別倒數計時＋真正的組間休息
 /// （SetRestPopup／setRestTimer）已依批次 2 完成；結束鍵確認彈窗（ConfirmPopup）、暫停/繼續
 /// （cancelInProgressHoldWithoutCounting／isSessionPaused／pauseSession／resumeSession，
-/// .onChange 已守衛 !isSessionPaused && btVM.isRecording）已依批次 3 完成。正式完成視窗＋
-/// 匯出JSON、PostWorking_22 還沒實作，等後續批次依 working9-database-port-plan.md 的骨架補上。
+/// .onChange 已守衛 !isSessionPaused && btVM.isRecording）已依批次 3 完成；正式完成視窗＋
+/// 匯出JSON（CompletionPopup，10 秒倒數／runExport）＋跳轉到新建立的 PostWorking_22.swift
+/// 已依批次 5 完成。working22-database-port-plan.md 規劃的 11 個階段全部完成。
 struct Working22: View {
     let content: TreatmentContent
     let exercise: Exercise?
@@ -70,6 +71,9 @@ struct Working22: View {
     private let resultVM = TreatmentResultViewModel()
     @State private var treatmentResult: TreatmentResult?
     @State private var showCompletionPopup = false
+    @State private var navigateToPostWorking22 = false
+    @State private var finalElapsedSeconds = 0
+    @State private var sessionStartDate = Date()
 
     /// 遊戲一開始（畫面顯示的那一刻）先建立這局遊戲唯一一筆 treatment_result，
     /// 陣列長度依目標組數/目標次數計算、全部初始化為 0，再把 id 交給 btVM
@@ -916,35 +920,39 @@ struct Working22: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             }
 
-            // 批次 1 佔位完成視窗：真正的 CompletionPopup（含匯出JSON）跟 PostWorking_22
-            // 是批次 5 的範圍，這裡先確保 treatment_result 記錄流程能跑完、能離開畫面。
             if showCompletionPopup {
                 Color.black.opacity(0.3)
                     .ignoresSafeArea()
-                VStack(spacing: 16) {
-                    Text("完成！（批次 1 佔位視窗）")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(.black)
-                    Button("返回") {
-                        onReturnToDashboard()
-                        dismiss()
-                    }
-                    .font(.system(size: 18, weight: .semibold))
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 12)
-                    .background(Color(red: 0.45, green: 0.35, blue: 0.85))
-                    .foregroundStyle(.white)
-                    .clipShape(Capsule())
-                }
-                .padding(32)
-                .background(Color.white)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+
+                CompletionPopup(treatmentResult: treatmentResult, onComplete: {
+                    showCompletionPopup = false
+                    finalElapsedSeconds = Int(Date().timeIntervalSince(sessionStartDate))
+                    navigateToPostWorking22 = true
+                })
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            }
+        }
+        .fullScreenCover(isPresented: $navigateToPostWorking22) {
+            if let treatmentResult {
+                PostWorking_22(
+                    content: content,
+                    exercise: exercise,
+                    totalCoins: totalCoins,
+                    totalReps: excellentCount + goodCount + okCount,
+                    totalElapsedSeconds: finalElapsedSeconds,
+                    treatmentResult: treatmentResult,
+                    onReturnToDashboard: onReturnToDashboard
+                )
             }
         }
         .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
             guard !isSessionPaused, btVM.isRecording else { return }
             handleAngleChange(newValue)
+        }
+        .onChange(of: navigateToPostWorking22) { _, newValue in
+            if newValue {
+                pauseSession()
+            }
         }
         .onAppear {
             createTreatmentResultIfNeeded()
@@ -1052,6 +1060,160 @@ private struct SetRestPopup: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(Color.black, lineWidth: 1.5)
         )
+    }
+}
+
+// MARK: - CompletionPopup
+
+// 逐字比照 9_Working.swift／2_Working.swift／12_Working.swift 目前最新版的 CompletionPopup：
+// 10 秒倒數，前 5 秒純粹是寫入緩衝，倒數到剛好顯示「匯出JSON(5)」那一次遞減才真正呼叫 runExport()，
+// 沒有分享面板，「完成」按鈕只看背景寫檔是否已經跑完（.done）才會解鎖。沒有 astronaut 主題的
+// 「結束」美術素材，改用已確認存在的 astronaut_get.png 代替 ArrowTheEndIcon/FishingEndIcon。
+private struct CompletionPopup: View {
+    let treatmentResult: TreatmentResult?
+    let onComplete: () -> Void
+
+    private enum ExportPhase: Equatable {
+        case ready
+        case counting(secondsRemaining: Int)
+        case waiting
+        case done
+    }
+
+    @State private var phase: ExportPhase = .ready
+    @State private var countdownTimer: Timer?
+
+    private var exportButtonTitle: String {
+        switch phase {
+        case .ready, .done: return "匯出JSON"
+        case .counting(let remaining): return "匯出JSON(\(remaining))"
+        case .waiting: return "再等待一下..."
+        }
+    }
+
+    private var isExportButtonEnabled: Bool {
+        switch phase {
+        case .ready, .done: return true
+        case .counting, .waiting: return false
+        }
+    }
+
+    private var isCompleteButtonEnabled: Bool {
+        phase == .done
+    }
+
+    private func performExport() {
+        guard phase == .ready || phase == .done else { return }
+        phase = .counting(secondsRemaining: 10)
+        countdownTimer?.invalidate()
+        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
+            switch phase {
+            case .counting(let remaining) where remaining > 0:
+                let next = remaining - 1
+                phase = .counting(secondsRemaining: next)
+                if next == 5 { runExport() }
+            case .counting:
+                phase = .waiting
+            case .waiting:
+                break
+            case .ready, .done:
+                timer.invalidate()
+                countdownTimer = nil
+            }
+        }
+    }
+
+    private func runExport() {
+        guard let treatmentResult else { return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let deviceVM = DeviceViewModel()
+            let files = GameDataExporter.export(treatmentResult: treatmentResult, deviceVM: deviceVM)
+            if let folderURL = ExportDestinationStore.resolveDesignatedFolder(),
+               folderURL.startAccessingSecurityScopedResource() {
+                for file in files {
+                    let url = folderURL.appendingPathComponent(file.filename)
+                    try? file.content.write(to: url, atomically: true, encoding: .utf8)
+                }
+                folderURL.stopAccessingSecurityScopedResource()
+            }
+            DispatchQueue.main.async {
+                phase = .done
+            }
+        }
+    }
+
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            VStack(spacing: 0) {
+                ZStack(alignment: .top) {
+                    Color.white
+                    Image("AstronautGetIcon")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 400, height: 400)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 344)
+                .clipped()
+
+                Color(red: 0.86, green: 0.90, blue: 0.94)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+            }
+
+            HStack(spacing: 12) {
+                if phase != .done {
+                    Button(action: performExport) {
+                        Text(exportButtonTitle)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(Color.white)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .stroke(Color.black, lineWidth: 1.5)
+                                    )
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!isExportButtonEnabled)
+                    .opacity(isExportButtonEnabled ? 1 : 0.5)
+                }
+
+                Button(action: onComplete) {
+                    Text("完成")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.white)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(Color.black, lineWidth: 1.5)
+                                )
+                        )
+                }
+                .buttonStyle(.plain)
+                .disabled(!isCompleteButtonEnabled)
+                .opacity(isCompleteButtonEnabled ? 1 : 0.5)
+            }
+            .padding(12)
+        }
+        .frame(width: 520, height: 400)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.black, lineWidth: 1.5)
+        )
+        .onDisappear {
+            countdownTimer?.invalidate()
+            countdownTimer = nil
+        }
     }
 }
 
