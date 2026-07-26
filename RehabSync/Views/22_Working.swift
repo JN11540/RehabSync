@@ -102,6 +102,7 @@ struct Working22: View {
             }
             .frame(width: 130, height: 130)
             .padding(24)
+            .offset(x: 25, y: -100)
         }
         .onDisappear {
             stopLiveTestIfNeeded()
