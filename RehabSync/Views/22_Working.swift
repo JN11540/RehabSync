@@ -3,10 +3,9 @@ import CoreBluetooth
 
 /// 弓步遊戲畫面（exercise_id 22）目前只做出「即時視覺回饋」的部分：
 /// 背景固定疊 earth／landing／space_shuttle 三張圖（不隨角度變化）；
-/// 前景太空人角度 < 70° 顯示 get.png，>= 70° 換成 holding.png（微微抖動），
-/// 曾經達到 70° 後又回落到 < 70° 時短暫換成 release.png（1.5 秒後切回預設）。
-/// 左側圓圈顯示即時角度數字、直式膠囊目前只是靜態外觀。組數/次數計分等遊戲機制
-/// 尚未實作，等後續確認規則後再依 9_Working.swift 的骨架補上。
+/// 前景太空人角度 < 70° 顯示 get.png，>= 70° 換成 holding.png（微微抖動，同時直式膠囊水位隨秒數上漲），
+/// 曾經達到 70° 後又回落到 < 25° 時短暫換成 release.png（1.5 秒後切回預設，直式膠囊水位歸零）。
+/// 左側圓圈顯示即時角度數字。組數/次數計分等遊戲機制尚未實作，等後續確認規則後再依 9_Working.swift 的骨架補上。
 struct Working22: View {
     let content: TreatmentContent
     let exercise: Exercise?
@@ -50,10 +49,26 @@ struct Working22: View {
         btVM.stopLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
     }
 
-    // 直式膠囊的讀秒進度，先給預設值讓膠囊能顯示出來；實際驅動 holdElapsed 累加的
-    // hold timer 邏輯等角度門檻規則確認後再補上。
+    // 直式膠囊水位：進入 holding 狀態時開始累加，離開 holding（不論回到 idle 或觸發 release）就停止累加；
+    // 觸發 release 時額外歸零，對應「直式膠囊水位要歸零」。
     @State private var holdElapsed: Double = 0
+    @State private var holdTimer: Timer?
     private static let holdDuration: Double = 5
+
+    private func startHoldTimer() {
+        guard holdTimer == nil else { return }
+        holdTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+            guard holdElapsed < Self.holdDuration else { return }
+            withAnimation(.linear(duration: 0.1)) {
+                holdElapsed = min(holdElapsed + 0.1, Self.holdDuration)
+            }
+        }
+    }
+
+    private func stopHoldTimer() {
+        holdTimer?.invalidate()
+        holdTimer = nil
+    }
 
     // MARK: - 太空人狀態機（get 預設 → holding 深蹲維持 → release 放開瞬間）
 
@@ -70,7 +85,7 @@ struct Working22: View {
     @State private var trembleOffset: CGSize = .zero
 
     private static let holdAngleThreshold: Double = 70
-    private static let releaseAngleThreshold: Double = 70
+    private static let releaseAngleThreshold: Double = 25
     private static let releaseAnimationDuration: Double = 1.5
 
     /// 進入 holding 狀態時開始讓 astronaut_holding.png 的內容物持續微微抖動，
@@ -108,12 +123,18 @@ struct Working22: View {
             releaseWorkItem?.cancel()
             astronautState = .holding
             startTremble()
+            startHoldTimer()
         } else if angle < Self.releaseAngleThreshold && hasReachedHoldThreshold {
             hasReachedHoldThreshold = false
             stopTremble()
+            stopHoldTimer()
+            withAnimation(.easeOut(duration: 0.2)) {
+                holdElapsed = 0
+            }
             triggerReleaseAnimation()
         } else if astronautState == .holding {
             stopTremble()
+            stopHoldTimer()
             astronautState = .idle
         }
     }
@@ -141,7 +162,7 @@ struct Working22: View {
             .allowsHitTesting(false)
 
             // 前景太空人：角度 < 70° 顯示 astronaut_get.png；角度 >= 70° 換成 astronaut_holding.png 並持續微微抖動；
-            // 曾經達到 70° 之後又回落到 < 70° 時，短暫換成 astronaut_release.png（1.5 秒後自動切回預設）。
+            // 曾經達到 70° 之後又回落到 < 25° 時，短暫換成 astronaut_release.png（1.5 秒後自動切回預設）。
             Group {
                 switch astronautState {
                 case .idle:
@@ -270,6 +291,7 @@ struct Working22: View {
         .onDisappear {
             stopLiveTestIfNeeded()
             trembleTimer?.invalidate()
+            holdTimer?.invalidate()
             releaseWorkItem?.cancel()
         }
     }
