@@ -18,9 +18,10 @@ import CoreBluetooth
 /// 三個刻度，水位跟著 totalCoins 即時更新，也是背景里程碑判斷的同一個數字來源。
 /// treatment_result 記錄（建立／markSetStart／finishSet／advanceProgress／recordExtensionLength）
 /// 已依 working22-database-port-plan.md 批次 1 完成；3 分鐘組別倒數計時＋真正的組間休息
-/// （SetRestPopup／setRestTimer）已依批次 2 完成。結束鍵確認、暫停/繼續（`cancelInProgressHoldWithoutCounting`／
-/// `isSessionPaused`）、正式完成視窗＋匯出JSON、PostWorking_22 都還沒實作，等後續批次依
-/// working9-database-port-plan.md 的骨架補上。
+/// （SetRestPopup／setRestTimer）已依批次 2 完成；結束鍵確認彈窗（ConfirmPopup）、暫停/繼續
+/// （cancelInProgressHoldWithoutCounting／isSessionPaused／pauseSession／resumeSession，
+/// .onChange 已守衛 !isSessionPaused && btVM.isRecording）已依批次 3 完成。正式完成視窗＋
+/// 匯出JSON、PostWorking_22 還沒實作，等後續批次依 working9-database-port-plan.md 的骨架補上。
 struct Working22: View {
     let content: TreatmentContent
     let exercise: Exercise?
@@ -134,19 +135,38 @@ struct Working22: View {
         resultVM.update(result)
     }
 
+    // MARK: - 取消進行中讀秒／暫停繼續（working22-database-port-plan.md 批次 3）
+
+    /// 「提前結束觸發當下正卡在讀秒中」的邊界情況：直接取消，不計入 reps、也不寫入 extension_length。
+    private func cancelInProgressHoldWithoutCounting() {
+        holdTimer?.invalidate()
+        holdTimer = nil
+        holdElapsed = 0
+    }
+
+    @State private var isSessionPaused = false
+    @State private var showExitConfirmPopup = false
+
+    private func pauseSession() {
+        isSessionPaused = true
+        holdTimer?.invalidate()
+        scoreTimer?.invalidate()
+        setTimeLimitTimer?.invalidate()
+    }
+
+    private func resumeSession() {
+        isSessionPaused = false
+    }
+
     // MARK: - 3 分鐘組別倒數計時（working22-database-port-plan.md 批次 2）
 
     @State private var setTimeLimitTimer: Timer?
     @State private var setCountdownRange: ClosedRange<Date>?
     private static let setTimeLimit: TimeInterval = 180
 
-    /// 從起始點起算倒數 3 分鐘歸零，視同該組提前結束。取消進行中讀秒的邏輯先直接內聯
-    /// （`holdTimer?.invalidate()`／`holdElapsed = 0`），等批次 3 新增
-    /// `cancelInProgressHoldWithoutCounting()` 後再換成呼叫該函式。
+    /// 從起始點起算倒數 3 分鐘歸零，視同該組提前結束。
     private func handleSetTimeLimitReached() {
-        holdTimer?.invalidate()
-        holdTimer = nil
-        holdElapsed = 0
+        cancelInProgressHoldWithoutCounting()
         finishSet(index: currentSet - 1, reps: currentRep)
         if currentSet < content.sets {
             startSetRestCountdown()
@@ -161,13 +181,9 @@ struct Working22: View {
     @State private var setRestCountdown: Int = 0
     @State private var setRestTimer: Timer?
 
-    /// 進入組間休息：取消進行中讀秒（同 handleSetTimeLimitReached 的內聯版本，
-    /// 批次 3 加入 cancelInProgressHoldWithoutCounting() 後改成呼叫該函式）、
-    /// 設定倒數秒數、顯示休息彈窗，倒數到 0 呼叫 closeSetRestPopup()。
+    /// 進入組間休息：取消進行中讀秒、設定倒數秒數、顯示休息彈窗，倒數到 0 呼叫 closeSetRestPopup()。
     private func startSetRestCountdown() {
-        holdTimer?.invalidate()
-        holdTimer = nil
-        holdElapsed = 0
+        cancelInProgressHoldWithoutCounting()
         setRestTimer?.invalidate()
         setRestCountdown = content.set_rest_time
         showSetRestPopup = true
@@ -583,8 +599,8 @@ struct Working22: View {
 
                     HStack(spacing: 12) {
                         Button {
-                            onReturnToDashboard()
-                            dismiss()
+                            showExitConfirmPopup = true
+                            pauseSession()
                         } label: {
                             ZStack {
                                 Circle()
@@ -880,6 +896,26 @@ struct Working22: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             }
 
+            if showExitConfirmPopup {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+
+                ConfirmPopup(
+                    message: "您確定要結束遊戲嗎？",
+                    onCancel: {
+                        showExitConfirmPopup = false
+                        resumeSession()
+                    },
+                    onConfirm: {
+                        showExitConfirmPopup = false
+                        cancelInProgressHoldWithoutCounting()
+                        finishSet(index: currentSet - 1, reps: currentRep)
+                        showCompletionPopup = true
+                    }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            }
+
             // 批次 1 佔位完成視窗：真正的 CompletionPopup（含匯出JSON）跟 PostWorking_22
             // 是批次 5 的範圍，這裡先確保 treatment_result 記錄流程能跑完、能離開畫面。
             if showCompletionPopup {
@@ -907,6 +943,7 @@ struct Working22: View {
             }
         }
         .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
+            guard !isSessionPaused, btVM.isRecording else { return }
             handleAngleChange(newValue)
         }
         .onAppear {
@@ -922,9 +959,60 @@ struct Working22: View {
             setTimeLimitTimer?.invalidate()
             setCountdownRange = nil
             setRestTimer?.invalidate()
+            pauseSession()
             btVM.stopRecordingAll()
             btVM.currentTreatmentResultId = nil
         }
+    }
+}
+
+// MARK: - ConfirmPopup
+
+// 結束鍵確認彈窗，逐字比照 9_Working.swift／2_Working.swift 的 ConfirmPopup。
+private struct ConfirmPopup: View {
+    let message: String
+    let onCancel: () -> Void
+    let onConfirm: () -> Void
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            Color.white
+            Text(message)
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(.black)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            Button(action: onCancel) {
+                ZStack {
+                    Circle().fill(Color.white)
+                    Circle().strokeBorder(Color.black, lineWidth: 1.5)
+                    Circle().strokeBorder(Color.black, lineWidth: 1.5).padding(4)
+                    Image(systemName: "xmark").font(.system(size: 16, weight: .bold)).foregroundStyle(.black)
+                }
+                .frame(width: 36, height: 36)
+            }
+            .buttonStyle(.plain)
+            .padding(8)
+            Button(action: onConfirm) {
+                Text("確定")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color.white)
+                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.black, lineWidth: 1.5))
+                    )
+            }
+            .buttonStyle(.plain)
+            .padding(12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+        }
+        .frame(width: 320, height: 220)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 1.5))
     }
 }
 
