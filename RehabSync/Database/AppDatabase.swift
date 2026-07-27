@@ -158,6 +158,14 @@ func createAppDatabase() throws -> DatabaseQueue {
         try db.create(index: "idx_advanced_statistics_treatment_result_id", on: "advanced_statistics", columns: ["treatment_result_id"])
     }
 
+    // A2（Enable EXG RAW DATA short package）：實測發現裝置必須收到這道指令（就算內容是全 0）
+    // 才會真正套用 A0 設定的取樣率，否則會停留在異常的慢速狀態（見 game-data-flow.md 2.1 節）。
+    migrator.registerMigration("v10") { db in
+        try db.alter(table: "bluetooth") { t in
+            t.add(column: "cmd_a2", .blob).notNull().defaults(to: Data([0xA2, 0x00]))
+        }
+    }
+
     try migrator.migrate(dbQueue)
     return dbQueue
 }

@@ -61,6 +61,10 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     @ObservationIgnored private var accOnlyCollecting: Set<UUID> = []
     @ObservationIgnored private var accOnlyBuffers: [UUID: [(timestamp: Int64, x: Double, y: Double, z: Double)]] = [:]
 
+    // EXG 封包遺失排查用（#if DEBUG）：記錄每個 device+channel 上一次收到的 Serial No／時間，
+    // 藉此分辨「裝置端真的沒送那麼快」還是「app 這邊漏收了封包」。
+    @ObservationIgnored private var exgPacketTracker: [String: (serial: UInt8, timestamp: Int64)] = [:]
+
     // Live Estimated Real Angle（即時預估真實角度，固定 5Hz 更新）— UI state (main thread)
     var isLiveEstimating = false
     var currentEstimatedRealAngle: Double? = nil
@@ -143,6 +147,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
                         gyro_sensitivity: dto.gyro_sensitivity,
                         cmd_a0:           Data(dto.cmd_a0),
                         cmd_a1:           Data(dto.cmd_a1),
+                        cmd_a2:           Data(dto.cmd_a2),
                         is_default:       dto.is_default
                     )
                     try record.insert(db, onConflict: .replace)
@@ -225,6 +230,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         if let writeChar = map[writeUUID] {
             peripheral.writeValue(config.cmd_a0, for: writeChar, type: .withResponse)
             peripheral.writeValue(config.cmd_a1, for: writeChar, type: .withResponse)
+            peripheral.writeValue(config.cmd_a2, for: writeChar, type: .withResponse)
         }
 
         if let c = map[accUUID]  { peripheral.setNotifyValue(true, for: c) }
@@ -268,6 +274,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             if let writeChar = map[CBUUID(string: config.write_uuid)] {
                 peripheral.writeValue(config.cmd_a0, for: writeChar, type: .withResponse)
                 peripheral.writeValue(config.cmd_a1, for: writeChar, type: .withResponse)
+                peripheral.writeValue(config.cmd_a2, for: writeChar, type: .withResponse)
             }
             if let c = map[CBUUID(string: config.sub_acc_uuid)]  { peripheral.setNotifyValue(true, for: c) }
             if let c = map[CBUUID(string: config.sub_gyro_uuid)] { peripheral.setNotifyValue(true, for: c) }
@@ -330,6 +337,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
                 if !wasRecording, let writeChar = map[CBUUID(string: config.write_uuid)] {
                     peripheral.writeValue(config.cmd_a0, for: writeChar, type: .withResponse)
                     peripheral.writeValue(config.cmd_a1, for: writeChar, type: .withResponse)
+                    peripheral.writeValue(config.cmd_a2, for: writeChar, type: .withResponse)
                 }
                 if let c = map[CBUUID(string: config.sub_acc_uuid)] { peripheral.setNotifyValue(true, for: c) }
             }
@@ -552,6 +560,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
                 if !wasRecording, let writeChar = map[CBUUID(string: config.write_uuid)] {
                     peripheral.writeValue(config.cmd_a0, for: writeChar, type: .withResponse)
                     peripheral.writeValue(config.cmd_a1, for: writeChar, type: .withResponse)
+                    peripheral.writeValue(config.cmd_a2, for: writeChar, type: .withResponse)
                 }
                 if let c = map[CBUUID(string: config.sub_acc_uuid)] { peripheral.setNotifyValue(true, for: c) }
             }
@@ -696,6 +705,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
                 if !wasRecording, let writeChar = map[CBUUID(string: config.write_uuid)] {
                     peripheral.writeValue(config.cmd_a0, for: writeChar, type: .withResponse)
                     peripheral.writeValue(config.cmd_a1, for: writeChar, type: .withResponse)
+                    peripheral.writeValue(config.cmd_a2, for: writeChar, type: .withResponse)
                 }
                 if let c = map[CBUUID(string: config.sub_acc_uuid)] { peripheral.setNotifyValue(true, for: c) }
             }
@@ -1042,6 +1052,16 @@ extension BluetoothViewModel: CBPeripheralDelegate {
         guard !data.isEmpty else { return }
         let flag = data[0]
 
+        #if DEBUG
+        // RMS 短封包（0xE8）的 layout 跟 raw（0xE0/0xE1）不同：[Flag][Serial No][8 bytes RMS Data]，
+        // Serial No 在 offset 1，不是 offset 2；兩種 channel 合併在同一包，所以用獨立的 tracker key。
+        if flag == 0xE0 || flag == 0xE1, data.count >= 3 {
+            logExgPacketTiming(deviceId: deviceId, trackerKey: "\(deviceId)-\(flag == 0xE0 ? 0 : 1)", serial: data[2], timestamp: timestamp, flag: flag)
+        } else if flag == 0xE8, data.count >= 2 {
+            logExgPacketTiming(deviceId: deviceId, trackerKey: "\(deviceId)-E8", serial: data[1], timestamp: timestamp, flag: flag)
+        }
+        #endif
+
         guard flag == 0xE0 || flag == 0xE1 else { return }
         guard data.count >= 131 else { return }
 
@@ -1053,6 +1073,18 @@ extension BluetoothViewModel: CBPeripheralDelegate {
         let treatmentResultId = DispatchQueue.main.sync { self.currentTreatmentResultId }
         deviceVM.insertEXGBatch(deviceId: deviceId, timestamp: timestamp, treatmentResultId: treatmentResultId, channel: channel, values: values)
     }
+
+    #if DEBUG
+    private func logExgPacketTiming(deviceId: Int64, trackerKey: String, serial: UInt8, timestamp: Int64, flag: UInt8) {
+        if let previous = exgPacketTracker[trackerKey] {
+            let deltaT = timestamp - previous.timestamp
+            let rawSerialDelta = Int(serial) - Int(previous.serial)
+            let deltaSerial = rawSerialDelta >= 0 ? rawSerialDelta : rawSerialDelta + 256
+            print(String(format: "[EXG-DIAG] device=%lld flag=0x%02X serial=%d Δserial=%d Δt=%lldms", deviceId, flag, serial, deltaSerial, deltaT))
+        }
+        exgPacketTracker[trackerKey] = (serial: serial, timestamp: timestamp)
+    }
+    #endif
 }
 
 // MARK: - Data Helper

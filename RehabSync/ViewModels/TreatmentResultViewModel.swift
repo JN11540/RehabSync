@@ -130,7 +130,7 @@ enum ExportDestinationStore {
 // MARK: - GameDataExporter（database-update-plan.md「4. 完成視窗『匯出JSON』功能」）
 
 /// 匯出功能專用：組裝「7 個 CSV 檔 + 1 個 JSON 檔」的內容，對應 database-update-plan.md
-/// 「4. 完成視窗『匯出JSON』功能」的規劃（exg 依 exg-csv-split-plan.md 拆成 4 個檔案）。
+/// 「4. 完成視窗『匯出JSON』功能」的規劃（exg 拆成 4 個檔案，裝置 × channel 各自獨立）。
 /// 只負責產生檔名＋內容字串，不負責寫檔／分享（見階段 4、5）。
 enum GameDataExporter {
 
@@ -243,12 +243,12 @@ enum GameDataExporter {
 
     // MARK: - exg
 
-    /// μV 換算係數：實驗校正得出的數值，不是感測器規格書上標示的 LSB 大小（見 exg-csv-split-plan.md）。
+    /// μV 換算係數：實驗校正得出的數值，不是感測器規格書上標示的 LSB 大小。
     /// 內部可見度（不是 private）：結果頁 EXG 趨勢圖（`PostWorking_2`/`PostWorking_9`/`PostWorking_12`）
     /// 也要用同一個係數換算 μV，數值才會跟匯出 CSV 一致。
     static let exgMicrovoltScale = 0.00003
 
-    /// 單一裝置＋單一 channel 的 exg 匯出，欄位固定只有 `timestamp,uv`（見 exg-csv-split-plan.md）。
+    /// 單一裝置＋單一 channel 的 exg 匯出，欄位固定只有 `timestamp,uv`。
     private static func buildExgChannelCSV(
         treatmentResultId: Int64, deviceId: Int64?, channel: Int,
         setStartTimes: [Int], setEndTimes: [Int], deviceVM: DeviceViewModel

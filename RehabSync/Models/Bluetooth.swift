@@ -10,6 +10,7 @@ struct BluetoothDTO: Decodable {
     let gyro_sensitivity: Double
     let cmd_a0: [UInt8]
     let cmd_a1: [UInt8]
+    let cmd_a2: [UInt8]
     let is_default: Int
 }
 
@@ -25,6 +26,7 @@ struct Bluetooth: Codable, FetchableRecord, MutablePersistableRecord {
     var gyro_sensitivity: Double
     var cmd_a0: Data
     var cmd_a1: Data
+    var cmd_a2: Data
     var is_default: Int
 
     mutating func didInsert(_ inserted: InsertionSuccess) {
