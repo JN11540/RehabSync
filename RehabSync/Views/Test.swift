@@ -2,6 +2,7 @@ import SwiftUI
 import GRDB
 import CoreBluetooth
 import UIKit
+import AVFoundation
 
 // MARK: - TestPage
 
@@ -13,6 +14,8 @@ struct TestPage: View {
     @State private var debugGyroRows: [Gyro] = []
     @State private var debugExgRows: [Exg] = []
     @State private var hasQueriedDebugRows = false
+    @State private var isVideoCircleVisible = true
+    @State private var selectedGuideVideo: GuideVideoOption = .exercise2Left
 
     private var bothConnected: Bool {
         let dvm = DeviceViewModel()
@@ -52,6 +55,40 @@ struct TestPage: View {
         ZStack {
             Color(red: 0.96, green: 0.94, blue: 0.91).ignoresSafeArea()
             VStack(spacing: 16) {
+                HStack {
+                    Spacer()
+                    Picker("引導影片", selection: $selectedGuideVideo) {
+                        ForEach(GuideVideoOption.allCases) { option in
+                            Text(option.title).tag(option)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
+                .padding(.horizontal, 24)
+
+                HStack {
+                    Spacer()
+                    if isVideoCircleVisible {
+                        ZStack(alignment: .leading) {
+                            VideoCircleToggleButton(systemName: "chevron.right") {
+                                isVideoCircleVisible = false
+                            }
+                            .offset(x: -30)
+
+                            CircularLoopingVideo(resourceName: selectedGuideVideo.resourceName)
+                                .frame(width: 400, height: 400)
+                                .clipShape(Circle())
+                                .overlay(Circle().stroke(Color(red: 0.45, green: 0.35, blue: 0.85), lineWidth: 6))
+                                .shadow(color: .black.opacity(0.15), radius: 10, y: 4)
+                        }
+                    } else {
+                        VideoCircleToggleButton(systemName: "chevron.left") {
+                            isVideoCircleVisible = true
+                        }
+                    }
+                }
+                .padding(.horizontal, 24)
+
                 // 共用按鈕列
                 HStack(spacing: 12) {
                     Button("開始收集") { btVM.startRecordingAll() }
@@ -298,5 +335,127 @@ struct TestPage: View {
             }
             root.present(av, animated: true)
         }
+    }
+}
+
+// MARK: - Video Circle Toggle Button
+
+/// 圓圈左邊緣的收合按鈕：顯示時是向右箭頭（點擊收合圓圈），收合後變成向左箭頭（點擊還原）。
+/// 外層是直式膠囊（比圓圈本身還小一圈，疊在圓圈左邊緣時被圓圈裁掉一部分邊邊沒關係）。
+private struct VideoCircleToggleButton: View {
+    let systemName: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 36, height: 110)
+                .background(Color(red: 0.45, green: 0.35, blue: 0.85))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Guide Video Option
+
+/// 下拉式選單的選項，對應 `RehabSync/Videos/` 底下 8 支引導影片（4 個動作各左右腳）。
+private enum GuideVideoOption: String, CaseIterable, Identifiable {
+    case exercise2Left, exercise2Right
+    case exercise9Left, exercise9Right
+    case exercise12Left, exercise12Right
+    case exercise22Left, exercise22Right
+
+    var id: String { rawValue }
+
+    var resourceName: String {
+        switch self {
+        case .exercise2Left: "2_left_video"
+        case .exercise2Right: "2_right_video"
+        case .exercise9Left: "9_left_video"
+        case .exercise9Right: "9_right_video"
+        case .exercise12Left: "12_left_video"
+        case .exercise12Right: "12_right_video"
+        case .exercise22Left: "22_left_video"
+        case .exercise22Right: "22_right_video"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .exercise2Left: "動作 2（左腳）"
+        case .exercise2Right: "動作 2（右腳）"
+        case .exercise9Left: "動作 9（左腳）"
+        case .exercise9Right: "動作 9（右腳）"
+        case .exercise12Left: "動作 12（左腳）"
+        case .exercise12Right: "動作 12（右腳）"
+        case .exercise22Left: "動作 22（左腳）"
+        case .exercise22Right: "動作 22（右腳）"
+        }
+    }
+}
+
+// MARK: - Circular Looping Video
+
+/// 播放 bundle 裡的影片並自動循環（用 AVQueuePlayer + AVPlayerLooper 做無縫 loop），
+/// 給圓形展示區塊用，videoGravity 用 .resizeAspectFill 讓影片填滿圓形、多餘部分被裁掉。
+private struct CircularLoopingVideo: View {
+    let resourceName: String
+
+    var body: some View {
+        if let url = Bundle.main.url(forResource: resourceName, withExtension: "mp4") {
+            CircularLoopingVideoPlayer(url: url)
+        } else {
+            Color.clear
+        }
+    }
+}
+
+private struct CircularLoopingVideoPlayer: UIViewRepresentable {
+    let url: URL
+
+    func makeUIView(context: Context) -> CircularLoopingVideoUIView {
+        CircularLoopingVideoUIView(url: url)
+    }
+
+    func updateUIView(_ uiView: CircularLoopingVideoUIView, context: Context) {
+        uiView.update(url: url)
+    }
+}
+
+private final class CircularLoopingVideoUIView: UIView {
+    private let playerLayer = AVPlayerLayer()
+    private var queuePlayer: AVQueuePlayer?
+    private var playerLooper: AVPlayerLooper?
+    private var currentURL: URL?
+
+    init(url: URL) {
+        super.init(frame: .zero)
+        playerLayer.videoGravity = .resizeAspectFill
+        layer.addSublayer(playerLayer)
+        update(url: url)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        playerLayer.frame = bounds
+    }
+
+    func update(url: URL) {
+        guard url != currentURL else { return }
+        currentURL = url
+        let player = AVQueuePlayer()
+        player.isMuted = true
+        playerLooper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: url))
+        playerLayer.player = player
+        queuePlayer = player
+        player.play()
     }
 }
