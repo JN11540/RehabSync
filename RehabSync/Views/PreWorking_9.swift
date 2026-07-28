@@ -451,28 +451,31 @@ private struct PreWorking9CalibrationAboutPanel: View {
         "\(side == 1 ? "右" : "左")腳版本"
     }
 
-    /// 按下「校正」開始 5 秒倒數，同時呼叫真正的校正演算法（收集 5 秒加速度計算基準角）；
-    /// 倒數結束後看 btVM.baselineResult 有沒有值決定成功或失敗，失敗要讓使用者能再按一次「校正」重試。
+    /// 按下「校正」開始 5 秒倒數（純視覺），同時呼叫真正的校正演算法（收集 5 秒加速度計算基準角）；
+    /// 成功或失敗的判定改成由 `startBaselineCalibration` 的 completion 觸發（後端真正算完的那一刻），
+    /// 不再用「倒數結束 + 0.3 秒緩衝」去猜後端是否已經算完——猜測秒數在系統忙碌時會不準，
+    /// 曾經發生過後端其實已經算出結果、但 UI 因為猜測時間到了而提早判定失敗的競爭情況。
     private func startCalibration() {
         guard let pair = thighAndCalfPeripherals else { return }
         calibrationFailed = false
         isCalibrating = true
         calibrationCountdown = 5
         countdownTimer?.invalidate()
-        btVM.startBaselineCalibration(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+        btVM.startBaselineCalibration(thighPeripheral: pair.thigh, calfPeripheral: pair.calf) { _ in
+            evaluateCalibrationResult()
+        }
         countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
             if calibrationCountdown > 1 {
                 calibrationCountdown -= 1
             } else {
                 timer.invalidate()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    evaluateCalibrationResult()
-                }
             }
         }
     }
 
+    /// 由 `startBaselineCalibration` 的 completion 呼叫，這時 `btVM.baselineResult` 保證已經寫入完成。
     private func evaluateCalibrationResult() {
+        countdownTimer?.invalidate()
         isCalibrating = false
         if btVM.baselineResult != nil {
             calibrationSucceeded = true
