@@ -61,7 +61,7 @@ struct VideoCircleToggleButton: View {
 
 // MARK: - Circular Looping Video
 
-/// 播放 bundle 裡的影片並自動循環（用 AVQueuePlayer + AVPlayerLooper 做無縫 loop），給圓形展示區塊用；
+/// 播放 bundle 裡的影片，播完一次後停 3 秒再重播（不是無縫循環），給圓形展示區塊用；
 /// `videoGravity` 預設 `.resizeAspectFill`（填滿圓形、多餘部分裁掉），動作 12 改傳 `.resizeAspect`
 /// （完整顯示、等比例縮放、不裁切）。
 struct CircularLoopingVideo: View {
@@ -91,10 +91,14 @@ struct CircularLoopingVideoPlayer: UIViewRepresentable {
 }
 
 final class CircularLoopingVideoUIView: UIView {
+    /// 播完一次之後，暫停多久才重播。
+    private static let restartDelay: TimeInterval = 3
+
     private let playerLayer = AVPlayerLayer()
-    private var queuePlayer: AVQueuePlayer?
-    private var playerLooper: AVPlayerLooper?
+    private var player: AVPlayer?
     private var currentURL: URL?
+    private var endObserver: NSObjectProtocol?
+    private var restartWorkItem: DispatchWorkItem?
 
     init(url: URL, videoGravity: AVLayerVideoGravity) {
         super.init(frame: .zero)
@@ -116,11 +120,45 @@ final class CircularLoopingVideoUIView: UIView {
         playerLayer.videoGravity = videoGravity
         guard url != currentURL else { return }
         currentURL = url
-        let player = AVQueuePlayer()
-        player.isMuted = true
-        playerLooper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: url))
-        playerLayer.player = player
-        queuePlayer = player
-        player.play()
+        teardown()
+
+        let item = AVPlayerItem(url: url)
+        let newPlayer = AVPlayer(playerItem: item)
+        newPlayer.isMuted = true
+        playerLayer.player = newPlayer
+        player = newPlayer
+
+        endObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: item,
+            queue: .main
+        ) { [weak self] _ in
+            self?.scheduleRestart()
+        }
+
+        newPlayer.play()
+    }
+
+    private func scheduleRestart() {
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.player?.seek(to: .zero)
+            self?.player?.play()
+        }
+        restartWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.restartDelay, execute: workItem)
+    }
+
+    private func teardown() {
+        if let endObserver {
+            NotificationCenter.default.removeObserver(endObserver)
+        }
+        endObserver = nil
+        restartWorkItem?.cancel()
+        restartWorkItem = nil
+        player?.pause()
+    }
+
+    deinit {
+        teardown()
     }
 }

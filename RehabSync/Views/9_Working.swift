@@ -735,8 +735,7 @@ struct Working9: View {
             .offset(x: 25, y: -100)
 
             GuideCircleOverlay(resourceName: "9_\(side == 1 ? "right" : "left")_video")
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                .padding(.top, 170)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
                 .padding(.trailing, 24)
 
             if showSetRestPopup {
