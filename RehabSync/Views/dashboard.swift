@@ -12,7 +12,19 @@ private enum DashboardPalette {
     static let cardBackground = Color(red: 0.97, green: 0.96, blue: 0.995)
     static let mutedText = Color(red: 0.55, green: 0.56, blue: 0.62)
     static let chartGray = Color(red: 0.80, green: 0.81, blue: 0.86)
+    static let activityLightPurple = Color(red: 0.80, green: 0.75, blue: 0.94)
+    static let activityPurple = Color(red: 0.58, green: 0.46, blue: 0.86)
+    static let activityDarkPurple = Color(red: 0.36, green: 0.24, blue: 0.62)
 }
+
+/// 以 exercise_id 對應要跳轉的訓練前置頁面，訓練菜單預覽卡（右側面板）跟「未完成動作」視窗共用同一份對照表，
+/// 之後新增其他動作的頁面時直接在這裡加一筆對應即可。
+private let dashboardTrainingMenuDestinations: [Int: (TreatmentContent, Exercise?, @escaping () -> Void) -> AnyView] = [
+    2: { content, exercise, onReturnToDashboard in AnyView(PreWorking_2(content: content, exercise: exercise, onReturnToDashboard: onReturnToDashboard)) },
+    9: { content, exercise, onReturnToDashboard in AnyView(PreWorking_9(content: content, exercise: exercise, onReturnToDashboard: onReturnToDashboard)) },
+    12: { content, exercise, onReturnToDashboard in AnyView(PreWorking_12(content: content, exercise: exercise, onReturnToDashboard: onReturnToDashboard)) },
+    22: { content, exercise, onReturnToDashboard in AnyView(PreWorking_22(content: content, exercise: exercise, onReturnToDashboard: onReturnToDashboard)) }
+]
 
 // MARK: - Taipei Week Helper
 
@@ -21,6 +33,13 @@ private func taipeiCalendar() -> Calendar {
     calendar.timeZone = TimeZone(identifier: "Asia/Taipei") ?? .current
     calendar.firstWeekday = 2 // 週一為一週的開始
     return calendar
+}
+
+/// 今天在「週一為 0」索引下對應的星期幾（0=週一…6=週日），跟 `currentWeekDates` 共用同一套換算。
+private func todayWeekdayIndex() -> Int {
+    let calendar = taipeiCalendar()
+    let weekday = calendar.component(.weekday, from: Date()) // 1=週日, 2=週一, ..., 7=週六
+    return (weekday + 5) % 7
 }
 
 /// 以台灣時區偵測今天所在的這週（週一~週日）日期，weekOffset 可往前/往後移動整週（-1 = 上週，1 = 下週）。
@@ -40,12 +59,9 @@ private func currentWeekDates(weekOffset: Int = 0) -> [Date] {
 struct Dashboard: View {
     @State private var selectedNav: DashboardNavItem = .overview
     @State private var weekOffset = 0
-    @State private var selectedWeekdayIndex: Int = {
-        let calendar = taipeiCalendar()
-        let weekday = calendar.component(.weekday, from: Date()) // 1=週日, 2=週一, ..., 7=週六
-        return (weekday + 5) % 7 // 轉成週一為 0 的索引
-    }()
+    @State private var selectedWeekdayIndex: Int = todayWeekdayIndex()
     @State private var showDeviceListModal = false
+    @State private var showIncompleteActionsModal = false
     @State private var deviceListSide = 0
     @State private var deviceListLimb = 0
     @State private var deviceStatusTick = 0
@@ -105,9 +121,17 @@ struct Dashboard: View {
                         .padding(28)
                         .background(Color.white)
 
-                    DashboardSchedulePanel(weekOffset: $weekOffset, selectedWeekdayIndex: $selectedWeekdayIndex)
+                    DashboardSchedulePanel(
+                        weekOffset: $weekOffset, selectedWeekdayIndex: $selectedWeekdayIndex,
+                        onBellTap: { showIncompleteActionsModal = true }
+                    )
                         .frame(width: 420)
                         .background(DashboardPalette.panelBackground)
+                } else if selectedNav == .importData {
+                    DashboardImportJSONPanel()
+                        .padding(28)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color.white)
                 } else if selectedNav == .exportData {
                     DashboardExportFolderPanel()
                         .padding(28)
@@ -128,6 +152,14 @@ struct Dashboard: View {
                     .ignoresSafeArea()
 
                 DashboardDeviceListModal(side: deviceListSide, limb: deviceListLimb, onClose: { showDeviceListModal = false })
+                    .frame(width: 420, height: 520)
+            }
+
+            if showIncompleteActionsModal {
+                Color.black.opacity(0.25)
+                    .ignoresSafeArea()
+
+                DashboardIncompleteActionsModal(onClose: { showIncompleteActionsModal = false })
                     .frame(width: 420, height: 520)
             }
         }
@@ -303,6 +335,7 @@ private struct DashboardExportFolderPanel: View {
     }
 
     private func presentFolderPicker() {
+        guard folderName == nil else { return }
         let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder])
         let delegate = ExportFolderPickerDelegate { url in
             ExportDestinationStore.save(folderURL: url)
@@ -322,7 +355,7 @@ private struct DashboardExportFolderPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("匯出")
-                .font(.system(size: 22, weight: .semibold))
+                .font(.system(size: 26, weight: .semibold))
                 .foregroundStyle(Color.black)
 
             if let folderName {
@@ -336,15 +369,16 @@ private struct DashboardExportFolderPanel: View {
             }
 
             Button(action: presentFolderPicker) {
-                Text(folderName == nil ? "選擇資料夾" : "重新選擇")
+                Text("選擇資料夾")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 12)
-                    .background(DashboardPalette.indigo)
+                    .background(folderName == nil ? DashboardPalette.indigo : DashboardPalette.mutedText)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
             }
             .buttonStyle(.plain)
+            .disabled(folderName != nil)
 
             Spacer()
         }
@@ -353,6 +387,119 @@ private struct DashboardExportFolderPanel: View {
         .onAppear {
             folderName = ExportDestinationStore.resolveDesignatedFolder()?.lastPathComponent
         }
+    }
+}
+
+// MARK: - Import JSON Panel
+
+/// 接住 UIDocumentPickerViewController 選取 JSON 檔案的結果，橋接回 SwiftUI；
+/// 呼叫端要在選取完成前一直持有這個物件，picker 才不會在使用者選定檔案前就被釋放掉。
+private final class ImportJSONPickerDelegate: NSObject, UIDocumentPickerDelegate {
+    let onPick: (URL) -> Void
+
+    init(onPick: @escaping (URL) -> Void) {
+        self.onPick = onPick
+    }
+
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        if let url = urls.first {
+            onPick(url)
+        }
+    }
+}
+
+private struct DashboardImportJSONPanel: View {
+    @State private var vm = TreatmentViewModel()
+    @State private var pickerDelegate: ImportJSONPickerDelegate?
+    @State private var importSuccess = false
+    @State private var importError: String?
+
+    /// 用資料庫裡現有的 `Treatment` 判斷「之前是否已經上傳過 JSON」——`Treatment` 只有透過這裡的匯入，
+    /// 或 Setting 頁「移除所有資料」才會清空，所以能直接拿來當作是否允許再次匯入的依據。
+    private var hasExistingTreatment: Bool { !vm.treatments.isEmpty }
+
+    private func topMostViewController(from base: UIViewController?) -> UIViewController? {
+        if let presented = base?.presentedViewController {
+            return topMostViewController(from: presented)
+        }
+        return base
+    }
+
+    private func presentFilePicker() {
+        guard !hasExistingTreatment else { return }
+        importSuccess = false
+        importError = nil
+
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.json])
+        let delegate = ImportJSONPickerDelegate { url in
+            do {
+                try vm.importTreatment(from: url)
+                importSuccess = true
+                Task {
+                    try? await Task.sleep(for: .seconds(3))
+                    importSuccess = false
+                }
+            } catch {
+                importError = error.localizedDescription
+                Task {
+                    try? await Task.sleep(for: .seconds(3))
+                    importError = nil
+                }
+            }
+            pickerDelegate = nil
+        }
+        pickerDelegate = delegate
+        picker.delegate = delegate
+
+        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let root = scene.windows.first?.rootViewController,
+           let topMost = topMostViewController(from: root) {
+            topMost.present(picker, animated: true)
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("匯入")
+                .font(.system(size: 26, weight: .semibold))
+                .foregroundStyle(Color.black)
+
+            if hasExistingTreatment {
+                Label("已經匯入過治療計畫，無法再次上傳 JSON。", systemImage: "exclamationmark.triangle.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.orange)
+            } else {
+                Text("選擇一個 JSON 檔案匯入治療計畫。")
+                    .font(.system(size: 16))
+                    .foregroundStyle(DashboardPalette.mutedText)
+            }
+
+            Button(action: presentFilePicker) {
+                Text("選擇檔案")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+                    .background(hasExistingTreatment ? DashboardPalette.mutedText : DashboardPalette.indigo)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+            .buttonStyle(.plain)
+            .disabled(hasExistingTreatment)
+
+            if importSuccess {
+                Label("匯入成功", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+            }
+            if let importError {
+                Label("匯入失敗：\(importError)", systemImage: "xmark.circle.fill")
+                    .foregroundStyle(.red)
+            }
+
+            Spacer()
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onAppear { vm.fetchAll() }
     }
 }
 
@@ -510,7 +657,8 @@ private struct ActivityChartCard: View {
     private let shortBarHeight: CGFloat = 40
     private let barWidth: CGFloat = 3
     private let barSpacing: CGFloat = 12
-    private let barColor = DashboardPalette.chartGray
+
+    private let resultVM = TreatmentResultViewModel()
 
     /// 同一天 4 根柱子的總寬度，讓不同天之間的間距（barSpacing）跟同一天內柱子的間距一致。
     private var dayGroupWidth: CGFloat { 4 * barWidth + 3 * barSpacing }
@@ -524,6 +672,26 @@ private struct ActivityChartCard: View {
         return "\(month)/\(day)"
     }
 
+    /// 查這一天（`date` 是當天零點）的 `treatment_result` 筆數，換算成對應的柱子顏色：
+    /// 0 筆＝灰色、1 筆＝淺紫、2 筆＝紫、>=3 筆＝深紫。
+    private func barColor(for date: Date) -> Color {
+        let calendar = taipeiCalendar()
+        let dayStart = calendar.startOfDay(for: date)
+        guard let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) else {
+            return DashboardPalette.chartGray
+        }
+        let from = Int(dayStart.timeIntervalSince1970 * 1000)
+        let to = Int(dayEnd.timeIntervalSince1970 * 1000)
+        let count = resultVM.count(from: from, to: to)
+
+        switch count {
+        case 0: return DashboardPalette.chartGray
+        case 1: return DashboardPalette.activityLightPurple
+        case 2: return DashboardPalette.activityPurple
+        default: return DashboardPalette.activityDarkPurple
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("活動數據")
@@ -531,22 +699,23 @@ private struct ActivityChartCard: View {
                 .foregroundStyle(Color.black)
 
             HStack(alignment: .bottom, spacing: barSpacing) {
-                ForEach(weekdays, id: \.self) { _ in
+                ForEach(Array(weekDates.enumerated()), id: \.offset) { _, date in
+                    let color = barColor(for: date)
                     HStack(alignment: .bottom, spacing: barSpacing) {
                         ForEach(0..<4, id: \.self) { index in
                             Group {
                                 if index == 2 {
                                     VStack(spacing: 3) {
                                         Capsule()
-                                            .fill(barColor)
+                                            .fill(color)
                                             .frame(width: barWidth, height: 15)
                                         Capsule()
-                                            .fill(barColor)
+                                            .fill(color)
                                             .frame(width: barWidth, height: 15)
                                     }
                                 } else {
                                     Capsule()
-                                        .fill(barColor)
+                                        .fill(color)
                                         .frame(width: barWidth, height: (index == 1 || index == 3) ? shortBarHeight : barHeight)
                                 }
                             }
@@ -742,27 +911,145 @@ private struct DashboardDeviceListModal: View {
     }
 }
 
-// MARK: - Schedule Panel (right column)
+// MARK: - Incomplete Actions Modal
 
-private struct DashboardSchedulePanel: View {
-    @Binding var weekOffset: Int
-    @Binding var selectedWeekdayIndex: Int
+/// 點鈴鐺跳出的視窗，跟藍牙裝置視窗（`DashboardDeviceListModal`）同樣大小／同樣的卡片樣式；
+/// 列出「今天安排、但還沒做過任何一次」的動作，判斷邏輯跟鈴鐺是否震動（`allTodayContentsDone`）共用同一套規則。
+private struct DashboardIncompleteActionsModal: View {
+    let onClose: () -> Void
 
     @State private var treatmentVM = TreatmentViewModel()
     @State private var contentVM = TreatmentContentViewModel()
     @State private var exerciseVM = ExerciseViewModel()
+    @State private var resultVM = TreatmentResultViewModel()
     @State private var showTrainingDestination = false
     @State private var destinationContent: TreatmentContent? = nil
     @State private var destinationExercise: Exercise? = nil
     @State private var showExportFolderNotSetAlert = false
 
-    /// 以 exercise_id 對應要跳轉的訓練前置頁面，之後新增其他動作的頁面時直接在這裡加一筆對應即可。
-    private static let trainingMenuDestinations: [Int: (TreatmentContent, Exercise?, @escaping () -> Void) -> AnyView] = [
-        2: { content, exercise, onReturnToDashboard in AnyView(PreWorking_2(content: content, exercise: exercise, onReturnToDashboard: onReturnToDashboard)) },
-        9: { content, exercise, onReturnToDashboard in AnyView(PreWorking_9(content: content, exercise: exercise, onReturnToDashboard: onReturnToDashboard)) },
-        12: { content, exercise, onReturnToDashboard in AnyView(PreWorking_12(content: content, exercise: exercise, onReturnToDashboard: onReturnToDashboard)) },
-        22: { content, exercise, onReturnToDashboard in AnyView(PreWorking_22(content: content, exercise: exercise, onReturnToDashboard: onReturnToDashboard)) }
-    ]
+    private func loadData() {
+        treatmentVM.fetchAll()
+        if let treatmentId = treatmentVM.treatments.first?.id {
+            contentVM.fetchAll(for: Int(treatmentId))
+        }
+        exerciseVM.fetchAll()
+    }
+
+    private var incompleteTodayContents: [TreatmentContent] {
+        guard let treatmentId = treatmentVM.treatments.first?.id else { return [] }
+        let calendar = taipeiCalendar()
+        let today = calendar.startOfDay(for: Date())
+        let todayContents = contentVM.contents.filter {
+            calendar.startOfDay(for: Date(timeIntervalSince1970: TimeInterval($0.date))) == today
+        }
+        let completedIds = resultVM.fetchCompletedContentIds(for: Int(treatmentId))
+        return todayContents.filter { !completedIds.contains(Int($0.id ?? -1)) }
+    }
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white)
+                .shadow(color: .black.opacity(0.2), radius: 20, y: 8)
+
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Text("未完成動作")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(Color.black)
+                        .padding(.leading, 24)
+
+                    Spacer()
+
+                    Button(action: onClose) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.white)
+                            Circle()
+                                .stroke(DashboardPalette.indigo, lineWidth: 1.5)
+                            Image(systemName: "xmark")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundStyle(DashboardPalette.indigo)
+                        }
+                        .frame(width: 50, height: 50)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.trailing, 16)
+                }
+                .padding(.top, 16)
+
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 12) {
+                        if incompleteTodayContents.isEmpty {
+                            Text("今天的動作都已完成")
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundStyle(DashboardPalette.mutedText)
+                                .padding(.top, 20)
+                        } else {
+                            ForEach(incompleteTodayContents, id: \.self) { content in
+                                let exercise = exerciseVM.fetch(by: content.exercise_id)
+                                DashboardTrainingMenuRow(
+                                    content: content,
+                                    exercise: exercise,
+                                    isInteractive: true,
+                                    onTap: {
+                                        guard dashboardTrainingMenuDestinations[content.exercise_id] != nil else { return }
+                                        guard ExportDestinationStore.hasDesignatedFolder() else {
+                                            showExportFolderNotSetAlert = true
+                                            return
+                                        }
+                                        destinationContent = content
+                                        destinationExercise = exercise
+                                        showTrainingDestination = true
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 24)
+                }
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.black.opacity(0.06), lineWidth: 1)
+        )
+        .onAppear { loadData() }
+        .fullScreenCover(isPresented: $showTrainingDestination) {
+            if let destinationContent,
+               let build = dashboardTrainingMenuDestinations[destinationContent.exercise_id] {
+                build(destinationContent, destinationExercise, {
+                    showTrainingDestination = false
+                    onClose()
+                })
+            }
+        }
+        .alert("尚未設定匯出資料夾", isPresented: $showExportFolderNotSetAlert) {
+            Button("好", role: .cancel) {}
+        } message: {
+            Text("請先到側邊欄「匯出」分頁設定指定資料夾，才能開始這個動作。")
+        }
+    }
+}
+
+// MARK: - Schedule Panel (right column)
+
+private struct DashboardSchedulePanel: View {
+    @Binding var weekOffset: Int
+    @Binding var selectedWeekdayIndex: Int
+    var onBellTap: () -> Void = {}
+
+    @State private var treatmentVM = TreatmentViewModel()
+    @State private var contentVM = TreatmentContentViewModel()
+    @State private var exerciseVM = ExerciseViewModel()
+    @State private var resultVM = TreatmentResultViewModel()
+    @State private var showTrainingDestination = false
+    @State private var destinationContent: TreatmentContent? = nil
+    @State private var destinationExercise: Exercise? = nil
+    @State private var showExportFolderNotSetAlert = false
+    @State private var bellShakeAngle: Double = 0
 
     /// 資料庫沒有治療計畫選擇 UI，比照 Test1 的作法，以第一個治療計畫代表「目前的訓練菜單」。
     private func loadTrainingMenu() {
@@ -796,8 +1083,44 @@ private struct DashboardSchedulePanel: View {
         return taipeiCalendar().isDate(selectedDate, inSameDayAs: Date())
     }
 
+    /// 鈴鐺永遠只看「真正的今天」，跟日曆目前選取檢視的那天（selectedDayContents／weekOffset／selectedWeekdayIndex）無關。
+    private var todayContents: [TreatmentContent] {
+        let calendar = taipeiCalendar()
+        let today = calendar.startOfDay(for: Date())
+        return contentVM.contents.filter {
+            calendar.startOfDay(for: Date(timeIntervalSince1970: TimeInterval($0.date))) == today
+        }
+    }
+
+    /// 今天安排的動作是否全部至少做過一次（`treatment_result` 裡有對應的 `treatment_content_id`）；
+    /// 今天沒有安排任何動作時視為「已完成」，鈴鐺不需要震動提醒。
+    private var allTodayContentsDone: Bool {
+        guard let treatmentId = treatmentVM.treatments.first?.id else { return true }
+        let completedIds = resultVM.fetchCompletedContentIds(for: Int(treatmentId))
+        return todayContents.allSatisfy { completedIds.contains(Int($0.id ?? -1)) }
+    }
+
+    private func updateBellShake() {
+        if allTodayContentsDone {
+            withAnimation(.easeInOut(duration: 0.2)) { bellShakeAngle = 0 }
+        } else {
+            withAnimation(.easeInOut(duration: 0.07).repeatForever(autoreverses: true)) {
+                bellShakeAngle = 14
+            }
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
+            Image(systemName: "bell.fill")
+                .font(.system(size: 26, weight: .bold))
+                .foregroundStyle(DashboardPalette.indigo)
+                .rotationEffect(.degrees(bellShakeAngle), anchor: .top)
+                .contentShape(Rectangle())
+                .onTapGesture { onBellTap() }
+                .onAppear { updateBellShake() }
+                .onChange(of: allTodayContentsDone) { _, _ in updateBellShake() }
+
             DashboardCalendarCard(weekOffset: $weekOffset, selectedWeekdayIndex: $selectedWeekdayIndex)
 
             Text("訓練菜單")
@@ -819,7 +1142,7 @@ private struct DashboardSchedulePanel: View {
                                 exercise: exercise,
                                 isInteractive: isSelectedDayToday,
                                 onTap: {
-                                    guard Self.trainingMenuDestinations[content.exercise_id] != nil else { return }
+                                    guard dashboardTrainingMenuDestinations[content.exercise_id] != nil else { return }
                                     guard ExportDestinationStore.hasDesignatedFolder() else {
                                         showExportFolderNotSetAlert = true
                                         return
@@ -839,7 +1162,7 @@ private struct DashboardSchedulePanel: View {
         .onAppear { loadTrainingMenu() }
         .fullScreenCover(isPresented: $showTrainingDestination) {
             if let destinationContent,
-               let build = Self.trainingMenuDestinations[destinationContent.exercise_id] {
+               let build = dashboardTrainingMenuDestinations[destinationContent.exercise_id] {
                 build(destinationContent, destinationExercise, { showTrainingDestination = false })
             }
         }
@@ -933,6 +1256,21 @@ private struct DashboardCalendarCard: View {
                     .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(Color.black)
                 Spacer()
+                Button {
+                    weekOffset = 0
+                    selectedWeekdayIndex = todayWeekdayIndex()
+                } label: {
+                    Text("今日")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(DashboardPalette.indigo)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule().stroke(DashboardPalette.indigo, lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, 12)
                 HStack(spacing: 20) {
                     Button {
                         weekOffset -= 1
@@ -952,7 +1290,6 @@ private struct DashboardCalendarCard: View {
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.top, 75)
 
             HStack(alignment: .top, spacing: 0) {
                 ForEach(Array(columns.enumerated()), id: \.offset) { index, column in

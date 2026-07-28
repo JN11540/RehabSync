@@ -42,6 +42,15 @@ class TreatmentResultViewModel {
         fetchAll(for: result.treatment_id)
     }
 
+    /// 總覽頁「活動數據」卡片專用：算出 `date`（毫秒 timestamp）落在 `[from, to)` 這一天範圍內的紀錄筆數。
+    func count(from: Int, to: Int) -> Int {
+        (try? db.read { db in
+            try TreatmentResult
+                .filter(Column("date") >= from && Column("date") < to)
+                .fetchCount(db)
+        }) ?? 0
+    }
+
     func fetchCompletedContentIds(for treatmentId: Int) -> Set<Int> {
         let fetched = (try? db.read { db in
             try TreatmentResult
