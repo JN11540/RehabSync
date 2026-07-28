@@ -74,6 +74,10 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     @ObservationIgnored private var liveCalfId: UUID?
     @ObservationIgnored private var liveThighIncline: Double?
     @ObservationIgnored private var liveCalfIncline: Double?
+    // 校正失敗排查用（#if DEBUG）：記錄大腿／小腿各自「最後一次收到 ACC 封包」的時間，
+    // 用來分辨「畫面角度卡住不動」是封包真的停了、還是換算結果本來就沒變。
+    @ObservationIgnored private var liveThighLastPacketAt: Int64?
+    @ObservationIgnored private var liveCalfLastPacketAt: Int64?
     @ObservationIgnored private var liveBaselineTable: [(measured: Double, realAngle: Double)] = []
     @ObservationIgnored private var liveShift: Double = 0
     @ObservationIgnored private var liveTickTimer: Timer?
@@ -383,7 +387,16 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
 
     /// 錄製大腿與小腿加速度計固定秒數，收集期間不寫入資料庫，結束後用 ACCCalibration 計算膝角基準值。
     /// - Parameter durationSec: 收集秒數，預設 5(跟正式流程畫面的 5 秒倒數一致)。
-    func startBaselineCalibration(thighPeripheral: CBPeripheral, calfPeripheral: CBPeripheral, durationSec: Double = 5) {
+    /// - Parameters:
+    ///   - durationSec: 收集秒數，預設 5(跟正式流程畫面的 5 秒倒數一致)。
+    ///   - completion: 選填，`baselineResult`／`isCollectingBaseline` 實際寫入完成的那一刻會呼叫（已經在 main thread），
+    ///     帶入跟 `baselineResult` 同一個值。呼叫端應該用這個 completion 判斷校正成功/失敗，
+    ///     不要另外用固定秒數的計時器去猜「應該已經算完了」——猜測秒數在系統忙碌時會不準，
+    ///     導致 UI 判定失敗當下、後端其實已經算出結果的競爭情況。
+    func startBaselineCalibration(
+        thighPeripheral: CBPeripheral, calfPeripheral: CBPeripheral, durationSec: Double = 5,
+        completion: ((Double?) -> Void)? = nil
+    ) {
         DispatchQueue.main.async {
             self.baselineResult = nil
             self.isCollectingBaseline = true
@@ -393,6 +406,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             DispatchQueue.main.async {
                 self?.baselineResult = result
                 self?.isCollectingBaseline = false
+                completion?(result)
             }
         }
     }
@@ -469,10 +483,12 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         thighPeripheral: CBPeripheral, calfPeripheral: CBPeripheral, baseline: Double,
         posture: KneePosture = .sitting
     ) {
-        // 坐姿/站立即時預估目前只針對左大腿（side 0, limb 0）+ 左小腿（side 0, limb 1）設計，
-        // 配對狀態不是這個組合時不允許啟動。
+        // 坐姿/站立即時預估要求大腿＋小腿配對齊全才允許啟動；不寫死左腳（side 0），
+        // 改用 fetchAnySide() 查「目前實際綁定的那一側」——這個 app 一次最多只會綁 2 顆裝置（同一側），
+        // 綁在右腳時這裡也要能通過檢查，不然右腳永遠無法啟動即時預估。
         let deviceVM = DeviceViewModel()
-        guard deviceVM.fetch(side: 0, limb: 0) != nil, deviceVM.fetch(side: 0, limb: 1) != nil else { return }
+        let side = deviceVM.fetchAnySide() ?? 0
+        guard deviceVM.fetch(side: side, limb: 0) != nil, deviceVM.fetch(side: side, limb: 1) != nil else { return }
 
         let thighId = thighPeripheral.identifier
         let calfId  = calfPeripheral.identifier
@@ -494,6 +510,8 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             liveCalfId  = calfId
             liveThighIncline = nil
             liveCalfIncline  = nil
+            liveThighLastPacketAt = nil
+            liveCalfLastPacketAt = nil
             // baseline 若為負值，整體平移到正值，量測到的膝角也要平移同樣的量，
             // 兩邊平移量一致，相對關係不變，藉此避免 baseline ~ baseline+maxStep 跨過 0 的歧義。
             switch posture {
@@ -543,12 +561,28 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     /// Timer callback（main thread 觸發），跳回 bleQueue 讀最新值計算，算完再寫回主執行緒的 UI 屬性。
     private func tickLiveEstimatedRealAngle() {
         bleQueue.async { [weak self] in
-            guard let self,
-                  let thigh = liveThighIncline,
+            guard let self else { return }
+            #if DEBUG
+            let now = Int64(Date().timeIntervalSince1970 * 1000)
+            let thighAgeMs = liveThighLastPacketAt.map { now - $0 }
+            let calfAgeMs = liveCalfLastPacketAt.map { now - $0 }
+            print("[LIVE-ANGLE-DIAG] tick: thighIncline=\(liveThighIncline.map { String(format: "%.2f", $0) } ?? "nil")（\(thighAgeMs.map { "\($0)ms 前" } ?? "從未收過")）"
+                  + " calfIncline=\(liveCalfIncline.map { String(format: "%.2f", $0) } ?? "nil")（\(calfAgeMs.map { "\($0)ms 前" } ?? "從未收過")）")
+            if let thighAgeMs, thighAgeMs > 1000 {
+                print("[LIVE-ANGLE-DIAG] ⚠️ 大腿已經超過 1 秒沒收到新封包，畫面角度會凍結不動")
+            }
+            if let calfAgeMs, calfAgeMs > 1000 {
+                print("[LIVE-ANGLE-DIAG] ⚠️ 小腿已經超過 1 秒沒收到新封包，畫面角度會凍結不動")
+            }
+            #endif
+            guard let thigh = liveThighIncline,
                   let calf  = liveCalfIncline else { return }
             let kneeAngle = thigh - calf
             let realAngle = Self.angleToReal(kneeAngle + liveShift, table: liveBaselineTable)
             let rounded = (realAngle * 10).rounded() / 10
+            #if DEBUG
+            print("[LIVE-ANGLE-DIAG] kneeAngle=\(String(format: "%.2f", kneeAngle)) realAngle=\(rounded)")
+            #endif
             DispatchQueue.main.async { self.currentEstimatedRealAngle = rounded }
 
             // 組間休息（未在記錄中）時暫停寫入，跟 acc/gyro/exg 的起訖規則一致。
@@ -573,9 +607,22 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             sumIncline += Self.inclinationDeg(x, y, z)
         }
         let incline = sumIncline / 20.0
+        let now = Int64(Date().timeIntervalSince1970 * 1000)
 
-        if id == liveThighId { liveThighIncline = incline }
-        if id == liveCalfId  { liveCalfIncline  = incline }
+        if id == liveThighId {
+            liveThighIncline = incline
+            liveThighLastPacketAt = now
+            #if DEBUG
+            print("[LIVE-ANGLE-DIAG] 收到大腿封包 incline=\(String(format: "%.2f", incline))")
+            #endif
+        }
+        if id == liveCalfId {
+            liveCalfIncline = incline
+            liveCalfLastPacketAt = now
+            #if DEBUG
+            print("[LIVE-ANGLE-DIAG] 收到小腿封包 incline=\(String(format: "%.2f", incline))")
+            #endif
+        }
     }
 
     // MARK: - Step Detection（登階運動）
@@ -619,10 +666,11 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     /// 差別是這裡把最新的膝角度（大腿傾角 - 小腿傾角）丟給 `detectStepStatus` 判斷登階狀態，
     /// 由 `stepTickTimer` 每 0.2 秒（5Hz）讀一次最新值並更新到畫面。
     func startStepStatusEstimation(thighPeripheral: CBPeripheral, calfPeripheral: CBPeripheral, baseline: Double) {
-        // 登階狀態預估目前只針對左大腿（side 0, limb 0）+ 左小腿（side 0, limb 1）設計，
-        // 配對狀態不是這個組合時不允許啟動。
+        // 登階狀態預估要求大腿＋小腿配對齊全才允許啟動；不寫死左腳（side 0），
+        // 改用 fetchAnySide() 查「目前實際綁定的那一側」，右腳綁定時也要能通過檢查。
         let deviceVM = DeviceViewModel()
-        guard deviceVM.fetch(side: 0, limb: 0) != nil, deviceVM.fetch(side: 0, limb: 1) != nil else { return }
+        let side = deviceVM.fetchAnySide() ?? 0
+        guard deviceVM.fetch(side: side, limb: 0) != nil, deviceVM.fetch(side: side, limb: 1) != nil else { return }
 
         let thighId = thighPeripheral.identifier
         let calfId  = calfPeripheral.identifier

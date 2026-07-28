@@ -31,6 +31,11 @@ struct Working22: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(BluetoothViewModel.self) private var btVM
 
+    /// 裝置目前實際綁定在哪一側（左/右），給引導圈圈決定播放哪一支示範影片用。
+    private var side: Int {
+        DeviceViewModel().fetchAnySide() ?? 0
+    }
+
     // 角度門檻判斷邏輯先註解掉，等後續確認實際規則後再打開。
     // /// 太空人四個層級對應的角度區間（0°～90° 平均分成四段），
     // /// 之後如果確認了實際的判斷規則（例如跟直式膠囊的握持門檻綁定），這裡要跟著調整。
@@ -891,6 +896,11 @@ struct Working22: View {
                 .position(capsuleCenter)
             }
             .allowsHitTesting(false)
+
+            GuideCircleOverlay(resourceName: "22_\(side == 1 ? "right" : "left")_video")
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                .padding(.top, 170)
+                .padding(.trailing, 24)
 
             if showSetRestPopup {
                 Color.black.opacity(0.3)

@@ -9,6 +9,11 @@ struct Working2: View {
     let onReturnToDashboard: () -> Void
     @Environment(BluetoothViewModel.self) private var btVM
 
+    /// 裝置目前實際綁定在哪一側（左/右），給引導圈圈決定播放哪一支示範影片用。
+    private var side: Int {
+        DeviceViewModel().fetchAnySide() ?? 0
+    }
+
     // 校正/測試階段在 PreWorking 啟動的即時角度預估，離開這裡時必須主動停止，
     // 否則 btVM.isLiveEstimating 會卡在 true，導致下次（不管同動作或別的動作）
     // 進測試頁時 guard 擋住重啟，畫面顯示殘留的舊角度或舊姿勢公式。
@@ -718,6 +723,11 @@ struct Working2: View {
             }
             .padding(24)
             .offset(x: 25, y: -100)
+
+            GuideCircleOverlay(resourceName: "2_\(side == 1 ? "right" : "left")_video")
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                .padding(.top, 170)
+                .padding(.trailing, 24)
 
             if showExitConfirmPopup {
                 Color.black.opacity(0.3)

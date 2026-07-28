@@ -17,10 +17,16 @@ struct TestPage: View {
     @State private var isVideoCircleVisible = true
     @State private var selectedGuideVideo: GuideVideoOption = .exercise2Left
 
+    /// 裝置目前實際綁定在哪一側（左/右）——比照 `PreWorking_X.swift` 的做法，不是寫死左腳；
+    /// 這個 app 一次最多只會綁 2 顆裝置（同一側大腿＋小腿），所以「隨便查一顆裝置的 side」就能知道目前是哪一側在用。
+    private var side: Int {
+        DeviceViewModel().fetchAnySide() ?? 0
+    }
+
     private var bothConnected: Bool {
         let dvm = DeviceViewModel()
-        guard let thigh = dvm.fetch(limb: 0), let thighUUID = UUID(uuidString: thigh.device_uuid),
-              let calf  = dvm.fetch(limb: 1), let calfUUID  = UUID(uuidString: calf.device_uuid)
+        guard let thigh = dvm.fetch(side: side, limb: 0), let thighUUID = UUID(uuidString: thigh.device_uuid),
+              let calf  = dvm.fetch(side: side, limb: 1), let calfUUID  = UUID(uuidString: calf.device_uuid)
         else { return false }
         return btVM.connectedPeripherals[thighUUID] != nil &&
                btVM.connectedPeripherals[calfUUID]  != nil
@@ -37,14 +43,23 @@ struct TestPage: View {
         btVM.recordingStartTime != nil && btVM.recordingEndTime != nil
     }
 
+    /// 動作 12 改用 `.resizeAspect`（完整顯示、等比例縮放，不裁切），
+    /// 其他動作維持 `.resizeAspectFill`（填滿圓形，多餘部分裁掉）。
+    private var guideVideoGravity: AVLayerVideoGravity {
+        switch selectedGuideVideo {
+        case .exercise12Left, .exercise12Right: return .resizeAspect
+        default: return .resizeAspectFill
+        }
+    }
+
     private var canEstimateRealAngle: Bool {
         bothConnected && btVM.baselineResult != nil
     }
 
     private var thighAndCalfPeripherals: (thigh: CBPeripheral, calf: CBPeripheral)? {
         let dvm = DeviceViewModel()
-        guard let thigh = dvm.fetch(limb: 0), let thighUUID = UUID(uuidString: thigh.device_uuid),
-              let calf  = dvm.fetch(limb: 1), let calfUUID  = UUID(uuidString: calf.device_uuid),
+        guard let thigh = dvm.fetch(side: side, limb: 0), let thighUUID = UUID(uuidString: thigh.device_uuid),
+              let calf  = dvm.fetch(side: side, limb: 1), let calfUUID  = UUID(uuidString: calf.device_uuid),
               let thighPeripheral = btVM.connectedPeripherals[thighUUID],
               let calfPeripheral  = btVM.connectedPeripherals[calfUUID]
         else { return nil }
@@ -70,24 +85,34 @@ struct TestPage: View {
                     Spacer()
                     if isVideoCircleVisible {
                         ZStack(alignment: .leading) {
-                            VideoCircleToggleButton(systemName: "chevron.right") {
+                            VideoCircleToggleButton(systemName: "arrowtriangle.right.fill") {
                                 isVideoCircleVisible = false
                             }
-                            .offset(x: -30)
+                            .offset(x: -55)
 
-                            CircularLoopingVideo(resourceName: selectedGuideVideo.resourceName)
+                            CircularLoopingVideo(resourceName: selectedGuideVideo.resourceName, videoGravity: guideVideoGravity)
                                 .frame(width: 400, height: 400)
+                                .background(Color.white)
                                 .clipShape(Circle())
-                                .overlay(Circle().stroke(Color(red: 0.45, green: 0.35, blue: 0.85), lineWidth: 6))
+                                .overlay(Circle().strokeBorder(Color.black, lineWidth: 2).frame(width: 404, height: 404))
+                                .overlay(Circle().strokeBorder(Color.white, lineWidth: 6).frame(width: 416, height: 416))
+                                .overlay(Circle().strokeBorder(Color.black, lineWidth: 2).frame(width: 420, height: 420))
                                 .shadow(color: .black.opacity(0.15), radius: 10, y: 4)
                         }
                     } else {
-                        VideoCircleToggleButton(systemName: "chevron.left") {
+                        VideoCircleToggleButton(systemName: "arrowtriangle.left.fill") {
                             isVideoCircleVisible = true
                         }
                     }
                 }
                 .padding(.horizontal, 24)
+
+                if bothConnected || anyConnected {
+                    Text("目前偵測到裝置綁定在：\(side == 1 ? "右腳" : "左腳")")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 24)
+                }
 
                 // 共用按鈕列
                 HStack(spacing: 12) {
@@ -295,9 +320,15 @@ struct TestPage: View {
         guard let from = btVM.recordingStartTime,
               let to   = btVM.recordingEndTime else { return }
 
+        // `fetchACC(deviceId:)` 要的是 device 表的真實主鍵，不是寫死的 0/1；
+        // 必須先用 side/limb 查出目前實際綁定裝置的 id，才能兼顧左右腳。
         let dvm = DeviceViewModel()
-        var thighAcc  = dvm.fetchACC(deviceId: 0, from: from, to: to)
-        var calfAcc   = dvm.fetchACC(deviceId: 1, from: from, to: to)
+        guard let thighDeviceId = dvm.fetch(side: side, limb: 0)?.id,
+              let calfDeviceId  = dvm.fetch(side: side, limb: 1)?.id
+        else { return }
+
+        var thighAcc  = dvm.fetchACC(deviceId: thighDeviceId, from: from, to: to)
+        var calfAcc   = dvm.fetchACC(deviceId: calfDeviceId, from: from, to: to)
 
         guard !thighAcc.isEmpty, !calfAcc.isEmpty else { return }
 
@@ -342,24 +373,6 @@ struct TestPage: View {
 
 /// 圓圈左邊緣的收合按鈕：顯示時是向右箭頭（點擊收合圓圈），收合後變成向左箭頭（點擊還原）。
 /// 外層是直式膠囊（比圓圈本身還小一圈，疊在圓圈左邊緣時被圓圈裁掉一部分邊邊沒關係）。
-private struct VideoCircleToggleButton: View {
-    let systemName: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: 36, height: 110)
-                .background(Color(red: 0.45, green: 0.35, blue: 0.85))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
-        }
-        .buttonStyle(.plain)
-    }
-}
-
 // MARK: - Guide Video Option
 
 /// 下拉式選單的選項，對應 `RehabSync/Videos/` 底下 8 支引導影片（4 個動作各左右腳）。
@@ -398,64 +411,5 @@ private enum GuideVideoOption: String, CaseIterable, Identifiable {
     }
 }
 
-// MARK: - Circular Looping Video
-
-/// 播放 bundle 裡的影片並自動循環（用 AVQueuePlayer + AVPlayerLooper 做無縫 loop），
-/// 給圓形展示區塊用，videoGravity 用 .resizeAspectFill 讓影片填滿圓形、多餘部分被裁掉。
-private struct CircularLoopingVideo: View {
-    let resourceName: String
-
-    var body: some View {
-        if let url = Bundle.main.url(forResource: resourceName, withExtension: "mp4") {
-            CircularLoopingVideoPlayer(url: url)
-        } else {
-            Color.clear
-        }
-    }
-}
-
-private struct CircularLoopingVideoPlayer: UIViewRepresentable {
-    let url: URL
-
-    func makeUIView(context: Context) -> CircularLoopingVideoUIView {
-        CircularLoopingVideoUIView(url: url)
-    }
-
-    func updateUIView(_ uiView: CircularLoopingVideoUIView, context: Context) {
-        uiView.update(url: url)
-    }
-}
-
-private final class CircularLoopingVideoUIView: UIView {
-    private let playerLayer = AVPlayerLayer()
-    private var queuePlayer: AVQueuePlayer?
-    private var playerLooper: AVPlayerLooper?
-    private var currentURL: URL?
-
-    init(url: URL) {
-        super.init(frame: .zero)
-        playerLayer.videoGravity = .resizeAspectFill
-        layer.addSublayer(playerLayer)
-        update(url: url)
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        playerLayer.frame = bounds
-    }
-
-    func update(url: URL) {
-        guard url != currentURL else { return }
-        currentURL = url
-        let player = AVQueuePlayer()
-        player.isMuted = true
-        playerLooper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: url))
-        playerLayer.player = player
-        queuePlayer = player
-        player.play()
-    }
-}
+// `CircularLoopingVideo`／`CircularLoopingVideoPlayer`／`CircularLoopingVideoUIView`／`VideoCircleToggleButton`
+// 已抽到 `GuideCircleOverlay.swift` 共用，`2/9/12/22_Working.swift` 的引導圈圈也是用同一份。

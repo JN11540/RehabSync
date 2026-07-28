@@ -1,5 +1,6 @@
 import SwiftUI
 import CoreBluetooth
+import AVFoundation
 
 // MARK: - Working12
 
@@ -8,6 +9,11 @@ struct Working12: View {
     let exercise: Exercise?
     let onReturnToDashboard: () -> Void
     @Environment(BluetoothViewModel.self) private var btVM
+
+    /// 裝置目前實際綁定在哪一側（左/右），給引導圈圈決定播放哪一支示範影片用。
+    private var side: Int {
+        DeviceViewModel().fetchAnySide() ?? 0
+    }
 
     // 校正/測試階段在 PreWorking 啟動的登階狀態估計，離開這裡時必須主動停止，
     // 否則 btVM.isEstimatingStepStatus 會卡在 true，導致下次進測試頁時
@@ -640,6 +646,11 @@ struct Working12: View {
             }
             .padding(24)
             .offset(x: 25, y: -100)
+
+            GuideCircleOverlay(resourceName: "12_\(side == 1 ? "right" : "left")_video", videoGravity: .resizeAspect)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                .padding(.top, 170)
+                .padding(.trailing, 24)
 
             if showSetRestPopup {
                 Color.black.opacity(0.3)
