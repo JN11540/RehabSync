@@ -407,11 +407,17 @@ private struct PreWorking22CalibrationAboutPanel: View {
 
     @Environment(BluetoothViewModel.self) private var btVM
     @State private var side: Int = 0
+    @State private var isPreparing = false
+    @State private var prepMessageVisible = false
+    @State private var prepTickCount = 0
+    @State private var prepTimer: Timer?
     @State private var isCalibrating = false
     @State private var calibrationCountdown = 5
     @State private var countdownTimer: Timer?
     @State private var calibrationSucceeded = false
     @State private var calibrationFailed = false
+
+    private let prepMessage = "請站好\n不要動"
 
     private var thighAndCalfPeripherals: (thigh: CBPeripheral, calf: CBPeripheral)? {
         let dvm = DeviceViewModel()
@@ -423,9 +429,11 @@ private struct PreWorking22CalibrationAboutPanel: View {
         return (thighPeripheral, calfPeripheral)
     }
 
-    /// 圓形按鈕的文字：閒置時是「校正」，倒數中換成數字，成功後改用膠囊「下一步」不會用到這個。
+    /// 圓形按鈕的文字：準備階段是提示文字，倒數中換成數字，閒置時是「校正」，成功後改用膠囊「下一步」不會用到這個。
     private var circleButtonLabel: String {
-        isCalibrating ? "\(calibrationCountdown)" : "校正"
+        if isPreparing { return prepMessage }
+        if isCalibrating { return "\(calibrationCountdown)" }
+        return "校正"
     }
 
     private var sideLabelText: String {
@@ -462,11 +470,46 @@ private struct PreWorking22CalibrationAboutPanel: View {
         }
     }
 
+    /// 按下「校正」先進入 3 秒準備階段，畫面每秒閃爍一次「請站好，不要動」（共 3 次），
+    /// 3 秒後才真正呼叫既有的 startCalibration()（5 秒倒數＋收集，秒數不變）。
+    private func startPreparing() {
+        guard thighAndCalfPeripherals != nil else { return }
+        calibrationFailed = false
+        isPreparing = true
+        prepTickCount = 0
+        prepTimer?.invalidate()
+
+        triggerPrepBlink()
+        prepTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
+            prepTickCount += 1
+            if prepTickCount >= 3 {
+                timer.invalidate()
+                isPreparing = false
+                startCalibration()
+            } else {
+                triggerPrepBlink()
+            }
+        }
+    }
+
+    /// 提示文字「閃一下」：淡入、短暫停留、淡出，配合每秒觸發一次的 Timer，做出「每秒重新出現一次」的效果。
+    private func triggerPrepBlink() {
+        prepMessageVisible = false
+        withAnimation(.easeIn(duration: 0.15)) {
+            prepMessageVisible = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            withAnimation(.easeOut(duration: 0.25)) {
+                prepMessageVisible = false
+            }
+        }
+    }
+
     private func handleButtonTap() {
         if calibrationSucceeded {
             onCalibrated()
-        } else if !isCalibrating {
-            startCalibration()
+        } else if !isCalibrating && !isPreparing {
+            startPreparing()
         }
     }
 
@@ -509,13 +552,15 @@ private struct PreWorking22CalibrationAboutPanel: View {
                         Circle()
                             .strokeBorder(PreWorking_22.midPurple, lineWidth: 4)
                         Text(circleButtonLabel)
-                            .font(.system(size: isCalibrating ? 60 : 25, weight: .bold))
+                            .font(.system(size: 60, weight: .bold))
                             .foregroundStyle(PreWorking_22.darkPurple)
+                            .multilineTextAlignment(.center)
+                            .opacity(isPreparing ? (prepMessageVisible ? 1 : 0) : 1)
                     }
                     .frame(width: 200, height: 200)
                 }
                 .buttonStyle(.plain)
-                .disabled(isCalibrating || thighAndCalfPeripherals == nil)
+                .disabled(isCalibrating || isPreparing || thighAndCalfPeripherals == nil)
                 .opacity(thighAndCalfPeripherals == nil ? 0.4 : 1)
             }
 
@@ -539,6 +584,7 @@ private struct PreWorking22CalibrationAboutPanel: View {
         }
         .onDisappear {
             countdownTimer?.invalidate()
+            prepTimer?.invalidate()
         }
     }
 }
