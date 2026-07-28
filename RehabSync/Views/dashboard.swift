@@ -69,7 +69,6 @@ struct Dashboard: View {
     private let deviceVM = DeviceViewModel()
     var onNavigateToTest: () -> Void = {}
     var onNavigateToTest1: () -> Void = {}
-    var onNavigateToSettings: () -> Void = {}
 
     private func openDeviceList(side: Int, limb: Int) {
         deviceListSide = side
@@ -109,8 +108,7 @@ struct Dashboard: View {
                 DashboardSidebar(
                     selectedNav: $selectedNav,
                     onNavigateToTest: onNavigateToTest,
-                    onNavigateToTest1: onNavigateToTest1,
-                    onNavigateToSettings: onNavigateToSettings
+                    onNavigateToTest1: onNavigateToTest1
                 )
                     .frame(width: 220)
 
@@ -134,6 +132,11 @@ struct Dashboard: View {
                         .background(Color.white)
                 } else if selectedNav == .exportData {
                     DashboardExportFolderPanel()
+                        .padding(28)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color.white)
+                } else if selectedNav == .settings {
+                    DashboardPlaceholderCard(title: selectedNav.title, titleFontSize: 26)
                         .padding(28)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .background(Color.white)
@@ -207,7 +210,6 @@ private struct DashboardSidebar: View {
     @Binding var selectedNav: DashboardNavItem
     var onNavigateToTest: () -> Void = {}
     var onNavigateToTest1: () -> Void = {}
-    var onNavigateToSettings: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -235,7 +237,7 @@ private struct DashboardSidebar: View {
 
             Spacer()
 
-            DashboardSidebarItem(item: .settings, selectedNav: $selectedNav, action: onNavigateToSettings)
+            DashboardSidebarItem(item: .settings, selectedNav: $selectedNav)
                 .padding(.bottom, 20)
         }
     }
@@ -291,11 +293,12 @@ private struct DashboardSidebarItem: View {
 
 private struct DashboardPlaceholderCard: View {
     let title: String
+    var titleFontSize: CGFloat = 22
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
-                .font(.system(size: 22, weight: .semibold))
+                .font(.system(size: titleFontSize, weight: .semibold))
                 .foregroundStyle(Color.black)
 
             Spacer()

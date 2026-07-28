@@ -25,8 +25,7 @@ struct Home: View {
             switch selectedTab {
             case .dashboard: Dashboard(
                 onNavigateToTest: { selectedTab = .test },
-                onNavigateToTest1: { selectedTab = .test1 },
-                onNavigateToSettings: { selectedTab = .setting }
+                onNavigateToTest1: { selectedTab = .test1 }
             )
             case .test: TestPage(btVM: btVM)
             case .setting: Setting()
