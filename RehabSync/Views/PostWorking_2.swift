@@ -564,8 +564,11 @@ private struct PostWorking2ExgCard: View {
                 treatmentResultId: treatmentResultId, deviceId: deviceId, channel: channel,
                 from: Int64(setStartTimeMs), to: Int64(setEndTimeMs)
             )
-            dataPoints = rows.map { row in
-                PostWorking2ExgPoint(time: Double(row.timestamp - Int64(setStartTimeMs)) / 1000.0, uv: Double(row.value) * GameDataExporter.exgMicrovoltScale)
+            let uvValues = rows.map { Double($0.value) * GameDataExporter.exgMicrovoltScale }
+            guard let (avgValues, centerIndices) = try? EMGAlgo.movingAverage(uv: uvValues) else { return }
+            let sampleRate = 32.0
+            dataPoints = zip(centerIndices, avgValues).map { center, avg in
+                PostWorking2ExgPoint(time: center / sampleRate, uv: avg)
             }
         }
     }
