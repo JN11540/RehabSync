@@ -121,7 +121,7 @@ struct TestPage: View {
 
                     Button("校正") {
                         if let pair = thighAndCalfPeripherals {
-                            btVM.startBaselineCalibration(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+                            btVM.startBaselineCalibration(thighPeripheral: pair.thigh, calfPeripheral: pair.calf, durationSec: 8)
                         }
                     }
                     .font(.system(size: 15, weight: .medium))

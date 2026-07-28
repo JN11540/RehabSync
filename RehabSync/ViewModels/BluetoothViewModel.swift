@@ -381,14 +381,15 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
 
     // MARK: - Baseline Calibration（膝角基準值）
 
-    /// 錄製大腿與小腿加速度計 5 秒，收集期間不寫入資料庫，結束後計算膝角基準值。
-    func startBaselineCalibration(thighPeripheral: CBPeripheral, calfPeripheral: CBPeripheral) {
+    /// 錄製大腿與小腿加速度計固定秒數，收集期間不寫入資料庫，結束後用 ACCCalibration 計算膝角基準值。
+    /// - Parameter durationSec: 收集秒數，預設 5(跟正式流程畫面的 5 秒倒數一致)。
+    func startBaselineCalibration(thighPeripheral: CBPeripheral, calfPeripheral: CBPeripheral, durationSec: Double = 5) {
         DispatchQueue.main.async {
             self.baselineResult = nil
             self.isCollectingBaseline = true
         }
-        beginAccOnlyCollection(thighPeripheral: thighPeripheral, calfPeripheral: calfPeripheral, durationSec: 5) { [weak self] thighSamples, calfSamples in
-            let result = Self.computeBaselineAngle(thighSamples: thighSamples, calfSamples: calfSamples)
+        beginAccOnlyCollection(thighPeripheral: thighPeripheral, calfPeripheral: calfPeripheral, durationSec: durationSec) { [weak self] thighSamples, calfSamples in
+            let result = ACCCalibration.computeBaseline(thighSamples: thighSamples, calfSamples: calfSamples)
             DispatchQueue.main.async {
                 self?.baselineResult = result
                 self?.isCollectingBaseline = false
@@ -396,59 +397,9 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         }
     }
 
-    /// 移植自 baseline_check.py（check_whole_range_stable）+ calibration_phase.py（inclination_deg / compute_knee_angle）：
-    /// 用加速度算大腿、小腿相對重力的傾角，膝角 = 大腿傾角 - 小腿傾角；整段錄製視為單一區間，
-    /// 標準差（樣本標準差）<= 1.5° 且時長 >= 1 秒才算穩定，穩定則回傳角度平均值（保留正負號，四捨五入到小數1位），否則回傳 nil。
-    static func computeBaselineAngle(
-        thighSamples: [(timestamp: Int64, x: Double, y: Double, z: Double)],
-        calfSamples: [(timestamp: Int64, x: Double, y: Double, z: Double)],
-        stdThresholdDeg: Double = 1.5,
-        minDurationSec: Double = 1.0
-    ) -> Double? {
-        guard !thighSamples.isEmpty, !calfSamples.isEmpty else { return nil }
-
-        let thighIncline = smoothedIncline(thighSamples)
-        let calfIncline  = smoothedIncline(calfSamples)
-        let count = min(thighIncline.count, calfIncline.count)
-        guard count >= 2 else { return nil }
-
-        // 大腿與小腿分別平滑後，依時間順序逐一配對計算膝角
-        var kneeAngles: [Double] = []
-        var tSecs: [Double] = []
-        for i in 0..<count {
-            kneeAngles.append(thighIncline[i].incline - calfIncline[i].incline)
-            tSecs.append(Double(thighIncline[i].t) / 1000.0)
-        }
-
-        let duration = tSecs.max()! - tSecs.min()!
-        let mean = kneeAngles.reduce(0, +) / Double(kneeAngles.count)
-        let variance = kneeAngles.reduce(0) { $0 + ($1 - mean) * ($1 - mean) } / Double(kneeAngles.count - 1)
-        let std = variance.squareRoot()
-
-        guard std <= stdThresholdDeg, duration >= minDurationSec else { return nil }
-
-        return (mean * 10).rounded() / 10
-    }
-
     /// 對應 inclination_deg：以重力向量計算肢段相對垂直線的傾角（度）
     private static func inclinationDeg(_ x: Double, _ y: Double, _ z: Double) -> Double {
         atan2(x, (y * y + z * z).squareRoot()) * 180 / .pi
-    }
-
-    /// 依 timestamp 分組平均，濾掉同一個 timestamp 底下多筆瞬間取樣的高頻雜訊（對應 load_and_smooth 的分組平均）
-    private static func smoothedIncline(
-        _ samples: [(timestamp: Int64, x: Double, y: Double, z: Double)]
-    ) -> [(t: Int64, incline: Double)] {
-        var sums: [Int64: (sum: Double, count: Int)] = [:]
-        for s in samples {
-            let incline = inclinationDeg(s.x, s.y, s.z)
-            var g = sums[s.timestamp] ?? (0, 0)
-            g.sum += incline
-            g.count += 1
-            sums[s.timestamp] = g
-        }
-        return sums.map { (t: $0.key, incline: $0.value.sum / Double($0.value.count)) }
-            .sorted { $0.t < $1.t }
     }
 
     /// 對應 build_baseline_mapping_table：以 baseline 為起點建立 (量測角度 -> 預估真實角度) 對應表，依量測角度排序。
