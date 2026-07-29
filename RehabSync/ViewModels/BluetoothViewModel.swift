@@ -220,6 +220,55 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         }
     }
 
+    /// 背景自動重連：不透過主動掃描（`startScan`／`discoveredDevices`），改用 CoreBluetooth
+    /// 已經認得的裝置識別碼直接 `retrievePeripherals(withIdentifiers:)` 找回 `CBPeripheral`
+    /// 並嘗試連線——即使裝置暫時不在範圍內、或還沒被系統快取過而找不到，這裡也只是靜靜失敗，
+    /// 不拋錯，呼叫端（`Dashboard.checkBoundDevicesReachable()`）每 5 秒會再呼叫一次重試。
+    /// 刻意不動用 `connectionState`／`pendingPeripheral`（那是給使用者手動在綁定視窗選裝置連線的
+    /// UI 狀態），避免背景重連跟使用者當下手動操作的畫面狀態互相干擾。
+    func attemptBackgroundReconnect(uuid: UUID) {
+        bleQueue.async {
+            #if DEBUG
+            print("[RECONNECT-DIAG] attemptBackgroundReconnect 開始 uuid=\(uuid) central.state=\(self.central.state.rawValue)")
+            #endif
+            guard self.central.state == .poweredOn else {
+                #if DEBUG
+                print("[RECONNECT-DIAG] 中止：central.state 不是 poweredOn（實際值 \(self.central.state.rawValue)）")
+                #endif
+                return
+            }
+            guard self.connectedPeripherals[uuid] == nil else {
+                #if DEBUG
+                print("[RECONNECT-DIAG] 中止：connectedPeripherals 裡已經有這顆，不需要重連")
+                #endif
+                return
+            }
+            guard let peripheral = self.central.retrievePeripherals(withIdentifiers: [uuid]).first else {
+                #if DEBUG
+                print("[RECONNECT-DIAG] 中止：retrievePeripherals(withIdentifiers:) 找不到這個 uuid，CoreBluetooth 不認得這顆裝置")
+                #endif
+                return
+            }
+            #if DEBUG
+            print("[RECONNECT-DIAG] retrievePeripherals 找到裝置，peripheral.state=\(peripheral.state.rawValue)（0=disconnected 1=connecting 2=connected 3=disconnecting）")
+            #endif
+            guard peripheral.state != .connecting, peripheral.state != .connected else {
+                #if DEBUG
+                print("[RECONNECT-DIAG] 中止：peripheral 已經在連線中或已連線")
+                #endif
+                return
+            }
+            // `retrievePeripherals(withIdentifiers:)` 現拿的 peripheral 沒有像掃描流程那樣
+            // 先存進 peripheralMap，只是 closure 裡的區域變數；沿用掃描流程的做法先存一份強參照，
+            // 避免連線請求送出後沒有東西撐著這個物件、悄悄失敗又永遠等不到 didConnect/didFailToConnect。
+            self.peripheralMap[uuid] = peripheral
+            #if DEBUG
+            print("[RECONNECT-DIAG] 呼叫 central.connect(...)")
+            #endif
+            self.central.connect(peripheral, options: nil)
+        }
+    }
+
     // MARK: - Recording
 
     func startRecording(peripheral: CBPeripheral) {
@@ -845,6 +894,9 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
 
     func centralManager(_ central: CBCentralManager,
                         didConnect peripheral: CBPeripheral) {
+        #if DEBUG
+        print("[RECONNECT-DIAG] didConnect 成功 uuid=\(peripheral.identifier)")
+        #endif
         // 在 bleQueue 直接賦值，確保 discoverServices 前 config 已就緒
         bluetoothConfig = loadDefaultBluetoothConfig()
 
@@ -862,6 +914,9 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     func centralManager(_ central: CBCentralManager,
                         didFailToConnect peripheral: CBPeripheral,
                         error: (any Error)?) {
+        #if DEBUG
+        print("[RECONNECT-DIAG] didFailToConnect uuid=\(peripheral.identifier) error=\(error?.localizedDescription ?? "nil")")
+        #endif
         DispatchQueue.main.async {
             self.connectionState = .failed(error?.localizedDescription ?? "連線失敗")
             self.pendingPeripheral = nil

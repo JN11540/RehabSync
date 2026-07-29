@@ -21,6 +21,14 @@ class DeviceViewModel {
         }
     }
 
+    /// `device` 表目前有幾筆綁定紀錄（不論目前是否有實際 BLE 連線）。正常配對完成是 2 筆
+    /// （同一側大腿＋小腿各一），給「進入訓練前檢查裝置是否已綁定」這類流程用。
+    func boundDeviceCount() -> Int {
+        (try? db.read { db in
+            try Device.fetchCount(db)
+        }) ?? 0
+    }
+
     func insert(uuid: String, name: String, side: Int = 0, limb: Int) {
         guard let bluetoothId = defaultBluetoothId() else { return }
         var device = Device(

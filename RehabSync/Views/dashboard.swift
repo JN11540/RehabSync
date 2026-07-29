@@ -60,32 +60,41 @@ struct Dashboard: View {
     @State private var selectedNav: DashboardNavItem = .overview
     @State private var weekOffset = 0
     @State private var selectedWeekdayIndex: Int = todayWeekdayIndex()
-    @State private var showDeviceListModal = false
     @State private var showIncompleteActionsModal = false
-    @State private var deviceListSide = 0
-    @State private var deviceListLimb = 0
+    @State private var showBluetoothBindingModal = false
     @State private var deviceStatusTick = 0
     @Environment(BluetoothViewModel.self) private var btVM
     private let deviceVM = DeviceViewModel()
     var onNavigateToTest: () -> Void = {}
     var onNavigateToTest1: () -> Void = {}
 
-    private func openDeviceList(side: Int, limb: Int) {
-        deviceListSide = side
-        deviceListLimb = limb
-        showDeviceListModal = true
-    }
-
-    /// 每 5 秒檢查已綁定的裝置是否仍偵測得到（存在於 btVM.connectedPeripherals），
-    /// 偵測不到（裝置關機/斷線）就自動解除綁定，並用 deviceStatusTick 強制畫面重新讀取最新狀態。
+    /// 每 5 秒檢查已綁定的裝置是否仍有連線（存在於 btVM.connectedPeripherals），
+    /// 沒有連線（裝置關機/離開範圍/App 剛重開還沒重新連上）就嘗試背景重連，
+    /// 不再自動解除綁定——裝置暫時連不到，下一個 5 秒週期會再重試，直到連上為止。
+    /// 用 deviceStatusTick 強制畫面重新讀取最新狀態。
     private func checkBoundDevicesReachable() {
+        #if DEBUG
+        print("[RECONNECT-DIAG] checkBoundDevicesReachable 開始檢查")
+        #endif
         for side in 0...1 {
             for limb in 0...1 {
-                guard let device = deviceVM.fetch(side: side, limb: limb),
-                      let uuid = UUID(uuidString: device.device_uuid),
-                      btVM.connectedPeripherals[uuid] == nil
-                else { continue }
-                deviceVM.delete(uuid: device.device_uuid)
+                guard let device = deviceVM.fetch(side: side, limb: limb) else { continue }
+                guard let uuid = UUID(uuidString: device.device_uuid) else {
+                    #if DEBUG
+                    print("[RECONNECT-DIAG] side=\(side) limb=\(limb) device_uuid 字串解析失敗：\(device.device_uuid)")
+                    #endif
+                    continue
+                }
+                guard btVM.connectedPeripherals[uuid] == nil else {
+                    #if DEBUG
+                    print("[RECONNECT-DIAG] side=\(side) limb=\(limb) 已經有連線，跳過")
+                    #endif
+                    continue
+                }
+                #if DEBUG
+                print("[RECONNECT-DIAG] side=\(side) limb=\(limb) 有紀錄但沒連線，呼叫 attemptBackgroundReconnect uuid=\(uuid)")
+                #endif
+                btVM.attemptBackgroundReconnect(uuid: uuid)
             }
         }
 
@@ -113,7 +122,7 @@ struct Dashboard: View {
                     .frame(width: 220)
 
                 if selectedNav == .overview {
-                    DashboardOverviewContent(onDeviceRowTap: openDeviceList)
+                    DashboardOverviewContent()
                         .id(deviceStatusTick)
                         .frame(maxWidth: .infinity)
                         .padding(28)
@@ -136,7 +145,8 @@ struct Dashboard: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .background(Color.white)
                 } else if selectedNav == .settings {
-                    DashboardPlaceholderCard(title: selectedNav.title, titleFontSize: 26)
+                    DashboardSettingsPanel(onBluetoothBindingTap: { showBluetoothBindingModal = true })
+                        .id(deviceStatusTick)
                         .padding(28)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .background(Color.white)
@@ -150,20 +160,20 @@ struct Dashboard: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.white)
 
-            if showDeviceListModal {
-                Color.black.opacity(0.25)
-                    .ignoresSafeArea()
-
-                DashboardDeviceListModal(side: deviceListSide, limb: deviceListLimb, onClose: { showDeviceListModal = false })
-                    .frame(width: 420, height: 520)
-            }
-
             if showIncompleteActionsModal {
                 Color.black.opacity(0.25)
                     .ignoresSafeArea()
 
                 DashboardIncompleteActionsModal(onClose: { showIncompleteActionsModal = false })
                     .frame(width: 420, height: 520)
+            }
+
+            if showBluetoothBindingModal {
+                Color.black.opacity(0.25)
+                    .ignoresSafeArea()
+
+                DashboardBluetoothBindingModal(onClose: { showBluetoothBindingModal = false })
+                    .frame(width: 640, height: 520)
             }
         }
         .task {
@@ -293,13 +303,52 @@ private struct DashboardSidebarItem: View {
 
 private struct DashboardPlaceholderCard: View {
     let title: String
-    var titleFontSize: CGFloat = 22
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
-                .font(.system(size: titleFontSize, weight: .semibold))
+                .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(Color.black)
+
+            Spacer()
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+// MARK: - Settings Panel
+
+private struct DashboardSettingsPanel: View {
+    let onBluetoothBindingTap: () -> Void
+
+    @State private var deviceVM = DeviceViewModel()
+    @Environment(BluetoothViewModel.self) private var btVM
+
+    /// `device` 表已經有 2 筆紀錄（不論目前是否有實際連線）就不能再綁新裝置，
+    /// 跟人形圖／藍芽裝置綁定視窗左欄「最多同時綁 2 顆」是同一條規則，共用 `DeviceBindingRules`。
+    private var isMaxDevicesReached: Bool {
+        DeviceBindingRules.snapshot(deviceVM: deviceVM, btVM: btVM).isMaxDevicesReached
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("設定")
+                .font(.system(size: 26, weight: .semibold))
+                .foregroundStyle(Color.black)
+
+            Button(action: onBluetoothBindingTap) {
+                Text("藍芽裝置綁定")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+                    .background(DashboardPalette.indigo)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+            .buttonStyle(.plain)
+            .disabled(isMaxDevicesReached)
+            .opacity(isMaxDevicesReached ? 0.4 : 1)
 
             Spacer()
         }
@@ -509,15 +558,13 @@ private struct DashboardImportJSONPanel: View {
 // MARK: - Overview Content (center column)
 
 private struct DashboardOverviewContent: View {
-    var onDeviceRowTap: (Int, Int) -> Void = { _, _ in }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("總覽")
                 .font(.system(size: 26, weight: .bold))
                 .foregroundStyle(Color.black)
 
-            DeviceOverviewCard(onDeviceRowTap: onDeviceRowTap)
+            DeviceOverviewCard()
 
             ActivityChartCard()
         }
@@ -527,15 +574,13 @@ private struct DashboardOverviewContent: View {
 // MARK: - Device Overview Card
 
 private struct DeviceOverviewCard: View {
-    var onDeviceRowTap: (Int, Int) -> Void = { _, _ in }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text("裝置")
                 .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(Color.black)
 
-            DeviceIllustration(onRowTap: onDeviceRowTap)
+            DeviceIllustration()
                 .frame(maxWidth: .infinity)
         }
         .padding(20)
@@ -549,7 +594,6 @@ private struct DeviceOverviewCard: View {
 }
 
 private struct DeviceIllustration: View {
-    var onRowTap: (Int, Int) -> Void = { _, _ in }
     @State private var deviceVM = DeviceViewModel()
     @Environment(BluetoothViewModel.self) private var btVM
 
@@ -562,32 +606,9 @@ private struct DeviceIllustration: View {
         deviceVM.delete(uuid: device.device_uuid)
     }
 
-    private var leftThighConnected: Bool { deviceVM.fetch(side: 0, limb: 0) != nil }
-    private var leftCalfConnected: Bool { deviceVM.fetch(side: 0, limb: 1) != nil }
-    private var rightThighConnected: Bool { deviceVM.fetch(side: 1, limb: 0) != nil }
-    private var rightCalfConnected: Bool { deviceVM.fetch(side: 1, limb: 1) != nil }
-
-    /// 已連線的左腿裝置數（0~2），用來判斷目前是不是「正要裝第二個裝置」的狀態。
-    private var leftConnectedCount: Int {
-        (leftThighConnected ? 1 : 0) + (leftCalfConnected ? 1 : 0)
-    }
-    private var rightConnectedCount: Int {
-        (rightThighConnected ? 1 : 0) + (rightCalfConnected ? 1 : 0)
-    }
-
-    /// 第一個裝置裝在左腿、右腿還沒開始裝時，鎖住右腿，強迫先把左腿裝滿；反之亦然。
-    private var isLeftDisabled: Bool { rightConnectedCount == 1 && leftConnectedCount == 0 }
-    private var isRightDisabled: Bool { leftConnectedCount == 1 && rightConnectedCount == 0 }
-
-    /// 裝置最多接兩個，湊滿兩個之後，尚未連線的圓形都不可再點擊。
-    private var isMaxDevicesReached: Bool { leftConnectedCount + rightConnectedCount >= 2 }
-
-    private var isLeftThighDisabled: Bool { isLeftDisabled || (isMaxDevicesReached && !leftThighConnected) }
-    private var isLeftCalfDisabled: Bool { isLeftDisabled || (isMaxDevicesReached && !leftCalfConnected) }
-    private var isRightThighDisabled: Bool { isRightDisabled || (isMaxDevicesReached && !rightThighConnected) }
-    private var isRightCalfDisabled: Bool { isRightDisabled || (isMaxDevicesReached && !rightCalfConnected) }
-
     var body: some View {
+        let snapshot = DeviceBindingRules.snapshot(deviceVM: deviceVM, btVM: btVM)
+
         GeometryReader { geo in
             ZStack {
                 Image("MuscleFigure")
@@ -595,33 +616,29 @@ private struct DeviceIllustration: View {
                     .scaledToFit()
                     .frame(width: geo.size.width, height: geo.size.height)
 
-                DashboardConnectionBadge(label: "左大腿", isConnected: leftThighConnected)
+                DashboardConnectionBadge(label: "左大腿", status: snapshot.leftThigh.status)
                     .contentShape(Rectangle())
-                    .onTapGesture { if !leftThighConnected { onRowTap(0, 0) } }
                     .onLongPressGesture(minimumDuration: 2) { unbind(side: 0, limb: 0) }
-                    .allowsHitTesting(!isLeftThighDisabled)
-                    .opacity(isLeftThighDisabled ? 0.4 : 1)
+                    .allowsHitTesting(!snapshot.leftThigh.isDisabled)
+                    .opacity(snapshot.leftThigh.isDisabled ? 0.4 : 1)
                     .position(x: geo.size.width * 0.22, y: geo.size.height * 0.54)
-                DashboardConnectionBadge(label: "左小腿", isConnected: leftCalfConnected)
+                DashboardConnectionBadge(label: "左小腿", status: snapshot.leftCalf.status)
                     .contentShape(Rectangle())
-                    .onTapGesture { if !leftCalfConnected { onRowTap(0, 1) } }
                     .onLongPressGesture(minimumDuration: 2) { unbind(side: 0, limb: 1) }
-                    .allowsHitTesting(!isLeftCalfDisabled)
-                    .opacity(isLeftCalfDisabled ? 0.4 : 1)
+                    .allowsHitTesting(!snapshot.leftCalf.isDisabled)
+                    .opacity(snapshot.leftCalf.isDisabled ? 0.4 : 1)
                     .position(x: geo.size.width * 0.22, y: geo.size.height * 0.84)
-                DashboardConnectionBadge(label: "右大腿", isConnected: rightThighConnected)
+                DashboardConnectionBadge(label: "右大腿", status: snapshot.rightThigh.status)
                     .contentShape(Rectangle())
-                    .onTapGesture { if !rightThighConnected { onRowTap(1, 0) } }
                     .onLongPressGesture(minimumDuration: 2) { unbind(side: 1, limb: 0) }
-                    .allowsHitTesting(!isRightThighDisabled)
-                    .opacity(isRightThighDisabled ? 0.4 : 1)
+                    .allowsHitTesting(!snapshot.rightThigh.isDisabled)
+                    .opacity(snapshot.rightThigh.isDisabled ? 0.4 : 1)
                     .position(x: geo.size.width * 0.78, y: geo.size.height * 0.54)
-                DashboardConnectionBadge(label: "右小腿", isConnected: rightCalfConnected)
+                DashboardConnectionBadge(label: "右小腿", status: snapshot.rightCalf.status)
                     .contentShape(Rectangle())
-                    .onTapGesture { if !rightCalfConnected { onRowTap(1, 1) } }
                     .onLongPressGesture(minimumDuration: 2) { unbind(side: 1, limb: 1) }
-                    .allowsHitTesting(!isRightCalfDisabled)
-                    .opacity(isRightCalfDisabled ? 0.4 : 1)
+                    .allowsHitTesting(!snapshot.rightCalf.isDisabled)
+                    .opacity(snapshot.rightCalf.isDisabled ? 0.4 : 1)
                     .position(x: geo.size.width * 0.78, y: geo.size.height * 0.84)
             }
         }
@@ -631,7 +648,30 @@ private struct DeviceIllustration: View {
 
 private struct DashboardConnectionBadge: View {
     let label: String
-    var isConnected: Bool = false
+    var status: DeviceConnectionStatus = .unbound
+
+    private var text: String {
+        switch status {
+        case .unbound: "未連線"
+        case .reconnecting: "掃描中"
+        case .connected: "已連線"
+        }
+    }
+
+    private var textColor: Color {
+        switch status {
+        case .unbound: Color.black.opacity(0.7)
+        case .reconnecting, .connected: Color.white
+        }
+    }
+
+    private var backgroundColor: Color {
+        switch status {
+        case .unbound: Color.white
+        case .reconnecting: DashboardPalette.indigo
+        case .connected: DashboardPalette.teal
+        }
+    }
 
     var body: some View {
         VStack(spacing: 6) {
@@ -639,12 +679,12 @@ private struct DashboardConnectionBadge: View {
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Color.black)
 
-            Text(isConnected ? "已連線" : "未連線")
+            Text(text)
                 .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(isConnected ? Color.white : Color.black.opacity(0.7))
+                .foregroundStyle(textColor)
                 .multilineTextAlignment(.center)
                 .frame(width: 72, height: 72)
-                .background(isConnected ? DashboardPalette.teal : Color.white)
+                .background(backgroundColor)
                 .clipShape(Circle())
                 .shadow(color: .black.opacity(0.08), radius: 5, y: 2)
         }
@@ -756,24 +796,32 @@ private struct ActivityChartCard: View {
     }
 }
 
-// MARK: - Device List Modal
 
-private struct DashboardDeviceListModal: View {
-    let side: Int
-    let limb: Int
+// MARK: - Bluetooth Binding Modal（settings-bluetooth-binding-plan.md）
+
+/// 「設定」頁「藍芽裝置綁定」按鈕跳出的視窗：左欄「綁定部位」（4 個固定選項）＋右欄「藍牙裝置」
+/// （目前掃描到的所有裝置）。現在是全 App 唯一的手動連線入口——人形圖（`DeviceIllustration`）
+/// 原本點部位會跳出的單欄視窗（`DashboardDeviceListModal`）已經拿掉，改成完全依賴背景重連
+/// （`BluetoothViewModel.attemptBackgroundReconnect`），見 settings-bluetooth-binding-plan.md 第 6 節。
+/// 左欄的「最多 2 顆、同側優先」規則共用 `DeviceBindingRules`，跟人形圖是同一套。
+private struct DashboardBluetoothBindingModal: View {
     let onClose: () -> Void
 
     @Environment(BluetoothViewModel.self) private var btVM
+    @State private var deviceVM = DeviceViewModel()
+    @State private var selectedLimb: (side: Int, limb: Int)?
     @State private var selectedDevice: DiscoveredDevice? = nil
-    private let deviceVM = DeviceViewModel()
+
+    private static let limbs: [(side: Int, limb: Int, label: String)] = [
+        (0, 0, "左大腿"), (0, 1, "左小腿"), (1, 0, "右大腿"), (1, 1, "右小腿"),
+    ]
 
     private func handleCancel() {
         releaseSelectedDevice()
         onClose()
     }
 
-    /// 解除目前選取裝置的連線（已連上就斷線，還在連線中就取消），
-    /// 供「關閉視窗」與「改點其他裝置」共用。
+    /// 解除目前選取裝置的連線（已連上就斷線，還在連線中就取消），供「關閉視窗」與「改點其他裝置」共用。
     private func releaseSelectedDevice() {
         guard let selectedDevice else { return }
         if btVM.connectedPeripherals[selectedDevice.id] != nil {
@@ -783,11 +831,30 @@ private struct DashboardDeviceListModal: View {
         }
     }
 
+    /// 確認＝寫進 `device` 表後直接關閉視窗，一次只能綁一個部位，要綁下一個部位得重新開視窗。
     private func handleConfirm() {
-        if let selectedDevice {
-            deviceVM.insert(uuid: selectedDevice.id.uuidString, name: selectedDevice.name, side: side, limb: limb)
+        if let selectedLimb, let selectedDevice {
+            deviceVM.insert(uuid: selectedDevice.id.uuidString, name: selectedDevice.name, side: selectedLimb.side, limb: selectedLimb.limb)
         }
         onClose()
+    }
+
+    /// 已連線裝置按壓超過兩秒才解除綁定，避免誤觸；解除時若還連著線也一併中斷藍牙連線。
+    private func unbind(side: Int, limb: Int) {
+        guard let device = deviceVM.fetch(side: side, limb: limb) else { return }
+        if let uuid = UUID(uuidString: device.device_uuid) {
+            btVM.disconnect(id: uuid)
+        }
+        deviceVM.delete(uuid: device.device_uuid)
+    }
+
+    private func slotState(side: Int, limb: Int, snapshot: DeviceBindingRules.Snapshot) -> DeviceBindingRules.SlotState {
+        switch (side, limb) {
+        case (0, 0): return snapshot.leftThigh
+        case (0, 1): return snapshot.leftCalf
+        case (1, 0): return snapshot.rightThigh
+        default: return snapshot.rightCalf
+        }
     }
 
     private var isConnecting: Bool {
@@ -796,14 +863,16 @@ private struct DashboardDeviceListModal: View {
     }
 
     var body: some View {
+        let snapshot = DeviceBindingRules.snapshot(deviceVM: deviceVM, btVM: btVM)
+
         ZStack(alignment: .top) {
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color.white)
                 .shadow(color: .black.opacity(0.2), radius: 20, y: 8)
 
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(spacing: 0) {
                 HStack {
-                    Text("藍牙裝置")
+                    Text("藍芽裝置綁定")
                         .font(.system(size: 22, weight: .semibold))
                         .foregroundStyle(Color.black)
                         .padding(.leading, 24)
@@ -828,63 +897,126 @@ private struct DashboardDeviceListModal: View {
                     .padding(.trailing, 16)
                 }
                 .padding(.top, 16)
+                .padding(.bottom, 16)
 
-                ScrollView(showsIndicators: false) {
+                HStack(spacing: 0) {
                     VStack(spacing: 12) {
-                        if btVM.discoveredDevices.isEmpty {
-                            Text("掃描中…")
-                                .font(.system(size: 20, weight: .medium))
-                                .foregroundStyle(DashboardPalette.mutedText)
-                                .padding(.top, 20)
-                        } else {
-                            ForEach(btVM.discoveredDevices) { device in
-                                let isConnected = btVM.connectedPeripherals[device.id] != nil
-                                let isConnecting = device.id == selectedDevice?.id && {
-                                    if case .connecting = btVM.connectionState { return true }
-                                    return false
-                                }()
+                        ForEach(Self.limbs, id: \.label) { item in
+                            let slot = slotState(side: item.side, limb: item.limb, snapshot: snapshot)
+                            let boundDevice = slot.status.isBound ? deviceVM.fetch(side: item.side, limb: item.limb) : nil
+                            let isSelected = selectedLimb?.side == item.side && selectedLimb?.limb == item.limb
 
-                                Button {
-                                    guard device.id != selectedDevice?.id else { return }
-                                    releaseSelectedDevice()
-                                    selectedDevice = device
-                                    btVM.connectDiscovered(device)
-                                } label: {
-                                    HStack {
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(device.name)
-                                                .font(.system(size: 20, weight: .semibold))
-                                                .foregroundStyle(isConnected ? .white : Color.black)
-                                                .lineLimit(1)
-                                            Text(device.id.uuidString)
-                                                .font(.system(size: 11))
-                                                .foregroundStyle(isConnected ? .white.opacity(0.8) : DashboardPalette.mutedText)
-                                                .lineLimit(1)
-                                                .minimumScaleFactor(0.6)
-                                        }
-                                        Spacer()
-                                        if isConnecting {
-                                            ProgressView()
-                                                .tint(isConnected ? .white : DashboardPalette.indigo)
-                                        } else if isConnected {
-                                            Image(systemName: "checkmark.circle.fill")
-                                                .foregroundStyle(.white)
-                                        }
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.label)
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(slot.status.isBound || isSelected ? .white : Color.black)
+
+                                if slot.status.isBound {
+                                    Text(slot.status == .connected ? "已連線" : "掃描中")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(.white.opacity(0.85))
+                                    if let boundDevice {
+                                        Text(boundDevice.device_name)
+                                            .font(.system(size: 12))
+                                            .foregroundStyle(.white.opacity(0.85))
+                                            .lineLimit(1)
+                                        Text(boundDevice.device_uuid)
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(.white.opacity(0.7))
+                                            .lineLimit(1)
+                                            .minimumScaleFactor(0.6)
                                     }
-                                    .padding(14)
-                                    .background(
-                                        isConnected
-                                            ? DashboardPalette.indigo
-                                            : (device.id == selectedDevice?.id ? DashboardPalette.indigo.opacity(0.15) : DashboardPalette.indigoFaint)
-                                    )
-                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                                } else {
+                                    Text("未連線")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(isSelected ? .white.opacity(0.85) : DashboardPalette.mutedText)
                                 }
-                                .buttonStyle(.plain)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(12)
+                            .background(
+                                slot.status.isBound
+                                    ? DashboardPalette.indigo
+                                    : (isSelected ? DashboardPalette.indigoDark : DashboardPalette.indigoFaint)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                if !slot.status.isBound { selectedLimb = (item.side, item.limb) }
+                            }
+                            .onLongPressGesture(minimumDuration: 2) {
+                                unbind(side: item.side, limb: item.limb)
+                            }
+                            .allowsHitTesting(!slot.isDisabled)
+                            .opacity(slot.isDisabled ? 0.4 : 1)
+                        }
+
+                        Spacer()
+                    }
+                    .padding(16)
+                    .frame(width: 200)
+
+                    Rectangle()
+                        .fill(Color.black.opacity(0.08))
+                        .frame(width: 1)
+
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 12) {
+                            if btVM.discoveredDevices.isEmpty {
+                                Text("掃描中…")
+                                    .font(.system(size: 20, weight: .medium))
+                                    .foregroundStyle(DashboardPalette.mutedText)
+                                    .padding(.top, 20)
+                            } else {
+                                ForEach(btVM.discoveredDevices) { device in
+                                    let isConnected = btVM.connectedPeripherals[device.id] != nil
+                                    let isSelected = device.id == selectedDevice?.id
+                                    let isThisConnecting = isSelected && isConnecting
+                                    let isHighlighted = isConnected || isSelected
+
+                                    Button {
+                                        guard device.id != selectedDevice?.id else { return }
+                                        releaseSelectedDevice()
+                                        selectedDevice = device
+                                        btVM.connectDiscovered(device)
+                                    } label: {
+                                        HStack {
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(device.name)
+                                                    .font(.system(size: 20, weight: .semibold))
+                                                    .foregroundStyle(isHighlighted ? .white : Color.black)
+                                                    .lineLimit(1)
+                                                Text(device.id.uuidString)
+                                                    .font(.system(size: 11))
+                                                    .foregroundStyle(isHighlighted ? .white.opacity(0.8) : DashboardPalette.mutedText)
+                                                    .lineLimit(1)
+                                                    .minimumScaleFactor(0.6)
+                                            }
+                                            Spacer()
+                                            if isThisConnecting {
+                                                ProgressView()
+                                                    .tint(.white)
+                                            } else if isConnected {
+                                                Image(systemName: "checkmark.circle.fill")
+                                                    .foregroundStyle(.white)
+                                            }
+                                        }
+                                        .padding(14)
+                                        .background(
+                                            isConnected
+                                                ? DashboardPalette.indigo
+                                                : (isSelected ? DashboardPalette.indigoDark : DashboardPalette.indigoFaint)
+                                        )
+                                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
                             }
                         }
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 80)
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 80)
+                    .frame(maxWidth: .infinity)
                 }
             }
 
@@ -900,8 +1032,8 @@ private struct DashboardDeviceListModal: View {
                 .padding(16)
             }
             .buttonStyle(.plain)
-            .disabled(selectedDevice == nil || isConnecting)
-            .opacity(selectedDevice == nil || isConnecting ? 0.4 : 1)
+            .disabled(selectedLimb == nil || selectedDevice == nil || isConnecting)
+            .opacity(selectedLimb == nil || selectedDevice == nil || isConnecting ? 0.4 : 1)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
         }
         .clipShape(RoundedRectangle(cornerRadius: 16))
@@ -916,7 +1048,7 @@ private struct DashboardDeviceListModal: View {
 
 // MARK: - Incomplete Actions Modal
 
-/// 點鈴鐺跳出的視窗，跟藍牙裝置視窗（`DashboardDeviceListModal`）同樣大小／同樣的卡片樣式；
+/// 點鈴鐺跳出的視窗，420×520，跟其他 Dashboard 彈出視窗同樣的卡片樣式；
 /// 列出「今天安排、但還沒做過任何一次」的動作，判斷邏輯跟鈴鐺是否震動（`allTodayContentsDone`）共用同一套規則。
 private struct DashboardIncompleteActionsModal: View {
     let onClose: () -> Void
@@ -929,6 +1061,8 @@ private struct DashboardIncompleteActionsModal: View {
     @State private var destinationContent: TreatmentContent? = nil
     @State private var destinationExercise: Exercise? = nil
     @State private var showExportFolderNotSetAlert = false
+    @State private var showBluetoothNotBoundAlert = false
+    private let deviceVM = DeviceViewModel()
 
     private func loadData() {
         treatmentVM.fetchAll()
@@ -997,6 +1131,10 @@ private struct DashboardIncompleteActionsModal: View {
                                     isInteractive: true,
                                     onTap: {
                                         guard dashboardTrainingMenuDestinations[content.exercise_id] != nil else { return }
+                                        guard deviceVM.boundDeviceCount() >= 2 else {
+                                            showBluetoothNotBoundAlert = true
+                                            return
+                                        }
                                         guard ExportDestinationStore.hasDesignatedFolder() else {
                                             showExportFolderNotSetAlert = true
                                             return
@@ -1034,6 +1172,11 @@ private struct DashboardIncompleteActionsModal: View {
         } message: {
             Text("請先到側邊欄「匯出」分頁設定指定資料夾，才能開始這個動作。")
         }
+        .alert("尚未綁定藍芽裝置", isPresented: $showBluetoothNotBoundAlert) {
+            Button("好", role: .cancel) {}
+        } message: {
+            Text("請先到「設定」頁綁定大腿／小腿藍芽裝置，才能開始這個動作。")
+        }
     }
 }
 
@@ -1052,7 +1195,9 @@ private struct DashboardSchedulePanel: View {
     @State private var destinationContent: TreatmentContent? = nil
     @State private var destinationExercise: Exercise? = nil
     @State private var showExportFolderNotSetAlert = false
+    @State private var showBluetoothNotBoundAlert = false
     @State private var bellShakeAngle: Double = 0
+    private let deviceVM = DeviceViewModel()
 
     /// 資料庫沒有治療計畫選擇 UI，比照 Test1 的作法，以第一個治療計畫代表「目前的訓練菜單」。
     private func loadTrainingMenu() {
@@ -1146,6 +1291,10 @@ private struct DashboardSchedulePanel: View {
                                 isInteractive: isSelectedDayToday,
                                 onTap: {
                                     guard dashboardTrainingMenuDestinations[content.exercise_id] != nil else { return }
+                                    guard deviceVM.boundDeviceCount() >= 2 else {
+                                        showBluetoothNotBoundAlert = true
+                                        return
+                                    }
                                     guard ExportDestinationStore.hasDesignatedFolder() else {
                                         showExportFolderNotSetAlert = true
                                         return
@@ -1173,6 +1322,11 @@ private struct DashboardSchedulePanel: View {
             Button("好", role: .cancel) {}
         } message: {
             Text("請先到側邊欄「匯出」分頁設定指定資料夾，才能開始這個動作。")
+        }
+        .alert("尚未綁定藍芽裝置", isPresented: $showBluetoothNotBoundAlert) {
+            Button("好", role: .cancel) {}
+        } message: {
+            Text("請先到「設定」頁綁定大腿／小腿藍芽裝置，才能開始這個動作。")
         }
     }
 }
