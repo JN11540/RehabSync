@@ -134,16 +134,6 @@ struct Dashboard: View {
                     )
                         .frame(width: 420)
                         .background(DashboardPalette.panelBackground)
-                } else if selectedNav == .importData {
-                    DashboardImportJSONPanel()
-                        .padding(28)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(Color.white)
-                } else if selectedNav == .exportData {
-                    DashboardExportFolderPanel()
-                        .padding(28)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(Color.white)
                 } else if selectedNav == .settings {
                     DashboardSettingsPanel(onBluetoothBindingTap: { showBluetoothBindingModal = true })
                         .id(deviceStatusTick)
@@ -189,7 +179,7 @@ struct Dashboard: View {
 // MARK: - Sidebar Nav
 
 private enum DashboardNavItem: CaseIterable {
-    case overview, training, test, test1, importData, exportData, settings
+    case overview, training, test, test1, settings
 
     var title: String {
         switch self {
@@ -197,8 +187,6 @@ private enum DashboardNavItem: CaseIterable {
         case .training: "訓練"
         case .test: "測試"
         case .test1: "測試1"
-        case .importData: "匯入"
-        case .exportData: "匯出"
         case .settings: "設定"
         }
     }
@@ -209,8 +197,6 @@ private enum DashboardNavItem: CaseIterable {
         case .training: "arrow.left.arrow.right"
         case .test: "wrench.and.screwdriver"
         case .test1: "wrench.and.screwdriver.fill"
-        case .importData: "square.and.arrow.down"
-        case .exportData: "square.and.arrow.up"
         case .settings: "gearshape.fill"
         }
     }
@@ -236,14 +222,6 @@ private struct DashboardSidebar: View {
 
             DashboardSidebarSectionLabel(text: "一般")
             DashboardSidebarItem(item: .overview, selectedNav: $selectedNav)
-            DashboardSidebarItem(item: .training, selectedNav: $selectedNav)
-            DashboardSidebarItem(item: .test, selectedNav: $selectedNav, action: onNavigateToTest)
-            DashboardSidebarItem(item: .test1, selectedNav: $selectedNav, action: onNavigateToTest1)
-
-            DashboardSidebarSectionLabel(text: "工具")
-                .padding(.top, 24)
-            DashboardSidebarItem(item: .importData, selectedNav: $selectedNav)
-            DashboardSidebarItem(item: .exportData, selectedNav: $selectedNav)
 
             Spacer()
 
@@ -319,6 +297,20 @@ private struct DashboardPlaceholderCard: View {
 
 // MARK: - Settings Panel
 
+/// 「設定」頁底下的子標題文字樣式，統一比主標題「設定」（26pt）小一階，
+/// 「匯入」「匯出」「藍芽裝置綁定」三個子區塊共用同一種樣式。
+private struct DashboardSettingsSectionTitle: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 20, weight: .semibold))
+            .foregroundStyle(Color.black)
+    }
+}
+
+/// 設定頁：主標題「設定」底下由上至下依序是「匯入」「匯出」「藍芽裝置綁定」三個子區塊，
+/// 原本各自獨立在側邊欄「工具」分頁下的匯入／匯出功能，整合進設定頁後不再需要獨立的側邊欄項目。
 private struct DashboardSettingsPanel: View {
     let onBluetoothBindingTap: () -> Void
 
@@ -332,27 +324,35 @@ private struct DashboardSettingsPanel: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("設定")
-                .font(.system(size: 26, weight: .semibold))
-                .foregroundStyle(Color.black)
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 32) {
+                Text("設定")
+                    .font(.system(size: 26, weight: .semibold))
+                    .foregroundStyle(Color.black)
 
-            Button(action: onBluetoothBindingTap) {
-                Text("藍芽裝置綁定")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 12)
-                    .background(DashboardPalette.indigo)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                DashboardImportJSONPanel()
+                DashboardExportFolderPanel()
+
+                VStack(alignment: .leading, spacing: 16) {
+                    DashboardSettingsSectionTitle(text: "藍芽裝置綁定")
+
+                    Button(action: onBluetoothBindingTap) {
+                        Text("藍芽裝置綁定")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                            .background(DashboardPalette.indigo)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isMaxDevicesReached)
+                    .opacity(isMaxDevicesReached ? 0.4 : 1)
+                }
             }
-            .buttonStyle(.plain)
-            .disabled(isMaxDevicesReached)
-            .opacity(isMaxDevicesReached ? 0.4 : 1)
-
-            Spacer()
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
@@ -406,9 +406,7 @@ private struct DashboardExportFolderPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("匯出")
-                .font(.system(size: 26, weight: .semibold))
-                .foregroundStyle(Color.black)
+            DashboardSettingsSectionTitle(text: "匯出")
 
             if let folderName {
                 Text("目前指定資料夾：\(folderName)")
@@ -431,11 +429,8 @@ private struct DashboardExportFolderPanel: View {
             }
             .buttonStyle(.plain)
             .disabled(folderName != nil)
-
-            Spacer()
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .onAppear {
             folderName = ExportDestinationStore.resolveDesignatedFolder()?.lastPathComponent
         }
@@ -512,9 +507,7 @@ private struct DashboardImportJSONPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("匯入")
-                .font(.system(size: 26, weight: .semibold))
-                .foregroundStyle(Color.black)
+            DashboardSettingsSectionTitle(text: "匯入")
 
             if hasExistingTreatment {
                 Label("已經匯入過治療計畫，無法再次上傳 JSON。", systemImage: "exclamationmark.triangle.fill")
@@ -546,11 +539,8 @@ private struct DashboardImportJSONPanel: View {
                 Label("匯入失敗：\(importError)", systemImage: "xmark.circle.fill")
                     .foregroundStyle(.red)
             }
-
-            Spacer()
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .onAppear { vm.fetchAll() }
     }
 }
@@ -1170,7 +1160,7 @@ private struct DashboardIncompleteActionsModal: View {
         .alert("尚未設定匯出資料夾", isPresented: $showExportFolderNotSetAlert) {
             Button("好", role: .cancel) {}
         } message: {
-            Text("請先到側邊欄「匯出」分頁設定指定資料夾，才能開始這個動作。")
+            Text("請先到「設定」頁設定匯出資料夾，才能開始這個動作。")
         }
         .alert("尚未綁定藍芽裝置", isPresented: $showBluetoothNotBoundAlert) {
             Button("好", role: .cancel) {}
@@ -1321,7 +1311,7 @@ private struct DashboardSchedulePanel: View {
         .alert("尚未設定匯出資料夾", isPresented: $showExportFolderNotSetAlert) {
             Button("好", role: .cancel) {}
         } message: {
-            Text("請先到側邊欄「匯出」分頁設定指定資料夾，才能開始這個動作。")
+            Text("請先到「設定」頁設定匯出資料夾，才能開始這個動作。")
         }
         .alert("尚未綁定藍芽裝置", isPresented: $showBluetoothNotBoundAlert) {
             Button("好", role: .cancel) {}
