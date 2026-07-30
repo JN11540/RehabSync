@@ -1036,8 +1036,8 @@ private struct CompletionPopup: View {
 
     private var exportButtonTitle: String {
         switch phase {
-        case .ready, .done: return "匯出JSON"
-        case .counting(let remaining): return "匯出JSON(\(remaining))"
+        case .ready, .done: return "儲存訓練結果"
+        case .counting(let remaining): return "儲存訓練結果(\(remaining))"
         case .waiting: return "再等待一下..."
         }
     }
@@ -1053,8 +1053,8 @@ private struct CompletionPopup: View {
         phase == .done
     }
 
-    /// 點擊「匯出JSON」：畫面倒數 10 秒（匯出JSON(10) → … → 匯出JSON(0)）。前 5 秒（10→…→5）純粹是寫入緩衝，
-    /// 讓遊戲結束當下還在飛行中的非同步資料庫寫入有時間落地；倒數到剛好顯示「匯出JSON(5)」那一次遞減，
+    /// 點擊「儲存訓練結果」：畫面倒數 10 秒（儲存訓練結果(10) → … → 儲存訓練結果(0)）。前 5 秒（10→…→5）純粹是寫入緩衝，
+    /// 讓遊戲結束當下還在飛行中的非同步資料庫寫入有時間落地；倒數到剛好顯示「儲存訓練結果(5)」那一次遞減，
     /// 才在背景真正開始查詢資料庫、組裝檔案、寫進使用者在「匯出」設定頁指定好的資料夾——這是全流程唯一
     /// 呼叫 runExport() 的地方，不會因為倒數到 0 又重複觸發一次。後 5 秒（5→0）只是給使用者看的可視倒數：
     /// 背景作業比較快完成就直接切到 .done，不必等文字倒數到 0；倒數到 0 又過了 1 秒背景作業還沒完成，
@@ -1071,7 +1071,7 @@ private struct CompletionPopup: View {
                 phase = .counting(secondsRemaining: next)
                 if next == 5 { runExport() }
             case .counting:
-                // 顯示「匯出JSON(0)」又過了 1 秒，背景作業還沒完成。
+                // 顯示「儲存訓練結果(0)」又過了 1 秒，背景作業還沒完成。
                 phase = .waiting
             case .waiting:
                 break

@@ -21,7 +21,7 @@ import CoreBluetooth
 /// （SetRestPopup／setRestTimer）已依批次 2 完成；結束鍵確認彈窗（ConfirmPopup）、暫停/繼續
 /// （cancelInProgressHoldWithoutCounting／isSessionPaused／pauseSession／resumeSession，
 /// .onChange 已守衛 !isSessionPaused && btVM.isRecording）已依批次 3 完成；正式完成視窗＋
-/// 匯出JSON（CompletionPopup，10 秒倒數／runExport）＋跳轉到新建立的 PostWorking_22.swift
+/// 儲存訓練結果（CompletionPopup，10 秒倒數／runExport）＋跳轉到新建立的 PostWorking_22.swift
 /// 已依批次 5 完成。working22-database-port-plan.md 規劃的 11 個階段全部完成。
 struct Working22: View {
     let content: TreatmentContent
@@ -1075,7 +1075,7 @@ private struct SetRestPopup: View {
 // MARK: - CompletionPopup
 
 // 逐字比照 9_Working.swift／2_Working.swift／12_Working.swift 目前最新版的 CompletionPopup：
-// 10 秒倒數，前 5 秒純粹是寫入緩衝，倒數到剛好顯示「匯出JSON(5)」那一次遞減才真正呼叫 runExport()，
+// 10 秒倒數，前 5 秒純粹是寫入緩衝，倒數到剛好顯示「儲存訓練結果(5)」那一次遞減才真正呼叫 runExport()，
 // 沒有分享面板，「完成」按鈕只看背景寫檔是否已經跑完（.done）才會解鎖。沒有 astronaut 主題的
 // 「結束」美術素材，改用已確認存在的 astronaut_get.png 代替 ArrowTheEndIcon/FishingEndIcon。
 private struct CompletionPopup: View {
@@ -1094,8 +1094,8 @@ private struct CompletionPopup: View {
 
     private var exportButtonTitle: String {
         switch phase {
-        case .ready, .done: return "匯出JSON"
-        case .counting(let remaining): return "匯出JSON(\(remaining))"
+        case .ready, .done: return "儲存訓練結果"
+        case .counting(let remaining): return "儲存訓練結果(\(remaining))"
         case .waiting: return "再等待一下..."
         }
     }
