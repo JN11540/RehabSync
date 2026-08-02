@@ -113,6 +113,7 @@ struct Working2: View {
         holdTimer?.invalidate()
         holdTimer = nil
         holdElapsed = 0
+        effortfulSoundPlayer.stop()
     }
 
     /// 3.3：從起始點起算倒數 3 分鐘歸零，視同該組提前結束。
@@ -125,6 +126,11 @@ struct Working2: View {
             showCompletionPopup = true
         }
     }
+
+    // 讀秒／捕獲／金幣三段音效，各自獨立實例，互不打斷（working2-database-port-plan.md 15.2）。
+    @State private var effortfulSoundPlayer = SoundEffectPlayer(resourceName: "2_effortful_fishing")
+    @State private var joyfulSoundPlayer = SoundEffectPlayer(resourceName: "2_joyful_fishing")
+    @State private var coinsSoundPlayer = SoundEffectPlayer(resourceName: "coins")
 
     @State private var holdElapsed: Double = 0
     @State private var holdTimer: Timer?
@@ -262,6 +268,7 @@ struct Working2: View {
 
     private func startHoldTimer() {
         guard holdTimer == nil else { return }
+        effortfulSoundPlayer.play(loop: true)
         holdTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
             guard holdElapsed < Self.holdDuration else { return }
             withAnimation(.linear(duration: 0.1)) {
@@ -276,6 +283,7 @@ struct Working2: View {
         }
         holdTimer?.invalidate()
         holdTimer = nil
+        effortfulSoundPlayer.stop()
         withAnimation(.easeOut(duration: 0.2)) {
             holdElapsed = 0
         }
@@ -292,12 +300,14 @@ struct Working2: View {
         advanceWeightliftingProgress()
         showCatchAnimation = true
         catchProgress = 0
+        joyfulSoundPlayer.play(loop: false)
         withAnimation(.easeInOut(duration: Self.catchAnimationDuration)) {
             catchProgress = 1
         }
         let landedSize = caughtFishSize
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.catchAnimationDuration) {
             showCatchAnimation = false
+            guard !isSessionPaused else { return }
             bounceBucket(for: landedSize)
         }
     }
@@ -348,6 +358,12 @@ struct Working2: View {
             }
         }
 
+        // 金幣動畫重疊時不特別偵測、不新增計數器，就跟著第一個開始播放的那組走，
+        // 已經在播放就不重新觸發，維持不被打斷（working2-database-port-plan.md 15.4）。
+        if !coinsSoundPlayer.isPlaying {
+            coinsSoundPlayer.play(loop: true)
+        }
+
         switch size {
         case .big:    playCoinBurst(count: size.coinCount, elapsed: $bigCoinElapsed, timer: $bigCoinTimer)
         case .middle: playCoinBurst(count: size.coinCount, elapsed: $middleCoinElapsed, timer: $middleCoinTimer)
@@ -380,6 +396,7 @@ struct Working2: View {
 
             if e >= totalDuration {
                 t.invalidate()
+                coinsSoundPlayer.stop()
             }
         }
     }
@@ -815,9 +832,11 @@ struct Working2: View {
         isSessionPaused = true
         holdTimer?.invalidate()
         holdTimer = nil
+        effortfulSoundPlayer.stop()
         bigCoinTimer?.invalidate()
         middleCoinTimer?.invalidate()
         smallCoinTimer?.invalidate()
+        coinsSoundPlayer.stop()
         setRestTimer?.invalidate()
     }
 

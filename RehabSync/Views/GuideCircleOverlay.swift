@@ -9,6 +9,17 @@ import AVFoundation
 struct GuideCircleOverlay: View {
     let resourceName: String
     var videoGravity: AVLayerVideoGravity = .resizeAspectFill
+    /// 影片本體圓形的直徑，預設 400（外層三圈邊框會依這個值等比例往外撐，實際佔用空間是
+    /// `circleSize + 20`）。`Working12` 改傳 500（working12-database-port-plan.md 第 16 節），
+    /// 其餘呼叫端不傳這個參數，維持原本 400 不變。
+    var circleSize: CGFloat = 400
+    /// `false` 時「隱藏」按鈕點擊沒有反應，影片全程強制保持顯示＋播放——給 `Working12` 用，
+    /// 因為 reps 次數改由影片播放完成事件驅動後，隱藏會連帶讓底層 `AVPlayer` 被銷毀、次數卡住不動
+    /// （working12-database-port-plan.md 14.5）。其餘呼叫端不傳這個參數，行為完全不變。
+    var allowsHiding: Bool = true
+    /// 影片每播完一次（進入 3 秒暫停、準備重播的那一刻）就呼叫一次，預設不做事。
+    /// 給 `Working12` 用來把 reps 次數改成影片驅動（working12-database-port-plan.md 第 14 節）。
+    var onPlaybackCompleted: () -> Void = {}
 
     @State private var isVisible = true
 
@@ -16,17 +27,17 @@ struct GuideCircleOverlay: View {
         if isVisible {
             ZStack(alignment: .leading) {
                 VideoCircleToggleButton(systemName: "eye.slash.fill") {
-                    isVisible = false
+                    if allowsHiding { isVisible = false }
                 }
                 .offset(x: -55)
 
-                CircularLoopingVideo(resourceName: resourceName, videoGravity: videoGravity)
-                    .frame(width: 400, height: 400)
+                CircularLoopingVideo(resourceName: resourceName, videoGravity: videoGravity, onPlaybackCompleted: onPlaybackCompleted)
+                    .frame(width: circleSize, height: circleSize)
                     .background(Color.white)
                     .clipShape(Circle())
-                    .overlay(Circle().strokeBorder(Color.black, lineWidth: 2).frame(width: 404, height: 404))
-                    .overlay(Circle().strokeBorder(Color.white, lineWidth: 6).frame(width: 416, height: 416))
-                    .overlay(Circle().strokeBorder(Color.black, lineWidth: 2).frame(width: 420, height: 420))
+                    .overlay(Circle().strokeBorder(Color.black, lineWidth: 2).frame(width: circleSize + 4, height: circleSize + 4))
+                    .overlay(Circle().strokeBorder(Color.white, lineWidth: 6).frame(width: circleSize + 16, height: circleSize + 16))
+                    .overlay(Circle().strokeBorder(Color.black, lineWidth: 2).frame(width: circleSize + 20, height: circleSize + 20))
                     .shadow(color: .black.opacity(0.15), radius: 10, y: 4)
             }
         } else {
@@ -67,10 +78,11 @@ struct VideoCircleToggleButton: View {
 struct CircularLoopingVideo: View {
     let resourceName: String
     var videoGravity: AVLayerVideoGravity = .resizeAspectFill
+    var onPlaybackCompleted: () -> Void = {}
 
     var body: some View {
         if let url = Bundle.main.url(forResource: resourceName, withExtension: "mp4") {
-            CircularLoopingVideoPlayer(url: url, videoGravity: videoGravity)
+            CircularLoopingVideoPlayer(url: url, videoGravity: videoGravity, onPlaybackCompleted: onPlaybackCompleted)
         } else {
             Color.clear
         }
@@ -80,13 +92,14 @@ struct CircularLoopingVideo: View {
 struct CircularLoopingVideoPlayer: UIViewRepresentable {
     let url: URL
     let videoGravity: AVLayerVideoGravity
+    var onPlaybackCompleted: () -> Void = {}
 
     func makeUIView(context: Context) -> CircularLoopingVideoUIView {
-        CircularLoopingVideoUIView(url: url, videoGravity: videoGravity)
+        CircularLoopingVideoUIView(url: url, videoGravity: videoGravity, onPlaybackCompleted: onPlaybackCompleted)
     }
 
     func updateUIView(_ uiView: CircularLoopingVideoUIView, context: Context) {
-        uiView.update(url: url, videoGravity: videoGravity)
+        uiView.update(url: url, videoGravity: videoGravity, onPlaybackCompleted: onPlaybackCompleted)
     }
 }
 
@@ -99,12 +112,14 @@ final class CircularLoopingVideoUIView: UIView {
     private var currentURL: URL?
     private var endObserver: NSObjectProtocol?
     private var restartWorkItem: DispatchWorkItem?
+    private var onPlaybackCompleted: () -> Void
 
-    init(url: URL, videoGravity: AVLayerVideoGravity) {
+    init(url: URL, videoGravity: AVLayerVideoGravity, onPlaybackCompleted: @escaping () -> Void = {}) {
+        self.onPlaybackCompleted = onPlaybackCompleted
         super.init(frame: .zero)
         playerLayer.videoGravity = videoGravity
         layer.addSublayer(playerLayer)
-        update(url: url, videoGravity: videoGravity)
+        update(url: url, videoGravity: videoGravity, onPlaybackCompleted: onPlaybackCompleted)
     }
 
     required init?(coder: NSCoder) {
@@ -116,8 +131,9 @@ final class CircularLoopingVideoUIView: UIView {
         playerLayer.frame = bounds
     }
 
-    func update(url: URL, videoGravity: AVLayerVideoGravity) {
+    func update(url: URL, videoGravity: AVLayerVideoGravity, onPlaybackCompleted: @escaping () -> Void = {}) {
         playerLayer.videoGravity = videoGravity
+        self.onPlaybackCompleted = onPlaybackCompleted
         guard url != currentURL else { return }
         currentURL = url
         teardown()
@@ -133,6 +149,7 @@ final class CircularLoopingVideoUIView: UIView {
             object: item,
             queue: .main
         ) { [weak self] _ in
+            self?.onPlaybackCompleted()
             self?.scheduleRestart()
         }
 

@@ -118,6 +118,11 @@ struct Working12: View {
         pendingCoinCount = nil
     }
 
+    /// 動作品質評分暫時關閉（working12-database-port-plan.md 第 15 節）：`false` 時強制畫面停留在
+    /// 「站立」視覺狀態、`standingTimer` 不讀秒，不受真實 BLE `currentStepStatus` 影響；之後要恢復
+    /// 只需要把這個值改回 `true`，不需要另外復原程式碼。
+    private let isMovementQualityScoringEnabled = false
+
     @State private var standingElapsed: Double = 0
     @State private var standingTimer: Timer?
     /// 離開站立（開始上階）當下先依站立等待秒數評好分，暫存起來，
@@ -179,6 +184,7 @@ struct Working12: View {
     }
 
     private var stepStatusLabel: String {
+        guard isMovementQualityScoringEnabled else { return "站立" }
         switch btVM.currentStepStatus {
         case 0: return "站立"
         case 1: return "上階"
@@ -189,6 +195,7 @@ struct Working12: View {
 
     private var characterImageName: String {
         if showGiveFood { return "TakoyakiGiveFoodIcon" }
+        guard isMovementQualityScoringEnabled else { return "TakoyakiHelloIcon" }
         switch btVM.currentStepStatus {
         case 1, 2: return "TakoyakiMakeFoodIcon"
         default: return "TakoyakiHelloIcon"
@@ -209,6 +216,7 @@ struct Working12: View {
     }
 
     private func startStandingTimer() {
+        guard isMovementQualityScoringEnabled else { return }
         guard standingTimer == nil else { return }
         standingElapsed = 0
         standingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
@@ -637,7 +645,7 @@ struct Working12: View {
 
                     Text(stepStatusLabel)
                         .font(.system(size: 32, weight: .bold))
-                        .foregroundStyle(btVM.currentStepStatus == 1 || btVM.currentStepStatus == 2 ? .red : .black)
+                        .foregroundStyle(isMovementQualityScoringEnabled && (btVM.currentStepStatus == 1 || btVM.currentStepStatus == 2) ? .red : .black)
                         .minimumScaleFactor(0.3)
                         .lineLimit(1)
                         .padding(12)
@@ -647,9 +655,29 @@ struct Working12: View {
             .padding(24)
             .offset(x: 25, y: -100)
 
-            GuideCircleOverlay(resourceName: "12_\(side == 1 ? "right" : "left")_video", videoGravity: .resizeAspect)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-                .padding(.trailing, 24)
+            GuideCircleOverlay(
+                resourceName: "12_\(side == 1 ? "right" : "left")_video",
+                videoGravity: .resizeAspect,
+                circleSize: 500,
+                allowsHiding: false,
+                onPlaybackCompleted: {
+                    // reps 次數改由引導圈圈影片播放完成事件驅動，不再靠 BLE 動作偵測
+                    // （working12-database-port-plan.md 第 14 節）；guard 比照 12.6 節既有模式，
+                    // 擋掉組間休息／確認視窗顯示中／完成視窗顯示中這三種不該計次的狀態。
+                    guard !isSessionPaused, btVM.isRecording else { return }
+                    showGiveFood = true
+                    showReceive = true
+                    startFoodPulse()
+                    startCoinRain(count: 15)
+                    startScoreSequence(count: 15)
+                    advanceProgress(coinCount: 15)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + Self.giveFoodDuration) {
+                        showGiveFood = false
+                        showReceive = false
+                    }
+                }
+            )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
 
             if showSetRestPopup {
                 Color.black.opacity(0.3)
@@ -713,6 +741,7 @@ struct Working12: View {
         }
         .onChange(of: btVM.currentStepStatus) { oldValue, newValue in
             guard !isSessionPaused, btVM.isRecording else { return }
+            guard isMovementQualityScoringEnabled else { return }
             // 只有站立狀態才計時：一回到站立（含一開始拿到第一筆資料）就開始計時，
             // 上階／下階全程不計時，離開站立時停止並依累計秒數先評好分（存到 pendingCoinCount，
             // 這時角色圖示是 TakoyakiMakeFoodIcon「做食物中」），
@@ -730,18 +759,11 @@ struct Working12: View {
                 }
                 stopStandingTimer()
             }
-            if oldValue == 2 && newValue == 0, let coinCount = pendingCoinCount {
+            // reps 次數改由引導圈圈影片播放完成事件驅動（見上方 GuideCircleOverlay 的
+            // onPlaybackCompleted），這裡不再呼叫 advanceProgress／送餐視覺回饋，只維持
+            // pendingCoinCount 歸零，避免殘留到下一次循環（working12-database-port-plan.md 第 14 節）。
+            if oldValue == 2 && newValue == 0 {
                 pendingCoinCount = nil
-                showGiveFood = true
-                showReceive = true
-                startFoodPulse()
-                startCoinRain(count: coinCount)
-                startScoreSequence(count: coinCount)
-                advanceProgress(coinCount: coinCount)
-                DispatchQueue.main.asyncAfter(deadline: .now() + Self.giveFoodDuration) {
-                    showGiveFood = false
-                    showReceive = false
-                }
             }
         }
         .onChange(of: navigateToPostWorking12) { _, newValue in

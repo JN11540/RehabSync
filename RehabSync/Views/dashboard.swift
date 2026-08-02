@@ -315,6 +315,7 @@ private struct DashboardSettingsPanel: View {
     let onBluetoothBindingTap: () -> Void
 
     @State private var deviceVM = DeviceViewModel()
+    @State private var settingVM = SettingViewModel()
     @Environment(BluetoothViewModel.self) private var btVM
 
     /// `device` 表已經有 2 筆紀錄（不論目前是否有實際連線）就不能再綁新裝置，
@@ -349,11 +350,20 @@ private struct DashboardSettingsPanel: View {
                     .disabled(isMaxDevicesReached)
                     .opacity(isMaxDevicesReached ? 0.4 : 1)
                 }
+
+                VStack(alignment: .leading, spacing: 16) {
+                    DashboardSettingsSectionTitle(text: "軟體版本")
+
+                    Text(settingVM.softwareVersion)
+                        .font(.system(size: 16))
+                        .foregroundStyle(DashboardPalette.mutedText)
+                }
             }
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onAppear { settingVM.fetchSoftwareVersion() }
     }
 }
 
