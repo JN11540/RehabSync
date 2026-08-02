@@ -306,7 +306,7 @@ struct Working9: View {
         withAnimation(.easeOut(duration: 0.2)) {
             holdElapsed = 0
         }
-        if wasHolding {
+        if wasHolding && heldSeconds > 1 {
             showOutIcon = true
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.outIconDuration) {
                 showOutIcon = false

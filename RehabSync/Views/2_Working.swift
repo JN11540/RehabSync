@@ -131,6 +131,8 @@ struct Working2: View {
     @State private var effortfulSoundPlayer = SoundEffectPlayer(resourceName: "2_effortful_fishing")
     @State private var joyfulSoundPlayer = SoundEffectPlayer(resourceName: "2_joyful_fishing")
     @State private var coinsSoundPlayer = SoundEffectPlayer(resourceName: "coins")
+    // 金幣動畫開始時加播的鼓勵語音，沒有單一固定檔案，每次觸發從對應等級的 5 個檔案隨機挑一個（16.2）。
+    @State private var praiseSoundPlayer = SoundEffectPlayer()
 
     @State private var holdElapsed: Double = 0
     @State private var holdTimer: Timer?
@@ -236,6 +238,15 @@ struct Working2: View {
             case .small:  return 3
             case .middle: return 9
             case .big:    return 15
+            }
+        }
+
+        // 對應金幣動畫開始時加播的鼓勵語音檔名前綴，各有 5 個檔案（_1~_5），播放時隨機挑一個（16.1）。
+        var praiseSoundBaseName: String {
+            switch self {
+            case .small:  return "good"
+            case .middle: return "better"
+            case .big:    return "excellent"
             }
         }
     }
@@ -363,6 +374,11 @@ struct Working2: View {
         if !coinsSoundPlayer.isPlaying {
             coinsSoundPlayer.play(loop: true)
         }
+
+        // 金幣動畫開始的同一刻，依這次捕獲的金額等級隨機挑一句鼓勵語音播放一次；重疊時直接打斷
+        // 前一句、重新播放新的，不判斷是否已在播放（working2-database-port-plan.md 16.1／16.4）。
+        let praiseFile = "\(size.praiseSoundBaseName)_\(Int.random(in: 1...5))"
+        praiseSoundPlayer.play(resourceName: praiseFile, loop: false)
 
         switch size {
         case .big:    playCoinBurst(count: size.coinCount, elapsed: $bigCoinElapsed, timer: $bigCoinTimer)
