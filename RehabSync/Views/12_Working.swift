@@ -138,6 +138,9 @@ struct Working12: View {
     @State private var foodBrightness: Double = 0
     @State private var scoreElapsed: Double = -1
     @State private var scoreTimer: Timer?
+    // 錢錢動畫音效＋鼓勵語音，各自獨立實例，互不打斷（working12-database-port-plan.md 17.3）。
+    @State private var coinsSoundPlayer = SoundEffectPlayer(resourceName: "coins")
+    @State private var praiseSoundPlayer = SoundEffectPlayer()
     @State private var totalCoins = 0
     @State private var currentSet = 1
     @State private var currentRep = 0
@@ -273,6 +276,15 @@ struct Working12: View {
         }
     }
 
+    // 錢錢動畫開始時加播的鼓勵語音檔名前綴，各有 5 個檔案（_1~_5），播放時隨機挑一個（working12-database-port-plan.md 17.4）。
+    private func praiseSoundBaseName(forCoinCount coinCount: Int) -> String {
+        switch coinCount {
+        case 15: return "excellent"
+        case 9: return "better"
+        default: return "good"
+        }
+    }
+
     // 數字累加跟硬幣飛行動畫脫鉤，用自己的 Timer 依固定節奏（CoinBurstScoreLabel.stagger）逐一往上跳，
     // 確保無論硬幣數量多少，一定會完整跑完第一個數字到最後一個數字，不受拋物線飛行時間影響。
     private func startScoreSequence(count: Int) {
@@ -292,6 +304,7 @@ struct Working12: View {
             if e >= totalDuration {
                 t.invalidate()
                 scoreElapsed = -1
+                coinsSoundPlayer.stop()
             }
         }
     }
@@ -304,6 +317,7 @@ struct Working12: View {
         coinRainTimer = nil
         scoreTimer?.invalidate()
         scoreTimer = nil
+        coinsSoundPlayer.stop()
         setRestTimer?.invalidate()
         setRestTimer = nil
     }
@@ -670,6 +684,14 @@ struct Working12: View {
                     startFoodPulse()
                     startCoinRain(count: 15)
                     startScoreSequence(count: 15)
+                    // 錢錢動畫開始的同一刻：coins.mp3 已經在播放就不重新觸發，
+                    // 依這次金額等級隨機挑一句鼓勵語音播放一次、直接打斷前一句
+                    // （working12-database-port-plan.md 17.1／17.4／17.5）。
+                    if !coinsSoundPlayer.isPlaying {
+                        coinsSoundPlayer.play(loop: true)
+                    }
+                    let praiseFile = "\(praiseSoundBaseName(forCoinCount: 15))_\(Int.random(in: 1...5))"
+                    praiseSoundPlayer.play(resourceName: praiseFile, loop: false)
                     advanceProgress(coinCount: 15)
                     DispatchQueue.main.asyncAfter(deadline: .now() + Self.giveFoodDuration) {
                         showGiveFood = false

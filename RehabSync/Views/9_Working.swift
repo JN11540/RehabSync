@@ -122,7 +122,19 @@ struct Working9: View {
         holdTimer?.invalidate()
         holdTimer = nil
         holdElapsed = 0
+        readySoundPlayer.stop()
+        countdownSoundPlayer.stop()
     }
+
+    // 讀秒／放箭／開心瞬間／金幣四段音效，各自獨立實例，互不打斷（working9-database-port-plan.md 16.2）。
+    @State private var readySoundPlayer = SoundEffectPlayer(resourceName: "9_ready")
+    @State private var countdownSoundPlayer = SoundEffectPlayer(resourceName: "9_countdown")
+    @State private var releaseSoundPlayer = SoundEffectPlayer(resourceName: "9_release")
+    @State private var girlExcitedSoundPlayer = SoundEffectPlayer(resourceName: "9_girl_excited")
+    @State private var shiningChimesSoundPlayer = SoundEffectPlayer(resourceName: "shining-chimes")
+    @State private var coinsSoundPlayer = SoundEffectPlayer(resourceName: "coins")
+    // 金幣動畫開始時加播的鼓勵語音，沒有單一固定檔案，每次觸發從對應等級的 5 個檔案隨機挑一個（17.2）。
+    @State private var praiseSoundPlayer = SoundEffectPlayer()
 
     @State private var totalCoins = 0
     @State private var currentSet = 1
@@ -219,8 +231,12 @@ struct Working9: View {
         isSessionPaused = true
         holdTimer?.invalidate()
         holdTimer = nil
+        readySoundPlayer.stop()
+        countdownSoundPlayer.stop()
         scoreTimer?.invalidate()
         scoreTimer = nil
+        coinsSoundPlayer.stop()
+        shiningChimesSoundPlayer.stop()
         setRestTimer?.invalidate()
         setRestTimer = nil
     }
@@ -265,6 +281,15 @@ struct Working9: View {
         }
     }
 
+    // 金幣動畫開始時加播的鼓勵語音檔名前綴，各有 5 個檔案（_1~_5），播放時隨機挑一個（working9-database-port-plan.md 17.1）。
+    private func praiseSoundBaseName(forCoinCount coinCount: Int) -> String {
+        switch coinCount {
+        case 15: return "excellent"
+        case 9: return "better"
+        default: return "good"
+        }
+    }
+
     // 數字累加跟硬幣飛行動畫脫鉤，用自己的 Timer 依固定節奏（scoreStagger）逐一往上跳，
     // 確保無論硬幣數量多少，一定會完整跑完第一個數字到最後一個數字，不受 1 秒飛行時間限制。
     private func startScoreSequence(count: Int) {
@@ -284,12 +309,15 @@ struct Working9: View {
             if e >= totalDuration {
                 t.invalidate()
                 scoreElapsed = -1
+                coinsSoundPlayer.stop()
             }
         }
     }
 
     private func startHoldTimer() {
         guard holdTimer == nil else { return }
+        readySoundPlayer.play(loop: false)
+        countdownSoundPlayer.play(loop: true)
         holdTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
             guard holdElapsed < Self.holdDuration else { return }
             withAnimation(.linear(duration: 0.1)) {
@@ -303,11 +331,14 @@ struct Working9: View {
         let heldSeconds = holdElapsed
         holdTimer?.invalidate()
         holdTimer = nil
+        readySoundPlayer.stop()
+        countdownSoundPlayer.stop()
         withAnimation(.easeOut(duration: 0.2)) {
             holdElapsed = 0
         }
         if wasHolding && heldSeconds > 1 {
             showOutIcon = true
+            releaseSoundPlayer.play(loop: false)
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.outIconDuration) {
                 showOutIcon = false
             }
@@ -357,10 +388,19 @@ struct Working9: View {
             if let pulseTimes {
                 let pulseTotalDuration = Double(pulseTimes) * Self.pulseStepDuration * 2
                 DispatchQueue.main.asyncAfter(deadline: .now() + Self.outIconDuration) {
+                    // 開心瞬間動畫這段延遲觸發的排程沒有既有的取消機制，暫停／離開畫面後
+                    // 也會準時執行，加這個 guard 擋掉，避免使用者已經看不到畫面時忽然響起音效
+                    // （working9-database-port-plan.md 16.4）。
+                    guard !isSessionPaused else { return }
                     showHappyMoment = true
+                    girlExcitedSoundPlayer.play(loop: false)
+                    if !shiningChimesSoundPlayer.isPlaying {
+                        shiningChimesSoundPlayer.play(loop: true)
+                    }
                 }
                 DispatchQueue.main.asyncAfter(deadline: .now() + Self.outIconDuration + pulseTotalDuration) {
                     showHappyMoment = false
+                    shiningChimesSoundPlayer.stop()
                 }
 
                 var coinCount = 0
@@ -374,6 +414,9 @@ struct Working9: View {
 
                 let coinBurstDelay = Self.outIconDuration + pulseTotalDuration
                 DispatchQueue.main.asyncAfter(deadline: .now() + coinBurstDelay) {
+                    // 同上，金幣動畫這段延遲觸發也要擋掉暫停／離開畫面後才執行的情況
+                    // （working9-database-port-plan.md 16.4）。
+                    guard !isSessionPaused else { return }
                     coinBurstCount = coinCount
                     coinBurstProgress = 0
                     showCoinBurst = true
@@ -383,6 +426,13 @@ struct Working9: View {
                     DispatchQueue.main.asyncAfter(deadline: .now() + Self.coinBurstDuration) {
                         showCoinBurst = false
                     }
+                    if !coinsSoundPlayer.isPlaying {
+                        coinsSoundPlayer.play(loop: true)
+                    }
+                    // 依這次命中的金額等級隨機挑一句鼓勵語音播放一次；重疊時直接打斷前一句、
+                    // 重新播放新的，不判斷是否已在播放（working9-database-port-plan.md 17.1／17.4）。
+                    let praiseFile = "\(praiseSoundBaseName(forCoinCount: coinCount))_\(Int.random(in: 1...5))"
+                    praiseSoundPlayer.play(resourceName: praiseFile, loop: false)
                     startScoreSequence(count: coinCount)
                 }
             }
