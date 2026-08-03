@@ -450,8 +450,9 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             self.baselineResult = nil
             self.isCollectingBaseline = true
         }
+        let side = DeviceViewModel().fetchAnySide() ?? 0
         beginAccOnlyCollection(thighPeripheral: thighPeripheral, calfPeripheral: calfPeripheral, durationSec: durationSec) { [weak self] thighSamples, calfSamples in
-            let result = ACCCalibration.computeBaseline(thighSamples: thighSamples, calfSamples: calfSamples)
+            let result = ACCCalibration.computeBaseline(thighSamples: thighSamples, calfSamples: calfSamples, side: side)
             DispatchQueue.main.async {
                 self?.baselineResult = result
                 self?.isCollectingBaseline = false
@@ -474,6 +475,24 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     ) -> [(measured: Double, realAngle: Double)] {
         (0...maxStep).map { step in
             let measured = baseline + Double(step)
+            let realAngle = maxRealAngleDeg - Double(step) * (maxRealAngleDeg / Double(maxStep))
+            return (measured, realAngle)
+        }.sorted { $0.measured < $1.measured }
+    }
+
+    /// 對應 realtime_angle_mapping_right_v2.py 的 build_mapping_table:右膝坐姿版,跟左膝坐姿版
+    /// `baselineMappingTable` 的 realAngle-vs-step 公式相同,但右膝感測器安裝方向與左膝相反,
+    /// `measured` 隨 step 遞減(而非遞增),導致 `measured` 跟 `realAngle` 的關係左右膝相反:
+    /// 左膝是量測角度越大、真實角度越小;右膝反而是量測角度越大、真實角度也越大
+    /// (step=0 對應 baseline,realAngle=90;step=maxStep 對應 baseline-maxStep,realAngle=0)。
+    /// 呼叫端一樣要先把 `baseline` 換成 `baseline + liveShift` 再傳入,沿用 `baselineMappingTable` 的呼叫慣例。
+    /// 回傳依 `measured` 由小到大排序 —— 右膝 step 遞增時 measured 遞減,不排序會違反 `linearInterp`
+    /// 假設 xs 遞增的前提。
+    private static func baselineMappingTableRight(
+        baseline: Double, maxStep: Int, maxRealAngleDeg: Double
+    ) -> [(measured: Double, realAngle: Double)] {
+        (0...maxStep).map { step in
+            let measured = baseline - Double(step)
             let realAngle = maxRealAngleDeg - Double(step) * (maxRealAngleDeg / Double(maxStep))
             return (measured, realAngle)
         }.sorted { $0.measured < $1.measured }
@@ -565,8 +584,13 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             // 兩邊平移量一致，相對關係不變，藉此避免 baseline ~ baseline+maxStep 跨過 0 的歧義。
             switch posture {
             case .sitting:
-                liveShift = baseline < 0 ? (abs(baseline) + 15) : 0
-                liveBaselineTable = Self.baselineMappingTable(baseline: baseline + liveShift, maxStep: 70, maxRealAngleDeg: 90)
+                if side == 1 {
+                    liveShift = baseline > 0 ? -(baseline + 15) : 0
+                    liveBaselineTable = Self.baselineMappingTableRight(baseline: baseline + liveShift, maxStep: 70, maxRealAngleDeg: 90)
+                } else {
+                    liveShift = baseline < 0 ? (abs(baseline) + 15) : 0
+                    liveBaselineTable = Self.baselineMappingTable(baseline: baseline + liveShift, maxStep: 70, maxRealAngleDeg: 90)
+                }
             case .standing:
                 liveShift = baseline < 0 ? (abs(baseline) + 10) : 0
                 liveBaselineTable = Self.standingMappingTable(baseline: baseline + liveShift, maxStep: 55, maxRealAngleDeg: 90)

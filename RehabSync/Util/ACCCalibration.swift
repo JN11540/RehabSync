@@ -6,15 +6,19 @@ import Foundation
 ///   inclination_deg          → inclinationDeg(x:y:z:)
 ///   （逐列算 knee_angle 後依 timestamp 分組平均）→ smoothedIncline(_:)（大腿、小腿各呼叫一次）+ index 配對
 ///   detect_stable_segments   → detectStableSegments(tSec:angles:windowSec:stdThresholdDeg:minDurationSec:)
-///   detect_stable_plateau    → detectStablePlateau(tSec:angles:windowSec:stdThresholdDeg:minDurationSec:)
-///   robust_min_angle         → robustMinAngle(_:lowestFraction:)
-///   run_calibration          → computeBaseline(thighSamples:calfSamples:...)
+///   detect_stable_plateau    → detectStablePlateau(tSec:angles:side:windowSec:stdThresholdDeg:minDurationSec:)
+///   robust_min_angle         → robustExtremeAngle(_:side:lowestFraction:)
+///   run_calibration          → computeBaseline(thighSamples:calfSamples:side:...)
 ///
 /// 跟 calibration_phase.py 的兩個差異(對照設計文件):
 ///   1. 全程保留正負號,不做任何 abs() 正規化(跟原始 python 行為一致)。
 ///   2. 大腿、小腿是兩個獨立的 BLE 周邊,各自依自己的 timestamp 分組平均出
 ///      thighIncline／calfIncline 兩條獨立曲線,再用陣列 index(排序後第 i 筆對第 i 筆)相減
 ///      得到膝角,不是像 python 版那樣假設同一列 CSV 本來就同時間對齊好。
+///
+/// 右膝支援(對照 right-knee-sitting-realtime-angle-design.md):右膝感測器安裝方向與左膝相反,
+/// 「最伸直」對應的是角度最大而非最小,`side`(0=左、1=右)決定 detectStablePlateau/robustExtremeAngle
+/// 挑最大還是最小,跟全專案 side 慣例一致。
 enum ACCCalibration {
 
     // MARK: - Public
@@ -27,12 +31,14 @@ enum ACCCalibration {
     ///   - windowSec: 局部標準差滑動視窗長度(秒),預設 1.0。
     ///   - stdThresholdDeg: 局部標準差低於這個值才算「穩定」(度),預設 1.5。
     ///   - minDurationSec: 平台至少要維持這麼久(秒)才算數,預設 1.0。
-    ///   - fallbackLowestFraction: 完全偵測不到合格平台時,取角度最低的這個比例的點當備案,預設 0.2(20%)。
+    ///   - side: 0 = 左膝(取平台/角度最小、最伸直)、1 = 右膝(感測器安裝方向相反,取平台/角度最大、最伸直),預設 0。
+    ///   - fallbackLowestFraction: 完全偵測不到合格平台時,取角度最低(右膝則是最高)的這個比例的點當備案,預設 0.2(20%)。
     /// - Returns: baseline 角度(保留正負號,四捨五入到小數1位)。只有在大腿、小腿樣本配對後完全沒有
-    ///   任何資料點時回傳 nil；只要有資料,即使偵測不到穩定平台,也會透過 robustMinAngle 備案算出一個值。
+    ///   任何資料點時回傳 nil；只要有資料,即使偵測不到穩定平台,也會透過 robustExtremeAngle 備案算出一個值。
     static func computeBaseline(
         thighSamples: [(timestamp: Int64, x: Double, y: Double, z: Double)],
         calfSamples: [(timestamp: Int64, x: Double, y: Double, z: Double)],
+        side: Int = 0,
         windowSec: Double = 1.0,
         stdThresholdDeg: Double = 1.5,
         minDurationSec: Double = 1.0,
@@ -54,12 +60,12 @@ enum ACCCalibration {
 
         let baseline: Double
         if let plateau = detectStablePlateau(
-            tSec: tSecs, angles: kneeAngles,
+            tSec: tSecs, angles: kneeAngles, side: side,
             windowSec: windowSec, stdThresholdDeg: stdThresholdDeg, minDurationSec: minDurationSec
         ) {
             baseline = plateau.meanAngleDeg
         } else {
-            baseline = robustMinAngle(kneeAngles, lowestFraction: fallbackLowestFraction)
+            baseline = robustExtremeAngle(kneeAngles, side: side, lowestFraction: fallbackLowestFraction)
         }
 
         return (baseline * 10).rounded() / 10
@@ -155,10 +161,12 @@ enum ACCCalibration {
         return segments
     }
 
-    /// 對應 detect_stable_plateau：在所有合格平台中,挑「平均角度最小」(最伸直)的那一個。
+    /// 對應 detect_stable_plateau：在所有合格平台中,左膝(side==0)挑「平均角度最小」(最伸直)的那一個,
+    /// 右膝(side==1)感測器安裝方向相反,改挑「平均角度最大」(最伸直)的那一個。
     private static func detectStablePlateau(
         tSec: [Double],
         angles: [Double],
+        side: Int,
         windowSec: Double,
         stdThresholdDeg: Double,
         minDurationSec: Double
@@ -167,15 +175,20 @@ enum ACCCalibration {
             tSec: tSec, angles: angles,
             windowSec: windowSec, stdThresholdDeg: stdThresholdDeg, minDurationSec: minDurationSec
         )
-        return segments.min { $0.meanAngleDeg < $1.meanAngleDeg }
+        return side == 1
+            ? segments.max { $0.meanAngleDeg < $1.meanAngleDeg }
+            : segments.min { $0.meanAngleDeg < $1.meanAngleDeg }
     }
 
-    /// 對應 robust_min_angle：完全偵測不到合格平台時的備案,取角度最低的 lowestFraction 比例的點,回傳其平均值。
-    private static func robustMinAngle(_ angles: [Double], lowestFraction: Double) -> Double {
+    /// 對應 robust_min_angle(左膝)/右膝鏡射版：完全偵測不到合格平台時的備案,左膝(side==0)取角度最低的
+    /// lowestFraction 比例的點,右膝(side==1)取角度最高的一批點,回傳其平均值。
+    private static func robustExtremeAngle(_ angles: [Double], side: Int, lowestFraction: Double) -> Double {
         let n = angles.count
         let k = max(1, Int((Double(n) * lowestFraction).rounded(.up)))
-        let lowestK = angles.sorted().prefix(k)
-        return lowestK.reduce(0, +) / Double(lowestK.count)
+        let picked = side == 1
+            ? angles.sorted(by: >).prefix(k)
+            : angles.sorted().prefix(k)
+        return picked.reduce(0, +) / Double(picked.count)
     }
 
     // MARK: - Private：數學工具
