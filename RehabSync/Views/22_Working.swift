@@ -151,15 +151,26 @@ struct Working22: View {
         holdTimer?.invalidate()
         holdTimer = nil
         holdElapsed = 0
+        effortfulSoundPlayer.stop()
     }
 
     @State private var isSessionPaused = false
     @State private var showExitConfirmPopup = false
 
+    // 讀秒／燃料箱飛行／命中／錢錢動畫四段音效，各自獨立實例，互不打斷（working22-database-port-plan.md 13.2）。
+    @State private var effortfulSoundPlayer = SoundEffectPlayer(resourceName: "22_effortful")
+    @State private var swooshSoundPlayer = SoundEffectPlayer(resourceName: "22_swoosh")
+    @State private var hitSoundPlayer = SoundEffectPlayer(resourceName: "22_hit")
+    @State private var coinsSoundPlayer = SoundEffectPlayer(resourceName: "coins")
+    // 錢錢動畫開始時加播的鼓勵語音，沒有單一固定檔案，每次觸發從對應等級的 5 個檔案隨機挑一個（working22-database-port-plan.md 14.2）。
+    @State private var praiseSoundPlayer = SoundEffectPlayer()
+
     private func pauseSession() {
         isSessionPaused = true
         holdTimer?.invalidate()
+        effortfulSoundPlayer.stop()
         scoreTimer?.invalidate()
+        coinsSoundPlayer.stop()
         setTimeLimitTimer?.invalidate()
     }
 
@@ -241,6 +252,7 @@ struct Working22: View {
     // 造成的頓挫感，改成每禎微小增量、視覺上才會是真正連續的水位上升。
     private func startHoldTimer() {
         guard holdTimer == nil else { return }
+        effortfulSoundPlayer.play(loop: true)
         holdTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { _ in
             guard holdElapsed < Self.holdDuration else { return }
             holdElapsed = min(holdElapsed + 1.0 / 60.0, Self.holdDuration)
@@ -250,6 +262,7 @@ struct Working22: View {
     private func stopHoldTimer() {
         holdTimer?.invalidate()
         holdTimer = nil
+        effortfulSoundPlayer.stop()
     }
 
     // MARK: - 太空人狀態機（get 預設 → holding 深蹲維持 → release 放開瞬間）
@@ -308,6 +321,7 @@ struct Working22: View {
         fuelHideWorkItem?.cancel()
         fuelProgress = 0
         showFuelAnimation = true
+        swooshSoundPlayer.play(loop: false)
         withAnimation(.linear(duration: Self.releaseAnimationDuration)) {
             fuelProgress = 1
         }
@@ -373,6 +387,11 @@ struct Working22: View {
     /// 依序（一個接一個）從 coinStartPixel 拋物線飛到 coinEndPixel。
     private func triggerCoinBurst(count: Int, delay: Double) {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            // 這段延遲觸發的排程沒有既有的取消機制，暫停／離開畫面後也會準時執行，加這個 guard
+            // 擋掉，避免使用者已經看不到畫面時忽然響起音效（working22-database-port-plan.md 13.4）。
+            // 只檢查 isSessionPaused，不檢查 btVM.isRecording——如果這次命中是最後一組最後一次，
+            // advanceProgress() 已經讓 isRecording 變 false，檢查它會誤擋掉正常的最後一次獎勵。
+            guard !isSessionPaused else { return }
             coinBurstCount = count
             coinBurstProgress = 0
             showCoinBurst = true
@@ -382,6 +401,14 @@ struct Working22: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.coinBurstDuration) {
                 showCoinBurst = false
             }
+            hitSoundPlayer.play(loop: false)
+            if !coinsSoundPlayer.isPlaying {
+                coinsSoundPlayer.play(loop: true)
+            }
+            // 依這次命中的金額等級隨機挑一句鼓勵語音播放一次；重疊時直接打斷前一句、
+            // 重新播放新的，不判斷是否已在播放（working22-database-port-plan.md 14.1／14.4）。
+            let praiseFile = "\(praiseSoundBaseName(forCoinCount: count))_\(Int.random(in: 1...5))"
+            praiseSoundPlayer.play(resourceName: praiseFile, loop: false)
         }
     }
 
@@ -397,6 +424,9 @@ struct Working22: View {
     /// startScoreSequence 完全相同；totalCoins 也是在這裡（而不是 recordHoldResult）逐一 +100 累加。
     private func startScoreSequence(count: Int, delay: Double) {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            // 跟 triggerCoinBurst 是各自獨立排程的延遲呼叫，要各自補上同一個 guard，
+            // 理由同上（working22-database-port-plan.md 13.4）。
+            guard !isSessionPaused else { return }
             scoreTimer?.invalidate()
             let start = Date()
             scoreElapsed = 0
@@ -413,6 +443,7 @@ struct Working22: View {
                 if e >= totalDuration {
                     t.invalidate()
                     scoreElapsed = -1
+                    coinsSoundPlayer.stop()
                 }
             }
         }
@@ -471,6 +502,15 @@ struct Working22: View {
             coinCount = 3
         }
         return coinCount
+    }
+
+    // 錢錢動畫開始時加播的鼓勵語音檔名前綴，各有 5 個檔案（_1~_5），播放時隨機挑一個（working22-database-port-plan.md 14.1）。
+    private func praiseSoundBaseName(forCoinCount coinCount: Int) -> String {
+        switch coinCount {
+        case 15: return "excellent"
+        case 9: return "better"
+        default: return "good"
+        }
     }
 
     private func handleAngleChange(_ angle: Double?) {
