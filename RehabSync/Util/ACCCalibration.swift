@@ -163,6 +163,13 @@ enum ACCCalibration {
 
     /// 對應 detect_stable_plateau：在所有合格平台中,左膝(side==0)挑「平均角度最小」(最伸直)的那一個,
     /// 右膝(side==1)感測器安裝方向相反,改挑「平均角度最大」(最伸直)的那一個。
+    ///
+    /// 兩個分支都刻意寫成 `.min(by:)`(而不是右膝用 `.max(by:)`):`meanAngleDeg` 已四捨五入到
+    /// 小數 1 位,不同平台打平(tie)並非不可能。Python 的 `min()`/`max()` 打平時都固定回傳第一個
+    /// 遇到的,Swift 的 `min(by:)` 打平時同樣回傳第一個,但 `max(by:)` 官方文件記載打平時回傳
+    /// 最後一個,方向跟 Python 的 `max()` 不一致。右膝改用 `segments.min { $0.meanAngleDeg > $1.meanAngleDeg }`
+    /// (用反過來的比較方向做 min),數學上等於找最大值,且打平時保留第一個,跟 Python 行為一致,
+    /// 避免依賴 `.max(by:)` 打平時「回傳最後一個」這個容易被忽略的細節。
     private static func detectStablePlateau(
         tSec: [Double],
         angles: [Double],
@@ -176,7 +183,7 @@ enum ACCCalibration {
             windowSec: windowSec, stdThresholdDeg: stdThresholdDeg, minDurationSec: minDurationSec
         )
         return side == 1
-            ? segments.max { $0.meanAngleDeg < $1.meanAngleDeg }
+            ? segments.min { $0.meanAngleDeg > $1.meanAngleDeg }
             : segments.min { $0.meanAngleDeg < $1.meanAngleDeg }
     }
 
