@@ -515,6 +515,24 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         }.sorted { $0.measured < $1.measured }
     }
 
+    /// 對應 realtime_angle_mapping_right.py 的 build_mapping_table:右膝站姿版,跟左膝站姿版
+    /// `standingMappingTable` 的 realAngle-vs-step 公式相同,但右膝感測器安裝方向與左膝相反,
+    /// `measured` 隨 step 遞減(而非遞增),導致 `measured` 跟 `realAngle` 的關係左右膝相反:
+    /// 左膝是量測角度越大、真實角度也越大;右膝反而是量測角度越大、真實角度越小
+    /// (step=0 對應 baseline,realAngle=0;step=maxStep 對應 baseline-maxStep,realAngle=90)。
+    /// 呼叫端一樣要先把 `baseline` 換成 `baseline + liveShift` 再傳入,沿用 `standingMappingTable` 的呼叫慣例。
+    /// 回傳依 `measured` 由小到大排序 —— 右膝 step 遞增時 measured 遞減,不排序會違反 `linearInterp`
+    /// 假設 xs 遞增的前提。
+    private static func standingMappingTableRight(
+        baseline: Double, maxStep: Int, maxRealAngleDeg: Double
+    ) -> [(measured: Double, realAngle: Double)] {
+        (0...maxStep).map { step in
+            let measured = baseline - Double(step)
+            let realAngle = Double(step) * (maxRealAngleDeg / Double(maxStep))
+            return (measured, realAngle)
+        }.sorted { $0.measured < $1.measured }
+    }
+
     /// 對應 angle_to_real：線性內插，超出對應表範圍時常數外插（跟 np.interp 行為一致）
     private static func angleToReal(_ measuredDeg: Double, table: [(measured: Double, realAngle: Double)]) -> Double {
         linearInterp(measuredDeg, xs: table.map(\.measured), ys: table.map(\.realAngle))
@@ -592,8 +610,13 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
                     liveBaselineTable = Self.baselineMappingTable(baseline: baseline + liveShift, maxStep: 70, maxRealAngleDeg: 90)
                 }
             case .standing:
-                liveShift = baseline < 0 ? (abs(baseline) + 10) : 0
-                liveBaselineTable = Self.standingMappingTable(baseline: baseline + liveShift, maxStep: 55, maxRealAngleDeg: 90)
+                if side == 1 {
+                    liveShift = baseline > 0 ? -(baseline + 10) : 0
+                    liveBaselineTable = Self.standingMappingTableRight(baseline: baseline + liveShift, maxStep: 55, maxRealAngleDeg: 90)
+                } else {
+                    liveShift = baseline < 0 ? (abs(baseline) + 10) : 0
+                    liveBaselineTable = Self.standingMappingTable(baseline: baseline + liveShift, maxStep: 55, maxRealAngleDeg: 90)
+                }
             }
             liveEstimating = [thighId, calfId]
 
