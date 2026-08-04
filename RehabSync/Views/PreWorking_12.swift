@@ -623,7 +623,6 @@ private struct PreWorking12MotionTestAboutPanel: View {
     @State private var prepTimer: Timer?
 
     private var playButtonText: String {
-        if side == 1 { return "開發中" }
         switch prepPhase {
         case .idle: return "遊戲"
         case .counting(let remaining): return "清理中(\(remaining))"
@@ -726,7 +725,7 @@ private struct PreWorking12MotionTestAboutPanel: View {
             .fixedSize(horizontal: false, vertical: true)
 
             PreWorking12StepCapsuleButton(text: playButtonText, icon: "arrow.right", action: {
-                if side != 1 { startGamePreparation() }
+                startGamePreparation()
             })
 
             Spacer()
