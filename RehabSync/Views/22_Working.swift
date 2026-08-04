@@ -1,0 +1,1399 @@
+import SwiftUI
+import CoreBluetooth
+
+/// 弓步遊戲畫面（exercise_id 22）目前只做出「即時視覺回饋」的部分：
+/// 背景底層圖依 totalCoins 里程碑切換：< 2400 是 earth，>= 2400 換成 moon，>= 7500 換成
+/// new_world；astronaut_landing.png 固定疊在底層圖上方，不隨里程碑改變；space_shuttle 是
+/// 獨立的一層，不受背景切換影響；
+/// 前景太空人角度 < 70° 顯示 get.png，>= 70° 換成 holding.png（微微抖動，同時直式膠囊水位隨秒數上漲），
+/// 曾經達到 70° 後又回落到 < 25° 且讀秒超過 1 秒時，短暫換成 release.png（1.5 秒後切回預設），
+/// 同時 astronaut_fuel.png 從雙手位置飛進火箭燃料艙口（同樣 1.5 秒），燃料箱抵達的瞬間
+/// astronaut_space_shuttle.png 會連續放大＋變亮再變回原狀 3 次；不論是否達到 1 秒，
+/// 只要回落到 < 25° 直式膠囊水位都會歸零；讀秒不足 1 秒時不計入 currentRep／評語次數／金錢，
+/// 也不觸發 release/燃料箱/pulse/金錢動畫，讀秒門檻跟 9_Working.swift／2_Working.swift 一樣是
+/// 1/3/5 秒對應 好/棒/優、3/9/15 個 coin.png；燃料箱抵達的同時，3/9/15 個 coin.png 也各自
+/// 從固定起點拋物線飛到燃料艙口，並在右側依序顯示 +100/+200/... 累計金額（totalCoins 逐一累加）。
+/// 頂部矩形匡顯示目標組次數、實際組次數、好/棒/優各自次數、累積金錢；左側圓圈顯示即時角度數字；
+/// 太空梭右側另有一個總金幣直式膠囊（中心點固定在畫布座標 (620, 350)），只有 0／2400／7500
+/// 三個刻度，水位跟著 totalCoins 即時更新，也是背景里程碑判斷的同一個數字來源。
+/// treatment_result 記錄（建立／markSetStart／finishSet／advanceProgress／recordExtensionLength）
+/// 已依 working22-database-port-plan.md 批次 1 完成；3 分鐘組別倒數計時＋真正的組間休息
+/// （SetRestPopup／setRestTimer）已依批次 2 完成；結束鍵確認彈窗（ConfirmPopup）、暫停/繼續
+/// （cancelInProgressHoldWithoutCounting／isSessionPaused／pauseSession／resumeSession，
+/// .onChange 已守衛 !isSessionPaused && btVM.isRecording）已依批次 3 完成；正式完成視窗＋
+/// 儲存訓練結果（CompletionPopup，10 秒倒數／runExport）＋跳轉到新建立的 PostWorking_22.swift
+/// 已依批次 5 完成。working22-database-port-plan.md 規劃的 11 個階段全部完成。
+struct Working22: View {
+    let content: TreatmentContent
+    let exercise: Exercise?
+    let onReturnToDashboard: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(BluetoothViewModel.self) private var btVM
+
+    /// 裝置目前實際綁定在哪一側（左/右），給引導圈圈決定播放哪一支示範影片用。
+    private var side: Int {
+        DeviceViewModel().fetchAnySide() ?? 0
+    }
+
+    // 角度門檻判斷邏輯先註解掉，等後續確認實際規則後再打開。
+    // /// 太空人四個層級對應的角度區間（0°～90° 平均分成四段），
+    // /// 之後如果確認了實際的判斷規則（例如跟直式膠囊的握持門檻綁定），這裡要跟著調整。
+    // private static let angleTierBoundaries: [Double] = [22.5, 45, 67.5]
+    //
+    // private enum AstronautTier {
+    //     case earth, landing, spaceShuttle, get
+    // }
+    //
+    // private func astronautTier(for angle: Double?) -> AstronautTier {
+    //     guard let angle else { return .earth }
+    //     if angle < Self.angleTierBoundaries[0] { return .earth }
+    //     if angle < Self.angleTierBoundaries[1] { return .landing }
+    //     if angle < Self.angleTierBoundaries[2] { return .spaceShuttle }
+    //     return .get
+    // }
+
+    // 校正/測試階段在 PreWorking 啟動的即時角度預估，離開這裡時必須主動停止，
+    // 否則 btVM.isLiveEstimating 會卡在 true，導致下次（不管同動作或別的動作）
+    // 進測試頁時 guard 擋住重啟，畫面顯示殘留的舊角度或舊姿勢公式。
+    private var thighAndCalfPeripherals: (thigh: CBPeripheral, calf: CBPeripheral)? {
+        let dvm = DeviceViewModel()
+        guard let thigh = dvm.fetch(limb: 0), let thighUUID = UUID(uuidString: thigh.device_uuid),
+              let calf  = dvm.fetch(limb: 1), let calfUUID  = UUID(uuidString: calf.device_uuid),
+              let thighPeripheral = btVM.connectedPeripherals[thighUUID],
+              let calfPeripheral  = btVM.connectedPeripherals[calfUUID]
+        else { return nil }
+        return (thighPeripheral, calfPeripheral)
+    }
+
+    private func stopLiveTestIfNeeded() {
+        guard btVM.isLiveEstimating, let pair = thighAndCalfPeripherals else { return }
+        btVM.stopLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+    }
+
+    // MARK: - treatment_result 建立與串接（working22-database-port-plan.md 批次 1）
+
+    private let resultVM = TreatmentResultViewModel()
+    @State private var treatmentResult: TreatmentResult?
+    @State private var showCompletionPopup = false
+    @State private var navigateToPostWorking22 = false
+    @State private var finalElapsedSeconds = 0
+    @State private var sessionStartDate = Date()
+
+    /// 遊戲一開始（畫面顯示的那一刻）先建立這局遊戲唯一一筆 treatment_result，
+    /// 陣列長度依目標組數/目標次數計算、全部初始化為 0，再把 id 交給 btVM
+    /// 讓之後 acc/gyro/exg/advanced_statistics 每一筆寫入都能帶上這個 treatment_result_id。
+    /// 建立完成後緊接著視同第一組的起始點，開始記錄。
+    private func createTreatmentResultIfNeeded() {
+        guard treatmentResult == nil else { return }
+        var result = TreatmentResult(
+            treatment_id: content.treatment_id,
+            treatment_content_id: Int(content.id ?? 0),
+            reps: Array(repeating: 0, count: content.sets),
+            extension_length: Array(repeating: 0, count: content.sets * content.reps),
+            set_start_time: Array(repeating: 0, count: content.sets),
+            set_end_time: Array(repeating: 0, count: content.sets),
+            date: Int(Date().timeIntervalSince1970 * 1000)
+        )
+        resultVM.insert(&result)
+        treatmentResult = result
+        btVM.currentTreatmentResultId = result.id
+        markSetStart(index: 0)
+    }
+
+    /// 某一組的起始點：把當下毫秒時間戳記寫進 set_start_time[index]、打開 acc/gyro/exg 的記錄，
+    /// 並啟動這一組的 3 分鐘倒數上限。
+    private func markSetStart(index: Int) {
+        guard var result = treatmentResult, result.set_start_time.indices.contains(index) else { return }
+        result.set_start_time[index] = Int(Date().timeIntervalSince1970 * 1000)
+        treatmentResult = result
+        resultVM.update(result)
+        btVM.startRecordingAll()
+
+        let now = Date()
+        setCountdownRange = now...now.addingTimeInterval(Self.setTimeLimit)
+        setTimeLimitTimer?.invalidate()
+        setTimeLimitTimer = Timer.scheduledTimer(withTimeInterval: Self.setTimeLimit, repeats: false) { _ in
+            handleSetTimeLimitReached()
+        }
+    }
+
+    /// 某一組的結束點：停止 acc/gyro/exg 的記錄、取消該組的 3 分鐘倒數計時器，
+    /// 並把結束時間、實際完成次數一併寫回 treatment_result
+    /// （reps 達標時傳目標次數，提前結束時傳目前實際完成次數）。
+    private func finishSet(index: Int, reps: Int) {
+        guard var result = treatmentResult, result.set_end_time.indices.contains(index) else { return }
+        setTimeLimitTimer?.invalidate()
+        setTimeLimitTimer = nil
+        setCountdownRange = nil
+        btVM.stopRecordingAll()
+        result.set_end_time[index] = Int(Date().timeIntervalSince1970 * 1000)
+        result.reps[index] = reps
+        treatmentResult = result
+        resultVM.update(result)
+    }
+
+    /// 一次動作（讀秒超過 1 秒才算數）＝一次成功撐住，把讀秒時長（毫秒整數）寫進 extension_length
+    /// 對應索引（索引 = (組序號-1)*目標次數 + (該組內第幾次-1)）。
+    private func recordExtensionLength(seconds: Double, repNumberInSet: Int) {
+        guard var result = treatmentResult else { return }
+        let index = (currentSet - 1) * content.reps + (repNumberInSet - 1)
+        guard result.extension_length.indices.contains(index) else { return }
+        result.extension_length[index] = Int((seconds * 1000).rounded())
+        treatmentResult = result
+        resultVM.update(result)
+    }
+
+    // MARK: - 取消進行中讀秒／暫停繼續（working22-database-port-plan.md 批次 3）
+
+    /// 「提前結束觸發當下正卡在讀秒中」的邊界情況：直接取消，不計入 reps、也不寫入 extension_length。
+    private func cancelInProgressHoldWithoutCounting() {
+        holdTimer?.invalidate()
+        holdTimer = nil
+        holdElapsed = 0
+        effortfulSoundPlayer.stop()
+    }
+
+    @State private var isSessionPaused = false
+    @State private var showExitConfirmPopup = false
+
+    // 讀秒／燃料箱飛行／命中／錢錢動畫四段音效，各自獨立實例，互不打斷（working22-database-port-plan.md 13.2）。
+    @State private var effortfulSoundPlayer = SoundEffectPlayer(resourceName: "22_effortful")
+    @State private var swooshSoundPlayer = SoundEffectPlayer(resourceName: "22_swoosh")
+    @State private var hitSoundPlayer = SoundEffectPlayer(resourceName: "22_hit")
+    @State private var coinsSoundPlayer = SoundEffectPlayer(resourceName: "coins")
+    // 錢錢動畫開始時加播的鼓勵語音，沒有單一固定檔案，每次觸發從對應等級的 5 個檔案隨機挑一個（working22-database-port-plan.md 14.2）。
+    @State private var praiseSoundPlayer = SoundEffectPlayer()
+
+    private func pauseSession() {
+        isSessionPaused = true
+        holdTimer?.invalidate()
+        effortfulSoundPlayer.stop()
+        scoreTimer?.invalidate()
+        coinsSoundPlayer.stop()
+        setTimeLimitTimer?.invalidate()
+    }
+
+    private func resumeSession() {
+        isSessionPaused = false
+    }
+
+    // MARK: - 3 分鐘組別倒數計時（working22-database-port-plan.md 批次 2）
+
+    @State private var setTimeLimitTimer: Timer?
+    @State private var setCountdownRange: ClosedRange<Date>?
+    private static let setTimeLimit: TimeInterval = 180
+
+    /// 從起始點起算倒數 3 分鐘歸零，視同該組提前結束。
+    private func handleSetTimeLimitReached() {
+        cancelInProgressHoldWithoutCounting()
+        finishSet(index: currentSet - 1, reps: currentRep)
+        if currentSet < content.sets {
+            startSetRestCountdown()
+        } else {
+            showCompletionPopup = true
+        }
+    }
+
+    // MARK: - 組間休息（working22-database-port-plan.md 批次 2）
+
+    @State private var showSetRestPopup = false
+    @State private var setRestCountdown: Int = 0
+    @State private var setRestTimer: Timer?
+
+    /// 進入組間休息：取消進行中讀秒、設定倒數秒數、顯示休息彈窗，倒數到 0 呼叫 closeSetRestPopup()。
+    private func startSetRestCountdown() {
+        cancelInProgressHoldWithoutCounting()
+        setRestTimer?.invalidate()
+        setRestCountdown = content.set_rest_time
+        showSetRestPopup = true
+        setRestTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            setRestCountdown -= 1
+            if setRestCountdown <= 0 {
+                closeSetRestPopup()
+            }
+        }
+    }
+
+    /// 組間休息結束、下一組開始：取消休息計時器、遞增 currentSet、currentRep 歸零，
+    /// 再呼叫 markSetStart 開始記錄下一組。
+    private func closeSetRestPopup() {
+        setRestTimer?.invalidate()
+        setRestTimer = nil
+        showSetRestPopup = false
+        if currentSet < content.sets {
+            currentSet += 1
+        }
+        currentRep = 0
+        markSetStart(index: currentSet - 1)
+    }
+
+    /// 全流程唯一一處 currentRep 遞增，遞增後判斷這組是否達標，達標就呼叫 finishSet，
+    /// 再依還有沒有下一組分派組間休息或完成視窗。
+    private func advanceProgress() {
+        currentRep += 1
+        if currentRep >= content.reps {
+            finishSet(index: currentSet - 1, reps: content.reps)
+            if currentSet < content.sets {
+                startSetRestCountdown()
+            } else {
+                showCompletionPopup = true
+            }
+        }
+    }
+
+    // 直式膠囊水位：進入 holding 狀態時開始累加，離開 holding（不論回到 idle 或觸發 release）就停止累加；
+    // 觸發 release 時額外歸零，對應「直式膠囊水位要歸零」。
+    @State private var holdElapsed: Double = 0
+    @State private var holdTimer: Timer?
+    private static let holdDuration: Double = 5
+
+    // 用 60Hz 直接改數值（不包 withAnimation），避免每 0.1 秒重啟一次動畫曲線
+    // 造成的頓挫感，改成每禎微小增量、視覺上才會是真正連續的水位上升。
+    private func startHoldTimer() {
+        guard holdTimer == nil else { return }
+        effortfulSoundPlayer.play(loop: true)
+        holdTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { _ in
+            guard holdElapsed < Self.holdDuration else { return }
+            holdElapsed = min(holdElapsed + 1.0 / 60.0, Self.holdDuration)
+        }
+    }
+
+    private func stopHoldTimer() {
+        holdTimer?.invalidate()
+        holdTimer = nil
+        effortfulSoundPlayer.stop()
+    }
+
+    // MARK: - 太空人狀態機（get 預設 → holding 深蹲維持 → release 放開瞬間）
+
+    private enum AstronautState: Equatable {
+        case idle
+        case holding
+        case releasing
+    }
+
+    @State private var astronautState: AstronautState = .idle
+    @State private var hasReachedHoldThreshold = false
+    @State private var releaseWorkItem: DispatchWorkItem?
+    @State private var trembleTimer: Timer?
+    @State private var trembleOffset: CGSize = .zero
+
+    private static let holdAngleThreshold: Double = 70
+    private static let releaseAngleThreshold: Double = 25
+    private static let releaseAnimationDuration: Double = 1.5
+    // 讀秒（holdElapsed）要超過這個秒數，回落到 releaseAngleThreshold 以下才算一次有效的 release。
+    private static let holdQualifyDuration: Double = 1
+
+    // MARK: - 燃料箱飛行動畫（release 當下，astronaut_fuel.png 從雙手位置飛進火箭艙口）
+
+    // 這些滿版疊圖都用同樣的 canvas 尺寸與 padding(48) + scaledToFill 處理，
+    // 座標換算公式跟 9_Working.swift／2_Working.swift 的 overlayPosition 完全相同。
+    private static let overlayCanvasSize = CGSize(width: 1232, height: 864)
+    private static let fuelStartPixel = CGPoint(x: 360, y: 620)
+    private static let fuelEndPixel = CGPoint(x: 612, y: 514)
+
+    private static func overlayPosition(for fraction: CGPoint, in size: CGSize, padding: CGFloat = 48) -> CGPoint {
+        let frameW = size.width - padding * 2
+        let frameH = size.height - padding * 2
+        guard frameW > 0, frameH > 0 else { return CGPoint(x: size.width / 2, y: size.height / 2) }
+        let scale = max(frameW / overlayCanvasSize.width, frameH / overlayCanvasSize.height)
+        let visibleW = frameW / scale
+        let visibleH = frameH / scale
+        let cropX = (overlayCanvasSize.width - visibleW) / 2
+        let cropY = (overlayCanvasSize.height - visibleH) / 2
+        let relX = (fraction.x * overlayCanvasSize.width - cropX) / visibleW
+        let relY = (fraction.y * overlayCanvasSize.height - cropY) / visibleH
+        return CGPoint(x: padding + relX * frameW, y: padding + relY * frameH)
+    }
+
+    private static func canvasFraction(x: CGFloat, y: CGFloat) -> CGPoint {
+        CGPoint(x: x / overlayCanvasSize.width, y: y / overlayCanvasSize.height)
+    }
+
+    @State private var showFuelAnimation = false
+    @State private var fuelProgress: Double = 0
+    @State private var fuelHideWorkItem: DispatchWorkItem?
+
+    /// release 觸發的同時，讓 astronaut_fuel.png 在 releaseAnimationDuration 秒內
+    /// 從 fuelStartPixel（雙手位置）飛到 fuelEndPixel（火箭燃料艙口）。
+    private func triggerFuelFlight() {
+        fuelHideWorkItem?.cancel()
+        fuelProgress = 0
+        showFuelAnimation = true
+        swooshSoundPlayer.play(loop: false)
+        withAnimation(.linear(duration: Self.releaseAnimationDuration)) {
+            fuelProgress = 1
+        }
+        let workItem = DispatchWorkItem { showFuelAnimation = false }
+        fuelHideWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.releaseAnimationDuration, execute: workItem)
+    }
+
+    // MARK: - 火箭 pulse（燃料箱抵達後，astronaut_space_shuttle.png 放大＋變亮 3 次）
+
+    @State private var spaceShuttleScale: CGFloat = 1
+    @State private var spaceShuttleBrightness: Double = 0
+
+    private static let pulseStepDuration: Double = 0.3
+    private static let pulseScale: CGFloat = 1.15
+    private static let pulseBrightness: Double = 0.3
+
+    // 讓 space_shuttle 在 delay 之後（燃料箱剛好飛抵艙口那一刻）連續 pulse 幾次：
+    // 每次 pulse 都是「放大＋變亮」再「回到原狀」，用 asyncAfter 依序排時間，
+    // 寫法跟 9_Working.swift 的 startPulse 完全相同。
+    private func startSpaceShuttlePulse(times: Int, delay: Double) {
+        for i in 0..<times {
+            let upTime = delay + Double(i) * Self.pulseStepDuration * 2
+            let downTime = upTime + Self.pulseStepDuration
+            DispatchQueue.main.asyncAfter(deadline: .now() + upTime) {
+                withAnimation(.easeInOut(duration: Self.pulseStepDuration)) {
+                    spaceShuttleScale = Self.pulseScale
+                    spaceShuttleBrightness = Self.pulseBrightness
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + downTime) {
+                withAnimation(.easeInOut(duration: Self.pulseStepDuration)) {
+                    spaceShuttleScale = 1
+                    spaceShuttleBrightness = 0
+                }
+            }
+        }
+    }
+
+    // MARK: - 金錢拋物線動畫（跟 space_shuttle pulse 同時觸發，coin.png 一個一個從固定起點飛到燃料艙口）
+
+    private static let coinStartPixel = CGPoint(x: 864, y: 620)
+    private static let coinEndPixel = CGPoint(x: 612, y: 514)
+    private static let coinBurstDuration: Double = 1.0
+
+    // 總金幣直式膠囊（太空梭右側）的刻度：0／2400／7500，水位 = totalCoins / coinCapsuleMaxValue。
+    private static let coinCapsuleMaxValue: Double = 7500
+    private static let coinCapsuleMidValue: Double = 2400
+
+    // 背景依 totalCoins 里程碑切換底層圖（層級最低）：< 2400 是 earth，>= 2400 換成 moon，
+    // >= 7500 換成 new_world；astronaut_landing.png（層級第二低）維持疊在底層圖上方，不隨里程碑改變。
+    private var backgroundBaseImageName: String {
+        if Double(totalCoins) >= Self.coinCapsuleMaxValue { return "AstronautNewWorldIcon" }
+        if Double(totalCoins) >= Self.coinCapsuleMidValue { return "AstronautMoonIcon" }
+        return "AstronautEarthIcon"
+    }
+
+    @State private var showCoinBurst = false
+    @State private var coinBurstProgress: Double = 0
+    @State private var coinBurstCount = 0
+
+    /// delay 秒後（跟 startSpaceShuttlePulse 同一個時間點），讓 count 個 coin.png
+    /// 依序（一個接一個）從 coinStartPixel 拋物線飛到 coinEndPixel。
+    private func triggerCoinBurst(count: Int, delay: Double) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            // 這段延遲觸發的排程沒有既有的取消機制，暫停／離開畫面後也會準時執行，加這個 guard
+            // 擋掉，避免使用者已經看不到畫面時忽然響起音效（working22-database-port-plan.md 13.4）。
+            // 只檢查 isSessionPaused，不檢查 btVM.isRecording——如果這次命中是最後一組最後一次，
+            // advanceProgress() 已經讓 isRecording 變 false，檢查它會誤擋掉正常的最後一次獎勵。
+            guard !isSessionPaused else { return }
+            coinBurstCount = count
+            coinBurstProgress = 0
+            showCoinBurst = true
+            withAnimation(.linear(duration: Self.coinBurstDuration)) {
+                coinBurstProgress = 1
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.coinBurstDuration) {
+                showCoinBurst = false
+            }
+            hitSoundPlayer.play(loop: false)
+            if !coinsSoundPlayer.isPlaying {
+                coinsSoundPlayer.play(loop: true)
+            }
+            // 依這次命中的金額等級隨機挑一句鼓勵語音播放一次；重疊時直接打斷前一句、
+            // 重新播放新的，不判斷是否已在播放（working22-database-port-plan.md 14.1／14.4）。
+            let praiseFile = "\(praiseSoundBaseName(forCoinCount: count))_\(Int.random(in: 1...5))"
+            praiseSoundPlayer.play(resourceName: praiseFile, loop: false)
+        }
+    }
+
+    // MARK: - 右側金錢累計數字（跟 coin.png 抵達同步，+100 → +200 → +300...）
+
+    @State private var scoreElapsed: Double = -1
+    @State private var scoreTimer: Timer?
+    private static let scoreHoldAfterLast: Double = 0.6
+
+    /// delay 秒後（跟 triggerCoinBurst 同一個時間點）開始跑右側的「+100/+200/+300...」累計數字：
+    /// 數字累加跟硬幣飛行動畫脫鉤，用自己的 Timer 依固定節奏（CoinBurstScoreLabel.stagger）逐一往上跳，
+    /// 確保無論硬幣數量多少，一定會完整跑完第一個數字到最後一個數字，寫法跟 9_Working.swift 的
+    /// startScoreSequence 完全相同；totalCoins 也是在這裡（而不是 recordHoldResult）逐一 +100 累加。
+    private func startScoreSequence(count: Int, delay: Double) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            // 跟 triggerCoinBurst 是各自獨立排程的延遲呼叫，要各自補上同一個 guard，
+            // 理由同上（working22-database-port-plan.md 13.4）。
+            guard !isSessionPaused else { return }
+            scoreTimer?.invalidate()
+            let start = Date()
+            scoreElapsed = 0
+            var lastAppeared = 0
+            let totalDuration = Double(count) * CoinBurstScoreLabel.stagger + Self.scoreHoldAfterLast
+            scoreTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { t in
+                let e = Date().timeIntervalSince(start)
+                scoreElapsed = e
+                let currentAppeared = e >= 0 ? min(count, Int(e / CoinBurstScoreLabel.stagger) + 1) : 0
+                if currentAppeared > lastAppeared {
+                    totalCoins += (currentAppeared - lastAppeared) * 100
+                    lastAppeared = currentAppeared
+                }
+                if e >= totalDuration {
+                    t.invalidate()
+                    scoreElapsed = -1
+                    coinsSoundPlayer.stop()
+                }
+            }
+        }
+    }
+
+    /// 進入 holding 狀態時開始讓 astronaut_holding.png 的內容物持續微微抖動，
+    /// 用 Timer 每 0.08 秒隨機挑一個小幅偏移，模擬用力撐住時的顫抖感。
+    private func startTremble() {
+        guard trembleTimer == nil else { return }
+        trembleTimer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { _ in
+            withAnimation(.easeInOut(duration: 0.08)) {
+                trembleOffset = CGSize(width: CGFloat.random(in: -2...2), height: CGFloat.random(in: 1...4))
+            }
+        }
+    }
+
+    private func stopTremble() {
+        trembleTimer?.invalidate()
+        trembleTimer = nil
+        withAnimation(.easeOut(duration: 0.1)) {
+            trembleOffset = .zero
+        }
+    }
+
+    /// 顯示 astronaut_release.png 1.5 秒後，自動切回預設的 astronaut_get.png。
+    private func triggerReleaseAnimation() {
+        astronautState = .releasing
+        releaseWorkItem?.cancel()
+        let workItem = DispatchWorkItem { astronautState = .idle }
+        releaseWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.releaseAnimationDuration, execute: workItem)
+    }
+
+    // 目標組次數（content.sets/content.reps）之外，實際完成的組次數與各評語次數、累積金錢。
+    @State private var currentSet = 1
+    @State private var currentRep = 0
+    @State private var excellentCount = 0
+    @State private var goodCount = 0
+    @State private var okCount = 0
+    @State private var totalCoins = 0
+
+    // 評語對應的讀秒門檻跟 9_Working.swift／2_Working.swift 的 1/3/5 秒完全相同；回傳值
+    // 同時是 coin.png 拋物線動畫要飛幾個、右側「+100/+200/...」數字要跑幾個 stagger。
+    // totalCoins 不在這裡加，改成跟 9_Working.swift 一樣交給 startScoreSequence 逐一 +100 累加。
+    @discardableResult
+    private func recordHoldResult(heldSeconds: Double) -> Int {
+        let coinCount: Int
+        if heldSeconds >= 5 {
+            excellentCount += 1
+            coinCount = 15
+        } else if heldSeconds >= 3 {
+            goodCount += 1
+            coinCount = 9
+        } else {
+            okCount += 1
+            coinCount = 3
+        }
+        return coinCount
+    }
+
+    // 錢錢動畫開始時加播的鼓勵語音檔名前綴，各有 5 個檔案（_1~_5），播放時隨機挑一個（working22-database-port-plan.md 14.1）。
+    private func praiseSoundBaseName(forCoinCount coinCount: Int) -> String {
+        switch coinCount {
+        case 15: return "excellent"
+        case 9: return "better"
+        default: return "good"
+        }
+    }
+
+    private func handleAngleChange(_ angle: Double?) {
+        guard let angle else { return }
+        if angle >= Self.holdAngleThreshold {
+            hasReachedHoldThreshold = true
+            releaseWorkItem?.cancel()
+            astronautState = .holding
+            startTremble()
+            startHoldTimer()
+        } else if angle < Self.releaseAngleThreshold && hasReachedHoldThreshold {
+            hasReachedHoldThreshold = false
+            let heldSeconds = holdElapsed
+            let qualified = heldSeconds > Self.holdQualifyDuration
+            stopTremble()
+            stopHoldTimer()
+            withAnimation(.easeOut(duration: 0.2)) {
+                holdElapsed = 0
+            }
+            if qualified {
+                recordExtensionLength(seconds: heldSeconds, repNumberInSet: currentRep + 1)
+                let coinCount = recordHoldResult(heldSeconds: heldSeconds)
+                advanceProgress()
+                triggerReleaseAnimation()
+                triggerFuelFlight()
+                startSpaceShuttlePulse(times: 3, delay: Self.releaseAnimationDuration)
+                triggerCoinBurst(count: coinCount, delay: Self.releaseAnimationDuration)
+                startScoreSequence(count: coinCount, delay: Self.releaseAnimationDuration)
+            } else {
+                astronautState = .idle
+            }
+        } else if astronautState == .holding {
+            stopTremble()
+            stopHoldTimer()
+            astronautState = .idle
+        }
+    }
+
+    var body: some View {
+        ZStack(alignment: .bottomLeading) {
+            Color.white
+                .ignoresSafeArea()
+
+            // 背景：底層圖依 totalCoins 里程碑切換（< 2400 是 earth，>= 2400 換成 moon，
+            // >= 7500 換成 new_world），astronaut_landing.png 固定疊在底層圖上方，不隨里程碑改變。
+            ZStack {
+                Image(backgroundBaseImageName)
+                    .resizable()
+                    .scaledToFill()
+                    .opacity(0.4)
+                Image("AstronautLandingIcon")
+                    .resizable()
+                    .scaledToFill()
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding(48)
+            .allowsHitTesting(false)
+
+            // space_shuttle 獨立成一層（跟 9_Working.swift 的靶心疊圖同樣做法），
+            // 燃料箱抵達艙口後才能單獨對它 scaleEffect／brightness 做 pulse，不影響其他背景圖。
+            Image("AstronautSpaceShuttleIcon")
+                .resizable()
+                .scaledToFill()
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .scaleEffect(spaceShuttleScale)
+                .brightness(spaceShuttleBrightness)
+                .padding(48)
+                .allowsHitTesting(false)
+
+            // 前景太空人：角度 < 70° 顯示 astronaut_get.png；角度 >= 70° 換成 astronaut_holding.png 並持續微微抖動；
+            // 曾經達到 70° 之後又回落到 < 25° 時，短暫換成 astronaut_release.png（1.5 秒後自動切回預設）。
+            Group {
+                switch astronautState {
+                case .idle:
+                    Image("AstronautGetIcon")
+                        .resizable()
+                        .scaledToFill()
+                case .holding:
+                    Image("AstronautHoldingIcon")
+                        .resizable()
+                        .scaledToFill()
+                        .offset(trembleOffset)
+                case .releasing:
+                    Image("AstronautReleaseIcon")
+                        .resizable()
+                        .scaledToFill()
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding(48)
+            .allowsHitTesting(false)
+
+            if showFuelAnimation {
+                GeometryReader { geo in
+                    MovingFuelIcon(
+                        progress: fuelProgress,
+                        start: Self.overlayPosition(for: Self.canvasFraction(x: Self.fuelStartPixel.x, y: Self.fuelStartPixel.y), in: geo.size),
+                        end: Self.overlayPosition(for: Self.canvasFraction(x: Self.fuelEndPixel.x, y: Self.fuelEndPixel.y), in: geo.size),
+                        startSize: 450,
+                        endSize: 200
+                    )
+                }
+                .allowsHitTesting(false)
+            }
+
+            if showCoinBurst {
+                GeometryReader { geo in
+                    CoinFlightBurst(
+                        progress: coinBurstProgress,
+                        count: coinBurstCount,
+                        start: Self.overlayPosition(for: Self.canvasFraction(x: Self.coinStartPixel.x, y: Self.coinStartPixel.y), in: geo.size),
+                        end: Self.overlayPosition(for: Self.canvasFraction(x: Self.coinEndPixel.x, y: Self.coinEndPixel.y), in: geo.size)
+                    )
+                }
+                .allowsHitTesting(false)
+            }
+
+            if scoreElapsed >= 0 {
+                GeometryReader { geo in
+                    CoinBurstScoreLabel(
+                        elapsed: scoreElapsed,
+                        count: coinBurstCount,
+                        position: Self.overlayPosition(for: Self.canvasFraction(x: 950, y: 600), in: geo.size)
+                    )
+                }
+                .allowsHitTesting(false)
+            }
+
+            // 頂部矩形匡：跟 9_Working.swift 同樣的淺色矩形條 + 底下深色分隔線，
+            // 寬度對齊下方遊戲畫面（同樣 padding(.horizontal, 48) + padding(.top, 48)）。
+            VStack(spacing: 0) {
+                ZStack {
+                    Rectangle()
+                        .fill(Color(red: 0.72, green: 0.82, blue: 0.82))
+
+                    HStack(spacing: 12) {
+                        Button {
+                            showExitConfirmPopup = true
+                            pauseSession()
+                        } label: {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.white)
+                                Circle()
+                                    .strokeBorder(Color.black, lineWidth: 1.5)
+                                Circle()
+                                    .strokeBorder(Color.black, lineWidth: 1.5)
+                                    .padding(4)
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundStyle(.black)
+                            }
+                            .frame(width: 40, height: 40)
+                        }
+                        .buttonStyle(.plain)
+
+                        if let setCountdownRange {
+                            Text(timerInterval: setCountdownRange, countsDown: true)
+                                .font(.system(size: 24, weight: .bold, design: .monospaced))
+                                .foregroundStyle(.black)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 16)
+
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color(red: 1.0, green: 0.85, blue: 0.35))
+                            .overlay(
+                                HStack(spacing: 10) {
+                                    Rectangle()
+                                        .fill(Color.white.opacity(0.5))
+                                        .frame(width: 10, height: 80)
+                                        .rotationEffect(.degrees(20))
+                                        .offset(x: 6)
+                                    Rectangle()
+                                        .fill(Color.white.opacity(0.5))
+                                        .frame(width: 5, height: 80)
+                                        .rotationEffect(.degrees(20))
+                                }
+                            )
+                            .frame(width: 115, height: 40)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .stroke(Color(red: 0.70, green: 0.52, blue: 0.10), lineWidth: 3)
+                            )
+
+                        ZStack(alignment: .leading) {
+                            Image("CoinIcon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 48, height: 48)
+                                .offset(x: -16)
+
+                            Text("\(totalCoins)")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(Color(red: 0.70, green: 0.52, blue: 0.10))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.5)
+                                .frame(width: 115 - 38, height: 48)
+                                .offset(x: 38)
+                        }
+                        .frame(width: 115, height: 48)
+                        .offset(x: -24)
+                    }
+                    .frame(width: 115, height: 48)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.trailing, 16)
+
+                    HStack(spacing: 20) {
+                        HStack(spacing: 4) {
+                            Image("TargetIcon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 48, height: 48)
+                            Text("\(content.sets) 組 × \(content.reps) 次")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+
+                        Rectangle()
+                            .fill(Color(white: 0.35))
+                            .frame(width: 2, height: 40)
+
+                        HStack(spacing: 4) {
+                            Image("WeightliftingIcon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 48, height: 48)
+                            Text("第 \(currentSet) 組．第 \(currentRep) 次")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+
+                        Rectangle()
+                            .fill(Color(white: 0.35))
+                            .frame(width: 2, height: 40)
+
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color(red: 0.369, green: 0.690, blue: 0.824))
+                                .overlay(Circle().stroke(Color.black, lineWidth: 1.5))
+                                .frame(width: 40, height: 40)
+                                .overlay(Text("好").font(.system(size: 16, weight: .bold)).foregroundStyle(.white))
+                            Text("\(okCount)")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color(red: 0.910, green: 0.306, blue: 0.290))
+                                .overlay(Circle().stroke(Color.black, lineWidth: 1.5))
+                                .frame(width: 40, height: 40)
+                                .overlay(Text("棒").font(.system(size: 16, weight: .bold)).foregroundStyle(.white))
+                            Text("\(goodCount)")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color(red: 0.957, green: 0.871, blue: 0.235))
+                                .overlay(Circle().stroke(Color.black, lineWidth: 1.5))
+                                .frame(width: 40, height: 40)
+                                .overlay(Text("優").font(.system(size: 16, weight: .bold)).foregroundStyle(.black))
+                            Text("\(excellentCount)")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                }
+                .frame(height: 60)
+                Rectangle()
+                    .fill(Color(white: 0.35))
+                    .frame(height: 4)
+                    .offset(y: -5)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding(.horizontal, 48)
+            .padding(.top, 48)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+
+            VStack(spacing: 12) {
+                GeometryReader { geo in
+                    let h = geo.size.height
+
+                    ZStack {
+                        Capsule()
+                            .fill(Color(white: 0.35))
+                        Capsule()
+                            .fill(Color.white)
+                            .padding(3)
+                        Capsule()
+                            .strokeBorder(Color.black, lineWidth: 1.5)
+                            .padding(3)
+                        GeometryReader { fillGeo in
+                            ZStack(alignment: .bottom) {
+                                Capsule()
+                                    .fill(Color.blue)
+                                Rectangle()
+                                    .fill(Color.yellow)
+                                    .frame(height: fillGeo.size.height * CGFloat(holdElapsed / Self.holdDuration))
+                            }
+                            .clipShape(Capsule())
+                        }
+                        .padding(6)
+                        .clipShape(Capsule())
+                        Capsule()
+                            .strokeBorder(Color.black, lineWidth: 1.5)
+                            .padding(6)
+
+                        ForEach(1..<5) { i in
+                            Rectangle()
+                                .fill(Color.black)
+                                .frame(width: 28, height: 1.5)
+                                .position(x: 20, y: h * CGFloat(i) / 5)
+                        }
+
+                        Text("5")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(.black)
+                            .position(x: -20, y: 0)
+
+                        ForEach(1..<5) { i in
+                            Text("\(5 - i)")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(.black)
+                                .position(x: -20, y: h * CGFloat(i) / 5)
+                        }
+
+                        // 右側評語：讀秒 1/3/5 秒對應「好」／「棒」／「優」，跟頂部矩形匡同樣的圈圈樣式。
+                        Circle()
+                            .fill(Color(red: 0.369, green: 0.690, blue: 0.824))
+                            .overlay(Circle().stroke(Color.black, lineWidth: 1.5))
+                            .frame(width: 32, height: 32)
+                            .overlay(Text("好").font(.system(size: 14, weight: .bold)).foregroundStyle(.white))
+                            .position(x: 60, y: h * 4 / 5)
+                        Circle()
+                            .fill(Color(red: 0.910, green: 0.306, blue: 0.290))
+                            .overlay(Circle().stroke(Color.black, lineWidth: 1.5))
+                            .frame(width: 32, height: 32)
+                            .overlay(Text("棒").font(.system(size: 14, weight: .bold)).foregroundStyle(.white))
+                            .position(x: 60, y: h * 2 / 5)
+                        Circle()
+                            .fill(Color(red: 0.957, green: 0.871, blue: 0.235))
+                            .overlay(Circle().stroke(Color.black, lineWidth: 1.5))
+                            .frame(width: 32, height: 32)
+                            .overlay(Text("優").font(.system(size: 14, weight: .bold)).foregroundStyle(.black))
+                            .position(x: 60, y: 0)
+                    }
+                }
+                .frame(width: 40, height: 400)
+
+                ZStack {
+                    Circle()
+                        .fill(Color(white: 0.35))
+                    Circle()
+                        .fill(Color.white)
+                        .padding(4)
+                    Circle()
+                        .strokeBorder(Color.black, lineWidth: 1.5)
+                        .padding(4)
+
+                    if let angle = btVM.currentEstimatedRealAngle {
+                        Text(String(format: "%.0f°", angle))
+                            .font(.system(size: 50, weight: .bold))
+                            .foregroundStyle(.black)
+                            .minimumScaleFactor(0.3)
+                            .lineLimit(1)
+                            .padding(12)
+                    }
+                }
+                .frame(width: 130, height: 130)
+            }
+            .padding(24)
+            .offset(x: 25, y: -100)
+
+            // 總金幣直式膠囊（中心點對齊 space_shuttle 畫布座標 (620, 350)）：
+            // 只有 0／2400／7500 三個刻度，水位跟著 totalCoins 即時更新。
+            GeometryReader { geo in
+                let capsuleCenter = Self.overlayPosition(for: Self.canvasFraction(x: 620, y: 350), in: geo.size)
+
+                GeometryReader { innerGeo in
+                    let h = innerGeo.size.height
+                    let fillFraction = min(CGFloat(totalCoins) / CGFloat(Self.coinCapsuleMaxValue), 1)
+                    let midY = h * (1 - CGFloat(Self.coinCapsuleMidValue / Self.coinCapsuleMaxValue))
+
+                    ZStack {
+                        Capsule()
+                            .fill(Color(white: 0.35))
+                        Capsule()
+                            .fill(Color.white)
+                            .padding(3)
+                        Capsule()
+                            .strokeBorder(Color.black, lineWidth: 1.5)
+                            .padding(3)
+                        GeometryReader { fillGeo in
+                            ZStack(alignment: .bottom) {
+                                Capsule()
+                                    .fill(Color.blue)
+                                Rectangle()
+                                    .fill(Color.yellow)
+                                    .frame(height: fillGeo.size.height * fillFraction)
+                            }
+                            .clipShape(Capsule())
+                        }
+                        .padding(6)
+                        .clipShape(Capsule())
+                        Capsule()
+                            .strokeBorder(Color.black, lineWidth: 1.5)
+                            .padding(6)
+
+                        Rectangle()
+                            .fill(Color.black)
+                            .frame(width: 28, height: 1.5)
+                            .position(x: 20, y: midY)
+                    }
+                }
+                .frame(width: 40, height: 170)
+                .position(capsuleCenter)
+            }
+            .allowsHitTesting(false)
+
+            GuideCircleOverlay(resourceName: "22_\(side == 1 ? "right" : "left")_video")
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                .padding(.trailing, 24)
+
+            if showSetRestPopup {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+
+                SetRestPopup(secondsRemaining: setRestCountdown)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            }
+
+            if showExitConfirmPopup {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+
+                ConfirmPopup(
+                    message: "您確定要結束遊戲嗎？",
+                    onCancel: {
+                        showExitConfirmPopup = false
+                        resumeSession()
+                    },
+                    onConfirm: {
+                        showExitConfirmPopup = false
+                        cancelInProgressHoldWithoutCounting()
+                        finishSet(index: currentSet - 1, reps: currentRep)
+                        showCompletionPopup = true
+                    }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            }
+
+            if showCompletionPopup {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+
+                CompletionPopup(treatmentResult: treatmentResult, onComplete: {
+                    showCompletionPopup = false
+                    finalElapsedSeconds = Int(Date().timeIntervalSince(sessionStartDate))
+                    navigateToPostWorking22 = true
+                })
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            }
+        }
+        .fullScreenCover(isPresented: $navigateToPostWorking22) {
+            if let treatmentResult {
+                PostWorking_22(
+                    content: content,
+                    exercise: exercise,
+                    totalCoins: totalCoins,
+                    totalReps: excellentCount + goodCount + okCount,
+                    totalElapsedSeconds: finalElapsedSeconds,
+                    treatmentResult: treatmentResult,
+                    onReturnToDashboard: onReturnToDashboard
+                )
+            }
+        }
+        .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
+            guard !isSessionPaused, btVM.isRecording else { return }
+            handleAngleChange(newValue)
+        }
+        .onChange(of: navigateToPostWorking22) { _, newValue in
+            if newValue {
+                pauseSession()
+            }
+        }
+        .onAppear {
+            createTreatmentResultIfNeeded()
+        }
+        .onDisappear {
+            stopLiveTestIfNeeded()
+            trembleTimer?.invalidate()
+            holdTimer?.invalidate()
+            releaseWorkItem?.cancel()
+            fuelHideWorkItem?.cancel()
+            scoreTimer?.invalidate()
+            setTimeLimitTimer?.invalidate()
+            setCountdownRange = nil
+            setRestTimer?.invalidate()
+            pauseSession()
+            btVM.stopRecordingAll()
+            btVM.currentTreatmentResultId = nil
+        }
+    }
+}
+
+// MARK: - ConfirmPopup
+
+// 結束鍵確認彈窗，逐字比照 9_Working.swift／2_Working.swift 的 ConfirmPopup。
+private struct ConfirmPopup: View {
+    let message: String
+    let onCancel: () -> Void
+    let onConfirm: () -> Void
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            Color.white
+            Text(message)
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(.black)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            Button(action: onCancel) {
+                ZStack {
+                    Circle().fill(Color.white)
+                    Circle().strokeBorder(Color.black, lineWidth: 1.5)
+                    Circle().strokeBorder(Color.black, lineWidth: 1.5).padding(4)
+                    Image(systemName: "xmark").font(.system(size: 16, weight: .bold)).foregroundStyle(.black)
+                }
+                .frame(width: 36, height: 36)
+            }
+            .buttonStyle(.plain)
+            .padding(8)
+            Button(action: onConfirm) {
+                Text("確定")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color.white)
+                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.black, lineWidth: 1.5))
+                    )
+            }
+            .buttonStyle(.plain)
+            .padding(12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+        }
+        .frame(width: 320, height: 220)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black, lineWidth: 1.5))
+    }
+}
+
+// MARK: - SetRestPopup
+
+// 組間休息倒數彈窗，逐字比照 9_Working.swift／2_Working.swift 的 SetRestPopup。
+private struct SetRestPopup: View {
+    let secondsRemaining: Int
+
+    var body: some View {
+        ZStack {
+            Color.white
+
+            VStack(spacing: 24) {
+                Text("組間休息時間")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(.black)
+
+                ZStack {
+                    Circle()
+                        .fill(Color.white)
+                    Circle()
+                        .strokeBorder(Color.black, lineWidth: 1.5)
+                    Text("\(max(secondsRemaining, 0))")
+                        .font(.system(size: 32, weight: .bold))
+                        .foregroundStyle(.black)
+                        .minimumScaleFactor(0.5)
+                        .lineLimit(1)
+                        .padding(8)
+                }
+                .frame(width: 90, height: 90)
+            }
+        }
+        .frame(width: 320, height: 220)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.black, lineWidth: 1.5)
+        )
+    }
+}
+
+// MARK: - CompletionPopup
+
+// 逐字比照 9_Working.swift／2_Working.swift／12_Working.swift 目前最新版的 CompletionPopup：
+// 10 秒倒數，前 5 秒純粹是寫入緩衝，倒數到剛好顯示「儲存訓練結果(5)」那一次遞減才真正呼叫 runExport()，
+// 沒有分享面板，「完成」按鈕只看背景寫檔是否已經跑完（.done）才會解鎖。沒有 astronaut 主題的
+// 「結束」美術素材，改用已確認存在的 astronaut_get.png 代替 ArrowTheEndIcon/FishingEndIcon。
+private struct CompletionPopup: View {
+    let treatmentResult: TreatmentResult?
+    let onComplete: () -> Void
+
+    private enum ExportPhase: Equatable {
+        case ready
+        case counting(secondsRemaining: Int)
+        case waiting
+        case done
+    }
+
+    @State private var phase: ExportPhase = .ready
+    @State private var countdownTimer: Timer?
+
+    private var exportButtonTitle: String {
+        switch phase {
+        case .ready, .done: return "儲存訓練結果"
+        case .counting(let remaining): return "儲存訓練結果(\(remaining))"
+        case .waiting: return "再等待一下..."
+        }
+    }
+
+    private var isExportButtonEnabled: Bool {
+        switch phase {
+        case .ready, .done: return true
+        case .counting, .waiting: return false
+        }
+    }
+
+    private var isCompleteButtonEnabled: Bool {
+        phase == .done
+    }
+
+    private func performExport() {
+        guard phase == .ready || phase == .done else { return }
+        phase = .counting(secondsRemaining: 10)
+        countdownTimer?.invalidate()
+        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
+            switch phase {
+            case .counting(let remaining) where remaining > 0:
+                let next = remaining - 1
+                phase = .counting(secondsRemaining: next)
+                if next == 5 { runExport() }
+            case .counting:
+                phase = .waiting
+            case .waiting:
+                break
+            case .ready, .done:
+                timer.invalidate()
+                countdownTimer = nil
+            }
+        }
+    }
+
+    private func runExport() {
+        guard let treatmentResult else { return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let deviceVM = DeviceViewModel()
+            let files = GameDataExporter.export(treatmentResult: treatmentResult, deviceVM: deviceVM)
+            if let folderURL = ExportDestinationStore.resolveDesignatedFolder(),
+               folderURL.startAccessingSecurityScopedResource() {
+                for file in files {
+                    let url = folderURL.appendingPathComponent(file.filename)
+                    try? file.content.write(to: url, atomically: true, encoding: .utf8)
+                }
+                folderURL.stopAccessingSecurityScopedResource()
+            }
+            DispatchQueue.main.async {
+                phase = .done
+            }
+        }
+    }
+
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            VStack(spacing: 0) {
+                ZStack(alignment: .top) {
+                    Color.white
+                    Image("AstronautTheEndIcon")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 400, height: 400)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 344)
+                .clipped()
+
+                Color(red: 0.86, green: 0.90, blue: 0.94)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+            }
+
+            HStack(spacing: 12) {
+                if phase != .done {
+                    Button(action: performExport) {
+                        Text(exportButtonTitle)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(Color.white)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .stroke(Color.black, lineWidth: 1.5)
+                                    )
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!isExportButtonEnabled)
+                    .opacity(isExportButtonEnabled ? 1 : 0.5)
+                }
+
+                Button(action: onComplete) {
+                    Text("完成")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.white)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(Color.black, lineWidth: 1.5)
+                                )
+                        )
+                }
+                .buttonStyle(.plain)
+                .disabled(!isCompleteButtonEnabled)
+                .opacity(isCompleteButtonEnabled ? 1 : 0.5)
+            }
+            .padding(12)
+        }
+        .frame(width: 520, height: 400)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.black, lineWidth: 1.5)
+        )
+        .onDisappear {
+            countdownTimer?.invalidate()
+            countdownTimer = nil
+        }
+    }
+}
+
+// MARK: - MovingFuelIcon
+
+// 讓燃料箱從起點直線飛向終點：progress 是唯一會被 SwiftUI 動畫插值的值，
+// x/y 在每個插值後的 progress 當下重新計算，才能跟著 withAnimation 平滑移動
+// （寫法跟 9_Working.swift 的 MovingArrow 完全相同）。
+private struct MovingFuelIcon: View, Animatable {
+    var progress: Double
+    let start: CGPoint
+    let end: CGPoint
+    let startSize: CGFloat
+    let endSize: CGFloat
+
+    var animatableData: Double {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    var body: some View {
+        let x = start.x + (end.x - start.x) * progress
+        let y = start.y + (end.y - start.y) * progress
+        let size = startSize + (endSize - startSize) * progress
+        Image("AstronautFuelIcon")
+            .resizable()
+            .scaledToFit()
+            .frame(width: size, height: size)
+            .position(x: x, y: y)
+    }
+}
+
+// MARK: - CoinFlightBurst
+
+// count 個 coin.png 從同一個固定起點依序（stagger）出發，各自沿拋物線飛向同一個終點後消失；
+// 全部硬幣共用同一個 0→1 的 progress（由外部 withAnimation 在 coinBurstDuration 秒內跑完），
+// 每顆硬幣依自己的出發時間換算出區間內的 localT，寫法跟 9_Working.swift 的 CoinConvergeBurst 相同，
+// 差別只在起點是同一個固定座標，不是繞著終點隨機散開。
+private struct CoinFlightBurst: View, Animatable {
+    var progress: Double
+    let count: Int
+    let start: CGPoint
+    let end: CGPoint
+
+    var animatableData: Double {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    private static let flightFraction = 0.5
+    private static let arcHeight: CGFloat = 40
+    private static let coinSize: CGFloat = 40
+
+    var body: some View {
+        let staggerFraction = count > 1 ? (1 - Self.flightFraction) / Double(count - 1) : 0
+
+        ZStack {
+            ForEach(0..<count, id: \.self) { i in
+                let startFraction = Double(i) * staggerFraction
+                let localT = min(max((progress - startFraction) / Self.flightFraction, 0), 1)
+
+                if progress >= startFraction && localT < 1 {
+                    let t = CGFloat(localT)
+                    let x = start.x + (end.x - start.x) * t
+                    let y = start.y + (end.y - start.y) * t - Self.arcHeight * 4 * t * (1 - t)
+
+                    Image("CoinIcon")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: Self.coinSize, height: Self.coinSize)
+                        .position(x: x, y: y)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - CoinBurstScoreLabel
+
+// 累計金額顯示完全參考 9_Working.swift 的 CoinBurstScoreLabel：黑色描邊 + 金黃色文字，
+// 用自己的 elapsed（由 Timer 驅動，見 Working22.startScoreSequence）逐一往上跳
+// （+100 → +200 → +300...），跟硬幣飛行動畫的 1 秒視覺效果脫鉤，確保無論硬幣數量多少
+// 都能完整跑完全部數字。
+private struct CoinBurstScoreLabel: View {
+    let elapsed: Double
+    let count: Int
+    let position: CGPoint
+
+    fileprivate static let stagger = 0.2
+    private static let pulseDuration = 0.15
+    private static let baseFontSize: CGFloat = 100
+
+    var body: some View {
+        let appearedCount = elapsed >= 0 ? min(count, Int(elapsed / Self.stagger) + 1) : 0
+        if appearedCount > 0 {
+            let label = "+\(appearedCount * 100)"
+            let lastSpawnTime = Double(appearedCount - 1) * Self.stagger
+            let timeSincePulse = elapsed - lastSpawnTime
+            let pulseProgress = min(max(timeSincePulse / Self.pulseDuration, 0), 1)
+            let pulseFactor = sin(pulseProgress * .pi)
+            let fontSize = Self.baseFontSize + 20 * CGFloat(pulseFactor)
+            let outlineOffsets: [CGSize] = [
+                CGSize(width: -2, height: -2), CGSize(width: 2, height: -2),
+                CGSize(width: -2, height: 2), CGSize(width: 2, height: 2)
+            ]
+            ZStack {
+                ForEach(0..<outlineOffsets.count, id: \.self) { i in
+                    Text(label)
+                        .font(.system(size: fontSize, weight: .bold))
+                        .foregroundStyle(Color(red: 0.93, green: 0.75, blue: 0.22))
+                        .offset(outlineOffsets[i])
+                }
+                Text(label)
+                    .font(.system(size: fontSize, weight: .bold))
+                    .foregroundStyle(Color(red: 0.933, green: 0.933, blue: 0.0))
+            }
+            .position(position)
+        }
+    }
+}
+
+#Preview {
+    Working22(
+        content: TreatmentContent(
+            treatment_id: 1, exercise_id: 22,
+            sets: 2, set_rest_time: 10,
+            reps: 2,
+            date: Int(Date().timeIntervalSince1970)
+        ),
+        exercise: nil,
+        onReturnToDashboard: {}
+    )
+    .environment(BluetoothViewModel())
+}

@@ -42,8 +42,10 @@ func createAppDatabase() throws -> DatabaseQueue {
                 .references("treatment", onDelete: .cascade)
             t.column("treatment_content_id", .integer).notNull()
                 .references("treatment_content", onDelete: .cascade)
-            t.column("reps", .integer).notNull()
-            t.column("total_time", .integer).notNull()
+            t.column("reps", .text).notNull()
+            t.column("extension_length", .text).notNull()
+            t.column("set_start_time", .text).notNull()
+            t.column("set_end_time", .text).notNull()
             t.column("date", .integer).notNull()
         }
     }
@@ -105,6 +107,7 @@ func createAppDatabase() throws -> DatabaseQueue {
     migrator.registerMigration("v6") { db in
         try db.create(table: "acc") { t in
             t.autoIncrementedPrimaryKey("id")
+            t.column("treatment_result_id", .integer)
             t.column("device_id",  .integer).notNull().references("device", onDelete: .cascade)
             t.column("timestamp", .integer).notNull()
             t.column("x",         .double).notNull()
@@ -113,6 +116,7 @@ func createAppDatabase() throws -> DatabaseQueue {
         }
         try db.create(table: "gyro") { t in
             t.autoIncrementedPrimaryKey("id")
+            t.column("treatment_result_id", .integer)
             t.column("device_id",  .integer).notNull().references("device", onDelete: .cascade)
             t.column("timestamp", .integer).notNull()
             t.column("pitch",     .double).notNull()
@@ -121,10 +125,44 @@ func createAppDatabase() throws -> DatabaseQueue {
         }
         try db.create(table: "exg") { t in
             t.autoIncrementedPrimaryKey("id")
+            t.column("treatment_result_id", .integer)
             t.column("device_id", .integer).notNull().references("device", onDelete: .cascade)
             t.column("timestamp", .integer).notNull()
             t.column("channel",   .integer).notNull()
             t.column("value",     .integer).notNull()
+        }
+    }
+
+    migrator.registerMigration("v7") { db in
+        try db.alter(table: "device") { t in
+            t.add(column: "side", .integer).notNull().defaults(to: 0)
+        }
+    }
+
+    migrator.registerMigration("v8") { db in
+        try db.create(table: "advanced_statistics") { t in
+            t.autoIncrementedPrimaryKey("id")
+            t.column("treatment_result_id", .integer)
+            t.column("timestamp", .integer).notNull()
+            t.column("angle",     .double).notNull()
+            t.column("emg",       .double)
+        }
+    }
+
+    // 匯出功能專用查詢（GameDataExporter.export）原本是全表掃描，這幾張表的清理門檻高達
+    // 1,728 萬筆（見 DeviceViewModel.swift 的 shouldCleanAcc/Gyro/Exg），全表掃描會很慢。
+    migrator.registerMigration("v9") { db in
+        try db.create(index: "idx_acc_treatment_result_id", on: "acc", columns: ["treatment_result_id"])
+        try db.create(index: "idx_gyro_treatment_result_id", on: "gyro", columns: ["treatment_result_id"])
+        try db.create(index: "idx_exg_treatment_result_id_device_id_channel", on: "exg", columns: ["treatment_result_id", "device_id", "channel"])
+        try db.create(index: "idx_advanced_statistics_treatment_result_id", on: "advanced_statistics", columns: ["treatment_result_id"])
+    }
+
+    // A2（Enable EXG RAW DATA short package）：實測發現裝置必須收到這道指令（就算內容是全 0）
+    // 才會真正套用 A0 設定的取樣率，否則會停留在異常的慢速狀態（見 game-data-flow.md 2.1 節）。
+    migrator.registerMigration("v10") { db in
+        try db.alter(table: "bluetooth") { t in
+            t.add(column: "cmd_a2", .blob).notNull().defaults(to: Data([0xA2, 0x00]))
         }
     }
 

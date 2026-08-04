@@ -19,6 +19,11 @@ class ExerciseViewModel {
         }
     }
 
+    func imageName(forExerciseId id: Int64?) -> String? {
+        guard let id else { return nil }
+        return "Exercise\(id)"
+    }
+
     func insert(_ exercise: inout Exercise) {
         try? db.write { db in
             try exercise.insert(db)

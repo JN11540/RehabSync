@@ -209,9 +209,11 @@ struct Working: View {
                 var result = TreatmentResult(
                     treatment_id: content.treatment_id,
                     treatment_content_id: Int(content.id ?? 0),
-                    reps: content.sets * content.reps,
-                    total_time: state.totalElapsed,
-                    date: Int(Date().timeIntervalSince1970)
+                    reps: [content.sets * content.reps],
+                    extension_length: [],
+                    set_start_time: [],
+                    set_end_time: [],
+                    date: Int(Date().timeIntervalSince1970 * 1000)
                 )
                 resultVM.insert(&result)
                 selectionState.userSelectedContentId = nil
