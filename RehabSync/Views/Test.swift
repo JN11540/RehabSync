@@ -9,6 +9,7 @@ import AVFoundation
 struct TestPage: View {
     let btVM: BluetoothViewModel
 
+    @Environment(\.goHome) private var goHome
     @State private var treatmentResultIdInput: String = ""
     @State private var debugAccRows: [Acc] = []
     @State private var debugGyroRows: [Gyro] = []
@@ -69,6 +70,26 @@ struct TestPage: View {
     var body: some View {
         ZStack {
             Color(red: 0.96, green: 0.94, blue: 0.91).ignoresSafeArea()
+
+            Button(action: goHome) {
+                HStack(spacing: 6) {
+                    Image(systemName: "chevron.left")
+                    Text("返回總覽")
+                }
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.black)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(Color.white)
+                .clipShape(Capsule())
+                .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 16)
+            .padding(.leading, 24)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .zIndex(1)
+
             VStack(spacing: 16) {
                 HStack {
                     Spacer()
