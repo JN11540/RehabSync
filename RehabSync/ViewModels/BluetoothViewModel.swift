@@ -16,6 +16,17 @@ struct DiscoveredDevice: Identifiable {
     let rssi: Int
 }
 
+struct EXGSample: Identifiable {
+    let id = UUID()
+    let timestamp: Int64   // 合成時間戳（毫秒），依 sampleRate 從封包到達時間往回推算
+    let value: Int
+}
+
+struct EXGChannelStatus {
+    var recentSamples: [EXGSample] = []   // 依時間先後排序，只保留過去 10 秒
+    var droppedPacketCount: Int = 0
+}
+
 @Observable
 final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     private var central: CBCentralManager!
@@ -64,6 +75,12 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     // EXG 封包遺失排查用（#if DEBUG）：記錄每個 device+channel 上一次收到的 Serial No／時間，
     // 藉此分辨「裝置端真的沒送那麼快」還是「app 這邊漏收了封包」。
     @ObservationIgnored private var exgPacketTracker: [String: (serial: UInt8, timestamp: Int64)] = [:]
+
+    // 即時 EXG 4 通道監控（Release 也要能用，跟上面 debug-only 的 exgPacketTracker 各自獨立）— UI state (main thread)
+    // key 格式："\(deviceId)-\(channel)"，channel 0/1 對應 flag 0xE0/0xE1。
+    var exgChannelStatus: [String: EXGChannelStatus] = [:]
+    // internal (bleQueue)：只記最新一筆 Serial No，用來算掉包數，不需要被畫面觀察。
+    @ObservationIgnored private var exgSerialTracker: [String: UInt8] = [:]
 
     // Live Estimated Real Angle（即時預估真實角度，固定 5Hz 更新）— UI state (main thread)
     var isLiveEstimating = false
@@ -886,6 +903,14 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         for peripheral in connectedPeripherals.values {
             stopRecording(peripheral: peripheral)
         }
+
+        // 即時 EXG 監控歸零，下次「開始收集」重新從 0 開始算（test-exg-realtime-monitor-plan.md 第 2 節第 4 點）。
+        // exgSerialTracker 只在 bleQueue 上被 parseEXG 讀寫，清空也要丟回 bleQueue，避免跟主執行緒的呼叫方 data race；
+        // exgChannelStatus 本來就只在主執行緒被更新，跟這裡的呼叫執行緒一致，直接清空即可。
+        bleQueue.async { [weak self] in
+            self?.exgSerialTracker.removeAll()
+        }
+        exgChannelStatus.removeAll()
     }
 
     /// 開始新一局遊戲前的準備：花 3 秒判斷資料表是否需要清理，完成後呼叫 `completion()`。
@@ -1173,6 +1198,38 @@ extension BluetoothViewModel: CBPeripheralDelegate {
         }
         let treatmentResultId = DispatchQueue.main.sync { self.currentTreatmentResultId }
         deviceVM.insertEXGBatch(deviceId: deviceId, timestamp: timestamp, treatmentResultId: treatmentResultId, channel: channel, values: values)
+
+        updateExgChannelStatus(deviceId: deviceId, channel: channel, serial: data[2], timestamp: timestamp, values: values)
+    }
+
+    /// 即時 EXG 4 通道監控：計算掉包數、把封包裡 64 筆樣本依 sampleRate 換算成合成時間戳，
+    /// 更新畫面用的 exgChannelStatus，只保留過去 10 秒（test-exg-realtime-monitor-plan.md）。
+    private func updateExgChannelStatus(deviceId: Int64, channel: Int, serial: UInt8, timestamp: Int64, values: [Int]) {
+        let key = "\(deviceId)-\(channel)"
+
+        var dropped = 0
+        if let previousSerial = exgSerialTracker[key] {
+            let rawDelta = Int(serial) - Int(previousSerial)
+            let delta = rawDelta >= 0 ? rawDelta : rawDelta + 256
+            dropped = max(0, delta - 1)
+        }
+        exgSerialTracker[key] = serial
+
+        let sampleRate = 32.0
+        let intervalMs = 1000.0 / sampleRate
+        let newSamples: [EXGSample] = values.enumerated().map { i, value in
+            let offsetFromEnd = Double(values.count - 1 - i) * intervalMs
+            return EXGSample(timestamp: timestamp - Int64(offsetFromEnd), value: value)
+        }
+
+        DispatchQueue.main.async {
+            var status = self.exgChannelStatus[key] ?? EXGChannelStatus()
+            status.droppedPacketCount += dropped
+            status.recentSamples.append(contentsOf: newSamples)
+            let cutoff = timestamp - 10_000
+            status.recentSamples.removeAll { $0.timestamp < cutoff }
+            self.exgChannelStatus[key] = status
+        }
     }
 
     #if DEBUG

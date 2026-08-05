@@ -2,6 +2,19 @@ import SwiftUI
 import GRDB
 import CoreBluetooth
 import UIKit
+import Charts
+
+// MARK: - EXG Display Mode
+
+private enum EXGDisplayMode: Equatable {
+    case raw, microvolt, smoothed
+}
+
+private struct SmoothedPoint: Identifiable {
+    let id = UUID()
+    let timestamp: Int64
+    let value: Double
+}
 
 // MARK: - TestPage
 
@@ -9,6 +22,7 @@ struct TestPage: View {
     let btVM: BluetoothViewModel
 
     @Environment(\.goHome) private var goHome
+    @State private var exgDisplayMode: EXGDisplayMode = .raw
 
     /// 裝置目前實際綁定在哪一側（左/右）——比照 `PreWorking_X.swift` 的做法，不是寫死左腳；
     /// 這個 app 一次最多只會綁 2 顆裝置（同一側大腿＋小腿），所以「隨便查一顆裝置的 side」就能知道目前是哪一側在用。
@@ -48,6 +62,93 @@ struct TestPage: View {
               let calfPeripheral  = btVM.connectedPeripherals[calfUUID]
         else { return nil }
         return (thighPeripheral, calfPeripheral)
+    }
+
+    // MARK: - EXG 即時 4 通道監控（test-exg-realtime-monitor-plan.md）
+
+    private var thighDeviceId: Int64? {
+        DeviceViewModel().fetch(side: side, limb: 0)?.id
+    }
+    private var calfDeviceId: Int64? {
+        DeviceViewModel().fetch(side: side, limb: 1)?.id
+    }
+
+    private func exgStatus(deviceId: Int64?, channel: Int) -> EXGChannelStatus? {
+        guard let deviceId else { return nil }
+        return btVM.exgChannelStatus["\(deviceId)-\(channel)"]
+    }
+
+    @ViewBuilder
+    private func exgChannelPanel(title: String, status: EXGChannelStatus?) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Text("掉包：\(status == nil ? "－" : "\(status!.droppedPacketCount)")")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+
+            ZStack {
+                exgChart(status)
+                if status == nil || status?.recentSamples.isEmpty == true {
+                    Text("尚無資料")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(8)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func exgChart(_ status: EXGChannelStatus?) -> some View {
+        let samples = status?.recentSamples ?? []
+        let latest = samples.last?.timestamp ?? Int64(Date().timeIntervalSince1970 * 1000)
+
+        return Group {
+            if exgDisplayMode == .smoothed {
+                Chart(smoothedPoints(samples)) { point in
+                    LineMark(
+                        x: .value("時間", point.timestamp),
+                        y: .value("數值", point.value)
+                    )
+                }
+            } else {
+                Chart(samples) { sample in
+                    LineMark(
+                        x: .value("時間", sample.timestamp),
+                        y: .value("數值", displayValue(sample.value))
+                    )
+                }
+            }
+        }
+        .chartXScale(domain: (latest - 10_000) ... latest)
+        .chartXAxis(.hidden)
+        .frame(height: 100)
+    }
+
+    private func displayValue(_ raw: Int) -> Double {
+        switch exgDisplayMode {
+        case .raw: Double(raw)
+        case .microvolt, .smoothed: Double(raw) * GameDataExporter.exgMicrovoltScale
+        }
+    }
+
+    /// 原始樣本 → μV → EMGAlgo.movingAverage(window/overlap 移動平均)。
+    /// centerIndices（小數索引）四捨五入回 recentSamples 的整數索引，直接借用該筆樣本既有的合成時間戳，
+    /// 避免用「假設樣本間隔固定」反推時間戳、隨封包間隔不規律累積誤差（test-exg-realtime-monitor-plan.md 第 10.3 節）。
+    private func smoothedPoints(_ samples: [EXGSample]) -> [SmoothedPoint] {
+        let uvValues = samples.map { Double($0.value) * GameDataExporter.exgMicrovoltScale }
+        guard let (avgValues, centerIndices) = try? EMGAlgo.movingAverage(uv: uvValues) else { return [] }
+
+        return zip(avgValues, centerIndices).compactMap { avg, centerIndex in
+            let idx = Int(centerIndex.rounded())
+            guard samples.indices.contains(idx) else { return nil }
+            return SmoothedPoint(timestamp: samples[idx].timestamp, value: avg)
+        }
     }
 
     var body: some View {
@@ -180,6 +281,42 @@ struct TestPage: View {
 
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 24)
+
+                // EXG 即時 4 通道監控（test-exg-realtime-monitor-plan.md）
+                HStack(spacing: 12) {
+                    Button("原始樣本") { exgDisplayMode = .raw }
+                        .font(.system(size: 15, weight: .medium))
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(exgDisplayMode == .raw ? Color.indigo.opacity(0.85) : Color.gray.opacity(0.3))
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                    Button("μV 換算") { exgDisplayMode = .microvolt }
+                        .font(.system(size: 15, weight: .medium))
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(exgDisplayMode == .microvolt ? Color.indigo.opacity(0.85) : Color.gray.opacity(0.3))
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                    Button("平滑") { exgDisplayMode = .smoothed }
+                        .font(.system(size: 15, weight: .medium))
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(exgDisplayMode == .smoothed ? Color.indigo.opacity(0.85) : Color.gray.opacity(0.3))
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                .padding(.horizontal, 24)
+
+                VStack(spacing: 12) {
+                    exgChannelPanel(title: "大腿 CH0", status: exgStatus(deviceId: thighDeviceId, channel: 0))
+                    exgChannelPanel(title: "大腿 CH1", status: exgStatus(deviceId: thighDeviceId, channel: 1))
+                    exgChannelPanel(title: "小腿 CH0", status: exgStatus(deviceId: calfDeviceId, channel: 0))
+                    exgChannelPanel(title: "小腿 CH1", status: exgStatus(deviceId: calfDeviceId, channel: 1))
+                }
                 .padding(.horizontal, 24)
             }
             .padding(.top, 20)
