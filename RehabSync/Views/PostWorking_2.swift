@@ -564,11 +564,58 @@ private struct PostWorking2ExgCard: View {
                 treatmentResultId: treatmentResultId, deviceId: deviceId, channel: channel,
                 from: Int64(setStartTimeMs), to: Int64(setEndTimeMs)
             )
-            let uvValues = rows.map { Double($0.value) * GameDataExporter.exgMicrovoltScale }
-            guard let (avgValues, centerIndices) = try? EMGAlgo.movingAverage(uv: uvValues) else { return }
+
             let sampleRate = 32.0
-            dataPoints = zip(centerIndices, avgValues).map { center, avg in
-                PostWorking2ExgPoint(time: center / sampleRate, uv: avg)
+
+            // 第 0 步：偵測掉包、補 0。exg 表沒存 Serial No，但同一個 BLE 封包的 64 筆樣本
+            // 共用同一個 row.timestamp（insertEXGBatch，DeviceViewModel.swift:65-72），
+            // 一個完整封包固定 64 筆＝2 秒。先把 rows 依連續相同 timestamp 分組成封包，
+            // 再比較相鄰封包的時間差：明顯是 2000ms 的整數倍時，代表中間掉了對應顆數的封包，
+            // 插入等量的 0 值樣本，讓後面的時間軸不會悄悄壓縮（postworking2-realdata-plan.md 第 10.3 節）。
+            let samplesPerPacket = 64
+            let packetDurationMs = Double(samplesPerPacket) / sampleRate * 1000.0   // 2000ms
+
+            struct Packet { let timestamp: Int64; var values: [Int] }
+            var packets: [Packet] = []
+            for row in rows {
+                if let lastIndex = packets.indices.last, packets[lastIndex].timestamp == row.timestamp {
+                    packets[lastIndex].values.append(row.value)
+                } else {
+                    packets.append(Packet(timestamp: row.timestamp, values: [row.value]))
+                }
+            }
+
+            var expandedValues: [Int] = []
+            for (i, packet) in packets.enumerated() {
+                if i > 0 {
+                    let gapMs = Double(packet.timestamp - packets[i - 1].timestamp)
+                    let missingPackets = Int((gapMs / packetDurationMs).rounded()) - 1
+                    if missingPackets > 0 {
+                        expandedValues.append(contentsOf: Array(repeating: 0, count: missingPackets * samplesPerPacket))
+                    }
+                }
+                expandedValues.append(contentsOf: packet.values)
+            }
+
+            // 第一步：原始樣本（含補過 0 的）一準備好就先配好時間戳（32Hz，1 秒切成 32 等分，依序），
+            // 比照 Test.swift 的做法：先建立一份權威的逐筆時間戳，後面平滑完是查表借用，不重新算。
+            let times: [Double] = expandedValues.indices.map { Double($0) / sampleRate }
+
+            // 第二步：換算 μV（0 值樣本換算後還是 0，不需要特殊處理）
+            let uvValues = expandedValues.map { Double($0) * GameDataExporter.exgMicrovoltScale }
+
+            // 第三步：平滑
+            guard let (avgValues, centerIndices) = try? EMGAlgo.movingAverage(uv: uvValues) else {
+                dataPoints = []
+                return
+            }
+
+            // 第四步：平滑後每個點的時間戳，用四捨五入的 centerIndex「查表」借用第一步配好的時間戳，
+            // 不是用 centerIndex / sampleRate 重新算一次。
+            dataPoints = zip(avgValues, centerIndices).compactMap { avg, centerIndex in
+                let idx = Int(centerIndex.rounded())
+                guard times.indices.contains(idx) else { return nil }
+                return PostWorking2ExgPoint(time: times[idx], uv: avg)
             }
         }
     }

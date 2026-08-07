@@ -2,20 +2,27 @@ import SwiftUI
 import GRDB
 import CoreBluetooth
 import UIKit
-import AVFoundation
+import Charts
+
+// MARK: - EXG Display Mode
+
+private enum EXGDisplayMode: Equatable {
+    case raw, microvolt, smoothed
+}
+
+private struct SmoothedPoint: Identifiable {
+    let id = UUID()
+    let timestamp: Int64
+    let value: Double
+}
 
 // MARK: - TestPage
 
 struct TestPage: View {
     let btVM: BluetoothViewModel
 
-    @State private var treatmentResultIdInput: String = ""
-    @State private var debugAccRows: [Acc] = []
-    @State private var debugGyroRows: [Gyro] = []
-    @State private var debugExgRows: [Exg] = []
-    @State private var hasQueriedDebugRows = false
-    @State private var isVideoCircleVisible = true
-    @State private var selectedGuideVideo: GuideVideoOption = .exercise2Left
+    @Environment(\.goHome) private var goHome
+    @State private var exgDisplayMode: EXGDisplayMode = .raw
 
     /// 裝置目前實際綁定在哪一側（左/右）——比照 `PreWorking_X.swift` 的做法，不是寫死左腳；
     /// 這個 app 一次最多只會綁 2 顆裝置（同一側大腿＋小腿），所以「隨便查一顆裝置的 side」就能知道目前是哪一側在用。
@@ -43,15 +50,6 @@ struct TestPage: View {
         btVM.recordingStartTime != nil && btVM.recordingEndTime != nil
     }
 
-    /// 動作 12 改用 `.resizeAspect`（完整顯示、等比例縮放，不裁切），
-    /// 其他動作維持 `.resizeAspectFill`（填滿圓形，多餘部分裁掉）。
-    private var guideVideoGravity: AVLayerVideoGravity {
-        switch selectedGuideVideo {
-        case .exercise12Left, .exercise12Right: return .resizeAspect
-        default: return .resizeAspectFill
-        }
-    }
-
     private var canEstimateRealAngle: Bool {
         bothConnected && btVM.baselineResult != nil
     }
@@ -66,47 +64,117 @@ struct TestPage: View {
         return (thighPeripheral, calfPeripheral)
     }
 
+    // MARK: - EXG 即時 4 通道監控（test-exg-realtime-monitor-plan.md）
+
+    private var thighDeviceId: Int64? {
+        DeviceViewModel().fetch(side: side, limb: 0)?.id
+    }
+    private var calfDeviceId: Int64? {
+        DeviceViewModel().fetch(side: side, limb: 1)?.id
+    }
+
+    private func exgStatus(deviceId: Int64?, channel: Int) -> EXGChannelStatus? {
+        guard let deviceId else { return nil }
+        return btVM.exgChannelStatus["\(deviceId)-\(channel)"]
+    }
+
+    @ViewBuilder
+    private func exgChannelPanel(title: String, status: EXGChannelStatus?) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Text("掉包：\(status == nil ? "－" : "\(status!.droppedPacketCount)")")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+
+            ZStack {
+                exgChart(status)
+                if status == nil || status?.recentSamples.isEmpty == true {
+                    Text("尚無資料")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(8)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func exgChart(_ status: EXGChannelStatus?) -> some View {
+        let samples = status?.recentSamples ?? []
+        let latest = samples.last?.timestamp ?? Int64(Date().timeIntervalSince1970 * 1000)
+
+        return Group {
+            if exgDisplayMode == .smoothed {
+                Chart(smoothedPoints(samples)) { point in
+                    LineMark(
+                        x: .value("時間", point.timestamp),
+                        y: .value("數值", point.value)
+                    )
+                }
+            } else {
+                Chart(samples) { sample in
+                    LineMark(
+                        x: .value("時間", sample.timestamp),
+                        y: .value("數值", displayValue(sample.value))
+                    )
+                }
+            }
+        }
+        .chartXScale(domain: (latest - 10_000) ... latest)
+        .chartXAxis(.hidden)
+        .frame(height: 100)
+    }
+
+    private func displayValue(_ raw: Int) -> Double {
+        switch exgDisplayMode {
+        case .raw: Double(raw)
+        case .microvolt, .smoothed: Double(raw) * GameDataExporter.exgMicrovoltScale
+        }
+    }
+
+    /// 原始樣本 → μV → EMGAlgo.movingAverage(window/overlap 移動平均)。
+    /// centerIndices（小數索引）四捨五入回 recentSamples 的整數索引，直接借用該筆樣本既有的合成時間戳，
+    /// 避免用「假設樣本間隔固定」反推時間戳、隨封包間隔不規律累積誤差（test-exg-realtime-monitor-plan.md 第 10.3 節）。
+    private func smoothedPoints(_ samples: [EXGSample]) -> [SmoothedPoint] {
+        let uvValues = samples.map { Double($0.value) * GameDataExporter.exgMicrovoltScale }
+        guard let (avgValues, centerIndices) = try? EMGAlgo.movingAverage(uv: uvValues) else { return [] }
+
+        return zip(avgValues, centerIndices).compactMap { avg, centerIndex in
+            let idx = Int(centerIndex.rounded())
+            guard samples.indices.contains(idx) else { return nil }
+            return SmoothedPoint(timestamp: samples[idx].timestamp, value: avg)
+        }
+    }
+
     var body: some View {
         ZStack {
             Color(red: 0.96, green: 0.94, blue: 0.91).ignoresSafeArea()
+
+            Button(action: goHome) {
+                HStack(spacing: 6) {
+                    Image(systemName: "chevron.left")
+                    Text("返回總覽")
+                }
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.black)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(Color.white)
+                .clipShape(Capsule())
+                .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 16)
+            .padding(.leading, 24)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .zIndex(1)
+
             VStack(spacing: 16) {
-                HStack {
-                    Spacer()
-                    Picker("引導影片", selection: $selectedGuideVideo) {
-                        ForEach(GuideVideoOption.allCases) { option in
-                            Text(option.title).tag(option)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                }
-                .padding(.horizontal, 24)
-
-                HStack {
-                    Spacer()
-                    if isVideoCircleVisible {
-                        ZStack(alignment: .leading) {
-                            VideoCircleToggleButton(systemName: "arrowtriangle.right.fill") {
-                                isVideoCircleVisible = false
-                            }
-                            .offset(x: -55)
-
-                            CircularLoopingVideo(resourceName: selectedGuideVideo.resourceName, videoGravity: guideVideoGravity)
-                                .frame(width: 400, height: 400)
-                                .background(Color.white)
-                                .clipShape(Circle())
-                                .overlay(Circle().strokeBorder(Color.black, lineWidth: 2).frame(width: 404, height: 404))
-                                .overlay(Circle().strokeBorder(Color.white, lineWidth: 6).frame(width: 416, height: 416))
-                                .overlay(Circle().strokeBorder(Color.black, lineWidth: 2).frame(width: 420, height: 420))
-                                .shadow(color: .black.opacity(0.15), radius: 10, y: 4)
-                        }
-                    } else {
-                        VideoCircleToggleButton(systemName: "arrowtriangle.left.fill") {
-                            isVideoCircleVisible = true
-                        }
-                    }
-                }
-                .padding(.horizontal, 24)
-
                 if bothConnected || anyConnected {
                     Text("目前偵測到裝置綁定在：\(side == 1 ? "右腳" : "左腳")")
                         .font(.system(size: 13))
@@ -211,108 +279,47 @@ struct TestPage: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    Button(btVM.isEstimatingStepStatus ? "停止預估登階狀態" : "開始預估登階狀態") {
-                        guard let pair = thighAndCalfPeripherals else { return }
-                        if btVM.isEstimatingStepStatus {
-                            btVM.stopStepStatusEstimation(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
-                        } else if let baseline = btVM.baselineResult {
-                            btVM.startStepStatusEstimation(thighPeripheral: pair.thigh, calfPeripheral: pair.calf, baseline: baseline)
-                        }
-                    }
-                    .font(.system(size: 15, weight: .medium))
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 10)
-                    .background(btVM.isEstimatingStepStatus ? Color.red.opacity(0.85)
-                        : (canEstimateRealAngle ? Color.purple.opacity(0.85) : Color.gray.opacity(0.3)))
-                    .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .disabled(!btVM.isEstimatingStepStatus && (!canEstimateRealAngle || btVM.isCollectingBaseline))
-
-                    if let status = btVM.currentStepStatus {
-                        Text(stepStatusText(status))
-                            .font(.system(size: 20, weight: .bold))
-                    } else if btVM.isEstimatingStepStatus {
-                        Text("等待資料…")
-                            .font(.system(size: 14))
-                            .foregroundStyle(.secondary)
-                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 24)
 
-                // 除錯用：輸入 treatment_result_id，查 acc/gyro/exg 三張表各 10 筆原始資料，
-                // 不經過匯出查詢（不需要先查到 device_id），方便直接確認資料庫裡到底有沒有資料。
+                // EXG 即時 4 通道監控（test-exg-realtime-monitor-plan.md）
                 HStack(spacing: 12) {
-                    TextField("輸入 treatment_result_id", text: $treatmentResultIdInput)
-                        .keyboardType(.numberPad)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 220)
-
-                    Button("查詢") { queryDebugRows() }
+                    Button("原始樣本") { exgDisplayMode = .raw }
                         .font(.system(size: 15, weight: .medium))
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
-                        .background(Int64(treatmentResultIdInput) != nil ? Color.blue.opacity(0.85) : Color.gray.opacity(0.3))
+                        .background(exgDisplayMode == .raw ? Color.indigo.opacity(0.85) : Color.gray.opacity(0.3))
                         .foregroundStyle(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .disabled(Int64(treatmentResultIdInput) == nil)
+
+                    Button("μV 換算") { exgDisplayMode = .microvolt }
+                        .font(.system(size: 15, weight: .medium))
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(exgDisplayMode == .microvolt ? Color.indigo.opacity(0.85) : Color.gray.opacity(0.3))
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                    Button("平滑") { exgDisplayMode = .smoothed }
+                        .font(.system(size: 15, weight: .medium))
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(exgDisplayMode == .smoothed ? Color.indigo.opacity(0.85) : Color.gray.opacity(0.3))
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
                 .padding(.horizontal, 24)
 
-                if hasQueriedDebugRows {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 16) {
-                            debugRowsSection(title: "acc（\(debugAccRows.count) 筆）") {
-                                ForEach(debugAccRows) { row in
-                                    Text("id:\(row.id ?? -1) device:\(row.device_id) ts:\(row.timestamp) x:\(row.x) y:\(row.y) z:\(row.z)")
-                                }
-                            }
-                            debugRowsSection(title: "gyro（\(debugGyroRows.count) 筆）") {
-                                ForEach(debugGyroRows) { row in
-                                    Text("id:\(row.id ?? -1) device:\(row.device_id) ts:\(row.timestamp) pitch:\(row.pitch) roll:\(row.roll) yaw:\(row.yaw)")
-                                }
-                            }
-                            debugRowsSection(title: "exg（\(debugExgRows.count) 筆）") {
-                                ForEach(debugExgRows) { row in
-                                    Text("id:\(row.id ?? -1) device:\(row.device_id) ts:\(row.timestamp) ch:\(row.channel) value:\(row.value)")
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 24)
-                    }
+                VStack(spacing: 12) {
+                    exgChannelPanel(title: "大腿 CH0", status: exgStatus(deviceId: thighDeviceId, channel: 0))
+                    exgChannelPanel(title: "大腿 CH1", status: exgStatus(deviceId: thighDeviceId, channel: 1))
+                    exgChannelPanel(title: "小腿 CH0", status: exgStatus(deviceId: calfDeviceId, channel: 0))
+                    exgChannelPanel(title: "小腿 CH1", status: exgStatus(deviceId: calfDeviceId, channel: 1))
                 }
+                .padding(.horizontal, 24)
             }
             .padding(.top, 20)
-        }
-    }
-
-    @ViewBuilder
-    private func debugRowsSection<Content: View>(title: String, @ViewBuilder rows: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.system(size: 15, weight: .semibold))
-            rows()
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    private func queryDebugRows() {
-        guard let treatmentResultId = Int64(treatmentResultIdInput) else { return }
-        let dvm = DeviceViewModel()
-        debugAccRows = dvm.fetchACC(treatmentResultId: treatmentResultId, limit: 10)
-        debugGyroRows = dvm.fetchGYRO(treatmentResultId: treatmentResultId, limit: 10)
-        debugExgRows = dvm.fetchEXG(treatmentResultId: treatmentResultId, limit: 10)
-        hasQueriedDebugRows = true
-    }
-
-    private func stepStatusText(_ status: Int) -> String {
-        switch status {
-        case 0: return "站立"
-        case 1: return "上階"
-        case 2: return "下階"
-        default: return ""
         }
     }
 
@@ -369,47 +376,3 @@ struct TestPage: View {
     }
 }
 
-// MARK: - Video Circle Toggle Button
-
-/// 圓圈左邊緣的收合按鈕：顯示時是向右箭頭（點擊收合圓圈），收合後變成向左箭頭（點擊還原）。
-/// 外層是直式膠囊（比圓圈本身還小一圈，疊在圓圈左邊緣時被圓圈裁掉一部分邊邊沒關係）。
-// MARK: - Guide Video Option
-
-/// 下拉式選單的選項，對應 `RehabSync/Videos/` 底下 8 支引導影片（4 個動作各左右腳）。
-private enum GuideVideoOption: String, CaseIterable, Identifiable {
-    case exercise2Left, exercise2Right
-    case exercise9Left, exercise9Right
-    case exercise12Left, exercise12Right
-    case exercise22Left, exercise22Right
-
-    var id: String { rawValue }
-
-    var resourceName: String {
-        switch self {
-        case .exercise2Left: "2_left_video"
-        case .exercise2Right: "2_right_video"
-        case .exercise9Left: "9_left_video"
-        case .exercise9Right: "9_right_video"
-        case .exercise12Left: "12_left_video"
-        case .exercise12Right: "12_right_video"
-        case .exercise22Left: "22_left_video"
-        case .exercise22Right: "22_right_video"
-        }
-    }
-
-    var title: String {
-        switch self {
-        case .exercise2Left: "動作 2（左腳）"
-        case .exercise2Right: "動作 2（右腳）"
-        case .exercise9Left: "動作 9（左腳）"
-        case .exercise9Right: "動作 9（右腳）"
-        case .exercise12Left: "動作 12（左腳）"
-        case .exercise12Right: "動作 12（右腳）"
-        case .exercise22Left: "動作 22（左腳）"
-        case .exercise22Right: "動作 22（右腳）"
-        }
-    }
-}
-
-// `CircularLoopingVideo`／`CircularLoopingVideoPlayer`／`CircularLoopingVideoUIView`／`VideoCircleToggleButton`
-// 已抽到 `GuideCircleOverlay.swift` 共用，`2/9/12/22_Working.swift` 的引導圈圈也是用同一份。
