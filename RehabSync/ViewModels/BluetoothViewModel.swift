@@ -764,13 +764,17 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     private func tickLiveEstimatedRealAngle() {
         bleQueue.async { [weak self] in
             guard let self else { return }
-            let recording = DispatchQueue.main.sync { self.isRecording }
 
-            // Working2 封包新鮮度保護（working2-database-port-plan.md 17.4）：只在 isRecording 為 true
-            // （Working2 情境）時生效，組間休息／PreWorking 動作測試（isRecording 恆為 false）不受影響、
-            // 維持原本行為。只清「真的 stale 的那一側」incline，currentEstimatedRealAngle 不分哪一側
-            // stale 一律清成 nil，才能讓下面既有的 nil-guard／畫面/`.onChange` 正確反映「資料不可信」。
-            if recording {
+            // Working2 封包新鮮度保護（working2-database-port-plan.md 17.4）：閘門用 `recordingSessionActive`，
+            // 不是 `isRecording`——`isRecording` 會被 `didDisconnectPeripheral` 在裝置真的斷線當下直接設回
+            // false（刻意維持不動，繼續給下面的 DB 寫入守門用），如果這裡也看 `isRecording`，裝置一斷線
+            // 這段清空邏輯反而會被跳過，導致 incline 從未被清空、角度停在斷線前最後一個值，變不回「等待
+            // 資料...」——這是實測時發現的真實 bug，改看 `recordingSessionActive`（只由 startRecordingAll／
+            // stopRecordingAll 控制、不受斷線影響）才能讓斷線也正確觸發清空。組間休息／PreWorking 動作測試
+            // （`recordingSessionActive` 恆為 false）不受影響、維持原本行為。只清「真的 stale 的那一側」
+            // incline，currentEstimatedRealAngle 不分哪一側 stale 一律清成 nil，才能讓下面既有的
+            // nil-guard／畫面/`.onChange` 正確反映「資料不可信」。
+            if recordingSessionActive {
                 let now = Int64(Date().timeIntervalSince1970 * 1000)
                 var thighStale = false
                 var calfStale = false
