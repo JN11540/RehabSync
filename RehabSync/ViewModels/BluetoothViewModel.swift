@@ -115,6 +115,25 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     @ObservationIgnored private var stepBaselineTable: [(measured: Double, realAngle: Double)] = []
     @ObservationIgnored private var stepTickTimer: Timer?
 
+    // MARK: - Working2 連線檢查／封包新鮮度檢查／共用修復路徑（working2-database-port-plan.md 第 17 節）
+    // 只在 isRecording 為 true 時運作。lastPacketAt 是唯一事實來源：ACC／GYRO／EXG_CH0／EXG_CH1
+    // 4 個訊號各自獨立記錄最後收到封包的時間，freshnessTimer（1 秒一次）跟 recoverIfNeeded（觸發
+    // BLE 層級修復）都讀同一份；tickLiveEstimatedRealAngle 的即時清空（0.2 秒）也讀同一份 ACC 部分。
+    private static let signalACC = "ACC"
+    private static let signalGYRO = "GYRO"
+    private static let signalEXGCh0 = "EXG_CH0"
+    private static let signalEXGCh1 = "EXG_CH1"
+    @ObservationIgnored private var lastPacketAt: [UUID: [String: Int64]] = [:]
+    @ObservationIgnored private var lastRecoveryAttemptAt: [UUID: Int64] = [:]
+    @ObservationIgnored private var freshnessTimer: Timer?
+    /// 跟 `isRecording` 不同：`didDisconnectPeripheral` 任何裝置斷線都會把 `isRecording` 直接設回
+    /// false（見該處，刻意維持不動，繼續給既有的 `.onChange` guard／`advanced_statistics` 寫入守門用），
+    /// 但 Working2 端還在同一組進行中、還是想繼續錄——這個旗標在 `startRecordingAll`／`stopRecordingAll`
+    /// 函式最外層直接、無條件設定（不透過迴圈遍歷 `connectedPeripherals`，不受裝置當下有沒有連著影響），
+    /// 代表「這個錄製 session 的意圖」，不會因為單次斷線被動翻掉，讓 1 秒偵測與重連後自動恢復錄製
+    /// 這兩處能正確判斷（working2-database-port-plan.md 17.4）。
+    @ObservationIgnored private var recordingSessionActive = false
+
     override init() {
         super.init()
         central = CBCentralManager(delegate: self, queue: bleQueue)
@@ -283,6 +302,76 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             print("[RECONNECT-DIAG] 呼叫 central.connect(...)")
             #endif
             self.central.connect(peripheral, options: nil)
+        }
+    }
+
+    // MARK: - Working2 連線檢查／封包新鮮度檢查（Channel A，working2-database-port-plan.md 17.3）
+
+    /// 每次收到 ACC／GYRO／EXG 封包時記錄「最後收到時間」，`lastPacketAt` 是唯一事實來源，
+    /// 給 1 秒偵測（連線檢查＋封包新鮮度檢查）跟 0.2 秒 tick 的即時清空共用讀取。
+    private func recordPacketFresh(uuid: UUID, signal: String, at timestamp: Int64) {
+        lastPacketAt[uuid, default: [:]][signal] = timestamp
+    }
+
+    /// 這顆裝置的 4 個訊號（ACC／GYRO／EXG_CH0／EXG_CH1）任一超過各自門檻就算 stale；
+    /// 從未收過封包（nil）不算 stale，避免剛開始錄製、封包還沒送達的第一輪就誤觸發。
+    private func isAnySignalStale(uuid: UUID) -> Bool {
+        let now = Int64(Date().timeIntervalSince1970 * 1000)
+        let signals = lastPacketAt[uuid] ?? [:]
+        func age(_ key: String) -> Int64? { signals[key].map { now - $0 } }
+        if let a = age(Self.signalACC),     a > 1000 { return true }
+        if let a = age(Self.signalGYRO),    a > 1000 { return true }
+        if let a = age(Self.signalEXGCh0),  a > 4500 { return true }
+        if let a = age(Self.signalEXGCh1),  a > 4500 { return true }
+        return false
+    }
+
+    /// Channel A：連線檢查（有順序性，優先於封包新鮮度檢查）＋封包新鮮度檢查，1 秒一次，
+    /// 只在 isRecording 為 true 時運作（跟 startRecordingAll／stopRecordingAll 綁在一起啟停）。
+    private func tickConnectionAndFreshnessCheck() {
+        bleQueue.async { [weak self] in
+            guard let self else { return }
+            guard self.recordingSessionActive else { return }
+
+            let dvm = DeviceViewModel()
+            let side = dvm.fetchAnySide() ?? 0
+            guard let thigh = dvm.fetch(side: side, limb: 0), let thighUUID = UUID(uuidString: thigh.device_uuid),
+                  let calf  = dvm.fetch(side: side, limb: 1), let calfUUID  = UUID(uuidString: calf.device_uuid)
+            else { return }
+
+            for uuid in [thighUUID, calfUUID] {
+                guard let peripheral = self.peripheralMap[uuid] ?? self.connectedPeripherals[uuid],
+                      peripheral.state == .connected else {
+                    self.recoverIfNeeded(uuid: uuid)
+                    continue
+                }
+                if self.isAnySignalStale(uuid: uuid) {
+                    self.recoverIfNeeded(uuid: uuid)
+                }
+            }
+        }
+    }
+
+    /// 共用修復路徑：連線缺失／封包新鮮度逾時都導向這裡，依 `peripheral.state` 分流。
+    /// 冷卻 3 秒、per-uuid 各自獨立，避免同一裝置在修復生效前被重複觸發。
+    private func recoverIfNeeded(uuid: UUID) {
+        let now = Int64(Date().timeIntervalSince1970 * 1000)
+        if let last = lastRecoveryAttemptAt[uuid], now - last < 3000 { return }
+        lastRecoveryAttemptAt[uuid] = now
+
+        guard let peripheral = peripheralMap[uuid] ?? connectedPeripherals[uuid] else {
+            attemptBackgroundReconnect(uuid: uuid)
+            return
+        }
+        switch peripheral.state {
+        case .connected:
+            // 連線物件還在、資料 stale：重新走一次 startRecording，從簡對這顆裝置的
+            // ACC／GYRO／EXG 全部重新訂閱，並補送 cmd_a0／cmd_a1／cmd_a2（見 17.4 節）。
+            startRecording(peripheral: peripheral)
+        case .connecting:
+            break
+        default:
+            attemptBackgroundReconnect(uuid: uuid)
         }
     }
 
@@ -675,6 +764,32 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     private func tickLiveEstimatedRealAngle() {
         bleQueue.async { [weak self] in
             guard let self else { return }
+            let recording = DispatchQueue.main.sync { self.isRecording }
+
+            // Working2 封包新鮮度保護（working2-database-port-plan.md 17.4）：只在 isRecording 為 true
+            // （Working2 情境）時生效，組間休息／PreWorking 動作測試（isRecording 恆為 false）不受影響、
+            // 維持原本行為。只清「真的 stale 的那一側」incline，currentEstimatedRealAngle 不分哪一側
+            // stale 一律清成 nil，才能讓下面既有的 nil-guard／畫面/`.onChange` 正確反映「資料不可信」。
+            if recording {
+                let now = Int64(Date().timeIntervalSince1970 * 1000)
+                var thighStale = false
+                var calfStale = false
+                if let thighId = liveThighId {
+                    let age = lastPacketAt[thighId]?[Self.signalACC].map { now - $0 }
+                    thighStale = age.map { $0 > 1000 } ?? false
+                }
+                if let calfId = liveCalfId {
+                    let age = lastPacketAt[calfId]?[Self.signalACC].map { now - $0 }
+                    calfStale = age.map { $0 > 1000 } ?? false
+                }
+                if thighStale { liveThighIncline = nil }
+                if calfStale  { liveCalfIncline  = nil }
+                if thighStale || calfStale {
+                    DispatchQueue.main.async { self.currentEstimatedRealAngle = nil }
+                    return
+                }
+            }
+
             #if DEBUG
             let now = Int64(Date().timeIntervalSince1970 * 1000)
             let thighAgeMs = liveThighLastPacketAt.map { now - $0 }
@@ -699,10 +814,10 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             DispatchQueue.main.async { self.currentEstimatedRealAngle = rounded }
 
             // 組間休息（未在記錄中）時暫停寫入，跟 acc/gyro/exg 的起訖規則一致。
-            let (recording, treatmentResultId) = DispatchQueue.main.sync {
+            let (stillRecording, treatmentResultId) = DispatchQueue.main.sync {
                 (self.isRecording, self.currentTreatmentResultId)
             }
-            guard recording else { return }
+            guard stillRecording else { return }
             let ts = Int64(Date().timeIntervalSince1970 * 1000)
             self.deviceVM.insertAdvancedStatistics(timestamp: ts, angle: rounded, treatmentResultId: treatmentResultId)
         }
@@ -893,16 +1008,24 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     func startRecordingAll() {
         recordingStartTime = Int64(Date().timeIntervalSince1970 * 1000)
         recordingEndTime   = nil
+        recordingSessionActive = true
         for peripheral in connectedPeripherals.values {
             startRecording(peripheral: peripheral)
+        }
+        freshnessTimer?.invalidate()
+        freshnessTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.tickConnectionAndFreshnessCheck()
         }
     }
 
     func stopRecordingAll() {
         recordingEndTime = Int64(Date().timeIntervalSince1970 * 1000)
+        recordingSessionActive = false
         for peripheral in connectedPeripherals.values {
             stopRecording(peripheral: peripheral)
         }
+        freshnessTimer?.invalidate()
+        freshnessTimer = nil
 
         // 即時 EXG 監控歸零，下次「開始收集」重新從 0 開始算（test-exg-realtime-monitor-plan.md 第 2 節第 4 點）。
         // exgSerialTracker 只在 bleQueue 上被 parseEXG 讀寫，清空也要丟回 bleQueue，避免跟主執行緒的呼叫方 data race；
@@ -1035,6 +1158,14 @@ extension BluetoothViewModel: CBPeripheralDelegate {
         var map = charMap[peripheral.identifier] ?? [:]
         for char in chars { map[char.uuid] = char }
         charMap[peripheral.identifier] = map
+
+        // 重連後自動恢復錄製：`recordingSessionActive` 代表 Working2 這個 session 還想繼續錄
+        // （不像 `isRecording`，斷線當下就會被 `didDisconnectPeripheral` 動翻掉），這裡拿到新的
+        // charMap 就重新走一次 startRecording，補回 notify 訂閱與 cmd_a0/a1/a2 設定，
+        // 不然連線物件恢復了、裝置實際上還是不會再送資料（working2-database-port-plan.md 17.4）。
+        if recordingSessionActive {
+            startRecording(peripheral: peripheral)
+        }
     }
 
     func peripheral(_ peripheral: CBPeripheral,
@@ -1044,6 +1175,17 @@ extension BluetoothViewModel: CBPeripheralDelegate {
               let data = characteristic.value else { return }
 
         let uuid = characteristic.uuid
+
+        // Working2 封包新鮮度追蹤（working2-database-port-plan.md 17.3）：不論目前是校正／收集／
+        // 一般錄製哪種模式，只要真的收到封包就記一筆，4 個訊號各自獨立（EXG 依 Flag byte 拆 ch0/ch1）。
+        let freshAt = Int64(Date().timeIntervalSince1970 * 1000)
+        if uuid == CBUUID(string: config.sub_acc_uuid) {
+            recordPacketFresh(uuid: peripheral.identifier, signal: Self.signalACC, at: freshAt)
+        } else if uuid == CBUUID(string: config.sub_gyro_uuid) {
+            recordPacketFresh(uuid: peripheral.identifier, signal: Self.signalGYRO, at: freshAt)
+        } else if uuid == CBUUID(string: config.sub_exg_uuid), let flag = data.first, flag == 0xE0 || flag == 0xE1 {
+            recordPacketFresh(uuid: peripheral.identifier, signal: flag == 0xE0 ? Self.signalEXGCh0 : Self.signalEXGCh1, at: freshAt)
+        }
 
         // 校正模式：收集到 buffer，不寫 DB
         if calibratingPeripherals.contains(peripheral.identifier) {
