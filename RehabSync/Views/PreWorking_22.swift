@@ -651,6 +651,12 @@ private struct PreWorking22MotionTestAboutPanel: View {
                 prepTimer?.invalidate()
                 prepTimer = nil
                 prepPhase = .idle
+                // 明確在導頁進 Working22 前停止 PreWorking 獨立 Channel A（preworking22-knee-plan.md
+                // 第 7 節）——這裡是真正觸發 navigateToWorking22 = true 的那一刻，不能依賴 onDisappear
+                // （.fullScreenCover 不會觸發底層 onDisappear），否則會一路帶進 Working22 干擾它自己的 Channel A。
+                if let pair = thighAndCalfPeripherals {
+                    btVM.stopPreTestChannelA(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+                }
                 onPlayGame()
             }
         )
@@ -675,11 +681,13 @@ private struct PreWorking22MotionTestAboutPanel: View {
               let baseline = btVM.baselineResult
         else { return }
         btVM.startLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf, baseline: baseline, posture: .standing)
+        btVM.startPreTestChannelA(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
     }
 
     private func stopLiveTestIfNeeded() {
         guard btVM.isLiveEstimating, let pair = thighAndCalfPeripherals else { return }
         btVM.stopLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+        btVM.stopPreTestChannelA(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
     }
 
     private var sideLabelText: String {
