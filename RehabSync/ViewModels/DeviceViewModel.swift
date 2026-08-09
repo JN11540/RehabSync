@@ -21,6 +21,17 @@ class DeviceViewModel {
         }
     }
 
+    /// [SIDE-DIAG] 除錯用：印出 `device` 表目前所有列（uuid/name/side/limb），
+    /// 用來驗證「同一次測試流程中，多處各自呼叫 `fetchAnySide()` 是否會因為表裡有殘留列而查到不一致的結果」。
+    /// 純診斷用，之後確認完假設可以移除。
+    func debugDumpAllDevices(tag: String) {
+        let rows = (try? db.read { db in try Device.fetchAll(db) }) ?? []
+        print("[SIDE-DIAG] \(tag) device表共\(rows.count)筆:")
+        for d in rows {
+            print("[SIDE-DIAG]   uuid=\(d.device_uuid) name=\(d.device_name) side=\(d.side) limb=\(d.limb)")
+        }
+    }
+
     /// `device` 表目前有幾筆綁定紀錄（不論目前是否有實際 BLE 連線）。正常配對完成是 2 筆
     /// （同一側大腿＋小腿各一），給「進入訓練前檢查裝置是否已綁定」這類流程用。
     func boundDeviceCount() -> Int {

@@ -134,6 +134,16 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     /// 這兩處能正確判斷（working2-database-port-plan.md 17.4）。
     @ObservationIgnored private var recordingSessionActive = false
 
+    // MARK: - PreWorking 獨立 Channel A（working2-database-port-plan.md 第 18 節）
+    // 純粹連線檢查＋封包新鮮度檢查，不做原始封包錄製，跟 Working2 的 Channel A 完全獨立。
+    // 泛用設計：掛在 BluetoothViewModel 層級，任何呼叫 startLiveEstimateRealAngle 的 PreWorking
+    // 頁面都可以直接呼叫這裡的 start/stop 函式，不用各自重新實作。
+    @ObservationIgnored private var preTestChannelAActive = false
+    /// 這個集合裡的 uuid，封包進來只更新 lastPacketAt（給新鮮度檢查用）跟餵給 Channel B，
+    /// 不落地寫入 acc/gyro/exg 表——順便一併修正既有的 ACC 孤兒寫入問題（見 18.4 節）。
+    @ObservationIgnored private var preTestMonitoring: Set<UUID> = []
+    @ObservationIgnored private var preTestFreshnessTimer: Timer?
+
     override init() {
         super.init()
         central = CBCentralManager(delegate: self, queue: bleQueue)
@@ -326,6 +336,14 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         return false
     }
 
+    /// 共用修復路徑的訂閱模式：`.full` 會呼叫 `startRecording`（連帶設定 `isRecording = true`，
+    /// 給 Working2 情境用）；`.monitorOnly` 呼叫 `subscribeAllCharacteristics`（不碰 `isRecording`，
+    /// 給 PreWorking 情境用，避免誤把 `advanced_statistics` 寫入保護打開，見 working2-database-port-plan.md 18.3）。
+    private enum RecoverySubscribeMode {
+        case full
+        case monitorOnly
+    }
+
     /// Channel A：連線檢查（有順序性，優先於封包新鮮度檢查）＋封包新鮮度檢查，1 秒一次，
     /// 只在 isRecording 為 true 時運作（跟 startRecordingAll／stopRecordingAll 綁在一起啟停）。
     private func tickConnectionAndFreshnessCheck() {
@@ -340,21 +358,78 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             else { return }
 
             for uuid in [thighUUID, calfUUID] {
-                guard let peripheral = self.peripheralMap[uuid] ?? self.connectedPeripherals[uuid],
-                      peripheral.state == .connected else {
-                    self.recoverIfNeeded(uuid: uuid)
-                    continue
-                }
-                if self.isAnySignalStale(uuid: uuid) {
-                    self.recoverIfNeeded(uuid: uuid)
-                }
+                self.checkAndRecoverIfNeeded(uuid: uuid, mode: .full)
             }
+        }
+    }
+
+    /// PreWorking 獨立 Channel A：連線檢查＋封包新鮮度檢查，1 秒一次，只在 `preTestChannelAActive`
+    /// 為 true 時運作。裝置 UUID 直接沿用 `liveThighId`／`liveCalfId`（`startLiveEstimateRealAngle`
+    /// 已經用 `fetchAnySide()` 正確解析過），不重新查一次，避免重蹈「沒帶 side」的既有 bug
+    /// （working2-database-port-plan.md 18.8）。
+    private func tickPreTestConnectionAndFreshnessCheck() {
+        bleQueue.async { [weak self] in
+            guard let self else { return }
+            guard self.preTestChannelAActive else { return }
+            guard let thighUUID = self.liveThighId, let calfUUID = self.liveCalfId else { return }
+
+            for uuid in [thighUUID, calfUUID] {
+                self.checkAndRecoverIfNeeded(uuid: uuid, mode: .monitorOnly)
+            }
+        }
+    }
+
+    /// 啟動 PreWorking 獨立 Channel A：純連線檢查＋封包新鮮度檢查，不做原始封包錄製。
+    /// 呼叫時機比照 `startLiveEstimateRealAngle`，在 PreWorking 動作測試面板 `onAppear` 一起呼叫。
+    func startPreTestChannelA(thighPeripheral: CBPeripheral, calfPeripheral: CBPeripheral) {
+        DispatchQueue.main.async {
+            self.preTestFreshnessTimer?.invalidate()
+            self.preTestFreshnessTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+                self?.tickPreTestConnectionAndFreshnessCheck()
+            }
+        }
+        bleQueue.async { [weak self] in
+            guard let self else { return }
+            self.preTestChannelAActive = true
+            self.preTestMonitoring.insert(thighPeripheral.identifier)
+            self.preTestMonitoring.insert(calfPeripheral.identifier)
+            self.subscribeAllCharacteristics(peripheral: thighPeripheral)
+            self.subscribeAllCharacteristics(peripheral: calfPeripheral)
+        }
+    }
+
+    /// 停止 PreWorking 獨立 Channel A：**不能依賴 `onDisappear`**——PreWorking 進入 Working2 是走
+    /// `.fullScreenCover`，不會觸發底層 `onDisappear`；必須在使用者點擊「遊戲」、觸發導頁的那一刻
+    /// 明確呼叫這個函式（working2-database-port-plan.md 18.2），否則會一路帶進 Working2、
+    /// 干擾 Working2 自己的 Channel A（例如組間休息時誤把剛關掉的 notify 重新打開）。
+    func stopPreTestChannelA(thighPeripheral: CBPeripheral, calfPeripheral: CBPeripheral) {
+        DispatchQueue.main.async {
+            self.preTestFreshnessTimer?.invalidate()
+            self.preTestFreshnessTimer = nil
+        }
+        bleQueue.async { [weak self] in
+            guard let self else { return }
+            self.preTestChannelAActive = false
+            self.preTestMonitoring.remove(thighPeripheral.identifier)
+            self.preTestMonitoring.remove(calfPeripheral.identifier)
+        }
+    }
+
+    /// 兩個 Channel A（Working2／PreWorking）共用的逐 uuid 檢查邏輯：連線檢查優先於封包新鮮度檢查。
+    private func checkAndRecoverIfNeeded(uuid: UUID, mode: RecoverySubscribeMode) {
+        guard let peripheral = peripheralMap[uuid] ?? connectedPeripherals[uuid],
+              peripheral.state == .connected else {
+            recoverIfNeeded(uuid: uuid, mode: mode)
+            return
+        }
+        if isAnySignalStale(uuid: uuid) {
+            recoverIfNeeded(uuid: uuid, mode: mode)
         }
     }
 
     /// 共用修復路徑：連線缺失／封包新鮮度逾時都導向這裡，依 `peripheral.state` 分流。
     /// 冷卻 3 秒、per-uuid 各自獨立，避免同一裝置在修復生效前被重複觸發。
-    private func recoverIfNeeded(uuid: UUID) {
+    private func recoverIfNeeded(uuid: UUID, mode: RecoverySubscribeMode) {
         let now = Int64(Date().timeIntervalSince1970 * 1000)
         if let last = lastRecoveryAttemptAt[uuid], now - last < 3000 { return }
         lastRecoveryAttemptAt[uuid] = now
@@ -365,9 +440,15 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         }
         switch peripheral.state {
         case .connected:
-            // 連線物件還在、資料 stale：重新走一次 startRecording，從簡對這顆裝置的
-            // ACC／GYRO／EXG 全部重新訂閱，並補送 cmd_a0／cmd_a1／cmd_a2（見 17.4 節）。
-            startRecording(peripheral: peripheral)
+            // 連線物件還在、資料 stale：從簡對這顆裝置的 ACC／GYRO／EXG 全部重新訂閱，並補送
+            // cmd_a0／cmd_a1／cmd_a2（見 17.4 節）。`.full` 連帶設定 isRecording（Working2 情境）；
+            // `.monitorOnly` 只訂閱不設定 isRecording（PreWorking 情境，見 18.3 節）。
+            switch mode {
+            case .full:
+                startRecording(peripheral: peripheral)
+            case .monitorOnly:
+                subscribeAllCharacteristics(peripheral: peripheral)
+            }
         case .connecting:
             break
         default:
@@ -377,7 +458,11 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
 
     // MARK: - Recording
 
-    func startRecording(peripheral: CBPeripheral) {
+    /// 只做「訂閱 ACC+GYRO+EXG + 補送 cmd_a0/a1/a2」，不碰 `isRecording`——給 `startRecording`
+    /// 跟 PreWorking Channel A 的 `.monitorOnly` 修復模式共用（working2-database-port-plan.md 18.3）。
+    /// 不能讓 PreWorking 的修復動作誤設 `isRecording`，否則會意外打開 `tickLiveEstimatedRealAngle()`
+    /// 的 `advanced_statistics` 寫入守門，讓 PreWorking 期間寫入 treatment_result_id 為 nil 的孤兒資料。
+    private func subscribeAllCharacteristics(peripheral: CBPeripheral) {
         guard let config = bluetoothConfig,
               let map = charMap[peripheral.identifier] else { return }
 
@@ -395,7 +480,10 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         if let c = map[accUUID]  { peripheral.setNotifyValue(true, for: c) }
         if let c = map[gyroUUID] { peripheral.setNotifyValue(true, for: c) }
         if let c = map[exgUUID]  { peripheral.setNotifyValue(true, for: c) }
+    }
 
+    func startRecording(peripheral: CBPeripheral) {
+        subscribeAllCharacteristics(peripheral: peripheral)
         DispatchQueue.main.async { self.isRecording = true }
     }
 
@@ -556,7 +644,9 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             self.baselineResult = nil
             self.isCollectingBaseline = true
         }
+        DeviceViewModel().debugDumpAllDevices(tag: "startBaselineCalibration")
         let side = DeviceViewModel().fetchAnySide() ?? 0
+        print("[SIDE-DIAG] startBaselineCalibration side=\(side)")
         beginAccOnlyCollection(thighPeripheral: thighPeripheral, calfPeripheral: calfPeripheral, durationSec: durationSec) { [weak self] thighSamples, calfSamples in
             let result = ACCCalibration.computeBaseline(thighSamples: thighSamples, calfSamples: calfSamples, side: side)
             DispatchQueue.main.async {
@@ -679,7 +769,9 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         // 改用 fetchAnySide() 查「目前實際綁定的那一側」——這個 app 一次最多只會綁 2 顆裝置（同一側），
         // 綁在右腳時這裡也要能通過檢查，不然右腳永遠無法啟動即時預估。
         let deviceVM = DeviceViewModel()
+        deviceVM.debugDumpAllDevices(tag: "startLiveEstimateRealAngle")
         let side = deviceVM.fetchAnySide() ?? 0
+        print("[SIDE-DIAG] startLiveEstimateRealAngle side=\(side) thighUUID=\(thighPeripheral.identifier) calfUUID=\(calfPeripheral.identifier)")
         guard deviceVM.fetch(side: side, limb: 0) != nil, deviceVM.fetch(side: side, limb: 1) != nil else { return }
 
         let thighId = thighPeripheral.identifier
@@ -765,16 +857,19 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         bleQueue.async { [weak self] in
             guard let self else { return }
 
-            // Working2 封包新鮮度保護（working2-database-port-plan.md 17.4）：閘門用 `recordingSessionActive`，
-            // 不是 `isRecording`——`isRecording` 會被 `didDisconnectPeripheral` 在裝置真的斷線當下直接設回
-            // false（刻意維持不動，繼續給下面的 DB 寫入守門用），如果這裡也看 `isRecording`，裝置一斷線
-            // 這段清空邏輯反而會被跳過，導致 incline 從未被清空、角度停在斷線前最後一個值，變不回「等待
-            // 資料...」——這是實測時發現的真實 bug，改看 `recordingSessionActive`（只由 startRecordingAll／
-            // stopRecordingAll 控制、不受斷線影響）才能讓斷線也正確觸發清空。組間休息／PreWorking 動作測試
-            // （`recordingSessionActive` 恆為 false）不受影響、維持原本行為。只清「真的 stale 的那一側」
-            // incline，currentEstimatedRealAngle 不分哪一側 stale 一律清成 nil，才能讓下面既有的
-            // nil-guard／畫面/`.onChange` 正確反映「資料不可信」。
-            if recordingSessionActive {
+            // 封包新鮮度保護（working2-database-port-plan.md 17.4／18.5）：閘門用 `isLiveEstimating`，
+            // 不是 `recordingSessionActive`——`recordingSessionActive` 只有 Working2 錄製期間才會是
+            // true，PreWorking 期間永遠是 false，如果這裡看 `recordingSessionActive`，PreWorking 動作
+            // 測試整段清空邏輯永遠不會執行，角度會停在斷線前最後一個值，變不回「等待資料...」（這是
+            // PreWorking 獨立 Channel A 實作完成後、實測時發現的真實 bug）。`isLiveEstimating` 從
+            // PreWorking 動作測試面板啟動開始、一路連續到 Working2 結束（含組間休息）才會變 false，
+            // 不會有轉場空窗，而且 `recordingSessionActive` 為 true 的範圍完全被包含在
+            // `isLiveEstimating` 為 true 的範圍裡，不會漏掉 Working2 原本想涵蓋的情況。組間休息時
+            // `isLiveEstimating` 仍是 true，會多做幾次無害的重複判斷，但不影響正確性、也不觸發任何
+            // BLE 動作（見 18.5 節）。只清「真的 stale 的那一側」incline，currentEstimatedRealAngle
+            // 不分哪一側 stale 一律清成 nil，才能讓下面既有的 nil-guard／畫面/`.onChange` 正確反映
+            // 「資料不可信」。
+            if isLiveEstimating {
                 let now = Int64(Date().timeIntervalSince1970 * 1000)
                 var thighStale = false
                 var calfStale = false
@@ -1210,8 +1305,12 @@ extension BluetoothViewModel: CBPeripheralDelegate {
         // （不像 `isRecording`，斷線當下就會被 `didDisconnectPeripheral` 動翻掉），這裡拿到新的
         // charMap 就重新走一次 startRecording，補回 notify 訂閱與 cmd_a0/a1/a2 設定，
         // 不然連線物件恢復了、裝置實際上還是不會再送資料（working2-database-port-plan.md 17.4）。
+        // PreWorking 情境（`preTestChannelAActive`）改呼叫不設定 isRecording 的 subscribeAllCharacteristics
+        // （working2-database-port-plan.md 18.3），兩種情境呼叫不同函式、不能共用同一個分支。
         if recordingSessionActive {
             startRecording(peripheral: peripheral)
+        } else if preTestChannelAActive {
+            subscribeAllCharacteristics(peripheral: peripheral)
         }
     }
 
@@ -1266,6 +1365,15 @@ extension BluetoothViewModel: CBPeripheralDelegate {
             if uuid == CBUUID(string: config.sub_acc_uuid) {
                 handleStepAccPacket(data, id: peripheral.identifier, config: config)
             }
+        }
+
+        // PreWorking 獨立 Channel A「監控但不落地寫資料庫」：lastPacketAt 已經在上面更新過，
+        // Channel B 需要的 handleLiveAccPacket/handleStepAccPacket 也已經在上面呼叫過，這裡直接
+        // return，不落到下面 parseACC/parseGYRO/parseEXG 那段寫入資料庫的邏輯——這同時也修正了
+        // 既有的問題：原本 liveEstimating 分支不 return，PreWorking 動作測試期間 ACC 封包會悄悄
+        // 寫進 acc 表（treatment_result_id 為 nil）（working2-database-port-plan.md 18.4）。
+        if preTestMonitoring.contains(peripheral.identifier) {
+            return
         }
 
         // 首次通知時 onConnected 已執行完畢，DB 已有裝置，lazy load device_id
