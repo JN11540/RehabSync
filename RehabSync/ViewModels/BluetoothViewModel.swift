@@ -139,6 +139,15 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     // 泛用設計：掛在 BluetoothViewModel 層級，任何呼叫 startLiveEstimateRealAngle 的 PreWorking
     // 頁面都可以直接呼叫這裡的 start/stop 函式，不用各自重新實作。
     @ObservationIgnored private var preTestChannelAActive = false
+    /// 要監控哪兩顆裝置，直接用 startPreTestChannelA 自己收到的 thighPeripheral/calfPeripheral 參數
+    /// 存下來，不要借用 liveThighId/liveCalfId——PreWorking_12 走的是 startStepStatusEstimation，
+    /// 只會設定 stepThighId/stepCalfId，從不碰 liveThighId/liveCalfId，如果 tick 函式讀 liveThighId/
+    /// liveCalfId，PreWorking_12 這裡永遠是 nil，Channel A 會變成表面上跑著、實際上每次都空轉的假保護
+    /// （preworking12-knee-plan.md 第 7 節）。獨立一組變數後，Channel A 不依賴任何特定 Channel B
+    /// 機制（角度／登階皆可），也不用假設 startLiveEstimateRealAngle/startStepStatusEstimation 一定要
+    /// 比 startPreTestChannelA 先執行。
+    @ObservationIgnored private var preTestThighId: UUID?
+    @ObservationIgnored private var preTestCalfId: UUID?
     /// 這個集合裡的 uuid，封包進來只更新 lastPacketAt（給新鮮度檢查用）跟餵給 Channel B，
     /// 不落地寫入 acc/gyro/exg 表——順便一併修正既有的 ACC 孤兒寫入問題（見 18.4 節）。
     @ObservationIgnored private var preTestMonitoring: Set<UUID> = []
@@ -364,14 +373,18 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     }
 
     /// PreWorking 獨立 Channel A：連線檢查＋封包新鮮度檢查，1 秒一次，只在 `preTestChannelAActive`
-    /// 為 true 時運作。裝置 UUID 直接沿用 `liveThighId`／`liveCalfId`（`startLiveEstimateRealAngle`
-    /// 已經用 `fetchAnySide()` 正確解析過），不重新查一次，避免重蹈「沒帶 side」的既有 bug
-    /// （working2-database-port-plan.md 18.8）。
+    /// 為 true 時運作。裝置 UUID 讀 `preTestThighId`／`preTestCalfId`（`startPreTestChannelA` 用自己
+    /// 收到的參數直接存下，不借用 `liveThighId`／`liveCalfId`，見該函式與 preworking12-knee-plan.md
+    /// 第 7 節）——不能沿用 `liveThighId`／`liveCalfId`，因為只有走 `startLiveEstimateRealAngle`
+    /// 的頁面（`PreWorking_2`／`9`）才會設定這兩個變數，走 `startStepStatusEstimation` 的
+    /// `PreWorking_12` 只會設定 `stepThighId`／`stepCalfId`，如果這裡讀 `liveThighId`／`liveCalfId`，
+    /// `PreWorking_12` 會拿到 nil、guard 直接 return，整個 Channel A 變成表面上跑著、實際上每次都
+    /// 空轉的假保護。
     private func tickPreTestConnectionAndFreshnessCheck() {
         bleQueue.async { [weak self] in
             guard let self else { return }
             guard self.preTestChannelAActive else { return }
-            guard let thighUUID = self.liveThighId, let calfUUID = self.liveCalfId else { return }
+            guard let thighUUID = self.preTestThighId, let calfUUID = self.preTestCalfId else { return }
 
             for uuid in [thighUUID, calfUUID] {
                 self.checkAndRecoverIfNeeded(uuid: uuid, mode: .monitorOnly)
@@ -380,7 +393,9 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     }
 
     /// 啟動 PreWorking 獨立 Channel A：純連線檢查＋封包新鮮度檢查，不做原始封包錄製。
-    /// 呼叫時機比照 `startLiveEstimateRealAngle`，在 PreWorking 動作測試面板 `onAppear` 一起呼叫。
+    /// 呼叫時機比照 `startLiveEstimateRealAngle`／`startStepStatusEstimation`，在 PreWorking
+    /// 動作測試面板 `onAppear` 一起呼叫，兩者呼叫先後順序不影響這裡（見 `preTestThighId`／
+    /// `preTestCalfId` 宣告處的說明）。
     func startPreTestChannelA(thighPeripheral: CBPeripheral, calfPeripheral: CBPeripheral) {
         DispatchQueue.main.async {
             self.preTestFreshnessTimer?.invalidate()
@@ -391,6 +406,8 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         bleQueue.async { [weak self] in
             guard let self else { return }
             self.preTestChannelAActive = true
+            self.preTestThighId = thighPeripheral.identifier
+            self.preTestCalfId  = calfPeripheral.identifier
             self.preTestMonitoring.insert(thighPeripheral.identifier)
             self.preTestMonitoring.insert(calfPeripheral.identifier)
             self.subscribeAllCharacteristics(peripheral: thighPeripheral)
@@ -1021,8 +1038,15 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             stepCalfIncline  = nil
             stepBaseline = baseline
             // advanced_statistics 記錄用的換算表，比照「站立即時預估」的站姿版做法（見 startLiveEstimateRealAngle 的 .standing 分支）。
-            stepShift = baseline < 0 ? (abs(baseline) + 10) : 0
-            stepBaselineTable = Self.standingMappingTable(baseline: baseline + stepShift, maxStep: 55, maxRealAngleDeg: 90)
+            // side 依鏡射分支選公式（working12-database-port-plan.md 19 節）：右膝感測器安裝方向與左膝相反，
+            // 沒有這個分支的話右膝使用者永遠套用左膝公式，advanced_statistics.angle 會算錯。
+            if side == 1 {
+                stepShift = baseline > 0 ? -(baseline + 10) : 0
+                stepBaselineTable = Self.standingMappingTableRight(baseline: baseline + stepShift, maxStep: 55, maxRealAngleDeg: 90)
+            } else {
+                stepShift = baseline < 0 ? (abs(baseline) + 10) : 0
+                stepBaselineTable = Self.standingMappingTable(baseline: baseline + stepShift, maxStep: 55, maxRealAngleDeg: 90)
+            }
             resetStepStatus()
             stepEstimating = [thighId, calfId]
 

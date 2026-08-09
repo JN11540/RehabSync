@@ -664,6 +664,12 @@ private struct PreWorking9MotionTestAboutPanel: View {
                 prepTimer?.invalidate()
                 prepTimer = nil
                 prepPhase = .idle
+                // 明確在導頁進 Working9 前停止 PreWorking 獨立 Channel A（preworking9-knee-plan.md
+                // 第 7 節）——這裡是真正觸發 navigateToWorking9 = true 的那一刻，不能依賴 onDisappear
+                // （.fullScreenCover 不會觸發底層 onDisappear），否則會一路帶進 Working9 干擾它自己的 Channel A。
+                if let pair = thighAndCalfPeripherals {
+                    btVM.stopPreTestChannelA(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+                }
                 onPlayGame()
             }
         )
@@ -680,17 +686,22 @@ private struct PreWorking9MotionTestAboutPanel: View {
     }
 
     /// 呼叫即時角度預估（站姿），圓圈裡的數字就是靠 btVM.currentEstimatedRealAngle 即時更新。
+    /// 同時啟動 PreWorking 獨立 Channel A（純連線檢查＋封包新鮮度檢查，不做原始封包錄製，
+    /// preworking9-knee-plan.md 第 7 節），兩者一起啟動、一起由 performCleanupThenPlay 裡的
+    /// stopPreTestChannelA 明確停止，不依賴 onDisappear。
     private func startLiveTestIfNeeded() {
         guard !btVM.isLiveEstimating,
               let pair = thighAndCalfPeripherals,
               let baseline = btVM.baselineResult
         else { return }
         btVM.startLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf, baseline: baseline, posture: .standing)
+        btVM.startPreTestChannelA(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
     }
 
     private func stopLiveTestIfNeeded() {
         guard btVM.isLiveEstimating, let pair = thighAndCalfPeripherals else { return }
         btVM.stopLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+        btVM.stopPreTestChannelA(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
     }
 
     private var sideLabelText: String {
