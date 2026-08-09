@@ -1175,6 +1175,21 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         recordingStartTime = Int64(Date().timeIntervalSince1970 * 1000)
         recordingEndTime   = nil
         recordingSessionActive = true
+        // 無條件清掉 PreWorking 獨立 Channel A 的殘留狀態（working2-database-port-plan.md 第 19 節）：
+        // 如果 PreWorking 導頁進 Working 那一刻裝置剛好瞬斷，thighAndCalfPeripherals 會回傳 nil，
+        // performCleanupThenPlay 裡的 stopPreTestChannelA 就完全不會被呼叫，preTestMonitoring 殘留的話
+        // 這場 Working 錄製的 acc/gyro/exg 封包會被 didUpdateValueFor 整場靜默攔截、完全不寫入資料庫。
+        // 真正開始錄製後，不應該再有任何 uuid 停留在「只監控不落地寫資料庫」模式，這裡無條件清空，
+        // 不管殘留是怎麼發生的都能自我修復；正常情況（stopPreTestChannelA 有成功呼叫）下這幾行只是
+        // 清一個已經是 false／nil／空集合的狀態，無害。
+        DispatchQueue.main.async { [weak self] in
+            self?.preTestFreshnessTimer?.invalidate()
+            self?.preTestFreshnessTimer = nil
+        }
+        bleQueue.async { [weak self] in
+            self?.preTestChannelAActive = false
+            self?.preTestMonitoring.removeAll()
+        }
         for peripheral in connectedPeripherals.values {
             startRecording(peripheral: peripheral)
         }
