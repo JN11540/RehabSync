@@ -970,8 +970,51 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     /// Timer callback（main thread 觸發），跳回 bleQueue 讀最新值判斷，算完再寫回主執行緒的 UI 屬性。
     private func tickStepStatus() {
         bleQueue.async { [weak self] in
-            guard let self,
-                  let thigh = stepThighIncline,
+            guard let self else { return }
+
+            // Working12 封包新鮮度保護（working12-database-port-plan.md 18.2）：閘門用 `recordingSessionActive`，
+            // 不是 `isRecording`——理由同 `tickLiveEstimatedRealAngle()`（working2-database-port-plan.md 17.4）：
+            // `isRecording` 會被 `didDisconnectPeripheral` 在裝置真的斷線當下直接設回 false，如果這裡也看
+            // `isRecording`，裝置一斷線這段清空邏輯反而會被跳過。組間休息（`recordingSessionActive` 恆為
+            // false）不評估、不清空，維持原本行為。只清「真的 stale 的那一側」incline，`currentStepStatus`
+            // 不分哪一側 stale 一律清成 nil，並跳過該次 `insertAdvancedStatistics` 寫入。
+            if recordingSessionActive {
+                let now = Int64(Date().timeIntervalSince1970 * 1000)
+                var thighStale = false
+                var calfStale = false
+                if let thighId = stepThighId {
+                    let age = lastPacketAt[thighId]?[Self.signalACC].map { now - $0 }
+                    thighStale = age.map { $0 > 1000 } ?? false
+                }
+                if let calfId = stepCalfId {
+                    let age = lastPacketAt[calfId]?[Self.signalACC].map { now - $0 }
+                    calfStale = age.map { $0 > 1000 } ?? false
+                }
+                if thighStale { stepThighIncline = nil }
+                if calfStale  { stepCalfIncline  = nil }
+                if thighStale || calfStale {
+                    DispatchQueue.main.async { self.currentStepStatus = nil }
+                    return
+                }
+            }
+
+            #if DEBUG
+            // 直接讀 lastPacketAt（跟上面新鮮度判斷同一份資料），不另外宣告 stepThighLastPacketAt／
+            // stepCalfLastPacketAt 第二份狀態（working12-database-port-plan.md 18.2 已定案的簡化）。
+            let now = Int64(Date().timeIntervalSince1970 * 1000)
+            let thighAgeMs = stepThighId.flatMap { self.lastPacketAt[$0]?[Self.signalACC] }.map { now - $0 }
+            let calfAgeMs = stepCalfId.flatMap { self.lastPacketAt[$0]?[Self.signalACC] }.map { now - $0 }
+            print("[STEP-STATUS-DIAG] tick: thighIncline=\(stepThighIncline.map { String(format: "%.2f", $0) } ?? "nil")（\(thighAgeMs.map { "\($0)ms 前" } ?? "從未收過")）"
+                  + " calfIncline=\(stepCalfIncline.map { String(format: "%.2f", $0) } ?? "nil")（\(calfAgeMs.map { "\($0)ms 前" } ?? "從未收過")）")
+            if let thighAgeMs, thighAgeMs > 1000 {
+                print("[STEP-STATUS-DIAG] ⚠️ 大腿已經超過 1 秒沒收到新封包，登階狀態會凍結不動")
+            }
+            if let calfAgeMs, calfAgeMs > 1000 {
+                print("[STEP-STATUS-DIAG] ⚠️ 小腿已經超過 1 秒沒收到新封包，登階狀態會凍結不動")
+            }
+            #endif
+
+            guard let thigh = stepThighIncline,
                   let calf  = stepCalfIncline else { return }
             let kneeAngle = thigh - calf
             let status = detectStepStatus(kneeAngle: kneeAngle, baseline: stepBaseline)
@@ -983,10 +1026,10 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             let rounded = (realAngle * 10).rounded() / 10
 
             // 組間休息（未在記錄中）時暫停寫入，跟 acc/gyro/exg 的起訖規則一致。
-            let (recording, treatmentResultId) = DispatchQueue.main.sync {
+            let (stillRecording, treatmentResultId) = DispatchQueue.main.sync {
                 (self.isRecording, self.currentTreatmentResultId)
             }
-            guard recording else { return }
+            guard stillRecording else { return }
             let ts = Int64(Date().timeIntervalSince1970 * 1000)
             self.deviceVM.insertAdvancedStatistics(timestamp: ts, angle: rounded, treatmentResultId: treatmentResultId)
         }
