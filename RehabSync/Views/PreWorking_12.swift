@@ -662,6 +662,12 @@ private struct PreWorking12MotionTestAboutPanel: View {
                 prepTimer?.invalidate()
                 prepTimer = nil
                 prepPhase = .idle
+                // 明確在導頁進 Working12 前停止 PreWorking 獨立 Channel A（preworking12-knee-plan.md
+                // 第 7 節）——這裡是真正觸發 navigateToWorking12 = true 的那一刻，不能依賴 onDisappear
+                // （.fullScreenCover 不會觸發底層 onDisappear），否則會一路帶進 Working12 干擾它自己的 Channel A。
+                if let pair = thighAndCalfPeripherals {
+                    btVM.stopPreTestChannelA(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+                }
                 onPlayGame()
             }
         )
@@ -678,17 +684,22 @@ private struct PreWorking12MotionTestAboutPanel: View {
     }
 
     /// 呼叫即時登階狀態估計，讓感測管線在進入遊戲前先暖機。
+    /// 同時啟動 PreWorking 獨立 Channel A（純連線檢查＋封包新鮮度檢查，不做原始封包錄製，
+    /// preworking12-knee-plan.md 第 7 節），兩者一起啟動、一起由 performCleanupThenPlay 裡的
+    /// stopPreTestChannelA 明確停止，不依賴 onDisappear。
     private func startLiveTestIfNeeded() {
         guard !btVM.isEstimatingStepStatus,
               let pair = thighAndCalfPeripherals,
               let baseline = btVM.baselineResult
         else { return }
         btVM.startStepStatusEstimation(thighPeripheral: pair.thigh, calfPeripheral: pair.calf, baseline: baseline)
+        btVM.startPreTestChannelA(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
     }
 
     private func stopLiveTestIfNeeded() {
         guard btVM.isEstimatingStepStatus, let pair = thighAndCalfPeripherals else { return }
         btVM.stopStepStatusEstimation(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+        btVM.stopPreTestChannelA(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
     }
 
     private var sideLabelText: String {

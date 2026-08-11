@@ -58,8 +58,8 @@ struct Working22: View {
     // 進測試頁時 guard 擋住重啟，畫面顯示殘留的舊角度或舊姿勢公式。
     private var thighAndCalfPeripherals: (thigh: CBPeripheral, calf: CBPeripheral)? {
         let dvm = DeviceViewModel()
-        guard let thigh = dvm.fetch(limb: 0), let thighUUID = UUID(uuidString: thigh.device_uuid),
-              let calf  = dvm.fetch(limb: 1), let calfUUID  = UUID(uuidString: calf.device_uuid),
+        guard let thigh = dvm.fetch(side: side, limb: 0), let thighUUID = UUID(uuidString: thigh.device_uuid),
+              let calf  = dvm.fetch(side: side, limb: 1), let calfUUID  = UUID(uuidString: calf.device_uuid),
               let thighPeripheral = btVM.connectedPeripherals[thighUUID],
               let calfPeripheral  = btVM.connectedPeripherals[calfUUID]
         else { return nil }
@@ -883,6 +883,14 @@ struct Working22: View {
                             .foregroundStyle(.black)
                             .minimumScaleFactor(0.3)
                             .lineLimit(1)
+                            .padding(12)
+                    } else {
+                        Text("等待資料...")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(.gray)
+                            .minimumScaleFactor(0.3)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.center)
                             .padding(12)
                     }
                 }
