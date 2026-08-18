@@ -133,6 +133,19 @@ struct PreWorking_2: View {
             .offset(x: 20, y: 20)
         }
         .ignoresSafeArea()
+        // 🔴 TKE 路徑的 PreWorking 端停用點**只有這裡**（根 View），兩個子面板都不可以停（§8.4）。
+        //
+        // 根 View 的語意剛好吻合三種需求，不需要額外的狀態判斷：
+        //   校正面板 → 動作測試面板（切換 step）：不觸發（同一個根 View）→ 路徑存活 ✅
+        //   按返回離開 PreWorking_2：          觸發                    → 路徑停用 ✅
+        //   .fullScreenCover 進 Working2：      不觸發（被覆蓋的那一層）  → 交棒 ✅
+        //
+        // 少了這一行就會有這個洩漏：校正失敗後使用者直接按返回離開，校正面板依規則不停用、
+        // 動作測試面板從未出現所以它的 .onDisappear 永遠不觸發 → 路徑永久殘留 →
+        // 接著進 PreWorking_9，TKE 分支在 liveEstimating 之前 return，動作 9 的即時角度完全失效。
+        .onDisappear {
+            if btVM.isTKEPathActive { btVM.stopTKEPath() }
+        }
         .fullScreenCover(isPresented: $navigateToWorking2) {
             Working2(content: content, exercise: exercise, onReturnToDashboard: onReturnToDashboard)
         }
@@ -423,12 +436,23 @@ private struct PreWorking2CalibrationAboutPanel: View {
     @State private var prepTickCount = 0
     @State private var prepTimer: Timer?
     @State private var isCalibrating = false
-    @State private var calibrationCountdown = 5
+    @State private var calibrationCountdown = calibrationSeconds
     @State private var countdownTimer: Timer?
     @State private var calibrationSucceeded = false
-    @State private var calibrationFailed = false
+    /// 校正結果訊息（`KneeCalibrationResult.message`）。11 種：10 種失敗 + 1 種「校正成功」。
+    /// 取代原本的 `calibrationFailed: Bool` —— 新流程要把**原因**告訴使用者，不只是成功/失敗。
+    @State private var calibrationMessage: String?
 
     private let prepMessage = "請坐好\n不要動"
+
+    /// 收集秒數。**畫面倒數與 `startKneeCalibration(durationSec:)` 必須是同一個值** ——
+    /// 兩邊各寫一次數字就是「有兩份、改了一份」，倒數歸零時後端還沒算完（或反之）。
+    ///
+    /// 用 5 而不是 `Test.swift` 的 8：TKE 路徑在 3 秒閃爍提示階段（`startPreparing`）就已啟用，
+    /// 平滑視窗（N=30 ≈ 0.29 秒）在收集開始前就填滿，所以這 5 秒是**零暖機損耗**的 5 秒 ——
+    /// 520 筆全部可用，對 250 門檻佔比 48%，正好還原 Python 原版的門檻嚴格度。
+    /// `Test.swift` 的 8 秒是為了補償「收集期包含路徑啟動」才放寬的。詳見 §8.2①。
+    private static let calibrationSeconds = 5
 
     private var thighAndCalfPeripherals: (thigh: CBPeripheral, calf: CBPeripheral)? {
         let dvm = DeviceViewModel()
@@ -451,18 +475,27 @@ private struct PreWorking2CalibrationAboutPanel: View {
         "\(side == 1 ? "右" : "左")腳版本"
     }
 
-    /// 按下「校正」開始 5 秒倒數（純視覺），同時呼叫真正的校正演算法（收集 5 秒加速度計算基準角）；
-    /// 成功或失敗的判定改成由 `startBaselineCalibration` 的 completion 觸發（後端真正算完的那一刻），
+    /// 按下「校正」開始 5 秒倒數（純視覺），同時呼叫真正的校正演算法；
+    /// 成功或失敗的判定由 `startKneeCalibration` 的 completion 觸發（後端真正算完的那一刻），
     /// 不再用「倒數結束 + 0.3 秒緩衝」去猜後端是否已經算完——猜測秒數在系統忙碌時會不準，
     /// 曾經發生過後端其實已經算出結果、但 UI 因為猜測時間到了而提早判定失敗的競爭情況。
+    ///
+    /// 演算法已從舊的 `startBaselineCalibration`（`ACCCalibration.computeBaseline`，自動偵測穩定平台
+    /// + mapping table）換成 offset 模型 `startKneeCalibration`（`KneeCalibration.computeOffsets`）。
+    /// **舊函式不可移除** —— 動作 9／12／22 仍在使用（§8.1）。
     private func startCalibration() {
         guard let pair = thighAndCalfPeripherals else { return }
-        calibrationFailed = false
+        calibrationMessage = nil
         isCalibrating = true
-        calibrationCountdown = 5
+        calibrationCountdown = Self.calibrationSeconds
         countdownTimer?.invalidate()
-        btVM.startBaselineCalibration(thighPeripheral: pair.thigh, calfPeripheral: pair.calf) { _ in
-            evaluateCalibrationResult()
+        // 路徑已在 startPreparing() 啟用，這裡 startKneeCalibration 內部的 alreadyActive 分支會成立，
+        // 因此不會重置 tkeClock 與平滑器（§8.2②）——這正是「5 秒零暖機損耗」的前提。
+        // ownsConnectionRecovery 省略不傳：預設 false，正式流程不啟動 tkeFreshnessTimer（§8.3）。
+        btVM.startKneeCalibration(spec: TKESpec.self,
+                                  thighPeripheral: pair.thigh, calfPeripheral: pair.calf,
+                                  durationSec: Double(Self.calibrationSeconds)) { result in
+            evaluateCalibrationResult(result)
         }
         countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
             if calibrationCountdown > 1 {
@@ -473,22 +506,40 @@ private struct PreWorking2CalibrationAboutPanel: View {
         }
     }
 
-    /// 由 `startBaselineCalibration` 的 completion 呼叫，這時 `btVM.baselineResult` 保證已經寫入完成。
-    private func evaluateCalibrationResult() {
+    /// 由 `startKneeCalibration` 的 completion 呼叫（已在主執行緒、且 `btVM.tkeResult` 已寫入完成）。
+    ///
+    /// 刻意收 `result` 參數而不是回頭讀 `btVM.tkeResult` —— 兩者內容相同，但直接用參數
+    /// 就不存在「讀到的是不是這一次的結果」這個問題。
+    private func evaluateCalibrationResult(_ result: KneeCalibrationResult) {
         countdownTimer?.invalidate()
         isCalibrating = false
-        if btVM.baselineResult != nil {
-            calibrationSucceeded = true
-        } else {
-            calibrationFailed = true
-        }
+        // succeeded == (thigh != nil && calf != nil)，等價於 §8.2② 的 `if let thigh, let calf`
+        calibrationSucceeded = result.succeeded
+        // 成功也顯示訊息（"校正成功"），不只失敗才顯示 —— 11 種訊息共用同一個顯示位置（§8.2③）
+        calibrationMessage = result.message
     }
 
     /// 按下「校正」先進入 3 秒準備階段，畫面每秒閃爍一次「請坐好，不要動」（共 3 次），
     /// 3 秒後才真正呼叫既有的 startCalibration()（5 秒倒數＋收集，秒數不變）。
+    ///
+    /// 🔴 **TKE 路徑在這裡啟用，不是在 `startCalibration()`。**
+    /// 3 秒閃爍提示階段真正的作用是**填滿平滑視窗**（N=30 ≈ 0.29 秒）——
+    /// 視窗若沒先填滿，收集期的前 29 筆會被丟棄，那才是「520 筆零暖機損耗」的來源。
+    /// 順帶累積的約 15 個回歸觀測點不是重點（門檻只有 10，從來不是瓶頸）。詳見 §8.2①。
+    ///
+    /// 🔴 **路徑的停用點在根 View 的 `.onDisappear`，不在這個面板。**
+    /// 校正成功會切換到動作測試面板、本面板隨之消失；若在這裡停用會清掉 clock 與平滑器，
+    /// 動作測試面板得重新暖機約 2 秒 —— 而那個症狀看起來像效能問題、不像設定錯誤（§8.4）。
     private func startPreparing() {
-        guard thighAndCalfPeripherals != nil else { return }
-        calibrationFailed = false
+        guard let pair = thighAndCalfPeripherals else { return }
+        // 已啟用就不重啟：重啟會清掉 tkeClock／平滑器／buffer，重試反而比第一次更沒有暖機餘裕，
+        // 也會多送一次 cmd_a0/a1/a2 與 setNotify。比照 startKneeCalibration 自己的 alreadyActive 判斷。
+        if !btVM.isTKEPathActive {
+            // ownsConnectionRecovery 省略不傳：預設 false。正式流程不可啟動 tkeFreshnessTimer，
+            // 否則組間休息時它會把 stopRecordingAll 剛關掉的 notify 重新訂閱回來（§8.3）。
+            btVM.startTKEPath(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+        }
+        calibrationMessage = nil
         isPreparing = true
         prepTickCount = 0
         prepTimer?.invalidate()
@@ -578,11 +629,19 @@ private struct PreWorking2CalibrationAboutPanel: View {
                 .opacity(thighAndCalfPeripherals == nil ? 0.4 : 1)
             }
 
-            if calibrationFailed {
-                Text("校正失敗，請重新嘗試")
-                    .font(.system(size: 25, weight: .semibold))
-                    .foregroundStyle(.red)
-            }
+            // 校正結果訊息（§8.2③）：11 種共用同一個位置，成功綠、失敗紅。
+            //
+            // 🔴 高度固定保留，不能只在有訊息時才出現 —— 這個 VStack 上下都是 Spacer，
+            // 內容高度一變整組就重新置中，圓圈會上下跳動。版面以最長的 5b 動態字串為準
+            //（「封包遺失嚴重（大腿 12 包 / 小腿 38 包），請確認裝置距離與電量」約 30 字），
+            // 在半個畫面寬度下會折成兩行，所以固定保留兩行的高度。
+            Text(calibrationMessage ?? " ")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(calibrationSucceeded ? Color.green : Color.red)
+                .lineSpacing(4)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, minHeight: 58, alignment: .topLeading)
+                .opacity(calibrationMessage == nil ? 0 : 1)
 
             if !calibrationSucceeded && thighAndCalfPeripherals == nil {
                 Text("裝置未連線")
@@ -672,6 +731,10 @@ private struct PreWorking2MotionTestAboutPanel: View {
                 if let pair = thighAndCalfPeripherals {
                     btVM.stopPreTestChannelA(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
                 }
+                // 🔴 TKE 路徑與即時角度刻意**不停用**——採「交棒」模式（§8.4）：
+                // 一路帶進 Working2，由 2_Working 的 .onDisappear 收尾（階段 D）。
+                // 好處是無轉場空窗、tkeClock 連續、免 2 秒暖機；比照現行 isLiveEstimating 的做法。
+                // 這裡只停 Channel A，因為 Working2 有它自己的 Channel A，兩者會互相干擾。
                 onPlayGame()
             }
         )
@@ -687,22 +750,64 @@ private struct PreWorking2MotionTestAboutPanel: View {
         return (thighPeripheral, calfPeripheral)
     }
 
-    /// 呼叫即時角度預估（坐姿），圓圈裡的數字就是靠 btVM.currentEstimatedRealAngle 即時更新。
-    /// 同時啟動 PreWorking 獨立 Channel A（純連線檢查＋封包新鮮度檢查，不做原始封包錄製，
-    /// working2-database-port-plan.md 第 18 節），兩者一起啟動、一起由 performCleanupThenPlay 裡的
-    /// stopPreTestChannelA 明確停止，不依賴 onDisappear。
+    /// 啟動「Channel A（4 訊號連線／新鮮度檢查）」與「即時角度」——**兩者各自獨立判斷，不共用 guard**。
+    ///
+    /// 🔴 **這對函式最容易照抄成錯的**：名字與呼叫點都不必改，看起來完全不用動，
+    /// 但舊版把三件事綁在同一個 guard 底下：
+    ///
+    /// ```swift
+    /// guard !btVM.isLiveEstimating,
+    ///       let pair = thighAndCalfPeripherals,
+    ///       let baseline = btVM.baselineResult   // ← 新流程不再產生這個值
+    /// else { return }
+    /// btVM.startLiveEstimateRealAngle(...)
+    /// btVM.startPreTestChannelA(...)            // ← 跟著被擋掉
+    /// ```
+    ///
+    /// 動作 2 改用 offset 模型後 `baselineResult` 永遠是 nil、`isLiveEstimating` 永遠是 false，
+    /// guard 直接短路 —— `startPreTestChannelA` **一次都不會被呼叫**，
+    /// 4 訊號新鮮度檢查、EXG／GYRO 訂閱、連線修復全部消失，
+    /// 動作測試階段退化成跟校正階段一樣沒有保護，**而畫面上看不出任何異常**。
+    ///
+    /// 這與第 14 節「`thighAndCalfPeripherals` 沒帶 `side:` 導致右腳 guard 永遠短路」同型 ——
+    /// **把多件事綁在同一個 guard 底下，其中一件的前提改變就會連坐**（§8.3）。
     private func startLiveTestIfNeeded() {
-        guard !btVM.isLiveEstimating,
-              let pair = thighAndCalfPeripherals,
-              let baseline = btVM.baselineResult
-        else { return }
-        btVM.startLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf, baseline: baseline, posture: .sitting)
+        guard let pair = thighAndCalfPeripherals else { return }
+
+        // ① Channel A：無條件啟動 —— 它監控 ACC／GYRO／EXG_CH0／EXG_CH1 共 4 個訊號，
+        //    與校正結果、與用哪個角度模型完全無關。TKE 路徑只訂閱 ACC，取代不了它（§8.3）。
         btVM.startPreTestChannelA(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+
+        // ② 角度路徑：另外判斷。含 §8.2④ 的 side 一致性檢查 ——
+        //    校正後換綁裝置會讓 k 值符號相反、theta 整個偏 180°，而畫面上只會看到
+        //    一個看似合理但錯誤的數字。正常流程走不到（離開頁面會 stopTKEPath 清掉 tkeResult），
+        //    但保留為防禦；不做專屬 UI，失敗時印 log 即可。
+        guard let r = btVM.tkeResult, r.succeeded else {
+            print("[TKE-LIVE] 動作測試面板：尚無成功的校正結果，不啟動即時角度")
+            return
+        }
+        guard r.side == side else {
+            print("[TKE-LIVE] ⚠️ 動作測試面板：綁定側已變更（校正時=\(r.side)、目前=\(side)），不啟動即時角度")
+            return
+        }
+        btVM.startTKELiveAngle()
     }
 
+    /// 只停 Channel A。
+    ///
+    /// 🔴 **這裡不可以呼叫 `stopTKEPath()`**：本函式掛在動作測試面板的 `.onDisappear`，
+    /// 使用者從動作測試面板退回校正面板時也會觸發 —— 那會誤殺路徑。
+    /// TKE 路徑的停用點統一在**根 View 的 `.onDisappear`**（§8.4，已於階段 B 實作）。
+    ///
+    /// 📌 **也刻意不呼叫 `stopTKELiveAngle()`**：即時角度要一路交棒進 `Working2`
+    /// （`.fullScreenCover` 不觸發底層 `onDisappear`，所以導頁時本函式不會執行）。
+    /// 把它放進來會讓整個交棒機制的成立與否，取決於 `fullScreenCover` 的 `onDisappear` 語意。
+    /// 唯一沒被涵蓋的情境是「從動作測試面板退回校正面板重新校正」，
+    /// 目前 UI 沒有這條路徑（動作測試面板沒有上一步按鈕）；
+    /// **日後若要加上一步按鈕，必須在那個 action 裡明確呼叫 `stopTKELiveAngle()`** ——
+    /// 否則即時與校正會同時操作 `tkeBuffers`，兩者的 buffer 保留規則是衝突的（§4.5①）。
     private func stopLiveTestIfNeeded() {
-        guard btVM.isLiveEstimating, let pair = thighAndCalfPeripherals else { return }
-        btVM.stopLiveEstimateRealAngle(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+        guard let pair = thighAndCalfPeripherals else { return }
         btVM.stopPreTestChannelA(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
     }
 
@@ -744,7 +849,11 @@ private struct PreWorking2MotionTestAboutPanel: View {
                     .fill(Color(red: 0.90, green: 0.87, blue: 0.98))
                 Circle()
                     .strokeBorder(PreWorking_2.midPurple, lineWidth: 4)
-                if let angle = btVM.currentEstimatedRealAngle {
+                // 讀 displayKneeAngle（夾限到 0），不是 currentEstimatedRealAngle。
+                // offset 模型完全伸直時 theta 是負值（實測 −12.7°／−15.6°），那是 C 增益補償的
+                // 預期行為、對演算法有意義，所以計算與寫入 advanced_statistics 都不夾限；
+                // 但顯示「−12.7°」對治療師是異常數字，只有顯示層夾限（§20.3）。
+                if let angle = btVM.displayKneeAngle {
                     Text(String(format: "%.1f°", angle))
                         .font(.system(size: 36, weight: .bold))
                         .foregroundStyle(PreWorking_2.darkPurple)

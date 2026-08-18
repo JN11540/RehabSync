@@ -877,7 +877,10 @@ struct Working22: View {
                         .strokeBorder(Color.black, lineWidth: 1.5)
                         .padding(4)
 
-                    if let angle = btVM.currentEstimatedRealAngle {
+                    // 唯一把角度**數字**顯示給使用者的地方 → 讀夾限過的 displayKneeAngle。
+                    // 計算與寫入 advanced_statistics 保留負值（校正殘差），只有顯示層夾限。
+                    // 負值出現在站直（動作的起始端），與門檻 70／25 都差得很遠，夾限不影響任何分支。
+                    if let angle = btVM.displayKneeAngle {
                         Text(String(format: "%.0f°", angle))
                             .font(.system(size: 50, weight: .bold))
                             .foregroundStyle(.black)
@@ -1002,6 +1005,10 @@ struct Working22: View {
                 )
             }
         }
+        // 這裡刻意**不**用 displayKneeAngle —— handleAngleChange 是遊戲判定
+        // （雙段門檻遲滯 holdAngleThreshold = 70／releaseAngleThreshold = 25），
+        // 判定一律讀未夾限值。結果其實相同（負值與 0 都遠低於 25），
+        // 維持未夾限是為了讓「判定讀原值、顯示讀夾限值」這條規則在檔案裡沒有例外。
         .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
             guard !isSessionPaused, btVM.isRecording else { return }
             handleAngleChange(newValue)
@@ -1016,6 +1023,18 @@ struct Working22: View {
         }
         .onDisappear {
             stopLiveTestIfNeeded()
+            // 🔴 TKE 路徑的**交棒終點**，必須是獨立的一行，不可放進 stopLiveTestIfNeeded()。
+            //
+            // 那個 helper 開頭是 `guard btVM.isLiveEstimating`，而新流程走 startTKELiveAngle()
+            // 設的是 isTKELiveEstimating —— 放進去會被 guard 短路、一次都不會執行，
+            // 交棒等於沒有終點：離開後 notify 一直開、tkeCollecting 一直攔截封包。
+            //
+            // 這條出口 PreWorking_22 根 View 的 .onDisappear 救不到 ——
+            // 導頁走 .fullScreenCover，不會觸發被覆蓋那一層的 onDisappear。
+            //
+            // ⚠️ 觸發時機比「遊戲結束」晚：PostWorking_22 蓋在 Working22 之上，
+            // 要到從結果頁返回總覽、整個堆疊收起才觸發。
+            btVM.stopTKEPath()
             trembleTimer?.invalidate()
             holdTimer?.invalidate()
             releaseWorkItem?.cancel()

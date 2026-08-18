@@ -1,0 +1,261 @@
+import Foundation
+
+/// BLE 封包時間軸重建與訊號平滑 —— **與動作無關的通用層**。
+///
+/// 解決的是通訊層問題：兩顆各自獨立計時的 BLE 裝置，如何把各自的封包定位到共同時間軸上，
+/// 以便逐筆配對。任何需要「大腿＋小腿跨裝置對齊」的動作都可以直接使用，不限於動作 2。
+///
+/// 設計與實測依據見 tke-sitting-calibration-port-plan.md §4.2、§9 階段 0–2。
+/// 動作專屬的角度公式、姿勢門檻、校正流程請放在各自的 `N_Calibration.swift`。
+
+/// 一筆已平滑、已定位的加速度樣本。
+///
+/// `k` 是 Serial 展開後的全域樣本索引，**不存時間戳** —— 時間一律透過 `BLEClockFit` 換算。
+struct BLESample {
+    let k: Int      // 全域樣本索引 = packetIndex * samplesPerPacket + i
+    let x: Double   // mg，已套用因果移動平均
+    let y: Double
+    let z: Double
+}
+
+/// 因果移動平均。在**原始 x/y/z 域**做平滑，不是角度域。
+///
+/// 視窗未滿前一律丟棄（暖機期處理）—— Python 原版靠收集前的穩定期讓視窗先填滿，
+/// App 不設穩定期，所以改成「未滿就不輸出」，代價僅 `window - 1` 筆。
+struct CausalSmoother {
+    /// 視窗長度。動作 2 用 30（≈0.29 秒 @104Hz）；其他動作可依需要調整。
+    let window: Int
+
+    private var buf: [(x: Double, y: Double, z: Double)] = []
+    private var head = 0
+    private var sumX = 0.0, sumY = 0.0, sumZ = 0.0
+
+    /// 已因暖機未滿而丟棄的樣本數（診斷用）
+    private(set) var warmupDiscarded = 0
+
+    init(window: Int = 30) {
+        self.window = window
+    }
+
+    /// 推入一筆原始樣本；視窗未滿時回傳 nil。
+    mutating func push(x: Double, y: Double, z: Double) -> (x: Double, y: Double, z: Double)? {
+        if buf.count < window {
+            buf.append((x, y, z))
+            sumX += x; sumY += y; sumZ += z
+            if buf.count < window {
+                warmupDiscarded += 1
+                return nil
+            }
+        } else {
+            // 環形覆寫：扣掉最舊的、加上最新的，維持 O(1)
+            let old = buf[head]
+            sumX += x - old.x
+            sumY += y - old.y
+            sumZ += z - old.z
+            buf[head] = (x, y, z)
+            head = (head + 1) % window
+        }
+        let n = Double(window)
+        return (sumX / n, sumY / n, sumZ / n)
+    }
+
+    /// clock 重置時一併呼叫 —— 重置後樣本的 `k` 落在新的編號基準，
+    /// 舊視窗裡的資料已無法與另一側對齊，繼續沿用只會產生錯誤的平滑值。
+    mutating func reset() {
+        buf.removeAll(keepingCapacity: true)
+        head = 0
+        sumX = 0; sumY = 0; sumZ = 0
+    }
+}
+
+/// 單一裝置的回歸擬合結果。
+/// `a`／`b` 供跨裝置配對換算索引，`pointCount` 供呼叫端判斷回歸是否可信。
+struct BLEClockFit {
+    let a: Double              // 截距（ms，相對於 session t0）
+    let b: Double              // 實測取樣週期（ms/sample）
+    let pointCount: Int        // 回歸觀測點數
+    let residualStdMs: Double  // 殘差標準差＝實際 BLE 到達抖動量
+
+    /// 樣本索引 → 主機時刻（ms，相對於 session t0）
+    func time(at k: Int) -> Double { a + b * Double(k) }
+
+    /// 主機時刻 → 樣本索引（四捨五入到最近的整數索引）
+    func sampleIndex(atTime t: Double) -> Int { Int(((t - a) / b).rounded()) }
+
+    /// 由 `b` 反推的實測取樣率（Hz）
+    var measuredRateHz: Double { b > 0 ? 1000.0 / b : 0 }
+}
+
+/// 單一裝置的時間軸狀態。
+///
+/// 兩件事分開處理：
+/// - **順序**：用封包的 Serial No 展開成單調遞增的全域樣本索引 `k`，完全不受到達時間影響。
+/// - **對應**：用到達時間對 `k` 做增量最小平方回歸，估出 `k → 主機時鐘` 的映射。
+///
+/// 這樣拆的好處是「掉包」與「抖動」互不干擾：掉包只在 `k` 上留下正確的空隙、不位移倖存樣本；
+/// 到達時間的抖動則被回歸平均掉，而不是逐包污染每一筆樣本的時間定位。
+///
+/// 時間一律使用「相對於 session t0 的毫秒」而非 epoch 毫秒 —— 見 `ingest` 的說明。
+struct BLEDeviceClock {
+
+    // MARK: - 常數
+
+    /// 標稱取樣週期（104Hz）。只在回歸尚未可信時，充當交叉驗證的後備估計值。
+    static let nominalPeriodMs = 1000.0 / 104.0
+    /// 每個封包帶幾筆樣本（實測 shift=20，相鄰封包零重疊）
+    static let samplesPerPacket = 20
+    /// 回歸至少要這麼多觀測點才可信
+    static let minPointsForFit = 10
+    /// serial 推算的間隔與實際到達間隔差距超過這個值，視為 serial 異常並重置
+    static let crossCheckToleranceMs = 1000.0
+
+    // MARK: - Serial 展開狀態
+
+    private(set) var lastSerial: UInt8?
+    private(set) var packetIndex = 0
+    private(set) var lastArrivalMs: Double?
+
+    // MARK: - 增量最小平方累加量
+    // 為了數值精度，`t` 必須是「相對於 session t0」的毫秒，不能用 epoch 毫秒：
+    // epoch ms ≈ 1.7e12，平方後 ≈ 3e24，Double 只有約 16 位有效數字，
+    // 算 SSE 時的大數相減會把整個殘差資訊吃掉。
+
+    private(set) var sumK = 0.0
+    private(set) var sumT = 0.0
+    private(set) var sumKK = 0.0
+    private(set) var sumKT = 0.0
+    private(set) var sumTT = 0.0
+    private(set) var pointCount = 0
+
+    /// 因 serial 異常而重置的次數（診斷用）
+    private(set) var resetCount = 0
+
+    /// 最近一次重置的判定依據（診斷用）。用來分辨重置的**成因**：
+    /// - `actualGap` 遠大於 `expectedGap` → **串流暫停**（例如重送設定指令、重新訂閱打斷了取樣）
+    /// - `delta` 異常大而 `actualGap` 正常 → **裝置端 serial 計數器被重置**
+    /// - 兩者接近但仍超過容許值 → 頻寬壅塞造成的到達時間抖動
+    private(set) var lastResetInfo: (delta: Int, expectedGapMs: Double, actualGapMs: Double)?
+
+    // MARK: - 結果
+
+    enum Outcome: Equatable {
+        /// 正常收下，回傳本包樣本的起始索引（樣本 i 的索引為 firstK + i）
+        case accepted(firstK: Int)
+        /// serial 沒有前進，視為重複封包，丟棄
+        case duplicate
+        /// serial 與到達時間對不上（計數器被重置、或掉包超過 256 包），已重置狀態後收下本包
+        case reset(firstK: Int)
+    }
+
+    // MARK: - 主流程
+
+    /// 收下一個封包。
+    /// - Parameters:
+    ///   - serial: 封包的 Serial No（`data[2]`）
+    ///   - arrivalMs: 到達時間，**相對於 session t0 的毫秒**
+    mutating func ingest(serial: UInt8, arrivalMs: Double) -> Outcome {
+        guard let last = lastSerial else {
+            // 第一包：直接錨定，不做交叉驗證
+            lastSerial = serial
+            lastArrivalMs = arrivalMs
+            packetIndex = 0
+            addObservation(k: lastSampleIndex(ofPacket: 0), t: arrivalMs)
+            return .accepted(firstK: 0)
+        }
+
+        let rawDelta = (Int(serial) - Int(last) + 256) % 256
+        if rawDelta == 0 { return .duplicate }
+
+        // 用已擬合的 b 當基準比用標稱值更穩健 —— 曾觀察到封包率與標稱值差 6.3 倍的情況，
+        // 此時標稱值會誤判。
+        let periodMs = fit()?.b ?? Self.nominalPeriodMs
+        let actualGap = arrivalMs - (lastArrivalMs ?? arrivalMs)
+
+        // ---- serial 繞回還原 ----
+        // `serial` 是 UInt8，只要中斷超過 256 包（256 × 20 ÷ 104Hz ≈ **49 秒**）就會繞回，
+        // `rawDelta` 從此失去意義。組間休息會關閉 ACC notify，而 `set_rest_time` 是**療程設定值**
+        // 不是程式常數 —— 短休息時 rawDelta 剛好正確、長休息時必定錯誤，
+        // 同一份程式在不同療程下表現不同，是最難察覺的那種問題。
+        //
+        // 解法：用實際經過的時間推估「真正走了幾包」，再取**與 rawDelta 同餘（mod 256）、
+        // 且最接近這個推估值**的那一個。正常情況（gap 遠小於 49 秒）推估值就在 rawDelta 附近，
+        // 圈數算出來是 0，行為與繞回還原前完全相同。
+        //
+        // 🔴 **這個還原不會放寬把關**：算出 `delta` 之後仍走下面同一套交叉驗證。
+        // 若裝置在中斷期間其實**停止取樣**（serial 沒前進），沒有任何圈數能讓
+        // expectedGap 對上 actualGap，一樣會落到重置分支。
+        // 也就是說它只可能把「本來會誤判成重置」的情況救回來，不可能製造新的誤放行。
+        let estimatedPackets = actualGap / (Double(Self.samplesPerPacket) * periodMs)
+        let wraps = ((estimatedPackets - Double(rawDelta)) / 256.0).rounded()
+        let unwrapped = rawDelta + Int(wraps) * 256
+        // 圈數為負且把 delta 推到 0 以下時不採用——封包編號不可能倒退
+        let delta = unwrapped > 0 ? unwrapped : rawDelta
+
+        // 交叉驗證：serial 推算出的時間間隔應與實際到達間隔相符。
+        let expectedGap = Double(delta * Self.samplesPerPacket) * periodMs
+
+        if abs(expectedGap - actualGap) > Self.crossCheckToleranceMs {
+            // packetIndex / lastSerial / 回歸累加量必須同進同出，
+            // 否則新舊兩段不同編號基準的 (k, t) 會混在同一條回歸線裡。
+            let info = (delta: delta, expectedGapMs: expectedGap, actualGapMs: actualGap)
+            reset()
+            lastResetInfo = info   // reset() 之後才設，否則會被清掉
+            resetCount += 1
+            lastSerial = serial
+            lastArrivalMs = arrivalMs
+            packetIndex = 0
+            addObservation(k: lastSampleIndex(ofPacket: 0), t: arrivalMs)
+            return .reset(firstK: 0)
+        }
+
+        packetIndex += delta
+        lastSerial = serial
+        lastArrivalMs = arrivalMs
+        addObservation(k: lastSampleIndex(ofPacket: packetIndex), t: arrivalMs)
+        return .accepted(firstK: packetIndex * Self.samplesPerPacket)
+    }
+
+    /// 目前的擬合結果；觀測點不足時回傳 nil。
+    func fit() -> BLEClockFit? {
+        guard pointCount >= Self.minPointsForFit else { return nil }
+        let n = Double(pointCount)
+        let denom = n * sumKK - sumK * sumK
+        guard abs(denom) > .ulpOfOne else { return nil }
+
+        let b = (n * sumKT - sumK * sumT) / denom
+        let a = (sumT - b * sumK) / n
+
+        // SSE = Σ(t − a − b·k)² = ΣT² − a·ΣT − b·ΣKT（最小平方的標準恆等式，O(1) 求得）
+        let sse = sumTT - a * sumT - b * sumKT
+        let residualStd = pointCount > 2 ? (max(0, sse) / Double(pointCount - 2)).squareRoot() : 0
+
+        return BLEClockFit(a: a, b: b, pointCount: pointCount, residualStdMs: residualStd)
+    }
+
+    /// 清空所有狀態（`resetCount` 除外，那是跨重置的累計診斷值）。
+    mutating func reset() {
+        lastSerial = nil
+        packetIndex = 0
+        lastArrivalMs = nil
+        sumK = 0; sumT = 0; sumKK = 0; sumKT = 0; sumTT = 0
+        pointCount = 0
+    }
+
+    // MARK: - Private
+
+    /// 觀測點取封包的**最後一筆**樣本索引 —— 因為封包是「集滿 20 筆才送出」，
+    /// 最後一筆的取樣時刻最接近送出時刻。兩顆裝置用同一個約定，任何固定偏移都會在配對時抵消。
+    private func lastSampleIndex(ofPacket index: Int) -> Int {
+        index * Self.samplesPerPacket + (Self.samplesPerPacket - 1)
+    }
+
+    private mutating func addObservation(k: Int, t: Double) {
+        let kd = Double(k)
+        sumK += kd
+        sumT += t
+        sumKK += kd * kd
+        sumKT += kd * t
+        sumTT += t * t
+        pointCount += 1
+    }
+}

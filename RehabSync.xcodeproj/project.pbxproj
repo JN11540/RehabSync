@@ -260,11 +260,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 5KRVTJ9ND4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "RehabSync Care";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "用於掃描並連接復健感測裝置";
 				INFOPLIST_KEY_NSCameraUsageDescription = "用於掃描 QR Code 以匯入治療計畫";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -277,8 +279,9 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = edward.RehabSync;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ttritextfile.RehabSync;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -294,11 +297,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 5KRVTJ9ND4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "RehabSync Care";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "用於掃描並連接復健感測裝置";
 				INFOPLIST_KEY_NSCameraUsageDescription = "用於掃描 QR Code 以匯入治療計畫";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -311,8 +316,9 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = edward.RehabSync;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ttritextfile.RehabSync;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;

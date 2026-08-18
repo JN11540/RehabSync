@@ -27,6 +27,36 @@ struct EXGChannelStatus {
     var droppedPacketCount: Int = 0
 }
 
+/// TKE Serial No 探針的單一裝置統計（tke-sitting-calibration-port-plan.md §9 階段 0）。
+/// 用來驗證 ACC 封包 Serial No（data[2]）是否符合「逐包 +1、掉包跳號、255→0 繞回」的假設——
+/// 這是整個 Serial 索引對齊架構的前提，不成立就得整個改回到達時間錨定。
+struct TKESerialProbe {
+    var label: String = ""                  // "大腿" / "小腿"
+    var lastSerial: UInt8? = nil
+    var lastArrivalMs: Double? = nil
+    var packetCount: Int = 0
+    var deltaHistogram: [Int: Int] = [:]    // serial 增量 -> 出現次數；正常應集中在 1
+    var wrapCount: Int = 0                  // 255 -> 0 繞回次數
+    var accTypeSeen: Set<UInt8> = []        // data[1]，預期恆為 0x04（104Hz）
+    var unexpectedLengthCount: Int = 0      // data.count != 123 的封包數
+    var gapSumMs: Double = 0
+    var gapCount: Int = 0
+    var minGapMs: Double = .greatestFiniteMagnitude
+    var maxGapMs: Double = 0
+
+    // 相鄰封包的樣本重疊檢查：測出「每包實際前進幾筆樣本」（shift）。
+    // 若 shift == 20 代表每包 20 筆全新（規劃書原本的假設）；
+    // 若 shift < 20 代表封包內容重疊，k = packetIndex * 20 + i 會把時間軸灌水 20/shift 倍。
+    var lastAccData: Data? = nil
+    var shiftHistogram: [Int: Int] = [:]    // shift -> 出現次數
+
+    var meanGapMs: Double { gapCount > 0 ? gapSumMs / Double(gapCount) : 0 }
+    /// 除了 delta == 1 之外的所有增量次數總和（掉包 + 重複 + 異常）
+    var abnormalDeltaCount: Int {
+        deltaHistogram.reduce(0) { $0 + ($1.key == 1 ? 0 : $1.value) }
+    }
+}
+
 @Observable
 final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     private var central: CBCentralManager!
@@ -72,6 +102,62 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     @ObservationIgnored private var accOnlyCollecting: Set<UUID> = []
     @ObservationIgnored private var accOnlyBuffers: [UUID: [(timestamp: Int64, x: Double, y: Double, z: Double)]] = [:]
 
+    // TKE Serial No 探針（tke-sitting-calibration-port-plan.md §9 階段 0 鷹架）
+    // 預設關閉，只有在 Test 頁按下「TKE探針」才啟用，正式流程完全不受影響。
+    // 階段 3 會把它補齊成正式的 TKE 收集分支，屆時這組狀態會被取代。
+    var isTKEPathActive = false   // UI state (main thread)
+    var isCollectingTKE = false   // UI state (main thread)：8 秒校正收集中
+    /// UI state (main thread)。階段 6 才會由即時流程驅動，但 §4.5① 的按鈕停用條件現在就需要它——
+    /// 校正與即時共用 tkeBuffers 但保留規則衝突，不能同時啟動。
+    var isTKELiveEstimating = false
+    var tkeResult: KneeCalibrationResult? = nil   // UI state (main thread)
+    @ObservationIgnored private var tkeLiveTimer: Timer?
+    @ObservationIgnored private var tkeLiveOThigh = 0.0
+    @ObservationIgnored private var tkeLiveOCalf = 0.0
+    @ObservationIgnored private var tkeLiveSide = 0
+    /// 連續配不到的 tick 數。達到門檻就把角度清成 nil——
+    /// 否則封包正常進來但配對持續失敗時，畫面會無限期停在過時的數字且毫無異常徵兆。
+    @ObservationIgnored private var tkeLiveConsecutiveMisses = 0
+    /// 本次校正使用的動作規格。即時階段必須用同一份 ——
+    /// 兩個動作的真值與係數套用肢段都不同，混用會算出完全錯誤的角度。
+    @ObservationIgnored private var tkeSpec: any KneeCalibrationSpec.Type = TKESpec.self
+    /// TKE 路徑的連線檢查／封包新鮮度 timer（1 秒一次）。
+    ///
+    /// **沒有它，裝置關機後就永遠回不來** —— `didDisconnectPeripheral` 只清狀態、不發起重連，
+    /// 而既有的 `freshnessTimer` 只在錄製時跑、`preTestFreshnessTimer` 只在 PreWorking 跑，
+    /// Test 頁的 TKE 路徑不在任何一者的涵蓋範圍內。
+    @ObservationIgnored private var tkeFreshnessTimer: Timer?
+    /// 校正開始當下的封包數，結算時用差值算出「這 8 秒實收幾包」（供步驟 5b）
+    @ObservationIgnored private var tkeCalibStartPackets: [UUID: Int] = [:]
+    @ObservationIgnored private var tkeCollecting: Set<UUID> = []          // internal (bleQueue)
+    @ObservationIgnored private var tkeProbes: [UUID: TKESerialProbe] = [:]
+    /// 啟用時記下兩顆的識別碼，讓 `stopTKEPath()` 不必依賴呼叫端還能取得 peripheral。
+    /// 使用者離開頁面時裝置若已斷線，`thighAndCalfPeripherals` 會是 nil——
+    /// 那時仍必須能清空狀態，否則 `tkeCollecting` 會永久攔截封包且無從關閉。
+    @ObservationIgnored private var tkeThighId: UUID?
+    @ObservationIgnored private var tkeCalfId: UUID?
+    /// 停用流程的排空期：notify 已關但可能還有在途封包。
+    /// 這段期間仍維持攔截（避免漏寫資料庫），但不再做任何處理。
+    @ObservationIgnored private var tkeDraining = false
+
+    // 階段 1：Serial 展開 + 增量回歸（Util/BLEClock.swift）
+    @ObservationIgnored private var tkeClock: [UUID: BLEDeviceClock] = [:]
+    // 階段 2：因果平滑 + 三態 buffer
+    @ObservationIgnored private var tkeSmoothers: [UUID: CausalSmoother] = [:]
+    @ObservationIgnored private var tkeBuffers: [UUID: [BLESample]] = [:]
+    /// 校正收集中的 bleQueue 端旗標。三態（校正中／即時中／閒置串流中）由它與
+    /// `tkeLiveEstimating` 決定；`tkeCollecting` 只代表「TKE 路徑已啟用」。
+    /// 用 bleQueue 端旗標而非主執行緒的 `isCollectingTKE`，理由同 `recordingSessionActive`。
+    @ObservationIgnored private var tkeCalibrating = false
+    @ObservationIgnored private var tkeLiveEstimating = false
+    /// 即時／閒置狀態下的環形 buffer 容量。220 筆 ≈ 2000ms（÷ b ≈ 9.6ms），
+    /// 沿用 Python `SECONDARY_BUFFER_MS` 的量級。校正中則不裁切，保留整個收集期。
+    @ObservationIgnored private static let tkeLiveBufferCapacity = 220
+    /// 跨裝置共用的時間原點（epoch ms）。兩顆裝置的 `a` 必須落在同一個時間框架，
+    /// 否則 `k_c = round((a_thigh + b_thigh·k_t − a_calf) / b_calf)` 這個配對公式不成立。
+    /// 同時也讓回歸的 `t` 維持小數值，避免 epoch 毫秒平方後吃掉 Double 的有效位數。
+    @ObservationIgnored private var tkeSessionT0Ms: Double?
+
     // EXG 封包遺失排查用（#if DEBUG）：記錄每個 device+channel 上一次收到的 Serial No／時間，
     // 藉此分辨「裝置端真的沒送那麼快」還是「app 這邊漏收了封包」。
     @ObservationIgnored private var exgPacketTracker: [String: (serial: UInt8, timestamp: Int64)] = [:]
@@ -85,6 +171,19 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     // Live Estimated Real Angle（即時預估真實角度，固定 5Hz 更新）— UI state (main thread)
     var isLiveEstimating = false
     var currentEstimatedRealAngle: Double? = nil
+
+    /// 給畫面用的膝角度：**夾限到 0 以上**。
+    ///
+    /// 計算端（`publishKneeAngle` 收到的值、寫進 `advanced_statistics` 的值）一律**不夾限** ——
+    /// 負角度是校正殘差的真實訊號，夾掉就無法從資料回頭診斷校正品質。
+    /// 夾限只發生在顯示層，因為「膝蓋 -3°」對使用者沒有意義。
+    ///
+    /// 正式流程的角度顯示一律走這個屬性；Test 頁刻意直接讀 `currentEstimatedRealAngle`（未夾限），
+    /// 它的用途就是與 Python 逐值比對，夾限會掩蓋差異。
+    var displayKneeAngle: Double? {
+        currentEstimatedRealAngle.map { max(0, $0) }
+    }
+
     // internal (bleQueue)：只記住「最新一筆」傾角，實際計算交給 liveTickTimer 每 0.2 秒統一處理
     @ObservationIgnored private var liveEstimating: Set<UUID> = []
     @ObservationIgnored private var liveThighId: UUID?
@@ -108,11 +207,12 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     @ObservationIgnored private var stepCalfId: UUID?
     @ObservationIgnored private var stepThighIncline: Double?
     @ObservationIgnored private var stepCalfIncline: Double?
+    /// `detectStepStatus` 的比較基準。動作 12 改用 offset 模型後由呼叫端傳 `0`——
+    /// theta 站立時 ≈ 0，「相對站立姿勢」已內建在 theta 裡。
+    /// ⚠️ 但 `detectStepStatus` 的 `+40` 門檻仍是舊尺度的值，見 working12-database-port-plan.md §20.3。
     @ObservationIgnored private var stepBaseline: Double = 0
-    /// 供 `advanced_statistics` 記錄用：跟「站立即時預估真實角度」同一套換算（`standingMappingTable`／`angleToReal`），
-    /// 跟 `detectStepStatus` 拿 `stepBaseline` 直接比較的登階狀態機邏輯完全獨立，不影響既有的登階判定。
-    @ObservationIgnored private var stepShift: Double = 0
-    @ObservationIgnored private var stepBaselineTable: [(measured: Double, realAngle: Double)] = []
+    // stepShift／stepBaselineTable 已於階段 12-C 移除：它們只服務 tickStepStatus() 內
+    // 那段 advanced_statistics 寫入，該寫入已交給 TKE 路徑（§20.2）。
     @ObservationIgnored private var stepTickTimer: Timer?
 
     // MARK: - Working2 連線檢查／封包新鮮度檢查／共用修復路徑（working2-database-port-plan.md 第 17 節）
@@ -397,6 +497,11 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     /// 動作測試面板 `onAppear` 一起呼叫，兩者呼叫先後順序不影響這裡（見 `preTestThighId`／
     /// `preTestCalfId` 宣告處的說明）。
     func startPreTestChannelA(thighPeripheral: CBPeripheral, calfPeripheral: CBPeripheral) {
+        // TKE 路徑若已啟用，兩顆裝置在校正階段就已經收過 cmd_a0/a1/a2 且正在正常串流 ——
+        // 這裡再送一次只會打斷取樣，讓 tkeClock 重置、動作測試頁開頭約 2 秒沒有角度。
+        // 這一行只影響「本來就在串流」的情境；斷線恢復仍由 recoverIfNeeded／
+        // didDiscoverCharacteristicsFor 走預設的 sendConfigCommands: true。
+        let pathAlreadyConfigured = isTKEPathActive
         DispatchQueue.main.async {
             self.preTestFreshnessTimer?.invalidate()
             self.preTestFreshnessTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
@@ -410,8 +515,11 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             self.preTestCalfId  = calfPeripheral.identifier
             self.preTestMonitoring.insert(thighPeripheral.identifier)
             self.preTestMonitoring.insert(calfPeripheral.identifier)
-            self.subscribeAllCharacteristics(peripheral: thighPeripheral)
-            self.subscribeAllCharacteristics(peripheral: calfPeripheral)
+            self.subscribeAllCharacteristics(peripheral: thighPeripheral,
+                                             sendConfigCommands: !pathAlreadyConfigured)
+            self.subscribeAllCharacteristics(peripheral: calfPeripheral,
+                                             sendConfigCommands: !pathAlreadyConfigured)
+            print("[TKE] PreWorking Channel A 啟動（重送設定指令=\(!pathAlreadyConfigured)）")
         }
     }
 
@@ -479,7 +587,16 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     /// 跟 PreWorking Channel A 的 `.monitorOnly` 修復模式共用（working2-database-port-plan.md 18.3）。
     /// 不能讓 PreWorking 的修復動作誤設 `isRecording`，否則會意外打開 `tickLiveEstimatedRealAngle()`
     /// 的 `advanced_statistics` 寫入守門，讓 PreWorking 期間寫入 treatment_result_id 為 nil 的孤兒資料。
-    private func subscribeAllCharacteristics(peripheral: CBPeripheral) {
+    /// - Parameter sendConfigCommands: 是否重送 `cmd_a0`／`cmd_a1`／`cmd_a2`（取樣率等裝置端設定）。
+    ///
+    ///   預設 `true`，涵蓋所有「裝置剛連上／剛從斷線恢復」的情境 —— 那時裝置端設定是未知的，必須送。
+    ///
+    ///   傳 `false` 的唯一情境是「裝置**已經**在正常串流、只是要多訂閱幾個 characteristic」。
+    ///   實測（階段 C 測試 2）確認重送設定指令會讓取樣**短暫中斷**，
+    ///   而 TKE 路徑的 `tkeClock` 會因此偵測到 serial 與到達時間不一致 → 重置 →
+    ///   **約 2 秒沒有角度**（回歸重新累積 10 個觀測點 + 平滑視窗重填 30 筆）。
+    ///   裝置設定既然已經是對的，這一次重送就是純粹的傷害。
+    private func subscribeAllCharacteristics(peripheral: CBPeripheral, sendConfigCommands: Bool = true) {
         guard let config = bluetoothConfig,
               let map = charMap[peripheral.identifier] else { return }
 
@@ -488,7 +605,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         let gyroUUID  = CBUUID(string: config.sub_gyro_uuid)
         let exgUUID   = CBUUID(string: config.sub_exg_uuid)
 
-        if let writeChar = map[writeUUID] {
+        if sendConfigCommands, let writeChar = map[writeUUID] {
             peripheral.writeValue(config.cmd_a0, for: writeChar, type: .withResponse)
             peripheral.writeValue(config.cmd_a1, for: writeChar, type: .withResponse)
             peripheral.writeValue(config.cmd_a2, for: writeChar, type: .withResponse)
@@ -643,6 +760,653 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         completion(thighSamples, calfSamples)
     }
 
+    // MARK: - TKE Serial No 探針（tke-sitting-calibration-port-plan.md §9 階段 0）
+
+    /// 啟用 TKE 路徑（tke-sitting-calibration-port-plan.md §4.4）。
+    ///
+    /// 連線由總覽頁管理，這裡**不 connect 也不 disconnect**，只開關 ACC notify。
+    /// 這是與 Python 腳本最大的行為差異之一 —— Python 用 `async with BleakClient(mac)`
+    /// 把連線與斷線都綁在校正的生命週期上，App 不能這樣做。
+    ///
+    /// 啟用後 notify 與 `tkeCollecting` **同生共死**，一路維持到 `stopTKEPath()`：
+    /// 校正結束不關、即時停止也不關。理由見 §4.4 ——
+    /// 中途關掉 notify 會讓封包中斷，`tkeClock` 就得面臨要不要重置的問題。
+    /// - Parameter ownsConnectionRecovery: 是否由 TKE 路徑自己跑 1 秒連線檢查 timer。
+    ///
+    ///   `false`（**預設**，正式流程）：PreWorking／Working 已各自有 `preTestFreshnessTimer`／
+    ///   `freshnessTimer` 在做同一件事。更關鍵的是**組間休息期間** —— `stopRecordingAll` 會刻意
+    ///   關閉 notify，若 TKE 路徑還在跑自己的檢查，會把剛關掉的 notify 重新訂閱回來，
+    ///   破壞休息期的起訖規則。（見 preworking2-knee-plan.md §8.3）
+    ///
+    ///   `true`（Test 頁）：測試頁沒有別的東西在做斷線修復，必須自己跑，否則裝置關機後
+    ///   `didDisconnectPeripheral` 只會清狀態、沒有任何東西會嘗試重連（階段 6 踩過的坑）。
+    ///
+    ///   ⚠️ **預設值刻意選安全的那個。** 危險的是 `true` —— 它在組間休息重新訂閱 notify 時
+    ///   不會有任何錯誤徵兆。把危險值當預設，等於「新增呼叫點時忘記傳 = 踩雷」，
+    ///   所以反過來讓唯一需要它的 Test 頁顯式傳 `true`。
+    func startTKEPath(thighPeripheral: CBPeripheral,
+                      calfPeripheral: CBPeripheral,
+                      ownsConnectionRecovery: Bool = false) {
+        DispatchQueue.main.async {
+            self.isTKEPathActive = true
+            self.tkeFreshnessTimer?.invalidate()
+            self.tkeFreshnessTimer = nil
+            if ownsConnectionRecovery {
+                self.tkeFreshnessTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+                    self?.tickTKEConnectionCheck()
+                }
+            }
+        }
+
+        bleQueue.async { [weak self] in
+            guard let self, let config = bluetoothConfig else { return }
+            let wasRecording = DispatchQueue.main.sync { self.isRecording }
+
+            let thighId = thighPeripheral.identifier
+            let calfId = calfPeripheral.identifier
+            tkeThighId = thighId
+            tkeCalfId = calfId
+
+            tkeProbes[thighId] = TKESerialProbe(label: "大腿")
+            tkeProbes[calfId]  = TKESerialProbe(label: "小腿")
+            tkeClock[thighId] = BLEDeviceClock()
+            tkeClock[calfId]  = BLEDeviceClock()
+            tkeSmoothers[thighId] = CausalSmoother(window: KneeCalibration.smoothWindow)
+            tkeSmoothers[calfId]  = CausalSmoother(window: KneeCalibration.smoothWindow)
+            tkeBuffers[thighId] = []
+            tkeBuffers[calfId]  = []
+            tkeCalibrating = false      // 階段 5 才會由校正流程設為 true
+            tkeLiveEstimating = false   // 階段 6 才會由即時流程設為 true
+            tkeSessionT0Ms = nil
+            tkeCollecting = [thighId, calfId]
+
+            for peripheral in [thighPeripheral, calfPeripheral] {
+                guard let map = charMap[peripheral.identifier] else { continue }
+                if !wasRecording, let writeChar = map[CBUUID(string: config.write_uuid)] {
+                    peripheral.writeValue(config.cmd_a0, for: writeChar, type: .withResponse)
+                    peripheral.writeValue(config.cmd_a1, for: writeChar, type: .withResponse)
+                    peripheral.writeValue(config.cmd_a2, for: writeChar, type: .withResponse)
+                }
+                if let c = map[CBUUID(string: config.sub_acc_uuid)] { peripheral.setNotifyValue(true, for: c) }
+            }
+            let c = deviceVM.accRowCounts()
+            print("[TKE] 路徑啟用（wasRecording=\(wasRecording)）。notify 開啟，tkeCollecting 已填入兩顆。")
+            print("[TKE-DB] 啟用前 acc 表：總筆數=\(c.total)，treatment_result_id 為 nil=\(c.orphan)")
+        }
+    }
+
+    /// 執行一次膝角校正（tke-sitting-calibration-port-plan.md §9 階段 5）。
+    ///
+    /// 若 TKE 路徑尚未啟用會先啟用。**校正結束後路徑維持啟用、notify 不關**（§4.4）——
+    /// 這是「`tkeClock` 跨階段保留、即時啟動時免暖機」能成立的前提。
+    ///
+    /// - Parameters:
+    ///   - spec: 動作規格（`TKESpec` = 動作 2 坐姿、`SquatSpec` = 動作 9 部分蹲）。
+    ///     收集層完全與動作無關，只有結算與即時換算需要知道規格。
+    ///   - durationSec: 收集秒數，預設 8。8 秒理論上限 ≈832 筆，
+    ///     扣掉平滑暖機與姿勢淘汰後約 723 筆，對 250 門檻有充分餘裕（§5.2）。
+    ///   - ownsConnectionRecovery: **只在本次呼叫需要順帶啟用路徑時才生效**，直接轉交
+    ///     `startTKEPath(...)`，語意見該函式。正式流程的路徑是在校正面板 `startPreparing()`
+    ///     就先啟用的，走不到這個備援分支；但備援分支一旦被走到（例如使用者從動作測試面板
+    ///     退回校正面板重按、或啟用當下取不到 peripheral），若這裡漏傳就會用預設值啟用路徑 ——
+    ///     所以參數必須一路傳到底，不能只加在 `startTKEPath` 上。
+    func startKneeCalibration(
+        spec: any KneeCalibrationSpec.Type = TKESpec.self,
+        thighPeripheral: CBPeripheral, calfPeripheral: CBPeripheral,
+        durationSec: Double = 8,
+        ownsConnectionRecovery: Bool = false,
+        completion: ((KneeCalibrationResult) -> Void)? = nil
+    ) {
+        let alreadyActive = isTKEPathActive
+        if !alreadyActive {
+            startTKEPath(thighPeripheral: thighPeripheral, calfPeripheral: calfPeripheral,
+                         ownsConnectionRecovery: ownsConnectionRecovery)
+        }
+
+        DispatchQueue.main.async {
+            self.tkeResult = nil
+            self.isCollectingTKE = true
+        }
+
+        let side = DeviceViewModel().fetchAnySide() ?? 0
+        let thighId = thighPeripheral.identifier
+        let calfId = calfPeripheral.identifier
+
+        // startTKEPath 也是丟到 bleQueue，同一條序列佇列，所以順序有保證
+        bleQueue.async { [weak self] in
+            guard let self else { return }
+            // 校正期間 buffer 不裁切，保留整個收集窗（§4.2 三態）
+            tkeCalibrating = true
+            tkeBuffers[thighId] = []
+            tkeBuffers[calfId] = []
+            // clock 刻意不重置——它從路徑啟用起就在累積，重置只會白白丟掉觀測點
+            tkeCalibStartPackets[thighId] = tkeProbes[thighId]?.packetCount ?? 0
+            tkeCalibStartPackets[calfId] = tkeProbes[calfId]?.packetCount ?? 0
+            // 記住這次校正用的規格，即時階段必須用同一份（係數與真值都不同）
+            tkeSpec = spec
+            print("[KNEE-CAL] \(spec.name) 開始收集 \(Int(durationSec)) 秒（side=\(side == 1 ? "右" : "左")，路徑\(alreadyActive ? "已啟用" : "本次啟用")）")
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + durationSec) { [weak self] in
+            self?.bleQueue.async {
+                self?.finishKneeCalibration(spec: spec, thighId: thighId, calfId: calfId, side: side, completion: completion)
+            }
+        }
+    }
+
+    private func finishKneeCalibration(
+        spec: any KneeCalibrationSpec.Type,
+        thighId: UUID, calfId: UUID, side: Int,
+        completion: ((KneeCalibrationResult) -> Void)?
+    ) {
+        tkeCalibrating = false
+
+        let thighSamples = tkeBuffers[thighId] ?? []
+        let calfSamples = tkeBuffers[calfId] ?? []
+
+        // 觀測點不足時 fit() 回傳 nil，這裡補一個帶真實 pointCount 的替身，
+        // 讓 computeOffsets 的步驟 5a 能正確判定「回歸不可信」而不是崩在 nil 上。
+        func fitOrFallback(_ id: UUID) -> BLEClockFit {
+            if let f = tkeClock[id]?.fit() { return f }
+            return BLEClockFit(a: 0, b: BLEDeviceClock.nominalPeriodMs,
+                               pointCount: tkeClock[id]?.pointCount ?? 0, residualStdMs: 0)
+        }
+
+        let thighPackets = (tkeProbes[thighId]?.packetCount ?? 0) - (tkeCalibStartPackets[thighId] ?? 0)
+        let calfPackets = (tkeProbes[calfId]?.packetCount ?? 0) - (tkeCalibStartPackets[calfId] ?? 0)
+
+        let result = KneeCalibration.computeOffsets(
+            spec: spec,
+            thighSamples: thighSamples, calfSamples: calfSamples, side: side,
+            thighFit: fitOrFallback(thighId), calfFit: fitOrFallback(calfId),
+            thighPacketCount: thighPackets, calfPacketCount: calfPackets)
+
+        DispatchQueue.main.async {
+            self.tkeResult = result
+            self.isCollectingTKE = false
+            completion?(result)
+        }
+    }
+
+    // MARK: - TKE 即時角度（§9 階段 6）
+
+    /// 每次 tick 最多往回退幾筆大腿樣本（1 個封包）。
+    /// 小腿封包間隔 192ms ≈ tick 間隔 200ms，最新一筆大腿樣本對應的小腿樣本經常還沒到。
+    private static let tkeLiveWalkBack = 20
+    /// 連續配不到幾次 tick 就清空角度。5 次 ≈ 1 秒，與封包新鮮度門檻對齊。
+    private static let tkeLiveMissLimit = 5
+
+    /// 開始即時角度估算。必須先校正成功，且**綁定側要與校正當時相同**。
+    func startTKELiveAngle() {
+        // 兩條 tick 都發布到 currentEstimatedRealAngle（§20.2），同時運作會互相覆蓋 5Hz 的值，
+        // 錄製中更會讓同一時間點寫入兩筆 advanced_statistics。正式流程動作 2 走新路徑、
+        // 9／12／22 走舊路徑，本來不該重疊；這道防呆是給 Test 頁與日後誤接用的。
+        guard !isLiveEstimating else {
+            print("[TKE-LIVE] ⚠️ 舊即時路徑（isLiveEstimating）仍在運作，拒絕啟動 —— 兩條 tick 不可同時發布角度")
+            return
+        }
+        guard let r = tkeResult, let oThigh = r.thigh, let oCalf = r.calf else {
+            print("[TKE-LIVE] 尚未校正成功，無法啟動")
+            return
+        }
+        let nowSide = DeviceViewModel().fetchAnySide() ?? 0
+        guard r.side == nowSide else {
+            // 換綁裝置後用舊 offset 搭配新 side，k 值符號相反、角度會完全錯誤，
+            // 而畫面上不會有任何異常徵兆——只會看到一個看似合理但錯誤的數字。
+            print("[TKE-LIVE] ⚠️ 綁定側已變更（校正時=\(r.side)、目前=\(nowSide)），請重新校正")
+            return
+        }
+
+        bleQueue.async { [weak self] in
+            guard let self else { return }
+            tkeLiveOThigh = oThigh
+            tkeLiveOCalf = oCalf
+            tkeLiveSide = r.side
+            tkeLiveConsecutiveMisses = 0
+            tkeLiveEstimating = true
+        }
+
+        publishKneeAngle(nil)
+        DispatchQueue.main.async {
+            self.isTKELiveEstimating = true
+            self.tkeLiveTimer?.invalidate()
+            self.tkeLiveTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+                self?.tickTKELiveAngle()
+            }
+        }
+        print("[TKE-LIVE] 啟動（side=\(r.side == 1 ? "右" : "左") o_thigh=\(String(format: "%.2f", oThigh))° o_calf=\(String(format: "%.2f", oCalf))°）")
+    }
+
+    /// 停止即時角度。**不關 notify、不清 tkeCollecting**（§4.4）——
+    /// 路徑一路維持到離開頁面才由 stopTKEPath 收尾。
+    func stopTKELiveAngle() {
+        publishKneeAngle(nil)
+        DispatchQueue.main.async {
+            self.tkeLiveTimer?.invalidate()
+            self.tkeLiveTimer = nil
+            self.isTKELiveEstimating = false
+        }
+        bleQueue.async { [weak self] in
+            self?.tkeLiveEstimating = false
+            self?.tkeLiveConsecutiveMisses = 0
+        }
+        print("[TKE-LIVE] 停止（notify 維持開啟）")
+    }
+
+    /// 每 0.2 秒取最新一筆大腿樣本算一次（§4.2「即時模式的 buffer 管理與計算頻率」）。
+    ///
+    /// 5Hz 取樣不會造成失真：收集層的因果移動平均 N=30 相當於 0.29 秒視窗，比 tick 間隔還長，
+    /// 相鄰兩次 tick 的視窗是重疊的，平滑本身已扮演降頻前的抗混疊濾波器。
+    private func tickTKELiveAngle() {
+        bleQueue.async { [weak self] in
+            guard let self, tkeLiveEstimating,
+                  let thighId = tkeThighId, let calfId = tkeCalfId else { return }
+
+            // 防護三：封包新鮮度。任一側超過 1000ms 沒收到封包就視為資料不可信。
+            let now = Int64(Date().timeIntervalSince1970 * 1000)
+            for id in [thighId, calfId] {
+                if let last = lastPacketAt[id]?[Self.signalACC], now - last > 1000 {
+                    self.publishKneeAngle(nil)
+                    return
+                }
+            }
+
+            guard let thighBuf = tkeBuffers[thighId], !thighBuf.isEmpty,
+                  let calfBuf = tkeBuffers[calfId], !calfBuf.isEmpty,
+                  let thighFit = tkeClock[thighId]?.fit(),
+                  let calfFit = tkeClock[calfId]?.fit() else { return }
+
+            // 防護一：從最新一筆往回退，最多一個封包。
+            // 回退必須發生在**大腿側**——在小腿側找鄰近樣本等同「取最近鄰替代」，
+            // 那是 findPair 明令禁止的行為。往回取較舊的大腿樣本，配到的仍是時間上真正對應的小腿樣本。
+            var paired: (thigh: BLESample, calf: BLESample)?
+            for offset in 0 ..< min(Self.tkeLiveWalkBack, thighBuf.count) {
+                let t = thighBuf[thighBuf.count - 1 - offset]
+                if let c = KneeCalibration.findPair(kThigh: t.k, thighFit: thighFit,
+                                                   calfSamples: calfBuf, calfFit: calfFit) {
+                    paired = (t, c)
+                    break
+                }
+            }
+
+            guard let p = paired else {
+                // 防護二：連續配不到就清空。少了這一層，封包正常但配對持續失敗時
+                // （clock 剛重置、回歸尚未收斂）畫面會無限期停在過時角度。
+                tkeLiveConsecutiveMisses += 1
+                if tkeLiveConsecutiveMisses >= Self.tkeLiveMissLimit {
+                    self.publishKneeAngle(nil)
+                }
+                return
+            }
+            tkeLiveConsecutiveMisses = 0
+
+            let theta = KneeCalibration.liveAngle(
+                spec: tkeSpec,
+                thigh: p.thigh, calf: p.calf, side: tkeLiveSide,
+                oThigh: tkeLiveOThigh, oCalf: tkeLiveOCalf)
+            let rounded = (theta * 10).rounded() / 10
+            self.publishKneeAngle(rounded)
+        }
+    }
+
+    /// TKE 路徑的連線檢查＋封包新鮮度檢查，1 秒一次，只在路徑啟用時運作。
+    ///
+    /// 走跟 Working2／PreWorking 相同的 `checkAndRecoverIfNeeded`，模式用 `.monitorOnly`
+    /// （只訂閱、不設定 `isRecording`）—— TKE 路徑不做原始封包錄製，比照 PreWorking Channel A。
+    /// 裝置若已完全斷線，`recoverIfNeeded` 會走到 `attemptBackgroundReconnect` 發起重連，
+    /// 重連完成後 `didDiscoverCharacteristicsFor` 再呼叫 `resubscribeTKEAcc` 補回訂閱。
+    private func tickTKEConnectionCheck() {
+        bleQueue.async { [weak self] in
+            guard let self, !tkeCollecting.isEmpty, !tkeDraining else { return }
+            guard let thighId = tkeThighId, let calfId = tkeCalfId else { return }
+            for uuid in [thighId, calfId] {
+                checkAndRecoverIfNeeded(uuid: uuid, mode: .monitorOnly)
+            }
+        }
+    }
+
+    /// 停用 TKE 路徑並印出彙整報告。
+    ///
+    /// **刻意不收 peripheral 參數** —— 使用者離開頁面時裝置可能已經斷線，
+    /// 呼叫端拿不到 peripheral；那時仍必須能清空 `tkeCollecting`，
+    /// 否則裝置一旦重連，封包會被永久攔截且無從關閉。
+    /// 識別碼在 `startTKEPath` 就已記下，這裡只從 `connectedPeripherals` 盡力關 notify。
+    func stopTKEPath() {
+        DispatchQueue.main.async {
+            self.isTKEPathActive = false
+            self.tkeFreshnessTimer?.invalidate()
+            self.tkeFreshnessTimer = nil
+        }
+
+        bleQueue.async { [weak self] in
+            guard let self else { return }
+            let wasRecording = DispatchQueue.main.sync { self.isRecording }
+            let thighId = tkeThighId
+            let calfId = tkeCalfId
+
+            // ⚠️ 順序關鍵：**先關 notify、後清 tkeCollecting**，中間維持攔截。
+            //
+            // 反過來做（先清 tkeCollecting）會漏 —— setNotifyValue(false) 是非同步生效的，
+            // 清空之後、notify 真正停止之前抵達的在途封包不再被攔截，
+            // 會一路掉到 parseACC 寫進 acc 表且 treatment_result_id 為 nil。
+            // 實測就是這樣漏掉整整一個封包（20 列）。
+            tkeDraining = true   // 仍攔截，但不再處理
+
+            // 錄製中不可關 notify，否則會打斷正在進行的收集（比照 finishAccOnlyCollection）
+            if !wasRecording, let config = bluetoothConfig {
+                let live = DispatchQueue.main.sync { self.connectedPeripherals }
+                for id in [thighId, calfId].compactMap({ $0 }) {
+                    guard let peripheral = live[id],
+                          let map = charMap[id],
+                          let c = map[CBUUID(string: config.sub_acc_uuid)] else { continue }
+                    peripheral.setNotifyValue(false, for: c)
+                }
+            }
+
+            if let thighId, let calfId {
+                printTKEProbeSummary(thighId: thighId, calfId: calfId)
+            }
+            tkeProbes.removeAll()
+            tkeClock.removeAll()
+            tkeSmoothers.removeAll()
+            tkeBuffers.removeAll()
+            tkeCalibrating = false
+            tkeLiveEstimating = false
+            tkeSessionT0Ms = nil
+            tkeThighId = nil
+            tkeCalfId = nil
+            tkeCalibStartPackets.removeAll()
+            tkeLiveConsecutiveMisses = 0
+            self.publishKneeAngle(nil)
+            DispatchQueue.main.async {
+                self.tkeLiveTimer?.invalidate()
+                self.tkeLiveTimer = nil
+                self.isTKELiveEstimating = false
+                self.tkeResult = nil
+                self.isCollectingTKE = false
+            }
+            print("[TKE] 路徑停用（wasRecording=\(wasRecording)，notify \(wasRecording ? "保留" : "已關閉")）。")
+
+            if wasRecording {
+                // 錄製中本來就要讓 ACC 寫進資料庫，立刻放行即可
+                tkeCollecting = []
+                tkeDraining = false
+                print("[TKE] 錄製進行中，立即解除攔截（ACC 應繼續寫入資料庫）。")
+            } else {
+                // 排空期：等在途封包到齊再解除攔截。1 秒 ≈ 5 個封包間隔，餘裕充足。
+                bleQueue.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                    guard let self else { return }
+                    tkeCollecting = []
+                    tkeDraining = false
+                    let c = deviceVM.accRowCounts()
+                    print("[TKE-DB] 排空完成後 acc 表：總筆數=\(c.total)，treatment_result_id 為 nil=\(c.orphan)")
+                    print("[TKE-DB] → 測試 A 判定：這兩個數字都必須與「啟用前」完全相同")
+                }
+            }
+        }
+    }
+
+    /// 階段 2：封包 → clock → 平滑 → buffer。這是 TKE 路徑的收集主流程。
+    ///
+    /// 三態（§4.2「即時模式的 buffer 管理」）：
+    /// - 校正中（`tkeCalibrating`）：保留整個收集期，不裁切
+    /// - 即時中／閒置串流中：只保留最近 `tkeLiveBufferCapacity` 筆，逐包裁切
+    ///
+    /// 回傳 clock 的處理結果供診斷用。
+    @discardableResult
+    private func collectTKEAcc(_ data: Data, id: UUID, config: Bluetooth) -> BLEDeviceClock.Outcome? {
+        guard data.count >= 123 else { return nil }
+
+        let nowMs = Date().timeIntervalSince1970 * 1000
+        if tkeSessionT0Ms == nil { tkeSessionT0Ms = nowMs }
+        let relMs = nowMs - (tkeSessionT0Ms ?? nowMs)
+
+        guard var clock = tkeClock[id] else { return nil }
+        let outcome = clock.ingest(serial: data[2], arrivalMs: relMs)
+        tkeClock[id] = clock
+
+        let firstK: Int
+        switch outcome {
+        case .duplicate:
+            return outcome
+        case .reset(let k):
+            // clock 重置後 k 回到新的編號基準，既有 buffer 與平滑視窗都是舊基準的資料，
+            // 留著只會讓配對取到撞號的錯誤樣本，一併清空。
+            tkeBuffers[id]?.removeAll(keepingCapacity: true)
+            tkeSmoothers[id]?.reset()
+            firstK = k
+            // 重置的代價是「約 2 秒沒有角度」：回歸要重新累積 10 個觀測點（10 × 192ms ≈ 1.9 秒），
+            // 平滑視窗還要再填 30 筆（≈0.29 秒）。所以每一次重置都要能被看見、且能判斷成因。
+            if let info = clock.lastResetInfo {
+                print(String(format: "[TKE-CLOCK] ⚠️ clock 重置（第 %d 次） id=%@ delta=%d 包 expectedGap=%.0fms actualGap=%.0fms → %@",
+                             clock.resetCount, id.uuidString.prefix(8).description,
+                             info.delta, info.expectedGapMs, info.actualGapMs,
+                             info.actualGapMs > info.expectedGapMs + BLEDeviceClock.crossCheckToleranceMs
+                                ? "串流暫停（重送設定指令／重新訂閱打斷取樣）"
+                                : "裝置端 serial 跳號"))
+            }
+        case .accepted(let k):
+            firstK = k
+        }
+
+        var smoother = tkeSmoothers[id] ?? CausalSmoother(window: KneeCalibration.smoothWindow)
+        var buf = tkeBuffers[id] ?? []
+
+        for i in 0 ..< 20 {
+            let o = 3 + i * 6
+            let rawX = Double(data.int16BE(at: o))     * config.acc_sensitivity
+            let rawY = Double(data.int16BE(at: o + 2)) * config.acc_sensitivity
+            let rawZ = Double(data.int16BE(at: o + 4)) * config.acc_sensitivity
+            // 視窗未滿的樣本直接丟棄，不進 buffer（§5.1）
+            guard let s = smoother.push(x: rawX, y: rawY, z: rawZ) else { continue }
+            buf.append(BLESample(k: firstK + i, x: s.x, y: s.y, z: s.z))
+        }
+
+        // 非校正狀態下裁成環形 buffer，避免無限成長
+        if !tkeCalibrating, buf.count > Self.tkeLiveBufferCapacity {
+            buf.removeFirst(buf.count - Self.tkeLiveBufferCapacity)
+        }
+
+        tkeSmoothers[id] = smoother
+        tkeBuffers[id] = buf
+        return outcome
+    }
+
+    /// 逐包更新統計並印出單行紀錄。只在 `tkeCollecting` 命中時被呼叫。
+    private func probeTKESerial(_ data: Data, id: UUID) {
+        guard var probe = tkeProbes[id] else { return }
+
+        let nowMs = Date().timeIntervalSince1970 * 1000
+        probe.packetCount += 1
+        if data.count != 123 { probe.unexpectedLengthCount += 1 }
+        if data.count >= 2 { probe.accTypeSeen.insert(data[1]) }
+
+        guard data.count >= 3 else { tkeProbes[id] = probe; return }
+        let serial = data[2]
+
+        var deltaText = "—"
+        if let last = probe.lastSerial {
+            // 與 §4.2 節①的展開公式一致：繞回後仍應得到正確的增量
+            let delta = (Int(serial) - Int(last) + 256) % 256
+            probe.deltaHistogram[delta, default: 0] += 1
+            if serial < last { probe.wrapCount += 1 }
+            deltaText = "\(delta)"
+        }
+
+        var gapText = "—"
+        if let lastAt = probe.lastArrivalMs {
+            let gap = nowMs - lastAt
+            probe.gapSumMs += gap
+            probe.gapCount += 1
+            probe.minGapMs = min(probe.minGapMs, gap)
+            probe.maxGapMs = max(probe.maxGapMs, gap)
+            gapText = String(format: "%.1f", gap)
+        }
+
+        // 樣本重疊檢查：找出使「前一包的 samples[s...19] == 本包的 samples[0...(19-s)]」
+        // 成立的最小 s，那就是本包相對前一包實際前進的樣本數。
+        // 找不到任何 s 則視為 20（完全不重疊，即每包 20 筆全新）。
+        var shiftText = "—"
+        if data.count >= 123 {
+            let acc = Data(data[3 ..< 123])          // 120 bytes = 20 樣本 × 6 bytes
+            if let prev = probe.lastAccData, deltaText == "1" {
+                // 只在 delta==1（沒掉包）時比對才有意義
+                var found = 20
+                for s in 1 ... 20 {
+                    let overlapBytes = (20 - s) * 6
+                    if overlapBytes == 0 { break }
+                    if prev[(s * 6) ..< 120] == acc[0 ..< overlapBytes] {
+                        found = s
+                        break
+                    }
+                }
+                probe.shiftHistogram[found, default: 0] += 1
+                shiftText = "\(found)"
+            }
+            probe.lastAccData = acc
+        }
+
+        probe.lastSerial = serial
+        probe.lastArrivalMs = nowMs
+        tkeProbes[id] = probe
+
+        // ---- 階段 1／2 狀態（clock 與 buffer 由 collectTKEAcc 更新，這裡只讀不寫）----
+        var clockText = ""
+        if let clock = tkeClock[id], let f = clock.fit() {
+            clockText = String(format: " b=%.4fms(%.1fHz) resid=%.1fms n=%d",
+                               f.b, f.measuredRateHz, f.residualStdMs, f.pointCount)
+        } else {
+            clockText = " b=（觀測點不足）"
+        }
+        let buffered = tkeBuffers[id]?.count ?? 0
+        let lastK = tkeBuffers[id]?.last?.k ?? -1
+        let warmup = tkeSmoothers[id]?.warmupDiscarded ?? 0
+        let bufText = " buf=\(buffered) lastK=\(lastK) warmup丟棄=\(warmup)"
+
+        let flag = (deltaText != "1" && deltaText != "—") ? " ⚠️掉包/重複" : ""
+        print(String(format: "[TKE-PROBE] %@ #%-4d serial=%3d delta=%@ shift=%@ gap=%@ms len=%d type=0x%02X%@%@%@",
+                     probe.label, probe.packetCount, Int(serial), deltaText, shiftText, gapText,
+                     data.count, data.count >= 2 ? data[1] : 0, flag, clockText, bufText))
+    }
+
+    /// §9 階段 0 的四項驗收：逐包 +1、掉包跳號、255→0 繞回、兩顆裝置各自獨立計數。
+    private func printTKEProbeSummary(thighId: UUID, calfId: UUID) {
+        print("\n========== [TKE-PROBE] 彙整報告 ==========")
+        for id in [thighId, calfId] {
+            guard let p = tkeProbes[id] else { continue }
+            let deltaDesc = p.deltaHistogram.sorted { $0.key < $1.key }
+                .map { "delta=\($0.key)×\($0.value)" }.joined(separator: ", ")
+            let typeDesc = p.accTypeSeen.sorted()
+                .map { String(format: "0x%02X", $0) }.joined(separator: ",")
+            let shiftDesc = p.shiftHistogram.sorted { $0.key < $1.key }
+                .map { "shift=\($0.key)×\($0.value)" }.joined(separator: ", ")
+            // 由實測的 shift 與到達間隔反推真實取樣率，與標稱值對照
+            let dominantShift = p.shiftHistogram.max { $0.value < $1.value }?.key
+            var rateDesc = "（資料不足）"
+            if let s = dominantShift, p.meanGapMs > 0 {
+                let hz = Double(s) / (p.meanGapMs / 1000.0)
+                rateDesc = String(format: "每包前進 %d 筆 → 實測取樣率 ≈ %.1f Hz", s, hz)
+            }
+            print("""
+            [\(p.label)]
+              封包數      = \(p.packetCount)
+              serial 增量 = \(deltaDesc.isEmpty ? "（無）" : deltaDesc)
+              異常增量數  = \(p.abnormalDeltaCount)（delta≠1 的總次數＝掉包或重複）
+              繞回次數    = \(p.wrapCount)（255→0）
+              ACC Type    = \(typeDesc)（預期 0x04 = 104Hz）
+              長度異常    = \(p.unexpectedLengthCount) 包（預期 0，長度應為 123）
+              到達間隔    = 平均 \(String(format: "%.1f", p.meanGapMs))ms / 最小 \(String(format: "%.1f", p.minGapMs == .greatestFiniteMagnitude ? 0 : p.minGapMs))ms / 最大 \(String(format: "%.1f", p.maxGapMs))ms
+              樣本前進量  = \(shiftDesc.isEmpty ? "（無）" : shiftDesc)
+              🔑 \(rateDesc)
+            """)
+        }
+
+        // 兩顆裝置是否各自獨立計數：serial 若同步前進，代表不是獨立計數器
+        if let t = tkeProbes[thighId], let c = tkeProbes[calfId],
+           let ts = t.lastSerial, let cs = c.lastSerial {
+            print("""
+              兩顆最後 serial：大腿=\(ts) 小腿=\(cs) → \(ts == cs ? "⚠️ 相同，需再觀察是否為巧合" : "✅ 不同，符合各自獨立計數")
+            """)
+        }
+
+        // ---- 階段 1：回歸自檢（§7.1）----
+        print("\n---- 回歸自檢（§9 階段 1 / §7.1）----")
+        let nominal = BLEDeviceClock.nominalPeriodMs
+        for (id, label) in [(thighId, "大腿"), (calfId, "小腿")] {
+            guard let clock = tkeClock[id] else { continue }
+            guard let f = clock.fit() else {
+                print("[\(label)] 觀測點不足（\(clock.pointCount) < \(BLEDeviceClock.minPointsForFit)），無法擬合")
+                continue
+            }
+            let deviationPct = (f.b - nominal) / nominal * 100
+            print("""
+            [\(label)]
+              a = \(String(format: "%.1f", f.a)) ms（相對 session t0）
+              b = \(String(format: "%.4f", f.b)) ms/sample → 實測取樣率 \(String(format: "%.2f", f.measuredRateHz)) Hz
+                  與標稱 \(String(format: "%.4f", nominal))ms（104Hz）偏差 \(String(format: "%+.2f", deviationPct))%
+              殘差標準差 = \(String(format: "%.1f", f.residualStdMs)) ms  ← 這就是實際的 BLE 到達抖動量
+              觀測點 = \(f.pointCount)   重置次數 = \(clock.resetCount)
+            """)
+        }
+
+        // 兩顆的相對時脈差：決定長時間下的漂移速度
+        if let tf = tkeClock[thighId]?.fit(), let cf = tkeClock[calfId]?.fit() {
+            let ratio = tf.b / cf.b
+            let driftMsPerMin = abs(ratio - 1.0) * 60_000
+            print("""
+              兩顆 b 比值 = \(String(format: "%.6f", ratio))
+              → 相對時脈差 \(String(format: "%.4f", abs(ratio - 1.0) * 100))%，
+                若只用單次錨定，每分鐘會累積約 \(String(format: "%.1f", driftMsPerMin)) ms 的對齊誤差
+                （本架構兩側各自回歸，此項已被吸收）
+            """)
+        }
+        // ---- 階段 2：平滑與 buffer 自檢 ----
+        print("\n---- 收集自檢（§9 階段 2）----")
+        for (id, label) in [(thighId, "大腿"), (calfId, "小腿")] {
+            let buffered = tkeBuffers[id]?.count ?? 0
+            let warmup = tkeSmoothers[id]?.warmupDiscarded ?? 0
+            let packets = tkeProbes[id]?.packetCount ?? 0
+            let expectedTotal = packets * 20                       // 若不丟棄、不裁切
+            let cap = Self.tkeLiveBufferCapacity
+            let firstK = tkeBuffers[id]?.first?.k ?? -1
+            let lastK = tkeBuffers[id]?.last?.k ?? -1
+            print("""
+            [\(label)]
+              buffer 筆數   = \(buffered)（上限 \(cap)）\(buffered <= cap ? "✅ 未超過上限" : "❌ 超過上限")
+              暖機丟棄      = \(warmup) 筆 \(warmup == KneeCalibration.smoothWindow - 1 ? "✅ 正好 N-1=\(KneeCalibration.smoothWindow - 1)" : "（預期 \(KneeCalibration.smoothWindow - 1)）")
+              k 範圍        = \(firstK) ~ \(lastK)
+              收到樣本總數  = \(expectedTotal)（\(packets) 包 × 20）
+              → 環形裁切後只留最近 \(buffered) 筆，符合「不隨時間成長」
+            """)
+        }
+
+        print("""
+        ---- 階段 2 驗收 ----
+        ① 暖機丟棄        ：應正好 29 筆（N=30 的視窗，前 29 筆未滿）
+        ② buffer 不成長   ：跑越久 buffer 筆數仍應停在 220，不隨封包數增加
+        ③ k 連續性        ：lastK − firstK 應接近 219（220 筆連續索引），掉包時才會更大
+
+        ---- 階段 1 驗收 ----
+        ① b 是否收斂       ：應穩定在 9.6154ms 附近；若明顯偏離，回歸是對的、標稱值是錯的
+        ② b 是否跳變       ：同一次工作階段內 b 若突然改變，代表裝置換了送包節奏（階段 0 曾觀察到 6.3 倍差異）
+        ③ 殘差標準差       ：這是真實的 σ，用來取代規劃書 §4.2 假設的 30ms
+        ④ 重置次數應為 0   ：正常連線下不該觸發 serial 異常判定
+        """)
+        print("""
+        ---- 驗收判定（§9 階段 0）----
+        ① 逐包 +1        ：看「serial 增量」是否幾乎全是 delta=1
+        ② 掉包跳號        ：刻意拿遠裝置後，應出現 delta≥2 而非亂數
+        ③ 255→0 繞回      ：繞回次數 >0 時，該次 delta 仍應是 1
+        ④ 兩顆獨立計數    ：兩顆的封包數與 serial 各自前進，不同步
+        ⑤ 樣本前進量      ：shift 若集中在 20 → 每包 20 筆全新，k = packetIndex*20 + i 成立
+                            shift 若 <20（例如 3）→ 封包內容重疊，該公式會把時間軸灌水
+                            20/shift 倍，§4.2 節①必須改成 k = packetIndex*shift + i
+        ①–④ 任一不成立 → Serial 索引架構的前提不成立，必須改回到達時間錨定。
+        ⑤ 不是 20 → 架構可留，但索引公式與所有時間相關常數都要重算。
+        ==========================================\n
+        """)
+    }
+
     // MARK: - Baseline Calibration（膝角基準值）
 
     /// 錄製大腿與小腿加速度計固定秒數，收集期間不寫入資料庫，結束後用 ACCCalibration 計算膝角基準值。
@@ -785,6 +1549,11 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         // 坐姿/站立即時預估要求大腿＋小腿配對齊全才允許啟動；不寫死左腳（side 0），
         // 改用 fetchAnySide() 查「目前實際綁定的那一側」——這個 app 一次最多只會綁 2 顆裝置（同一側），
         // 綁在右腳時這裡也要能通過檢查，不然右腳永遠無法啟動即時預估。
+        // 防呆同 startTKELiveAngle：兩條 tick 都發布到 currentEstimatedRealAngle，不可同時運作（§20.2）。
+        guard !isTKELiveEstimating else {
+            print("[LIVE] ⚠️ TKE 即時路徑（isTKELiveEstimating）仍在運作，拒絕啟動 —— 兩條 tick 不可同時發布角度")
+            return
+        }
         let deviceVM = DeviceViewModel()
         deviceVM.debugDumpAllDevices(tag: "startLiveEstimateRealAngle")
         let side = deviceVM.fetchAnySide() ?? 0
@@ -794,8 +1563,8 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         let thighId = thighPeripheral.identifier
         let calfId  = calfPeripheral.identifier
 
+        publishKneeAngle(nil)   // 啟動歸零也走共用管道，不留第二個直接寫入點（§20.2）
         DispatchQueue.main.async {
-            self.currentEstimatedRealAngle = nil
             self.isLiveEstimating = true
             self.liveTickTimer?.invalidate()
             self.liveTickTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
@@ -869,6 +1638,43 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         }
     }
 
+    // MARK: - 膝角度的共用發布管道（working2-database-port-plan.md §20.2）
+
+    /// 算出膝角度後**統一由這裡發布**：更新 UI + 依 `isRecording` 決定是否寫入 `advanced_statistics`。
+    ///
+    /// 新舊兩條 tick（`tickLiveEstimatedRealAngle` 舊、`tickTKELiveAngle` 新）都呼叫同一份，
+    /// 確保「算完之後往哪裡去」只有一份實作 —— 寫入條件、時間戳基準、清空目標都不會走鐘。
+    ///
+    /// - Parameter angle: 角度值；傳 `nil` 代表**清空**（stale 保護、停止即時、停用路徑都用它）。
+    ///   清空同樣必須集中在這裡，否則「發布到 A、卻清空 B」會讓角度殘留在畫面上。
+    ///
+    /// - Note: 動作 12 的登階路徑（`tickStepStatus`）是**第三條獨立 tick**，本次不納入，
+    ///   待動作 12 遷移時一併收編（見 §20.2）。
+    ///
+    /// - Important: **執行緒約定**
+    ///   - `nil`（清空）：任何執行緒都可以呼叫 —— 只做 `main.async`，在讀 `isRecording` 之前就 return。
+    ///     停止／停用路徑那幾個呼叫點都在主執行緒，靠的就是這一點。
+    ///   - **非 `nil`（發布 + 寫入）：只能從 `bleQueue` 呼叫。** 它要用 `main.sync` 讀
+    ///     `isRecording`／`currentTreatmentResultId`，從主執行緒呼叫會直接死鎖。
+    ///     目前兩個非 nil 呼叫點（`tickTKELiveAngle`／`tickLiveEstimatedRealAngle`）都在 bleQueue 內。
+    private func publishKneeAngle(_ angle: Double?) {
+        DispatchQueue.main.async { self.currentEstimatedRealAngle = angle }
+
+        guard let angle else { return }
+        #if DEBUG
+        // 非 nil 路徑底下就是 main.sync，從主執行緒呼叫必然死鎖——在 Debug 就攔下來。
+        dispatchPrecondition(condition: .notOnQueue(.main))
+        #endif
+        // 組間休息（未在記錄中）時暫停寫入，跟 acc/gyro/exg 的起訖規則一致。
+        // 守門用 isRecording 而不是 recordingSessionActive——兩者是不同的判斷，不可混用。
+        let (stillRecording, treatmentResultId) = DispatchQueue.main.sync {
+            (self.isRecording, self.currentTreatmentResultId)
+        }
+        guard stillRecording else { return }
+        let ts = Int64(Date().timeIntervalSince1970 * 1000)
+        deviceVM.insertAdvancedStatistics(timestamp: ts, angle: angle, treatmentResultId: treatmentResultId)
+    }
+
     /// Timer callback（main thread 觸發），跳回 bleQueue 讀最新值計算，算完再寫回主執行緒的 UI 屬性。
     private func tickLiveEstimatedRealAngle() {
         bleQueue.async { [weak self] in
@@ -901,7 +1707,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
                 if thighStale { liveThighIncline = nil }
                 if calfStale  { liveCalfIncline  = nil }
                 if thighStale || calfStale {
-                    DispatchQueue.main.async { self.currentEstimatedRealAngle = nil }
+                    self.publishKneeAngle(nil)
                     return
                 }
             }
@@ -927,15 +1733,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             #if DEBUG
             print("[LIVE-ANGLE-DIAG] kneeAngle=\(String(format: "%.2f", kneeAngle)) realAngle=\(rounded)")
             #endif
-            DispatchQueue.main.async { self.currentEstimatedRealAngle = rounded }
-
-            // 組間休息（未在記錄中）時暫停寫入，跟 acc/gyro/exg 的起訖規則一致。
-            let (stillRecording, treatmentResultId) = DispatchQueue.main.sync {
-                (self.isRecording, self.currentTreatmentResultId)
-            }
-            guard stillRecording else { return }
-            let ts = Int64(Date().timeIntervalSince1970 * 1000)
-            self.deviceVM.insertAdvancedStatistics(timestamp: ts, angle: rounded, treatmentResultId: treatmentResultId)
+            self.publishKneeAngle(rounded)
         }
     }
 
@@ -1037,28 +1835,34 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             stepThighIncline = nil
             stepCalfIncline  = nil
             stepBaseline = baseline
-            // advanced_statistics 記錄用的換算表，比照「站立即時預估」的站姿版做法（見 startLiveEstimateRealAngle 的 .standing 分支）。
-            // side 依鏡射分支選公式（working12-database-port-plan.md 19 節）：右膝感測器安裝方向與左膝相反，
-            // 沒有這個分支的話右膝使用者永遠套用左膝公式，advanced_statistics.angle 會算錯。
-            if side == 1 {
-                stepShift = baseline > 0 ? -(baseline + 10) : 0
-                stepBaselineTable = Self.standingMappingTableRight(baseline: baseline + stepShift, maxStep: 55, maxRealAngleDeg: 90)
-            } else {
-                stepShift = baseline < 0 ? (abs(baseline) + 10) : 0
-                stepBaselineTable = Self.standingMappingTable(baseline: baseline + stepShift, maxStep: 55, maxRealAngleDeg: 90)
-            }
+            // 原本這裡會建立 advanced_statistics 記錄用的換算表（stepShift／stepBaselineTable，
+            // 含第 19 節修正的左右膝鏡射分支）。階段 12-C 把角度寫入交給 TKE 路徑之後，
+            // 那張表已無人讀取，連同計算一併移除（working12-database-port-plan.md §20.2）。
+            // stepBaseline 保留 —— detectStepStatus 的狀態機還在用。
             resetStepStatus()
             stepEstimating = [thighId, calfId]
 
+            // 🔴 TKE 路徑已啟用時**不可重送設定指令**（working12-database-port-plan.md §20.2.1①）。
+            //
+            // 這一段是自己寫的，不走 subscribeAllCharacteristics，所以動作 2 階段 C 加的
+            // `sendConfigCommands` 參數涵蓋不到這裡。實測已證實重送 cmd_a0/a1/a2 會讓取樣短暫中斷，
+            // tkeClock 的交叉驗證因此失敗 → 重置 → 清空 buffer 與平滑器 → 約 2 秒沒有角度
+            //（working2-database-port-plan.md §20.9）。
+            //
+            // 動作 12 是唯一在 TKE 路徑啟用後仍會呼叫本函式的動作（動作 2／9 已停用舊即時路徑），
+            // 所以也是唯一會踩到這件事的動作。裝置在校正階段就已收過設定指令且正在串流，
+            // 這裡再送一次是純粹的傷害。setNotifyValue 是冪等的，維持無條件呼叫。
+            let tkePathActive = DispatchQueue.main.sync { self.isTKEPathActive }
             for peripheral in [thighPeripheral, calfPeripheral] {
                 guard let map = charMap[peripheral.identifier] else { continue }
-                if !wasRecording, let writeChar = map[CBUUID(string: config.write_uuid)] {
+                if !wasRecording, !tkePathActive, let writeChar = map[CBUUID(string: config.write_uuid)] {
                     peripheral.writeValue(config.cmd_a0, for: writeChar, type: .withResponse)
                     peripheral.writeValue(config.cmd_a1, for: writeChar, type: .withResponse)
                     peripheral.writeValue(config.cmd_a2, for: writeChar, type: .withResponse)
                 }
                 if let c = map[CBUUID(string: config.sub_acc_uuid)] { peripheral.setNotifyValue(true, for: c) }
             }
+            print("[STEP] 登階狀態預估啟動（重送設定指令=\(!wasRecording && !tkePathActive)）")
         }
     }
 
@@ -1072,10 +1876,23 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         }
         bleQueue.async { [weak self] in
             guard let self else { return }
-            let wasRecording = DispatchQueue.main.sync { self.isRecording }
+            let (wasRecording, tkePathActive) = DispatchQueue.main.sync {
+                (self.isRecording, self.isTKEPathActive)
+            }
             stepEstimating = []
             resetStepStatus()
-            if !wasRecording, let config = bluetoothConfig {
+            // 🔴 TKE 路徑仍啟用時**不可關 ACC notify**（working12-database-port-plan.md §20.2.1②）。
+            //
+            // startTKEPath 只訂閱 ACC —— 這一關就把 TKE 路徑的唯一資料來源切斷了，
+            // 而本函式原本的判斷條件只有 !wasRecording，完全不知道 TKE 路徑的存在。
+            //
+            // 目前唯一會走到的路徑是「按返回離開 PreWorking_12」，後面緊接著根 View 的
+            // stopTKEPath()，所以影響有限 —— 但那是靠兩個 .onDisappear 的執行順序僥倖成立，
+            // 而執行順序是 SwiftUI 的實作細節，不是保證。日後若出現「退回校正面板」的路徑，
+            // 這一關會在 TKE 路徑仍需存活時切斷它，校正頁的角度直接死掉且沒有錯誤訊息。
+            //
+            // 交給 stopTKEPath 統一收尾，與「notify 與 tkeCollecting 同生共死」的原則一致。
+            if !wasRecording, !tkePathActive, let config = bluetoothConfig {
                 for peripheral in [thighPeripheral, calfPeripheral] {
                     if let map = charMap[peripheral.identifier],
                        let c = map[CBUUID(string: config.sub_acc_uuid)] {
@@ -1139,18 +1956,19 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             let status = detectStepStatus(kneeAngle: kneeAngle, baseline: stepBaseline)
             DispatchQueue.main.async { self.currentStepStatus = status }
 
-            // 寫進 advanced_statistics 的角度比照「站立即時預估真實角度」的換算方式（angleToReal + 站姿對應表），
-            // 不是直接寫 detectStepStatus 用的原始 kneeAngle，兩者計算目的不同、互不影響。
-            let realAngle = Self.angleToReal(kneeAngle + stepShift, table: stepBaselineTable)
-            let rounded = (realAngle * 10).rounded() / 10
-
-            // 組間休息（未在記錄中）時暫停寫入，跟 acc/gyro/exg 的起訖規則一致。
-            let (stillRecording, treatmentResultId) = DispatchQueue.main.sync {
-                (self.isRecording, self.currentTreatmentResultId)
-            }
-            guard stillRecording else { return }
-            let ts = Int64(Date().timeIntervalSince1970 * 1000)
-            self.deviceVM.insertAdvancedStatistics(timestamp: ts, angle: rounded, treatmentResultId: treatmentResultId)
+            // 🔴 `advanced_statistics` 的寫入已於階段 12-C 移除（working12-database-port-plan.md §20.2）。
+            //
+            // 原本這裡會自己算 realAngle（angleToReal + 站姿對應表）並自己 insert，
+            // 是寫入 advanced_statistics 的**第三條獨立 tick**，與 tickLiveEstimatedRealAngle 平行。
+            // 動作 12 改用 offset 模型後，角度統一由 tickTKELiveAngle → publishKneeAngle 發布與寫入，
+            // 本函式只保留登階狀態機那一半。
+            //
+            // ⚠️ 移除寫入與「開啟 TKE 即時路徑」必須是同一次改動：
+            //   只開路徑不移除這裡 → 同一時間點寫入兩筆 angle
+            //   只移除這裡不開路徑 → advanced_statistics 完全沒有資料
+            // 兩種都沒有任何畫面徵兆（動作 12 的角度不上畫面）。
+            //
+            // 連帶：stepShift／stepBaselineTable 只服務這段寫入，移除後不再被讀取。
         }
     }
 
@@ -1351,6 +2169,45 @@ extension BluetoothViewModel: CBPeripheralDelegate {
         } else if preTestChannelAActive {
             subscribeAllCharacteristics(peripheral: peripheral)
         }
+
+        // TKE 路徑同樣要補回訂閱（tke-sitting-calibration-port-plan.md §4.4）。
+        // 少了這段，裝置重開後連線物件恢復了、卻永遠不再送 ACC，即時角度會卡在「等待資料…」
+        // 不會自動恢復——實測就是這個症狀。
+        if tkeCollecting.contains(peripheral.identifier), !tkeDraining {
+            resubscribeTKEAcc(peripheral: peripheral)
+        }
+    }
+
+    /// 重連後補回 TKE 的 ACC 訂閱與設定指令，並重置該側的時間軸狀態。
+    ///
+    /// **為什麼要明確重置，而不依賴 clock 自己的交叉驗證**：
+    /// 裝置重開後 serial 會從 0 重新開始，舊的 `packetIndex` 基準失效。交叉驗證雖然能偵測
+    /// 多數 serial 異常，但在長時間斷線後有機會誤判為正常——例如斷線 10 秒、serial 從 200 繞到 0
+    /// 算出 delta=56，`expectedGap ≈ 10752ms` 與 `actualGap ≈ 10000ms` 只差 752ms，
+    /// 低於 1000ms 容許值就不會觸發重置，於是新舊兩段不同基準的 `(k, t)` 會混進同一條回歸線。
+    ///
+    /// 「這裡發生過斷線」是交叉驗證沒有的資訊，所以直接重置最安全。
+    /// 代價只是重新累積 10 個觀測點（約 2 秒）。
+    private func resubscribeTKEAcc(peripheral: CBPeripheral) {
+        guard let config = bluetoothConfig, let map = charMap[peripheral.identifier] else { return }
+        let id = peripheral.identifier
+        let wasRecording = DispatchQueue.main.sync { self.isRecording }
+
+        // 三者必須同進同出：k 的編號基準變了，舊 buffer 與平滑視窗都無法與另一側對齊
+        tkeClock[id] = BLEDeviceClock()
+        tkeSmoothers[id] = CausalSmoother(window: KneeCalibration.smoothWindow)
+        tkeBuffers[id] = []
+        // session t0 刻意保留——兩顆的 a 必須落在同一時間框架，配對公式才成立
+
+        if !wasRecording, let writeChar = map[CBUUID(string: config.write_uuid)] {
+            peripheral.writeValue(config.cmd_a0, for: writeChar, type: .withResponse)
+            peripheral.writeValue(config.cmd_a1, for: writeChar, type: .withResponse)
+            peripheral.writeValue(config.cmd_a2, for: writeChar, type: .withResponse)
+        }
+        if let c = map[CBUUID(string: config.sub_acc_uuid)] {
+            peripheral.setNotifyValue(true, for: c)
+        }
+        print("[TKE] 重連補訂閱：\(id)（clock／buffer／平滑已重置，需約 2 秒重新收斂）")
     }
 
     func peripheral(_ peripheral: CBPeripheral,
@@ -1388,6 +2245,31 @@ extension BluetoothViewModel: CBPeripheralDelegate {
                 collectAccOnly(data, id: peripheral.identifier, config: config)
             }
             return
+        }
+
+        // TKE 收集分支（tke-sitting-calibration-port-plan.md §4.2「didUpdateValueFor 的 TKE 分支」）：
+        // 位置固定在 accOnlyCollecting 之後、liveEstimating 之前。`tkeCollecting` 只有在
+        // Test 頁啟用 TKE 路徑時才非空，正式流程不受影響。
+        //
+        // 閘門用 `recordingSessionActive`（bleQueue 端旗標）而不是 `isRecording`：後者是主執行緒
+        // 屬性，在封包路徑上讀取等於每包都阻塞等 main thread。
+        //
+        // `return` 必須有條件，兩個方向的風險都是真的：
+        //  - 完全不 return → 未錄製時 ACC 掉到下面的 parseACC，靜默寫進 acc 表且
+        //    treatment_result_id 為 nil（working2-database-port-plan.md 18.4 修過的那個問題）
+        //  - 無條件 return → tkeCollecting 是常駐的，一旦使用者按「開始收集」，
+        //    這場錄製的 ACC 會整場被吞掉，acc 表與匯出都是空的
+        // collectTKEAcc 放在 return 判斷之前，確保兩種情況下 tkeClock 都持續更新。
+        if tkeCollecting.contains(peripheral.identifier) {
+            // 排空期（stopTKEPath 已關 notify、等在途封包到齊）只攔截不處理，
+            // 否則會把剛清空的 buffer／clock 又重新填回去。
+            if !tkeDraining, uuid == CBUUID(string: config.sub_acc_uuid) {
+                // 順序固定：先 collectTKEAcc（clock 展開 + 平滑 + buffer），
+                // probeTKESerial 只讀狀態做診斷，不可自己再 ingest 一次（會重複累加回歸）。
+                collectTKEAcc(data, id: peripheral.identifier, config: config)
+                probeTKESerial(data, id: peripheral.identifier)
+            }
+            if !recordingSessionActive { return }
         }
 
         // 即時預估真實角度：更新最新值供 UI 顯示；不 return，讓封包繼續往下走

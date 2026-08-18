@@ -339,6 +339,10 @@ struct Working2: View {
         cancelInProgressHoldWithoutCounting()
         setRestTimer?.invalidate()
         setRestCountdown = content.set_rest_time
+        // 組間休息的起訖標記：拿來對照 [TKE-CLOCK] 有沒有在休息結束的那一刻重置（§20.9）。
+        // 休息期間 stopRecordingAll 會關閉 ACC notify，整段沒有封包；
+        // serial 是 UInt8，超過 256 包（≈49 秒）就會繞回，delta 失去意義而必定重置。
+        print("[TKE-REST] 組間休息開始（第 \(currentSet) 組結束，休息 \(content.set_rest_time) 秒；serial 繞回門檻約 49 秒）")
         showSetRestPopup = true
         setRestTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
             setRestCountdown -= 1
@@ -356,6 +360,7 @@ struct Working2: View {
             currentSet += 1
         }
         currentRep = 0
+        print("[TKE-REST] 組間休息結束，第 \(currentSet) 組開始 —— 接下來 2 秒內若出現 [TKE-CLOCK] 重置，代表這一組開頭會沒有角度")
         markSetStart(index: currentSet - 1)
     }
 
@@ -617,6 +622,10 @@ struct Working2: View {
                                 endSize: 50
                             ))
                     }
+                // 這裡刻意**不**用 displayKneeAngle —— 它不顯示角度數字，只是依門檻挑圖，
+                // 屬於「判定」而非「顯示」，依 §20.3 判定一律讀未夾限值。
+                // （結果其實相同：負值與 0 都滿足 `<= 20`。維持未夾限是為了讓
+                //  「判定讀原值、顯示讀夾限值」這條規則在檔案裡沒有例外。）
                 } else if let angle = btVM.currentEstimatedRealAngle, angle <= Self.holdThreshold {
                     Image("NoGetFishIcon")
                         .resizable()
@@ -743,7 +752,14 @@ struct Working2: View {
                         .strokeBorder(Color.black, lineWidth: 1.5)
                         .padding(4)
 
-                    if let angle = btVM.currentEstimatedRealAngle {
+                    // 唯一把角度**數字**顯示給使用者的地方 → 讀夾限過的 displayKneeAngle。
+                    // offset 模型完全伸直時 theta 是負值（實測 −12.7°／−15.6°），
+                    // 那是 C 增益補償的預期行為，計算與寫入 advanced_statistics 都保留；
+                    // 但「−13°」對治療師是異常數字，只有顯示層夾限（§20.3）。
+                    //
+                    // 下面的紅字判斷 `angle <= holdThreshold` 用夾限值不影響結果 ——
+                    // 負值與 0 都滿足 `<= 20`，是同一個分支。
+                    if let angle = btVM.displayKneeAngle {
                         Text(String(format: "%.0f°", angle))
                             .font(.system(size: 50, weight: .bold))
                             .foregroundStyle(angle <= Self.holdThreshold ? .red : .black)
@@ -844,6 +860,19 @@ struct Working2: View {
         .onDisappear {
             pauseSession()
             stopLiveTestIfNeeded()
+            // 🔴 TKE 路徑的**交棒終點**，必須是獨立的一行，不可放進 stopLiveTestIfNeeded()。
+            //
+            // 那個 helper 開頭是 `guard btVM.isLiveEstimating`，而新流程走 startTKELiveAngle()
+            // 設的是 isTKELiveEstimating —— isLiveEstimating 永遠是 false，
+            // 放進去會被 guard 短路、一次都不會執行，交棒等於沒有終點：
+            // 離開後 notify 一直開、tkeCollecting 一直攔截封包，接著進任何走舊路徑的頁面
+            //（PreWorking_9／_12／_22）即時角度都會失效。（§20.6）
+            //
+            // ⚠️ 觸發時機比「遊戲結束」晚：PostWorking_2 是蓋在 Working2 之上的第三層
+            // fullScreenCover，所以進結果頁時不觸發，要到從結果頁返回總覽、整個堆疊收起才觸發。
+            // TKE 路徑會活過整個 PostWorking 階段——已確認可接受（那時 recordingSessionActive
+            // 已是 false，不會寫入資料庫；舊路徑的 stopLiveEstimateRealAngle 也完全一樣晚）。
+            btVM.stopTKEPath()
             setTimeLimitTimer?.invalidate()
             setTimeLimitTimer = nil
             setCountdownRange = nil

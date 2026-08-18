@@ -24,6 +24,15 @@ struct TestPage: View {
     @Environment(\.goHome) private var goHome
     @State private var exgDisplayMode: EXGDisplayMode = .raw
 
+    /// 四個動作的校正規格。收集層完全共用，差異只在真值、姿勢檢查軸、經驗係數。
+    /// 動作 9／12／22 的校正姿勢都是站立，僅係數不同（9 是左1.7/右1.55，12 與 22 兩側都 1.7）。
+    private static let exercises: [(label: String, spec: any KneeCalibrationSpec.Type)] = [
+        ("2",  TKESpec.self),
+        ("9",  SquatSpec.self),
+        ("12", StepUpSpec.self),
+        ("22", Exercise22Spec.self),
+    ]
+
     /// 裝置目前實際綁定在哪一側（左/右）——比照 `PreWorking_X.swift` 的做法，不是寫死左腳；
     /// 這個 app 一次最多只會綁 2 顆裝置（同一側大腿＋小腿），所以「隨便查一顆裝置的 side」就能知道目前是哪一側在用。
     private var side: Int {
@@ -52,6 +61,19 @@ struct TestPage: View {
 
     private var canEstimateRealAngle: Bool {
         bothConnected && btVM.baselineResult != nil
+    }
+
+    /// TKE 即時角度的啟用條件（tke-sitting-calibration-port-plan.md §4.5②）：
+    /// 校正成功，**且 `tkeResult.side` 等於目前綁定側**。
+    ///
+    /// side 一致性檢查不是選配——換綁裝置後用舊 offset 搭配新的 side，k 值符號相反、
+    /// 角度會完全錯誤，而畫面上不會有任何異常徵兆，只會看到一個看似合理但錯的數字。
+    private var canStartTKELive: Bool {
+        // !btVM.isLiveEstimating：新舊兩條 tick 都發布到 currentEstimatedRealAngle，
+        // 不可同時運作（§20.2）。ViewModel 內另有 guard，這裡是 UI 層的同一道互斥。
+        guard bothConnected, !btVM.isCollectingTKE, !btVM.isLiveEstimating,
+              let r = btVM.tkeResult, r.succeeded else { return false }
+        return r.side == side
     }
 
     private var thighAndCalfPeripherals: (thigh: CBPeripheral, calf: CBPeripheral)? {
@@ -251,7 +273,10 @@ struct TestPage: View {
                         : (canEstimateRealAngle ? Color.teal.opacity(0.85) : Color.gray.opacity(0.3)))
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .disabled(!btVM.isLiveEstimating && (!canEstimateRealAngle || btVM.isCollectingBaseline))
+                    // 新舊兩條 tick 都發布到 currentEstimatedRealAngle，不可同時運作（§20.2）——
+                    // ViewModel 內已有 guard 擋住，這裡一併 disable，讓使用者看得出來是互斥而不是壞掉。
+                    .disabled(!btVM.isLiveEstimating
+                              && (!canEstimateRealAngle || btVM.isCollectingBaseline || btVM.isTKELiveEstimating))
 
                     Button(btVM.isLiveEstimating ? "停止站立即時預估" : "開始站立即時預估") {
                         guard let pair = thighAndCalfPeripherals else { return }
@@ -268,7 +293,8 @@ struct TestPage: View {
                         : (canEstimateRealAngle ? Color.teal.opacity(0.85) : Color.gray.opacity(0.3)))
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .disabled(!btVM.isLiveEstimating && (!canEstimateRealAngle || btVM.isCollectingBaseline))
+                    .disabled(!btVM.isLiveEstimating
+                              && (!canEstimateRealAngle || btVM.isCollectingBaseline || btVM.isTKELiveEstimating))
 
                     if let angle = btVM.currentEstimatedRealAngle {
                         Text(String(format: "%.1f°", angle))
@@ -283,7 +309,86 @@ struct TestPage: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 24)
 
-                // EXG 即時 4 通道監控（test-exg-realtime-monitor-plan.md）
+                // 第二排：四動作校正 + 即時角度（tke-sitting-calibration-port-plan.md §4.5）
+                // 收集層與四個動作完全共用，只有規格（真值／檢查軸／係數）不同。
+                HStack(spacing: 12) {
+                    ForEach(Self.exercises.indices, id: \.self) { i in
+                        let ex = Self.exercises[i]
+                        // 按下即啟用 TKE 路徑並收集 8 秒。校正結束後路徑維持啟用、notify 不關（§4.4），
+                        // 一路到離開頁面才由 .onDisappear 收尾。
+                        Button("動作\(ex.label)校正") {
+                            guard let pair = thighAndCalfPeripherals else { return }
+                            // ownsConnectionRecovery: true 是測試頁專屬 —— 這裡沒有
+                            // preTestFreshnessTimer／freshnessTimer，TKE 路徑必須自己跑斷線修復。
+                            // 正式流程一律用預設 false，見 startTKEPath 的說明。
+                            btVM.startKneeCalibration(spec: ex.spec,
+                                                      thighPeripheral: pair.thigh, calfPeripheral: pair.calf,
+                                                      ownsConnectionRecovery: true)
+                        }
+                        .font(.system(size: 15, weight: .medium))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(bothConnected && !btVM.isCollectingTKE
+                            ? Color.brown.opacity(0.85) : Color.gray.opacity(0.3))
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        // 必須排除「即時進行中」——校正與即時的 buffer 保留規則衝突（§4.5①）
+                        .disabled(!bothConnected || btVM.isCollectingTKE || btVM.isTKELiveEstimating)
+                    }
+
+                    Button(btVM.isTKELiveEstimating ? "停止即時角度" : "開始即時角度") {
+                        if btVM.isTKELiveEstimating {
+                            btVM.stopTKELiveAngle()
+                        } else {
+                            btVM.startTKELiveAngle()
+                        }
+                    }
+                    .font(.system(size: 15, weight: .medium))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(btVM.isTKELiveEstimating ? Color.red.opacity(0.85)
+                        : (canStartTKELive ? Color.teal.opacity(0.85) : Color.gray.opacity(0.3)))
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .disabled(!btVM.isTKELiveEstimating && !canStartTKELive)
+
+                    // 刻意讀未夾限的 currentEstimatedRealAngle（不是 displayKneeAngle）——
+                    // 測試頁的用途是與 Python 逐值比對，夾限到 0 會掩蓋校正殘差。
+                    if let theta = btVM.currentEstimatedRealAngle {
+                        Text(String(format: "%.1f°", theta))
+                            .font(.system(size: 20, weight: .bold, design: .monospaced))
+                    } else if btVM.isTKELiveEstimating {
+                        Text("等待資料…")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.secondary)
+                    } else if let r = btVM.tkeResult, r.succeeded, r.side != side {
+                        Text("綁定裝置已變更，請重新校正")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.red)
+                    }
+
+                    // 結果：大腿 / 小腿 / 訊息。失敗時 offset 顯示 --，只有訊息有內容。
+                    if btVM.isCollectingTKE {
+                        Text("收集中…")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.secondary)
+                    } else if let r = btVM.tkeResult {
+                        HStack(spacing: 8) {
+                            Text("大腿 \(r.thigh.map { String(format: "%.2f°", $0) } ?? "--")")
+                            Text("/")
+                            Text("小腿 \(r.calf.map { String(format: "%.2f°", $0) } ?? "--")")
+                            Text("/")
+                            Text(r.message)
+                                .foregroundStyle(r.succeeded ? Color.green : Color.red)
+                        }
+                        .font(.system(size: 14, weight: .medium))
+                        .fixedSize(horizontal: true, vertical: false)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 24)
+
+                // 第三排：EXG 即時 4 通道監控（test-exg-realtime-monitor-plan.md）
                 HStack(spacing: 12) {
                     Button("原始樣本") { exgDisplayMode = .raw }
                         .font(.system(size: 15, weight: .medium))
@@ -320,6 +425,13 @@ struct TestPage: View {
                 .padding(.horizontal, 24)
             }
             .padding(.top, 20)
+        }
+        // TKE 路徑必須在離開頁面時收尾（tke-sitting-calibration-port-plan.md §4.4）：
+        // notify 是刻意保持開啟到離開頁面才關的，若這裡不關，ACC 會持續傳輸；
+        // 而 tkeCollecting 若殘留，封包會被永久攔截、正式流程的 acc 寫入也會受影響。
+        // stopTKEPath() 不需要 peripheral 參數，裝置已斷線時一樣能清空狀態。
+        .onDisappear {
+            if btVM.isTKEPathActive { btVM.stopTKEPath() }
         }
     }
 
