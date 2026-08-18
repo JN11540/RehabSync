@@ -54,6 +54,17 @@ struct TestPage: View {
         bothConnected && btVM.baselineResult != nil
     }
 
+    /// TKE 即時角度的啟用條件（tke-sitting-calibration-port-plan.md §4.5②）：
+    /// 校正成功，**且 `tkeResult.side` 等於目前綁定側**。
+    ///
+    /// side 一致性檢查不是選配——換綁裝置後用舊 offset 搭配新的 side，k 值符號相反、
+    /// 角度會完全錯誤，而畫面上不會有任何異常徵兆，只會看到一個看似合理但錯的數字。
+    private var canStartTKELive: Bool {
+        guard bothConnected, !btVM.isCollectingTKE,
+              let r = btVM.tkeResult, r.succeeded else { return false }
+        return r.side == side
+    }
+
     private var thighAndCalfPeripherals: (thigh: CBPeripheral, calf: CBPeripheral)? {
         let dvm = DeviceViewModel()
         guard let thigh = dvm.fetch(side: side, limb: 0), let thighUUID = UUID(uuidString: thigh.device_uuid),
@@ -279,29 +290,69 @@ struct TestPage: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    // TKE 路徑開關（tke-sitting-calibration-port-plan.md §9 階段 0 鷹架）：
-                    // 暫時的 toggle，階段 5 會由正式的「TKE校正」按鈕取代。診斷印在 Xcode console。
-                    Button(btVM.isTKEPathActive ? "停用 TKE 路徑" : "啟用 TKE 路徑") {
-                        if btVM.isTKEPathActive {
-                            btVM.stopTKEPath()
-                        } else if let pair = thighAndCalfPeripherals {
-                            btVM.startTKEPath(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+                    // TKE 校正（tke-sitting-calibration-port-plan.md §4.5①）：
+                    // 按下即啟用 TKE 路徑並收集 8 秒。校正結束後路徑維持啟用、notify 不關（§4.4），
+                    // 一路到離開頁面才由 .onDisappear 收尾。
+                    Button("TKE校正") {
+                        guard let pair = thighAndCalfPeripherals else { return }
+                        btVM.startTKECalibration(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+                    }
+                    .font(.system(size: 15, weight: .medium))
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(bothConnected && !btVM.isCollectingTKE
+                        ? Color.brown.opacity(0.85) : Color.gray.opacity(0.3))
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    // 必須排除「即時進行中」——校正與即時的 buffer 保留規則衝突（§4.5①）
+                    .disabled(!bothConnected || btVM.isCollectingTKE || btVM.isTKELiveEstimating)
+
+                    // 結果：大腿 / 小腿 / 訊息。失敗時 offset 顯示 --，只有訊息有內容。
+                    if btVM.isCollectingTKE {
+                        Text("收集中…")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.secondary)
+                    } else if let r = btVM.tkeResult {
+                        HStack(spacing: 8) {
+                            Text("大腿 \(r.thigh.map { String(format: "%.2f°", $0) } ?? "--")")
+                            Text("/")
+                            Text("小腿 \(r.calf.map { String(format: "%.2f°", $0) } ?? "--")")
+                            Text("/")
+                            Text(r.message)
+                                .foregroundStyle(r.succeeded ? Color.green : Color.red)
+                        }
+                        .font(.system(size: 14, weight: .medium))
+                        .fixedSize(horizontal: true, vertical: false)
+                    }
+
+                    // TKE 即時角度（tke-sitting-calibration-port-plan.md §4.5②）
+                    Button(btVM.isTKELiveEstimating ? "停止 TKE 即時角度" : "開始 TKE 即時角度") {
+                        if btVM.isTKELiveEstimating {
+                            btVM.stopTKELiveAngle()
+                        } else {
+                            btVM.startTKELiveAngle()
                         }
                     }
                     .font(.system(size: 15, weight: .medium))
                     .padding(.horizontal, 20)
                     .padding(.vertical, 10)
-                    .background(btVM.isTKEPathActive ? Color.red.opacity(0.85)
-                        : (bothConnected ? Color.brown.opacity(0.85) : Color.gray.opacity(0.3)))
+                    .background(btVM.isTKELiveEstimating ? Color.red.opacity(0.85)
+                        : (canStartTKELive ? Color.teal.opacity(0.85) : Color.gray.opacity(0.3)))
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
-                    // 停用不需要 bothConnected——裝置斷線時更需要能關掉，否則狀態會卡住
-                    .disabled(btVM.isTKEPathActive ? false : (!bothConnected || btVM.isCollectingBaseline))
+                    .disabled(!btVM.isTKELiveEstimating && !canStartTKELive)
 
-                    if btVM.isTKEPathActive {
-                        Text("TKE 路徑啟用中…看 console")
+                    if let theta = btVM.currentTKEAngle {
+                        Text(String(format: "%.1f°", theta))
+                            .font(.system(size: 20, weight: .bold, design: .monospaced))
+                    } else if btVM.isTKELiveEstimating {
+                        Text("等待資料…")
                             .font(.system(size: 14))
                             .foregroundStyle(.secondary)
+                    } else if let r = btVM.tkeResult, r.succeeded, r.side != side {
+                        Text("綁定裝置已變更，請重新校正")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.red)
                     }
 
                 }

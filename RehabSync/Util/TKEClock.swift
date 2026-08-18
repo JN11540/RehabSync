@@ -1,5 +1,21 @@
 import Foundation
 
+/// 校正結果（tke-sitting-calibration-port-plan.md §4.1）。
+///
+/// `thigh`／`calf` 恆同時有值或同時為 nil，呼叫端用 `if let thigh, let calf` 判定成功；
+/// `message` 不論成功失敗都可直接顯示。
+///
+/// `side` 一律回填 —— 即時階段必須確認「現在綁定的側」與「校正當時的側」相同，
+/// 否則 `k` 值符號相反會產生完全錯誤的角度，而畫面上不會有任何異常徵兆。
+struct TKECalibrationResult {
+    let thigh: Double?    // 成功 = o_thigh；失敗 = nil
+    let calf: Double?     // 成功 = o_calf； 失敗 = nil
+    let message: String   // 成功 = "校正成功"；失敗 = 對應提示
+    let side: Int         // 校正當下的綁定側（0=左 1=右）
+
+    var succeeded: Bool { thigh != nil && calf != nil }
+}
+
 /// 一筆已平滑、已定位的加速度樣本（tke-sitting-calibration-port-plan.md §4.1）。
 ///
 /// `k` 是 Serial 展開後的全域樣本索引，**不存時間戳** —— 時間一律透過 `TKEClockFit` 換算。
