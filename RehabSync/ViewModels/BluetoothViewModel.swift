@@ -105,9 +105,17 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     // TKE Serial No 探針（tke-sitting-calibration-port-plan.md §9 階段 0 鷹架）
     // 預設關閉，只有在 Test 頁按下「TKE探針」才啟用，正式流程完全不受影響。
     // 階段 3 會把它補齊成正式的 TKE 收集分支，屆時這組狀態會被取代。
-    var isTKEProbing = false   // UI state (main thread)
-    @ObservationIgnored private var tkeProbing: Set<UUID> = []            // internal (bleQueue)
+    var isTKEPathActive = false   // UI state (main thread)
+    @ObservationIgnored private var tkeCollecting: Set<UUID> = []          // internal (bleQueue)
     @ObservationIgnored private var tkeProbes: [UUID: TKESerialProbe] = [:]
+    /// 啟用時記下兩顆的識別碼，讓 `stopTKEPath()` 不必依賴呼叫端還能取得 peripheral。
+    /// 使用者離開頁面時裝置若已斷線，`thighAndCalfPeripherals` 會是 nil——
+    /// 那時仍必須能清空狀態，否則 `tkeCollecting` 會永久攔截封包且無從關閉。
+    @ObservationIgnored private var tkeThighId: UUID?
+    @ObservationIgnored private var tkeCalfId: UUID?
+    /// 停用流程的排空期：notify 已關但可能還有在途封包。
+    /// 這段期間仍維持攔截（避免漏寫資料庫），但不再做任何處理。
+    @ObservationIgnored private var tkeDraining = false
 
     // 階段 1：Serial 展開 + 增量回歸（Util/TKEClock.swift）
     @ObservationIgnored private var tkeClock: [UUID: TKEDeviceClock] = [:]
@@ -115,7 +123,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     @ObservationIgnored private var tkeSmoothers: [UUID: TKECausalSmoother] = [:]
     @ObservationIgnored private var tkeBuffers: [UUID: [TKESample]] = [:]
     /// 校正收集中的 bleQueue 端旗標。三態（校正中／即時中／閒置串流中）由它與
-    /// `tkeLiveEstimating` 決定；`tkeProbing`／`tkeCollecting` 只代表「TKE 路徑已啟用」。
+    /// `tkeLiveEstimating` 決定；`tkeCollecting` 只代表「TKE 路徑已啟用」。
     /// 用 bleQueue 端旗標而非主執行緒的 `isCollectingTKE`，理由同 `recordingSessionActive`。
     @ObservationIgnored private var tkeCalibrating = false
     @ObservationIgnored private var tkeLiveEstimating = false
@@ -700,31 +708,39 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
 
     // MARK: - TKE Serial No 探針（tke-sitting-calibration-port-plan.md §9 階段 0）
 
-    /// 開始探測 ACC 封包的 Serial No 行為。**只做觀測與統計，不做任何角度計算。**
+    /// 啟用 TKE 路徑（tke-sitting-calibration-port-plan.md §4.4）。
     ///
-    /// 目的是驗證 §4.2 節①「Serial 索引」的四項前提：逐包 +1、掉包跳號、255→0 繞回、
-    /// 兩顆裝置各自獨立計數。這是整個對齊架構的基礎，不成立就得改回到達時間錨定。
+    /// 連線由總覽頁管理，這裡**不 connect 也不 disconnect**，只開關 ACC notify。
+    /// 這是與 Python 腳本最大的行為差異之一 —— Python 用 `async with BleakClient(mac)`
+    /// 把連線與斷線都綁在校正的生命週期上，App 不能這樣做。
     ///
-    /// 連線由總覽頁管理，這裡**不 connect 也不 disconnect**（§4.4），只開關 ACC notify。
-    func startTKEProbe(thighPeripheral: CBPeripheral, calfPeripheral: CBPeripheral) {
-        DispatchQueue.main.async { self.isTKEProbing = true }
+    /// 啟用後 notify 與 `tkeCollecting` **同生共死**，一路維持到 `stopTKEPath()`：
+    /// 校正結束不關、即時停止也不關。理由見 §4.4 ——
+    /// 中途關掉 notify 會讓封包中斷，`tkeClock` 就得面臨要不要重置的問題。
+    func startTKEPath(thighPeripheral: CBPeripheral, calfPeripheral: CBPeripheral) {
+        DispatchQueue.main.async { self.isTKEPathActive = true }
 
         bleQueue.async { [weak self] in
             guard let self, let config = bluetoothConfig else { return }
             let wasRecording = DispatchQueue.main.sync { self.isRecording }
 
-            tkeProbes[thighPeripheral.identifier] = TKESerialProbe(label: "大腿")
-            tkeProbes[calfPeripheral.identifier]  = TKESerialProbe(label: "小腿")
-            tkeClock[thighPeripheral.identifier] = TKEDeviceClock()
-            tkeClock[calfPeripheral.identifier]  = TKEDeviceClock()
-            tkeSmoothers[thighPeripheral.identifier] = TKECausalSmoother()
-            tkeSmoothers[calfPeripheral.identifier]  = TKECausalSmoother()
-            tkeBuffers[thighPeripheral.identifier] = []
-            tkeBuffers[calfPeripheral.identifier]  = []
+            let thighId = thighPeripheral.identifier
+            let calfId = calfPeripheral.identifier
+            tkeThighId = thighId
+            tkeCalfId = calfId
+
+            tkeProbes[thighId] = TKESerialProbe(label: "大腿")
+            tkeProbes[calfId]  = TKESerialProbe(label: "小腿")
+            tkeClock[thighId] = TKEDeviceClock()
+            tkeClock[calfId]  = TKEDeviceClock()
+            tkeSmoothers[thighId] = TKECausalSmoother()
+            tkeSmoothers[calfId]  = TKECausalSmoother()
+            tkeBuffers[thighId] = []
+            tkeBuffers[calfId]  = []
             tkeCalibrating = false      // 階段 5 才會由校正流程設為 true
             tkeLiveEstimating = false   // 階段 6 才會由即時流程設為 true
             tkeSessionT0Ms = nil
-            tkeProbing = [thighPeripheral.identifier, calfPeripheral.identifier]
+            tkeCollecting = [thighId, calfId]
 
             for peripheral in [thighPeripheral, calfPeripheral] {
                 guard let map = charMap[peripheral.identifier] else { continue }
@@ -735,34 +751,76 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
                 }
                 if let c = map[CBUUID(string: config.sub_acc_uuid)] { peripheral.setNotifyValue(true, for: c) }
             }
-            print("[TKE-PROBE] 開始探測（wasRecording=\(wasRecording)）。預期每包間隔 ≈192.31ms、ACC Type=0x04、長度 123。")
+            let c = deviceVM.accRowCounts()
+            print("[TKE] 路徑啟用（wasRecording=\(wasRecording)）。notify 開啟，tkeCollecting 已填入兩顆。")
+            print("[TKE-DB] 啟用前 acc 表：總筆數=\(c.total)，treatment_result_id 為 nil=\(c.orphan)")
         }
     }
 
-    /// 停止探測並印出彙整報告，供 §9 階段 0 的四項驗收判定。
-    func stopTKEProbe(thighPeripheral: CBPeripheral, calfPeripheral: CBPeripheral) {
-        DispatchQueue.main.async { self.isTKEProbing = false }
+    /// 停用 TKE 路徑並印出彙整報告。
+    ///
+    /// **刻意不收 peripheral 參數** —— 使用者離開頁面時裝置可能已經斷線，
+    /// 呼叫端拿不到 peripheral；那時仍必須能清空 `tkeCollecting`，
+    /// 否則裝置一旦重連，封包會被永久攔截且無從關閉。
+    /// 識別碼在 `startTKEPath` 就已記下，這裡只從 `connectedPeripherals` 盡力關 notify。
+    func stopTKEPath() {
+        DispatchQueue.main.async { self.isTKEPathActive = false }
 
         bleQueue.async { [weak self] in
             guard let self else { return }
             let wasRecording = DispatchQueue.main.sync { self.isRecording }
-            tkeProbing = []
+            let thighId = tkeThighId
+            let calfId = tkeCalfId
 
+            // ⚠️ 順序關鍵：**先關 notify、後清 tkeCollecting**，中間維持攔截。
+            //
+            // 反過來做（先清 tkeCollecting）會漏 —— setNotifyValue(false) 是非同步生效的，
+            // 清空之後、notify 真正停止之前抵達的在途封包不再被攔截，
+            // 會一路掉到 parseACC 寫進 acc 表且 treatment_result_id 為 nil。
+            // 實測就是這樣漏掉整整一個封包（20 列）。
+            tkeDraining = true   // 仍攔截，但不再處理
+
+            // 錄製中不可關 notify，否則會打斷正在進行的收集（比照 finishAccOnlyCollection）
             if !wasRecording, let config = bluetoothConfig {
-                for peripheral in [thighPeripheral, calfPeripheral] {
-                    if let map = charMap[peripheral.identifier],
-                       let c = map[CBUUID(string: config.sub_acc_uuid)] {
-                        peripheral.setNotifyValue(false, for: c)
-                    }
+                let live = DispatchQueue.main.sync { self.connectedPeripherals }
+                for id in [thighId, calfId].compactMap({ $0 }) {
+                    guard let peripheral = live[id],
+                          let map = charMap[id],
+                          let c = map[CBUUID(string: config.sub_acc_uuid)] else { continue }
+                    peripheral.setNotifyValue(false, for: c)
                 }
             }
 
-            printTKEProbeSummary(thighId: thighPeripheral.identifier, calfId: calfPeripheral.identifier)
+            if let thighId, let calfId {
+                printTKEProbeSummary(thighId: thighId, calfId: calfId)
+            }
             tkeProbes.removeAll()
             tkeClock.removeAll()
             tkeSmoothers.removeAll()
             tkeBuffers.removeAll()
+            tkeCalibrating = false
+            tkeLiveEstimating = false
             tkeSessionT0Ms = nil
+            tkeThighId = nil
+            tkeCalfId = nil
+            print("[TKE] 路徑停用（wasRecording=\(wasRecording)，notify \(wasRecording ? "保留" : "已關閉")）。")
+
+            if wasRecording {
+                // 錄製中本來就要讓 ACC 寫進資料庫，立刻放行即可
+                tkeCollecting = []
+                tkeDraining = false
+                print("[TKE] 錄製進行中，立即解除攔截（ACC 應繼續寫入資料庫）。")
+            } else {
+                // 排空期：等在途封包到齊再解除攔截。1 秒 ≈ 5 個封包間隔，餘裕充足。
+                bleQueue.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                    guard let self else { return }
+                    tkeCollecting = []
+                    tkeDraining = false
+                    let c = deviceVM.accRowCounts()
+                    print("[TKE-DB] 排空完成後 acc 表：總筆數=\(c.total)，treatment_result_id 為 nil=\(c.orphan)")
+                    print("[TKE-DB] → 測試 A 判定：這兩個數字都必須與「啟用前」完全相同")
+                }
+            }
         }
     }
 
@@ -822,7 +880,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         return outcome
     }
 
-    /// 逐包更新統計並印出單行紀錄。只在 `tkeProbing` 命中時被呼叫。
+    /// 逐包更新統計並印出單行紀錄。只在 `tkeCollecting` 命中時被呼叫。
     private func probeTKESerial(_ data: Data, id: UUID) {
         guard var probe = tkeProbes[id] else { return }
 
@@ -1764,17 +1822,23 @@ extension BluetoothViewModel: CBPeripheralDelegate {
             return
         }
 
-        // TKE Serial No 探針（tke-sitting-calibration-port-plan.md §9 階段 0 鷹架）：
-        // 位置比照 accOnlyCollecting 之後、liveEstimating 之前。`tkeProbing` 只有在 Test 頁
-        // 按下「TKE探針」時才非空，正式流程不受影響。
+        // TKE 收集分支（tke-sitting-calibration-port-plan.md §4.2「didUpdateValueFor 的 TKE 分支」）：
+        // 位置固定在 accOnlyCollecting 之後、liveEstimating 之前。`tkeCollecting` 只有在
+        // Test 頁啟用 TKE 路徑時才非空，正式流程不受影響。
         //
         // 閘門用 `recordingSessionActive`（bleQueue 端旗標）而不是 `isRecording`：後者是主執行緒
-        // 屬性，在封包路徑上讀取等於每包都阻塞等 main thread。這裡的 return 條件是必要的——
-        // 探針會開啟 ACC notify，若不攔截，封包會掉到下面的 parseACC 寫進 acc 表且
-        // treatment_result_id 為 nil（就是 working2-database-port-plan.md 18.4 修過的那個問題）；
-        // 但錄製中必須放行，否則這場錄製的 ACC 會整場被吞掉。
-        if tkeProbing.contains(peripheral.identifier) {
-            if uuid == CBUUID(string: config.sub_acc_uuid) {
+        // 屬性，在封包路徑上讀取等於每包都阻塞等 main thread。
+        //
+        // `return` 必須有條件，兩個方向的風險都是真的：
+        //  - 完全不 return → 未錄製時 ACC 掉到下面的 parseACC，靜默寫進 acc 表且
+        //    treatment_result_id 為 nil（working2-database-port-plan.md 18.4 修過的那個問題）
+        //  - 無條件 return → tkeCollecting 是常駐的，一旦使用者按「開始收集」，
+        //    這場錄製的 ACC 會整場被吞掉，acc 表與匯出都是空的
+        // collectTKEAcc 放在 return 判斷之前，確保兩種情況下 tkeClock 都持續更新。
+        if tkeCollecting.contains(peripheral.identifier) {
+            // 排空期（stopTKEPath 已關 notify、等在途封包到齊）只攔截不處理，
+            // 否則會把剛清空的 buffer／clock 又重新填回去。
+            if !tkeDraining, uuid == CBUUID(string: config.sub_acc_uuid) {
                 // 順序固定：先 collectTKEAcc（clock 展開 + 平滑 + buffer），
                 // probeTKESerial 只讀狀態做診斷，不可自己再 ingest 一次（會重複累加回歸）。
                 collectTKEAcc(data, id: peripheral.identifier, config: config)

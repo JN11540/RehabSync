@@ -307,4 +307,17 @@ class DeviceViewModel {
             try Bluetooth.filter(Column("is_default") == 1).fetchOne(db)?.id
         }
     }
+
+    /// acc 表總筆數，以及其中 `treatment_result_id` 為 nil 的筆數。
+    ///
+    /// 供 tke-sitting-calibration-port-plan.md §9 階段 3 的資料完整性驗收使用 ——
+    /// 測試 A（未錄製時不可污染資料庫）沒有錄製區間，所以無法用「匯出」觀察，
+    /// 必須直接查表。`treatment_result_id` 為 nil 正是那個要防的污染特徵。
+    func accRowCounts() -> (total: Int, orphan: Int) {
+        let total = (try? db.read { db in try Acc.fetchCount(db) }) ?? 0
+        let orphan = (try? db.read { db in
+            try Acc.filter(Column("treatment_result_id") == nil).fetchCount(db)
+        }) ?? 0
+        return (total, orphan)
+    }
 }

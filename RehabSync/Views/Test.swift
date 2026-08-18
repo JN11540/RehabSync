@@ -279,27 +279,27 @@ struct TestPage: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    // TKE Serial No 探針（tke-sitting-calibration-port-plan.md §9 階段 0 鷹架）：
-                    // 暫時的開關，階段 5 會由正式的「TKE校正」按鈕取代。統計結果印在 Xcode console。
-                    Button(btVM.isTKEProbing ? "停止 TKE 探針" : "TKE 探針") {
-                        guard let pair = thighAndCalfPeripherals else { return }
-                        if btVM.isTKEProbing {
-                            btVM.stopTKEProbe(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
-                        } else {
-                            btVM.startTKEProbe(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+                    // TKE 路徑開關（tke-sitting-calibration-port-plan.md §9 階段 0 鷹架）：
+                    // 暫時的 toggle，階段 5 會由正式的「TKE校正」按鈕取代。診斷印在 Xcode console。
+                    Button(btVM.isTKEPathActive ? "停用 TKE 路徑" : "啟用 TKE 路徑") {
+                        if btVM.isTKEPathActive {
+                            btVM.stopTKEPath()
+                        } else if let pair = thighAndCalfPeripherals {
+                            btVM.startTKEPath(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
                         }
                     }
                     .font(.system(size: 15, weight: .medium))
                     .padding(.horizontal, 20)
                     .padding(.vertical, 10)
-                    .background(btVM.isTKEProbing ? Color.red.opacity(0.85)
+                    .background(btVM.isTKEPathActive ? Color.red.opacity(0.85)
                         : (bothConnected ? Color.brown.opacity(0.85) : Color.gray.opacity(0.3)))
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .disabled(!bothConnected || btVM.isCollectingBaseline)
+                    // 停用不需要 bothConnected——裝置斷線時更需要能關掉，否則狀態會卡住
+                    .disabled(btVM.isTKEPathActive ? false : (!bothConnected || btVM.isCollectingBaseline))
 
-                    if btVM.isTKEProbing {
-                        Text("探測中…看 console")
+                    if btVM.isTKEPathActive {
+                        Text("TKE 路徑啟用中…看 console")
                             .font(.system(size: 14))
                             .foregroundStyle(.secondary)
                     }
@@ -345,6 +345,13 @@ struct TestPage: View {
                 .padding(.horizontal, 24)
             }
             .padding(.top, 20)
+        }
+        // TKE 路徑必須在離開頁面時收尾（tke-sitting-calibration-port-plan.md §4.4）：
+        // notify 是刻意保持開啟到離開頁面才關的，若這裡不關，ACC 會持續傳輸；
+        // 而 tkeCollecting 若殘留，封包會被永久攔截、正式流程的 acc 寫入也會受影響。
+        // stopTKEPath() 不需要 peripheral 參數，裝置已斷線時一樣能清空狀態。
+        .onDisappear {
+            if btVM.isTKEPathActive { btVM.stopTKEPath() }
         }
     }
 
