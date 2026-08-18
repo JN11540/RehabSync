@@ -279,6 +279,31 @@ struct TestPage: View {
                             .foregroundStyle(.secondary)
                     }
 
+                    // TKE Serial No 探針（tke-sitting-calibration-port-plan.md §9 階段 0 鷹架）：
+                    // 暫時的開關，階段 5 會由正式的「TKE校正」按鈕取代。統計結果印在 Xcode console。
+                    Button(btVM.isTKEProbing ? "停止 TKE 探針" : "TKE 探針") {
+                        guard let pair = thighAndCalfPeripherals else { return }
+                        if btVM.isTKEProbing {
+                            btVM.stopTKEProbe(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+                        } else {
+                            btVM.startTKEProbe(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+                        }
+                    }
+                    .font(.system(size: 15, weight: .medium))
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(btVM.isTKEProbing ? Color.red.opacity(0.85)
+                        : (bothConnected ? Color.brown.opacity(0.85) : Color.gray.opacity(0.3)))
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .disabled(!bothConnected || btVM.isCollectingBaseline)
+
+                    if btVM.isTKEProbing {
+                        Text("探測中…看 console")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.secondary)
+                    }
+
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 24)

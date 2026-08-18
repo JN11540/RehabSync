@@ -27,6 +27,36 @@ struct EXGChannelStatus {
     var droppedPacketCount: Int = 0
 }
 
+/// TKE Serial No 探針的單一裝置統計（tke-sitting-calibration-port-plan.md §9 階段 0）。
+/// 用來驗證 ACC 封包 Serial No（data[2]）是否符合「逐包 +1、掉包跳號、255→0 繞回」的假設——
+/// 這是整個 Serial 索引對齊架構的前提，不成立就得整個改回到達時間錨定。
+struct TKESerialProbe {
+    var label: String = ""                  // "大腿" / "小腿"
+    var lastSerial: UInt8? = nil
+    var lastArrivalMs: Double? = nil
+    var packetCount: Int = 0
+    var deltaHistogram: [Int: Int] = [:]    // serial 增量 -> 出現次數；正常應集中在 1
+    var wrapCount: Int = 0                  // 255 -> 0 繞回次數
+    var accTypeSeen: Set<UInt8> = []        // data[1]，預期恆為 0x04（104Hz）
+    var unexpectedLengthCount: Int = 0      // data.count != 123 的封包數
+    var gapSumMs: Double = 0
+    var gapCount: Int = 0
+    var minGapMs: Double = .greatestFiniteMagnitude
+    var maxGapMs: Double = 0
+
+    // 相鄰封包的樣本重疊檢查：測出「每包實際前進幾筆樣本」（shift）。
+    // 若 shift == 20 代表每包 20 筆全新（規劃書原本的假設）；
+    // 若 shift < 20 代表封包內容重疊，k = packetIndex * 20 + i 會把時間軸灌水 20/shift 倍。
+    var lastAccData: Data? = nil
+    var shiftHistogram: [Int: Int] = [:]    // shift -> 出現次數
+
+    var meanGapMs: Double { gapCount > 0 ? gapSumMs / Double(gapCount) : 0 }
+    /// 除了 delta == 1 之外的所有增量次數總和（掉包 + 重複 + 異常）
+    var abnormalDeltaCount: Int {
+        deltaHistogram.reduce(0) { $0 + ($1.key == 1 ? 0 : $1.value) }
+    }
+}
+
 @Observable
 final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     private var central: CBCentralManager!
@@ -71,6 +101,31 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     // 共用的加速度計收集機制 — internal (bleQueue)，收集期間不寫入資料庫
     @ObservationIgnored private var accOnlyCollecting: Set<UUID> = []
     @ObservationIgnored private var accOnlyBuffers: [UUID: [(timestamp: Int64, x: Double, y: Double, z: Double)]] = [:]
+
+    // TKE Serial No 探針（tke-sitting-calibration-port-plan.md §9 階段 0 鷹架）
+    // 預設關閉，只有在 Test 頁按下「TKE探針」才啟用，正式流程完全不受影響。
+    // 階段 3 會把它補齊成正式的 TKE 收集分支，屆時這組狀態會被取代。
+    var isTKEProbing = false   // UI state (main thread)
+    @ObservationIgnored private var tkeProbing: Set<UUID> = []            // internal (bleQueue)
+    @ObservationIgnored private var tkeProbes: [UUID: TKESerialProbe] = [:]
+
+    // 階段 1：Serial 展開 + 增量回歸（Util/TKEClock.swift）
+    @ObservationIgnored private var tkeClock: [UUID: TKEDeviceClock] = [:]
+    // 階段 2：因果平滑 + 三態 buffer
+    @ObservationIgnored private var tkeSmoothers: [UUID: TKECausalSmoother] = [:]
+    @ObservationIgnored private var tkeBuffers: [UUID: [TKESample]] = [:]
+    /// 校正收集中的 bleQueue 端旗標。三態（校正中／即時中／閒置串流中）由它與
+    /// `tkeLiveEstimating` 決定；`tkeProbing`／`tkeCollecting` 只代表「TKE 路徑已啟用」。
+    /// 用 bleQueue 端旗標而非主執行緒的 `isCollectingTKE`，理由同 `recordingSessionActive`。
+    @ObservationIgnored private var tkeCalibrating = false
+    @ObservationIgnored private var tkeLiveEstimating = false
+    /// 即時／閒置狀態下的環形 buffer 容量。220 筆 ≈ 2000ms（÷ b ≈ 9.6ms），
+    /// 沿用 Python `SECONDARY_BUFFER_MS` 的量級。校正中則不裁切，保留整個收集期。
+    @ObservationIgnored private static let tkeLiveBufferCapacity = 220
+    /// 跨裝置共用的時間原點（epoch ms）。兩顆裝置的 `a` 必須落在同一個時間框架，
+    /// 否則 `k_c = round((a_thigh + b_thigh·k_t − a_calf) / b_calf)` 這個配對公式不成立。
+    /// 同時也讓回歸的 `t` 維持小數值，避免 epoch 毫秒平方後吃掉 Double 的有效位數。
+    @ObservationIgnored private var tkeSessionT0Ms: Double?
 
     // EXG 封包遺失排查用（#if DEBUG）：記錄每個 device+channel 上一次收到的 Serial No／時間，
     // 藉此分辨「裝置端真的沒送那麼快」還是「app 這邊漏收了封包」。
@@ -641,6 +696,325 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         }
 
         completion(thighSamples, calfSamples)
+    }
+
+    // MARK: - TKE Serial No 探針（tke-sitting-calibration-port-plan.md §9 階段 0）
+
+    /// 開始探測 ACC 封包的 Serial No 行為。**只做觀測與統計，不做任何角度計算。**
+    ///
+    /// 目的是驗證 §4.2 節①「Serial 索引」的四項前提：逐包 +1、掉包跳號、255→0 繞回、
+    /// 兩顆裝置各自獨立計數。這是整個對齊架構的基礎，不成立就得改回到達時間錨定。
+    ///
+    /// 連線由總覽頁管理，這裡**不 connect 也不 disconnect**（§4.4），只開關 ACC notify。
+    func startTKEProbe(thighPeripheral: CBPeripheral, calfPeripheral: CBPeripheral) {
+        DispatchQueue.main.async { self.isTKEProbing = true }
+
+        bleQueue.async { [weak self] in
+            guard let self, let config = bluetoothConfig else { return }
+            let wasRecording = DispatchQueue.main.sync { self.isRecording }
+
+            tkeProbes[thighPeripheral.identifier] = TKESerialProbe(label: "大腿")
+            tkeProbes[calfPeripheral.identifier]  = TKESerialProbe(label: "小腿")
+            tkeClock[thighPeripheral.identifier] = TKEDeviceClock()
+            tkeClock[calfPeripheral.identifier]  = TKEDeviceClock()
+            tkeSmoothers[thighPeripheral.identifier] = TKECausalSmoother()
+            tkeSmoothers[calfPeripheral.identifier]  = TKECausalSmoother()
+            tkeBuffers[thighPeripheral.identifier] = []
+            tkeBuffers[calfPeripheral.identifier]  = []
+            tkeCalibrating = false      // 階段 5 才會由校正流程設為 true
+            tkeLiveEstimating = false   // 階段 6 才會由即時流程設為 true
+            tkeSessionT0Ms = nil
+            tkeProbing = [thighPeripheral.identifier, calfPeripheral.identifier]
+
+            for peripheral in [thighPeripheral, calfPeripheral] {
+                guard let map = charMap[peripheral.identifier] else { continue }
+                if !wasRecording, let writeChar = map[CBUUID(string: config.write_uuid)] {
+                    peripheral.writeValue(config.cmd_a0, for: writeChar, type: .withResponse)
+                    peripheral.writeValue(config.cmd_a1, for: writeChar, type: .withResponse)
+                    peripheral.writeValue(config.cmd_a2, for: writeChar, type: .withResponse)
+                }
+                if let c = map[CBUUID(string: config.sub_acc_uuid)] { peripheral.setNotifyValue(true, for: c) }
+            }
+            print("[TKE-PROBE] 開始探測（wasRecording=\(wasRecording)）。預期每包間隔 ≈192.31ms、ACC Type=0x04、長度 123。")
+        }
+    }
+
+    /// 停止探測並印出彙整報告，供 §9 階段 0 的四項驗收判定。
+    func stopTKEProbe(thighPeripheral: CBPeripheral, calfPeripheral: CBPeripheral) {
+        DispatchQueue.main.async { self.isTKEProbing = false }
+
+        bleQueue.async { [weak self] in
+            guard let self else { return }
+            let wasRecording = DispatchQueue.main.sync { self.isRecording }
+            tkeProbing = []
+
+            if !wasRecording, let config = bluetoothConfig {
+                for peripheral in [thighPeripheral, calfPeripheral] {
+                    if let map = charMap[peripheral.identifier],
+                       let c = map[CBUUID(string: config.sub_acc_uuid)] {
+                        peripheral.setNotifyValue(false, for: c)
+                    }
+                }
+            }
+
+            printTKEProbeSummary(thighId: thighPeripheral.identifier, calfId: calfPeripheral.identifier)
+            tkeProbes.removeAll()
+            tkeClock.removeAll()
+            tkeSmoothers.removeAll()
+            tkeBuffers.removeAll()
+            tkeSessionT0Ms = nil
+        }
+    }
+
+    /// 階段 2：封包 → clock → 平滑 → buffer。這是 TKE 路徑的收集主流程。
+    ///
+    /// 三態（§4.2「即時模式的 buffer 管理」）：
+    /// - 校正中（`tkeCalibrating`）：保留整個收集期，不裁切
+    /// - 即時中／閒置串流中：只保留最近 `tkeLiveBufferCapacity` 筆，逐包裁切
+    ///
+    /// 回傳 clock 的處理結果供診斷用。
+    @discardableResult
+    private func collectTKEAcc(_ data: Data, id: UUID, config: Bluetooth) -> TKEDeviceClock.Outcome? {
+        guard data.count >= 123 else { return nil }
+
+        let nowMs = Date().timeIntervalSince1970 * 1000
+        if tkeSessionT0Ms == nil { tkeSessionT0Ms = nowMs }
+        let relMs = nowMs - (tkeSessionT0Ms ?? nowMs)
+
+        guard var clock = tkeClock[id] else { return nil }
+        let outcome = clock.ingest(serial: data[2], arrivalMs: relMs)
+        tkeClock[id] = clock
+
+        let firstK: Int
+        switch outcome {
+        case .duplicate:
+            return outcome
+        case .reset(let k):
+            // clock 重置後 k 回到新的編號基準，既有 buffer 與平滑視窗都是舊基準的資料，
+            // 留著只會讓配對取到撞號的錯誤樣本，一併清空。
+            tkeBuffers[id]?.removeAll(keepingCapacity: true)
+            tkeSmoothers[id]?.reset()
+            firstK = k
+        case .accepted(let k):
+            firstK = k
+        }
+
+        var smoother = tkeSmoothers[id] ?? TKECausalSmoother()
+        var buf = tkeBuffers[id] ?? []
+
+        for i in 0 ..< 20 {
+            let o = 3 + i * 6
+            let rawX = Double(data.int16BE(at: o))     * config.acc_sensitivity
+            let rawY = Double(data.int16BE(at: o + 2)) * config.acc_sensitivity
+            let rawZ = Double(data.int16BE(at: o + 4)) * config.acc_sensitivity
+            // 視窗未滿的樣本直接丟棄，不進 buffer（§5.1）
+            guard let s = smoother.push(x: rawX, y: rawY, z: rawZ) else { continue }
+            buf.append(TKESample(k: firstK + i, x: s.x, y: s.y, z: s.z))
+        }
+
+        // 非校正狀態下裁成環形 buffer，避免無限成長
+        if !tkeCalibrating, buf.count > Self.tkeLiveBufferCapacity {
+            buf.removeFirst(buf.count - Self.tkeLiveBufferCapacity)
+        }
+
+        tkeSmoothers[id] = smoother
+        tkeBuffers[id] = buf
+        return outcome
+    }
+
+    /// 逐包更新統計並印出單行紀錄。只在 `tkeProbing` 命中時被呼叫。
+    private func probeTKESerial(_ data: Data, id: UUID) {
+        guard var probe = tkeProbes[id] else { return }
+
+        let nowMs = Date().timeIntervalSince1970 * 1000
+        probe.packetCount += 1
+        if data.count != 123 { probe.unexpectedLengthCount += 1 }
+        if data.count >= 2 { probe.accTypeSeen.insert(data[1]) }
+
+        guard data.count >= 3 else { tkeProbes[id] = probe; return }
+        let serial = data[2]
+
+        var deltaText = "—"
+        if let last = probe.lastSerial {
+            // 與 §4.2 節①的展開公式一致：繞回後仍應得到正確的增量
+            let delta = (Int(serial) - Int(last) + 256) % 256
+            probe.deltaHistogram[delta, default: 0] += 1
+            if serial < last { probe.wrapCount += 1 }
+            deltaText = "\(delta)"
+        }
+
+        var gapText = "—"
+        if let lastAt = probe.lastArrivalMs {
+            let gap = nowMs - lastAt
+            probe.gapSumMs += gap
+            probe.gapCount += 1
+            probe.minGapMs = min(probe.minGapMs, gap)
+            probe.maxGapMs = max(probe.maxGapMs, gap)
+            gapText = String(format: "%.1f", gap)
+        }
+
+        // 樣本重疊檢查：找出使「前一包的 samples[s...19] == 本包的 samples[0...(19-s)]」
+        // 成立的最小 s，那就是本包相對前一包實際前進的樣本數。
+        // 找不到任何 s 則視為 20（完全不重疊，即每包 20 筆全新）。
+        var shiftText = "—"
+        if data.count >= 123 {
+            let acc = Data(data[3 ..< 123])          // 120 bytes = 20 樣本 × 6 bytes
+            if let prev = probe.lastAccData, deltaText == "1" {
+                // 只在 delta==1（沒掉包）時比對才有意義
+                var found = 20
+                for s in 1 ... 20 {
+                    let overlapBytes = (20 - s) * 6
+                    if overlapBytes == 0 { break }
+                    if prev[(s * 6) ..< 120] == acc[0 ..< overlapBytes] {
+                        found = s
+                        break
+                    }
+                }
+                probe.shiftHistogram[found, default: 0] += 1
+                shiftText = "\(found)"
+            }
+            probe.lastAccData = acc
+        }
+
+        probe.lastSerial = serial
+        probe.lastArrivalMs = nowMs
+        tkeProbes[id] = probe
+
+        // ---- 階段 1／2 狀態（clock 與 buffer 由 collectTKEAcc 更新，這裡只讀不寫）----
+        var clockText = ""
+        if let clock = tkeClock[id], let f = clock.fit() {
+            clockText = String(format: " b=%.4fms(%.1fHz) resid=%.1fms n=%d",
+                               f.b, f.measuredRateHz, f.residualStdMs, f.pointCount)
+        } else {
+            clockText = " b=（觀測點不足）"
+        }
+        let buffered = tkeBuffers[id]?.count ?? 0
+        let lastK = tkeBuffers[id]?.last?.k ?? -1
+        let warmup = tkeSmoothers[id]?.warmupDiscarded ?? 0
+        let bufText = " buf=\(buffered) lastK=\(lastK) warmup丟棄=\(warmup)"
+
+        let flag = (deltaText != "1" && deltaText != "—") ? " ⚠️掉包/重複" : ""
+        print(String(format: "[TKE-PROBE] %@ #%-4d serial=%3d delta=%@ shift=%@ gap=%@ms len=%d type=0x%02X%@%@%@",
+                     probe.label, probe.packetCount, Int(serial), deltaText, shiftText, gapText,
+                     data.count, data.count >= 2 ? data[1] : 0, flag, clockText, bufText))
+    }
+
+    /// §9 階段 0 的四項驗收：逐包 +1、掉包跳號、255→0 繞回、兩顆裝置各自獨立計數。
+    private func printTKEProbeSummary(thighId: UUID, calfId: UUID) {
+        print("\n========== [TKE-PROBE] 彙整報告 ==========")
+        for id in [thighId, calfId] {
+            guard let p = tkeProbes[id] else { continue }
+            let deltaDesc = p.deltaHistogram.sorted { $0.key < $1.key }
+                .map { "delta=\($0.key)×\($0.value)" }.joined(separator: ", ")
+            let typeDesc = p.accTypeSeen.sorted()
+                .map { String(format: "0x%02X", $0) }.joined(separator: ",")
+            let shiftDesc = p.shiftHistogram.sorted { $0.key < $1.key }
+                .map { "shift=\($0.key)×\($0.value)" }.joined(separator: ", ")
+            // 由實測的 shift 與到達間隔反推真實取樣率，與標稱值對照
+            let dominantShift = p.shiftHistogram.max { $0.value < $1.value }?.key
+            var rateDesc = "（資料不足）"
+            if let s = dominantShift, p.meanGapMs > 0 {
+                let hz = Double(s) / (p.meanGapMs / 1000.0)
+                rateDesc = String(format: "每包前進 %d 筆 → 實測取樣率 ≈ %.1f Hz", s, hz)
+            }
+            print("""
+            [\(p.label)]
+              封包數      = \(p.packetCount)
+              serial 增量 = \(deltaDesc.isEmpty ? "（無）" : deltaDesc)
+              異常增量數  = \(p.abnormalDeltaCount)（delta≠1 的總次數＝掉包或重複）
+              繞回次數    = \(p.wrapCount)（255→0）
+              ACC Type    = \(typeDesc)（預期 0x04 = 104Hz）
+              長度異常    = \(p.unexpectedLengthCount) 包（預期 0，長度應為 123）
+              到達間隔    = 平均 \(String(format: "%.1f", p.meanGapMs))ms / 最小 \(String(format: "%.1f", p.minGapMs == .greatestFiniteMagnitude ? 0 : p.minGapMs))ms / 最大 \(String(format: "%.1f", p.maxGapMs))ms
+              樣本前進量  = \(shiftDesc.isEmpty ? "（無）" : shiftDesc)
+              🔑 \(rateDesc)
+            """)
+        }
+
+        // 兩顆裝置是否各自獨立計數：serial 若同步前進，代表不是獨立計數器
+        if let t = tkeProbes[thighId], let c = tkeProbes[calfId],
+           let ts = t.lastSerial, let cs = c.lastSerial {
+            print("""
+              兩顆最後 serial：大腿=\(ts) 小腿=\(cs) → \(ts == cs ? "⚠️ 相同，需再觀察是否為巧合" : "✅ 不同，符合各自獨立計數")
+            """)
+        }
+
+        // ---- 階段 1：回歸自檢（§7.1）----
+        print("\n---- 回歸自檢（§9 階段 1 / §7.1）----")
+        let nominal = TKEDeviceClock.nominalPeriodMs
+        for (id, label) in [(thighId, "大腿"), (calfId, "小腿")] {
+            guard let clock = tkeClock[id] else { continue }
+            guard let f = clock.fit() else {
+                print("[\(label)] 觀測點不足（\(clock.pointCount) < \(TKEDeviceClock.minPointsForFit)），無法擬合")
+                continue
+            }
+            let deviationPct = (f.b - nominal) / nominal * 100
+            print("""
+            [\(label)]
+              a = \(String(format: "%.1f", f.a)) ms（相對 session t0）
+              b = \(String(format: "%.4f", f.b)) ms/sample → 實測取樣率 \(String(format: "%.2f", f.measuredRateHz)) Hz
+                  與標稱 \(String(format: "%.4f", nominal))ms（104Hz）偏差 \(String(format: "%+.2f", deviationPct))%
+              殘差標準差 = \(String(format: "%.1f", f.residualStdMs)) ms  ← 這就是實際的 BLE 到達抖動量
+              觀測點 = \(f.pointCount)   重置次數 = \(clock.resetCount)
+            """)
+        }
+
+        // 兩顆的相對時脈差：決定長時間下的漂移速度
+        if let tf = tkeClock[thighId]?.fit(), let cf = tkeClock[calfId]?.fit() {
+            let ratio = tf.b / cf.b
+            let driftMsPerMin = abs(ratio - 1.0) * 60_000
+            print("""
+              兩顆 b 比值 = \(String(format: "%.6f", ratio))
+              → 相對時脈差 \(String(format: "%.4f", abs(ratio - 1.0) * 100))%，
+                若只用單次錨定，每分鐘會累積約 \(String(format: "%.1f", driftMsPerMin)) ms 的對齊誤差
+                （本架構兩側各自回歸，此項已被吸收）
+            """)
+        }
+        // ---- 階段 2：平滑與 buffer 自檢 ----
+        print("\n---- 收集自檢（§9 階段 2）----")
+        for (id, label) in [(thighId, "大腿"), (calfId, "小腿")] {
+            let buffered = tkeBuffers[id]?.count ?? 0
+            let warmup = tkeSmoothers[id]?.warmupDiscarded ?? 0
+            let packets = tkeProbes[id]?.packetCount ?? 0
+            let expectedTotal = packets * 20                       // 若不丟棄、不裁切
+            let cap = Self.tkeLiveBufferCapacity
+            let firstK = tkeBuffers[id]?.first?.k ?? -1
+            let lastK = tkeBuffers[id]?.last?.k ?? -1
+            print("""
+            [\(label)]
+              buffer 筆數   = \(buffered)（上限 \(cap)）\(buffered <= cap ? "✅ 未超過上限" : "❌ 超過上限")
+              暖機丟棄      = \(warmup) 筆 \(warmup == TKECausalSmoother.window - 1 ? "✅ 正好 N-1=29" : "（預期 29）")
+              k 範圍        = \(firstK) ~ \(lastK)
+              收到樣本總數  = \(expectedTotal)（\(packets) 包 × 20）
+              → 環形裁切後只留最近 \(buffered) 筆，符合「不隨時間成長」
+            """)
+        }
+
+        print("""
+        ---- 階段 2 驗收 ----
+        ① 暖機丟棄        ：應正好 29 筆（N=30 的視窗，前 29 筆未滿）
+        ② buffer 不成長   ：跑越久 buffer 筆數仍應停在 220，不隨封包數增加
+        ③ k 連續性        ：lastK − firstK 應接近 219（220 筆連續索引），掉包時才會更大
+
+        ---- 階段 1 驗收 ----
+        ① b 是否收斂       ：應穩定在 9.6154ms 附近；若明顯偏離，回歸是對的、標稱值是錯的
+        ② b 是否跳變       ：同一次工作階段內 b 若突然改變，代表裝置換了送包節奏（階段 0 曾觀察到 6.3 倍差異）
+        ③ 殘差標準差       ：這是真實的 σ，用來取代規劃書 §4.2 假設的 30ms
+        ④ 重置次數應為 0   ：正常連線下不該觸發 serial 異常判定
+        """)
+        print("""
+        ---- 驗收判定（§9 階段 0）----
+        ① 逐包 +1        ：看「serial 增量」是否幾乎全是 delta=1
+        ② 掉包跳號        ：刻意拿遠裝置後，應出現 delta≥2 而非亂數
+        ③ 255→0 繞回      ：繞回次數 >0 時，該次 delta 仍應是 1
+        ④ 兩顆獨立計數    ：兩顆的封包數與 serial 各自前進，不同步
+        ⑤ 樣本前進量      ：shift 若集中在 20 → 每包 20 筆全新，k = packetIndex*20 + i 成立
+                            shift 若 <20（例如 3）→ 封包內容重疊，該公式會把時間軸灌水
+                            20/shift 倍，§4.2 節①必須改成 k = packetIndex*shift + i
+        ①–④ 任一不成立 → Serial 索引架構的前提不成立，必須改回到達時間錨定。
+        ⑤ 不是 20 → 架構可留，但索引公式與所有時間相關常數都要重算。
+        ==========================================\n
+        """)
     }
 
     // MARK: - Baseline Calibration（膝角基準值）
@@ -1388,6 +1762,25 @@ extension BluetoothViewModel: CBPeripheralDelegate {
                 collectAccOnly(data, id: peripheral.identifier, config: config)
             }
             return
+        }
+
+        // TKE Serial No 探針（tke-sitting-calibration-port-plan.md §9 階段 0 鷹架）：
+        // 位置比照 accOnlyCollecting 之後、liveEstimating 之前。`tkeProbing` 只有在 Test 頁
+        // 按下「TKE探針」時才非空，正式流程不受影響。
+        //
+        // 閘門用 `recordingSessionActive`（bleQueue 端旗標）而不是 `isRecording`：後者是主執行緒
+        // 屬性，在封包路徑上讀取等於每包都阻塞等 main thread。這裡的 return 條件是必要的——
+        // 探針會開啟 ACC notify，若不攔截，封包會掉到下面的 parseACC 寫進 acc 表且
+        // treatment_result_id 為 nil（就是 working2-database-port-plan.md 18.4 修過的那個問題）；
+        // 但錄製中必須放行，否則這場錄製的 ACC 會整場被吞掉。
+        if tkeProbing.contains(peripheral.identifier) {
+            if uuid == CBUUID(string: config.sub_acc_uuid) {
+                // 順序固定：先 collectTKEAcc（clock 展開 + 平滑 + buffer），
+                // probeTKESerial 只讀狀態做診斷，不可自己再 ingest 一次（會重複累加回歸）。
+                collectTKEAcc(data, id: peripheral.identifier, config: config)
+                probeTKESerial(data, id: peripheral.identifier)
+            }
+            if !recordingSessionActive { return }
         }
 
         // 即時預估真實角度：更新最新值供 UI 顯示；不 return，讓封包繼續往下走
