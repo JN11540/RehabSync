@@ -621,6 +621,10 @@ struct Working9: View {
                     } else if showHappyMoment {
                         Image("ArrowHappyMomentIcon")
                             .resizable()
+                    // 這裡刻意**不**用 displayKneeAngle —— 它不顯示角度數字，只是依門檻挑圖，
+                    // 屬於「判定」而非「顯示」，判定一律讀未夾限值。
+                    // （結果其實相同：負值與 0 都遠低於 45。維持未夾限是為了讓
+                    //  「判定讀原值、顯示讀夾限值」這條規則在檔案裡沒有例外。）
                     } else if let angle = btVM.currentEstimatedRealAngle, angle >= Self.holdThreshold {
                         Image("ArcheryFocusIcon")
                             .resizable()
@@ -770,7 +774,13 @@ struct Working9: View {
                         .strokeBorder(Color.black, lineWidth: 1.5)
                         .padding(4)
 
-                    if let angle = btVM.currentEstimatedRealAngle {
+                    // 唯一把角度**數字**顯示給使用者的地方 → 讀夾限過的 displayKneeAngle。
+                    // 計算與寫入 advanced_statistics 保留負值（校正殘差），只有顯示層夾限。
+                    //
+                    // 下面的紅字判斷 `angle >= holdThreshold` 用夾限值不影響結果 ——
+                    // 動作 9 的負值出現在站直（動作的起始端），與門檻 45 差得很遠，
+                    // 夾成 0 之後仍在同一個分支。
+                    if let angle = btVM.displayKneeAngle {
                         Text(String(format: "%.0f°", angle))
                             .font(.system(size: 50, weight: .bold))
                             .foregroundStyle(angle >= Self.holdThreshold ? .red : .black)
@@ -879,6 +889,20 @@ struct Working9: View {
             btVM.stopRecordingAll()
             btVM.currentTreatmentResultId = nil
             stopLiveTestIfNeeded()
+            // 🔴 TKE 路徑的**交棒終點**，必須是獨立的一行，不可放進 stopLiveTestIfNeeded()。
+            //
+            // 那個 helper 開頭是 `guard btVM.isLiveEstimating`，而新流程走 startTKELiveAngle()
+            // 設的是 isTKELiveEstimating —— isLiveEstimating 永遠是 false，
+            // 放進去會被 guard 短路、一次都不會執行，交棒等於沒有終點：
+            // 離開後 notify 一直開、tkeCollecting 一直攔截封包，接著進任何走舊路徑的頁面
+            //（PreWorking_12／_22）即時角度都會失效。
+            //
+            // 這條出口 PreWorking_9 根 View 的 .onDisappear 救不到 ——
+            // 導頁走 .fullScreenCover，不會觸發被覆蓋那一層的 onDisappear。
+            //
+            // ⚠️ 觸發時機比「遊戲結束」晚：PostWorking_9 蓋在 Working9 之上，
+            // 進結果頁時不觸發，要到從結果頁返回總覽、整個堆疊收起才觸發。
+            btVM.stopTKEPath()
         }
     }
 }
