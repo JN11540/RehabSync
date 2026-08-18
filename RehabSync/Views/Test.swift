@@ -69,7 +69,9 @@ struct TestPage: View {
     /// side 一致性檢查不是選配——換綁裝置後用舊 offset 搭配新的 side，k 值符號相反、
     /// 角度會完全錯誤，而畫面上不會有任何異常徵兆，只會看到一個看似合理但錯的數字。
     private var canStartTKELive: Bool {
-        guard bothConnected, !btVM.isCollectingTKE,
+        // !btVM.isLiveEstimating：新舊兩條 tick 都發布到 currentEstimatedRealAngle，
+        // 不可同時運作（§20.2）。ViewModel 內另有 guard，這裡是 UI 層的同一道互斥。
+        guard bothConnected, !btVM.isCollectingTKE, !btVM.isLiveEstimating,
               let r = btVM.tkeResult, r.succeeded else { return false }
         return r.side == side
     }
@@ -271,7 +273,10 @@ struct TestPage: View {
                         : (canEstimateRealAngle ? Color.teal.opacity(0.85) : Color.gray.opacity(0.3)))
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .disabled(!btVM.isLiveEstimating && (!canEstimateRealAngle || btVM.isCollectingBaseline))
+                    // 新舊兩條 tick 都發布到 currentEstimatedRealAngle，不可同時運作（§20.2）——
+                    // ViewModel 內已有 guard 擋住，這裡一併 disable，讓使用者看得出來是互斥而不是壞掉。
+                    .disabled(!btVM.isLiveEstimating
+                              && (!canEstimateRealAngle || btVM.isCollectingBaseline || btVM.isTKELiveEstimating))
 
                     Button(btVM.isLiveEstimating ? "停止站立即時預估" : "開始站立即時預估") {
                         guard let pair = thighAndCalfPeripherals else { return }
@@ -288,7 +293,8 @@ struct TestPage: View {
                         : (canEstimateRealAngle ? Color.teal.opacity(0.85) : Color.gray.opacity(0.3)))
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .disabled(!btVM.isLiveEstimating && (!canEstimateRealAngle || btVM.isCollectingBaseline))
+                    .disabled(!btVM.isLiveEstimating
+                              && (!canEstimateRealAngle || btVM.isCollectingBaseline || btVM.isTKELiveEstimating))
 
                     if let angle = btVM.currentEstimatedRealAngle {
                         Text(String(format: "%.1f°", angle))
@@ -312,8 +318,12 @@ struct TestPage: View {
                         // 一路到離開頁面才由 .onDisappear 收尾。
                         Button("動作\(ex.label)校正") {
                             guard let pair = thighAndCalfPeripherals else { return }
+                            // ownsConnectionRecovery: true 是測試頁專屬 —— 這裡沒有
+                            // preTestFreshnessTimer／freshnessTimer，TKE 路徑必須自己跑斷線修復。
+                            // 正式流程一律用預設 false，見 startTKEPath 的說明。
                             btVM.startKneeCalibration(spec: ex.spec,
-                                                      thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+                                                      thighPeripheral: pair.thigh, calfPeripheral: pair.calf,
+                                                      ownsConnectionRecovery: true)
                         }
                         .font(.system(size: 15, weight: .medium))
                         .padding(.horizontal, 16)
@@ -342,7 +352,9 @@ struct TestPage: View {
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .disabled(!btVM.isTKELiveEstimating && !canStartTKELive)
 
-                    if let theta = btVM.currentTKEAngle {
+                    // 刻意讀未夾限的 currentEstimatedRealAngle（不是 displayKneeAngle）——
+                    // 測試頁的用途是與 Python 逐值比對，夾限到 0 會掩蓋校正殘差。
+                    if let theta = btVM.currentEstimatedRealAngle {
                         Text(String(format: "%.1f°", theta))
                             .font(.system(size: 20, weight: .bold, design: .monospaced))
                     } else if btVM.isTKELiveEstimating {

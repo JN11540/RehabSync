@@ -285,6 +285,38 @@ enum KneeCalibration {
 
     // MARK: - 診斷輸出
 
+    /// 「平滑視窗有沒有在收集開始前就填滿」的直接判定。
+    ///
+    /// 這是 `preworking2-knee-plan.md` §8.2① 整套推論的唯一實證，但原本只印出
+    /// 「進入計算樣本」的絕對值，要人工去記「520 才對、491 就不對」——
+    /// 實際驗收時這個數字反覆沒被記下來，所以改成 log 自己算、自己下結論。
+    ///
+    /// 判定方式不需要知道收集秒數：收集期間實收 N 個封包 = N×20 筆原始樣本，
+    /// 平滑器若已預先填滿，這些樣本會**全部**進入 buffer；若是在收集期才開始暖機，
+    /// 前 `smoothWindow − 1` 筆會被丟棄（[CausalSmoother] 視窗未滿不輸出）。
+    /// 兩者相減就是實際的暖機損耗。
+    ///
+    /// 損耗明顯大於 `smoothWindow` 時，通常代表收集期間發生過 clock 重置
+    ///（`.reset` 分支會清空 buffer 與平滑器），可對照 `[TKE-CLOCK]` log 確認。
+    private static func warmupVerdict(packetCount: Int, sampleCount: Int, label: String) -> String {
+        let raw = packetCount * BLEDeviceClock.samplesPerPacket
+        let lost = raw - sampleCount
+        let verdict: String
+        switch lost {
+        case 0:
+            verdict = "✅ 零暖機損耗（視窗已在提示階段填滿）"
+        case 1 ..< smoothWindow:
+            verdict = "⚠️ 部分損耗，視窗未完全填滿"
+        case smoothWindow:
+            verdict = "❌ 完整暖機損耗 —— 平滑視窗是在收集期才開始填的，§8.2① 推論不成立"
+        default:
+            verdict = lost < 0
+                ? "⚠️ 樣本多於實收封包，數字異常，請回報"
+                : "❌ 損耗 > 視窗長度，收集期間可能發生過 clock 重置（對照 [TKE-CLOCK]）"
+        }
+        return "\(label)=\(lost) 筆（實收 \(packetCount) 包 × \(BLEDeviceClock.samplesPerPacket) = \(raw)，進入計算 \(sampleCount)）→ \(verdict)"
+    }
+
     /// 整組診斷欄位統一由這裡輸出，不另外定義第二套。
     private static func printDiagnostics(
         spec: any KneeCalibrationSpec.Type, side: Int,
@@ -302,6 +334,8 @@ enum KneeCalibration {
           回歸 b         大腿=\(String(format: "%.4f", thighFit.b))ms  小腿=\(String(format: "%.4f", calfFit.b))ms
           回歸殘差       大腿=\(String(format: "%.1f", thighFit.residualStdMs))ms  小腿=\(String(format: "%.1f", calfFit.residualStdMs))ms
           進入計算樣本   大腿=\(thighSamples.count)  小腿=\(calfSamples.count)
+          平滑暖機損耗   \(warmupVerdict(packetCount: thighPacketCount, sampleCount: thighSamples.count, label: "大腿"))
+                         \(warmupVerdict(packetCount: calfPacketCount, sampleCount: calfSamples.count, label: "小腿"))
           成功配對       \(pairedCount)（佔大腿樣本 \(thighSamples.isEmpty ? 0 : pairedCount * 100 / thighSamples.count)%）
           姿勢通過       大腿=\(thighOnlyPass)  小腿=\(calfOnlyPass)  同時=\(qualified)（門檻 \(spec.minQualifiedSamples)）
         \(extra.map { "  \($0)\n" } ?? "")  → \(message)

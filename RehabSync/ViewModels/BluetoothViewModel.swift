@@ -111,7 +111,6 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     /// 校正與即時共用 tkeBuffers 但保留規則衝突，不能同時啟動。
     var isTKELiveEstimating = false
     var tkeResult: KneeCalibrationResult? = nil   // UI state (main thread)
-    var currentTKEAngle: Double? = nil           // UI state (main thread)：即時 theta
     @ObservationIgnored private var tkeLiveTimer: Timer?
     @ObservationIgnored private var tkeLiveOThigh = 0.0
     @ObservationIgnored private var tkeLiveOCalf = 0.0
@@ -172,6 +171,19 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     // Live Estimated Real Angle（即時預估真實角度，固定 5Hz 更新）— UI state (main thread)
     var isLiveEstimating = false
     var currentEstimatedRealAngle: Double? = nil
+
+    /// 給畫面用的膝角度：**夾限到 0 以上**。
+    ///
+    /// 計算端（`publishKneeAngle` 收到的值、寫進 `advanced_statistics` 的值）一律**不夾限** ——
+    /// 負角度是校正殘差的真實訊號，夾掉就無法從資料回頭診斷校正品質。
+    /// 夾限只發生在顯示層，因為「膝蓋 -3°」對使用者沒有意義。
+    ///
+    /// 正式流程的角度顯示一律走這個屬性；Test 頁刻意直接讀 `currentEstimatedRealAngle`（未夾限），
+    /// 它的用途就是與 Python 逐值比對，夾限會掩蓋差異。
+    var displayKneeAngle: Double? {
+        currentEstimatedRealAngle.map { max(0, $0) }
+    }
+
     // internal (bleQueue)：只記住「最新一筆」傾角，實際計算交給 liveTickTimer 每 0.2 秒統一處理
     @ObservationIgnored private var liveEstimating: Set<UUID> = []
     @ObservationIgnored private var liveThighId: UUID?
@@ -484,6 +496,11 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     /// 動作測試面板 `onAppear` 一起呼叫，兩者呼叫先後順序不影響這裡（見 `preTestThighId`／
     /// `preTestCalfId` 宣告處的說明）。
     func startPreTestChannelA(thighPeripheral: CBPeripheral, calfPeripheral: CBPeripheral) {
+        // TKE 路徑若已啟用，兩顆裝置在校正階段就已經收過 cmd_a0/a1/a2 且正在正常串流 ——
+        // 這裡再送一次只會打斷取樣，讓 tkeClock 重置、動作測試頁開頭約 2 秒沒有角度。
+        // 這一行只影響「本來就在串流」的情境；斷線恢復仍由 recoverIfNeeded／
+        // didDiscoverCharacteristicsFor 走預設的 sendConfigCommands: true。
+        let pathAlreadyConfigured = isTKEPathActive
         DispatchQueue.main.async {
             self.preTestFreshnessTimer?.invalidate()
             self.preTestFreshnessTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
@@ -497,8 +514,11 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             self.preTestCalfId  = calfPeripheral.identifier
             self.preTestMonitoring.insert(thighPeripheral.identifier)
             self.preTestMonitoring.insert(calfPeripheral.identifier)
-            self.subscribeAllCharacteristics(peripheral: thighPeripheral)
-            self.subscribeAllCharacteristics(peripheral: calfPeripheral)
+            self.subscribeAllCharacteristics(peripheral: thighPeripheral,
+                                             sendConfigCommands: !pathAlreadyConfigured)
+            self.subscribeAllCharacteristics(peripheral: calfPeripheral,
+                                             sendConfigCommands: !pathAlreadyConfigured)
+            print("[TKE] PreWorking Channel A 啟動（重送設定指令=\(!pathAlreadyConfigured)）")
         }
     }
 
@@ -566,7 +586,16 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     /// 跟 PreWorking Channel A 的 `.monitorOnly` 修復模式共用（working2-database-port-plan.md 18.3）。
     /// 不能讓 PreWorking 的修復動作誤設 `isRecording`，否則會意外打開 `tickLiveEstimatedRealAngle()`
     /// 的 `advanced_statistics` 寫入守門，讓 PreWorking 期間寫入 treatment_result_id 為 nil 的孤兒資料。
-    private func subscribeAllCharacteristics(peripheral: CBPeripheral) {
+    /// - Parameter sendConfigCommands: 是否重送 `cmd_a0`／`cmd_a1`／`cmd_a2`（取樣率等裝置端設定）。
+    ///
+    ///   預設 `true`，涵蓋所有「裝置剛連上／剛從斷線恢復」的情境 —— 那時裝置端設定是未知的，必須送。
+    ///
+    ///   傳 `false` 的唯一情境是「裝置**已經**在正常串流、只是要多訂閱幾個 characteristic」。
+    ///   實測（階段 C 測試 2）確認重送設定指令會讓取樣**短暫中斷**，
+    ///   而 TKE 路徑的 `tkeClock` 會因此偵測到 serial 與到達時間不一致 → 重置 →
+    ///   **約 2 秒沒有角度**（回歸重新累積 10 個觀測點 + 平滑視窗重填 30 筆）。
+    ///   裝置設定既然已經是對的，這一次重送就是純粹的傷害。
+    private func subscribeAllCharacteristics(peripheral: CBPeripheral, sendConfigCommands: Bool = true) {
         guard let config = bluetoothConfig,
               let map = charMap[peripheral.identifier] else { return }
 
@@ -575,7 +604,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         let gyroUUID  = CBUUID(string: config.sub_gyro_uuid)
         let exgUUID   = CBUUID(string: config.sub_exg_uuid)
 
-        if let writeChar = map[writeUUID] {
+        if sendConfigCommands, let writeChar = map[writeUUID] {
             peripheral.writeValue(config.cmd_a0, for: writeChar, type: .withResponse)
             peripheral.writeValue(config.cmd_a1, for: writeChar, type: .withResponse)
             peripheral.writeValue(config.cmd_a2, for: writeChar, type: .withResponse)
@@ -741,14 +770,30 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     /// 啟用後 notify 與 `tkeCollecting` **同生共死**，一路維持到 `stopTKEPath()`：
     /// 校正結束不關、即時停止也不關。理由見 §4.4 ——
     /// 中途關掉 notify 會讓封包中斷，`tkeClock` 就得面臨要不要重置的問題。
-    func startTKEPath(thighPeripheral: CBPeripheral, calfPeripheral: CBPeripheral) {
+    /// - Parameter ownsConnectionRecovery: 是否由 TKE 路徑自己跑 1 秒連線檢查 timer。
+    ///
+    ///   `false`（**預設**，正式流程）：PreWorking／Working 已各自有 `preTestFreshnessTimer`／
+    ///   `freshnessTimer` 在做同一件事。更關鍵的是**組間休息期間** —— `stopRecordingAll` 會刻意
+    ///   關閉 notify，若 TKE 路徑還在跑自己的檢查，會把剛關掉的 notify 重新訂閱回來，
+    ///   破壞休息期的起訖規則。（見 preworking2-knee-plan.md §8.3）
+    ///
+    ///   `true`（Test 頁）：測試頁沒有別的東西在做斷線修復，必須自己跑，否則裝置關機後
+    ///   `didDisconnectPeripheral` 只會清狀態、沒有任何東西會嘗試重連（階段 6 踩過的坑）。
+    ///
+    ///   ⚠️ **預設值刻意選安全的那個。** 危險的是 `true` —— 它在組間休息重新訂閱 notify 時
+    ///   不會有任何錯誤徵兆。把危險值當預設，等於「新增呼叫點時忘記傳 = 踩雷」，
+    ///   所以反過來讓唯一需要它的 Test 頁顯式傳 `true`。
+    func startTKEPath(thighPeripheral: CBPeripheral,
+                      calfPeripheral: CBPeripheral,
+                      ownsConnectionRecovery: Bool = false) {
         DispatchQueue.main.async {
             self.isTKEPathActive = true
-            // 連線檢查 timer：裝置斷線／封包 stale 時發起修復。
-            // 少了它，裝置關機後 didDisconnectPeripheral 只會清狀態、沒有任何東西會嘗試重連。
             self.tkeFreshnessTimer?.invalidate()
-            self.tkeFreshnessTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-                self?.tickTKEConnectionCheck()
+            self.tkeFreshnessTimer = nil
+            if ownsConnectionRecovery {
+                self.tkeFreshnessTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+                    self?.tickTKEConnectionCheck()
+                }
             }
         }
 
@@ -799,15 +844,22 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     ///     收集層完全與動作無關，只有結算與即時換算需要知道規格。
     ///   - durationSec: 收集秒數，預設 8。8 秒理論上限 ≈832 筆，
     ///     扣掉平滑暖機與姿勢淘汰後約 723 筆，對 250 門檻有充分餘裕（§5.2）。
+    ///   - ownsConnectionRecovery: **只在本次呼叫需要順帶啟用路徑時才生效**，直接轉交
+    ///     `startTKEPath(...)`，語意見該函式。正式流程的路徑是在校正面板 `startPreparing()`
+    ///     就先啟用的，走不到這個備援分支；但備援分支一旦被走到（例如使用者從動作測試面板
+    ///     退回校正面板重按、或啟用當下取不到 peripheral），若這裡漏傳就會用預設值啟用路徑 ——
+    ///     所以參數必須一路傳到底，不能只加在 `startTKEPath` 上。
     func startKneeCalibration(
         spec: any KneeCalibrationSpec.Type = TKESpec.self,
         thighPeripheral: CBPeripheral, calfPeripheral: CBPeripheral,
         durationSec: Double = 8,
+        ownsConnectionRecovery: Bool = false,
         completion: ((KneeCalibrationResult) -> Void)? = nil
     ) {
         let alreadyActive = isTKEPathActive
         if !alreadyActive {
-            startTKEPath(thighPeripheral: thighPeripheral, calfPeripheral: calfPeripheral)
+            startTKEPath(thighPeripheral: thighPeripheral, calfPeripheral: calfPeripheral,
+                         ownsConnectionRecovery: ownsConnectionRecovery)
         }
 
         DispatchQueue.main.async {
@@ -885,6 +937,13 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
 
     /// 開始即時角度估算。必須先校正成功，且**綁定側要與校正當時相同**。
     func startTKELiveAngle() {
+        // 兩條 tick 都發布到 currentEstimatedRealAngle（§20.2），同時運作會互相覆蓋 5Hz 的值，
+        // 錄製中更會讓同一時間點寫入兩筆 advanced_statistics。正式流程動作 2 走新路徑、
+        // 9／12／22 走舊路徑，本來不該重疊；這道防呆是給 Test 頁與日後誤接用的。
+        guard !isLiveEstimating else {
+            print("[TKE-LIVE] ⚠️ 舊即時路徑（isLiveEstimating）仍在運作，拒絕啟動 —— 兩條 tick 不可同時發布角度")
+            return
+        }
         guard let r = tkeResult, let oThigh = r.thigh, let oCalf = r.calf else {
             print("[TKE-LIVE] 尚未校正成功，無法啟動")
             return
@@ -906,8 +965,8 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             tkeLiveEstimating = true
         }
 
+        publishKneeAngle(nil)
         DispatchQueue.main.async {
-            self.currentTKEAngle = nil
             self.isTKELiveEstimating = true
             self.tkeLiveTimer?.invalidate()
             self.tkeLiveTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
@@ -920,11 +979,11 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     /// 停止即時角度。**不關 notify、不清 tkeCollecting**（§4.4）——
     /// 路徑一路維持到離開頁面才由 stopTKEPath 收尾。
     func stopTKELiveAngle() {
+        publishKneeAngle(nil)
         DispatchQueue.main.async {
             self.tkeLiveTimer?.invalidate()
             self.tkeLiveTimer = nil
             self.isTKELiveEstimating = false
-            self.currentTKEAngle = nil
         }
         bleQueue.async { [weak self] in
             self?.tkeLiveEstimating = false
@@ -946,7 +1005,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             let now = Int64(Date().timeIntervalSince1970 * 1000)
             for id in [thighId, calfId] {
                 if let last = lastPacketAt[id]?[Self.signalACC], now - last > 1000 {
-                    DispatchQueue.main.async { self.currentTKEAngle = nil }
+                    self.publishKneeAngle(nil)
                     return
                 }
             }
@@ -974,7 +1033,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
                 // （clock 剛重置、回歸尚未收斂）畫面會無限期停在過時角度。
                 tkeLiveConsecutiveMisses += 1
                 if tkeLiveConsecutiveMisses >= Self.tkeLiveMissLimit {
-                    DispatchQueue.main.async { self.currentTKEAngle = nil }
+                    self.publishKneeAngle(nil)
                 }
                 return
             }
@@ -985,7 +1044,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
                 thigh: p.thigh, calf: p.calf, side: tkeLiveSide,
                 oThigh: tkeLiveOThigh, oCalf: tkeLiveOCalf)
             let rounded = (theta * 10).rounded() / 10
-            DispatchQueue.main.async { self.currentTKEAngle = rounded }
+            self.publishKneeAngle(rounded)
         }
     }
 
@@ -1057,11 +1116,11 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             tkeCalfId = nil
             tkeCalibStartPackets.removeAll()
             tkeLiveConsecutiveMisses = 0
+            self.publishKneeAngle(nil)
             DispatchQueue.main.async {
                 self.tkeLiveTimer?.invalidate()
                 self.tkeLiveTimer = nil
                 self.isTKELiveEstimating = false
-                self.currentTKEAngle = nil
                 self.tkeResult = nil
                 self.isCollectingTKE = false
             }
@@ -1115,6 +1174,16 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             tkeBuffers[id]?.removeAll(keepingCapacity: true)
             tkeSmoothers[id]?.reset()
             firstK = k
+            // 重置的代價是「約 2 秒沒有角度」：回歸要重新累積 10 個觀測點（10 × 192ms ≈ 1.9 秒），
+            // 平滑視窗還要再填 30 筆（≈0.29 秒）。所以每一次重置都要能被看見、且能判斷成因。
+            if let info = clock.lastResetInfo {
+                print(String(format: "[TKE-CLOCK] ⚠️ clock 重置（第 %d 次） id=%@ delta=%d 包 expectedGap=%.0fms actualGap=%.0fms → %@",
+                             clock.resetCount, id.uuidString.prefix(8).description,
+                             info.delta, info.expectedGapMs, info.actualGapMs,
+                             info.actualGapMs > info.expectedGapMs + BLEDeviceClock.crossCheckToleranceMs
+                                ? "串流暫停（重送設定指令／重新訂閱打斷取樣）"
+                                : "裝置端 serial 跳號"))
+            }
         case .accepted(let k):
             firstK = k
         }
@@ -1479,6 +1548,11 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         // 坐姿/站立即時預估要求大腿＋小腿配對齊全才允許啟動；不寫死左腳（side 0），
         // 改用 fetchAnySide() 查「目前實際綁定的那一側」——這個 app 一次最多只會綁 2 顆裝置（同一側），
         // 綁在右腳時這裡也要能通過檢查，不然右腳永遠無法啟動即時預估。
+        // 防呆同 startTKELiveAngle：兩條 tick 都發布到 currentEstimatedRealAngle，不可同時運作（§20.2）。
+        guard !isTKELiveEstimating else {
+            print("[LIVE] ⚠️ TKE 即時路徑（isTKELiveEstimating）仍在運作，拒絕啟動 —— 兩條 tick 不可同時發布角度")
+            return
+        }
         let deviceVM = DeviceViewModel()
         deviceVM.debugDumpAllDevices(tag: "startLiveEstimateRealAngle")
         let side = deviceVM.fetchAnySide() ?? 0
@@ -1488,8 +1562,8 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         let thighId = thighPeripheral.identifier
         let calfId  = calfPeripheral.identifier
 
+        publishKneeAngle(nil)   // 啟動歸零也走共用管道，不留第二個直接寫入點（§20.2）
         DispatchQueue.main.async {
-            self.currentEstimatedRealAngle = nil
             self.isLiveEstimating = true
             self.liveTickTimer?.invalidate()
             self.liveTickTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
@@ -1563,6 +1637,43 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         }
     }
 
+    // MARK: - 膝角度的共用發布管道（working2-database-port-plan.md §20.2）
+
+    /// 算出膝角度後**統一由這裡發布**：更新 UI + 依 `isRecording` 決定是否寫入 `advanced_statistics`。
+    ///
+    /// 新舊兩條 tick（`tickLiveEstimatedRealAngle` 舊、`tickTKELiveAngle` 新）都呼叫同一份，
+    /// 確保「算完之後往哪裡去」只有一份實作 —— 寫入條件、時間戳基準、清空目標都不會走鐘。
+    ///
+    /// - Parameter angle: 角度值；傳 `nil` 代表**清空**（stale 保護、停止即時、停用路徑都用它）。
+    ///   清空同樣必須集中在這裡，否則「發布到 A、卻清空 B」會讓角度殘留在畫面上。
+    ///
+    /// - Note: 動作 12 的登階路徑（`tickStepStatus`）是**第三條獨立 tick**，本次不納入，
+    ///   待動作 12 遷移時一併收編（見 §20.2）。
+    ///
+    /// - Important: **執行緒約定**
+    ///   - `nil`（清空）：任何執行緒都可以呼叫 —— 只做 `main.async`，在讀 `isRecording` 之前就 return。
+    ///     停止／停用路徑那幾個呼叫點都在主執行緒，靠的就是這一點。
+    ///   - **非 `nil`（發布 + 寫入）：只能從 `bleQueue` 呼叫。** 它要用 `main.sync` 讀
+    ///     `isRecording`／`currentTreatmentResultId`，從主執行緒呼叫會直接死鎖。
+    ///     目前兩個非 nil 呼叫點（`tickTKELiveAngle`／`tickLiveEstimatedRealAngle`）都在 bleQueue 內。
+    private func publishKneeAngle(_ angle: Double?) {
+        DispatchQueue.main.async { self.currentEstimatedRealAngle = angle }
+
+        guard let angle else { return }
+        #if DEBUG
+        // 非 nil 路徑底下就是 main.sync，從主執行緒呼叫必然死鎖——在 Debug 就攔下來。
+        dispatchPrecondition(condition: .notOnQueue(.main))
+        #endif
+        // 組間休息（未在記錄中）時暫停寫入，跟 acc/gyro/exg 的起訖規則一致。
+        // 守門用 isRecording 而不是 recordingSessionActive——兩者是不同的判斷，不可混用。
+        let (stillRecording, treatmentResultId) = DispatchQueue.main.sync {
+            (self.isRecording, self.currentTreatmentResultId)
+        }
+        guard stillRecording else { return }
+        let ts = Int64(Date().timeIntervalSince1970 * 1000)
+        deviceVM.insertAdvancedStatistics(timestamp: ts, angle: angle, treatmentResultId: treatmentResultId)
+    }
+
     /// Timer callback（main thread 觸發），跳回 bleQueue 讀最新值計算，算完再寫回主執行緒的 UI 屬性。
     private func tickLiveEstimatedRealAngle() {
         bleQueue.async { [weak self] in
@@ -1595,7 +1706,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
                 if thighStale { liveThighIncline = nil }
                 if calfStale  { liveCalfIncline  = nil }
                 if thighStale || calfStale {
-                    DispatchQueue.main.async { self.currentEstimatedRealAngle = nil }
+                    self.publishKneeAngle(nil)
                     return
                 }
             }
@@ -1621,15 +1732,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             #if DEBUG
             print("[LIVE-ANGLE-DIAG] kneeAngle=\(String(format: "%.2f", kneeAngle)) realAngle=\(rounded)")
             #endif
-            DispatchQueue.main.async { self.currentEstimatedRealAngle = rounded }
-
-            // 組間休息（未在記錄中）時暫停寫入，跟 acc/gyro/exg 的起訖規則一致。
-            let (stillRecording, treatmentResultId) = DispatchQueue.main.sync {
-                (self.isRecording, self.currentTreatmentResultId)
-            }
-            guard stillRecording else { return }
-            let ts = Int64(Date().timeIntervalSince1970 * 1000)
-            self.deviceVM.insertAdvancedStatistics(timestamp: ts, angle: rounded, treatmentResultId: treatmentResultId)
+            self.publishKneeAngle(rounded)
         }
     }
 

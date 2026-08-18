@@ -130,6 +130,12 @@ struct BLEDeviceClock {
     /// 因 serial 異常而重置的次數（診斷用）
     private(set) var resetCount = 0
 
+    /// 最近一次重置的判定依據（診斷用）。用來分辨重置的**成因**：
+    /// - `actualGap` 遠大於 `expectedGap` → **串流暫停**（例如重送設定指令、重新訂閱打斷了取樣）
+    /// - `delta` 異常大而 `actualGap` 正常 → **裝置端 serial 計數器被重置**
+    /// - 兩者接近但仍超過容許值 → 頻寬壅塞造成的到達時間抖動
+    private(set) var lastResetInfo: (delta: Int, expectedGapMs: Double, actualGapMs: Double)?
+
     // MARK: - 結果
 
     enum Outcome: Equatable {
@@ -157,20 +163,43 @@ struct BLEDeviceClock {
             return .accepted(firstK: 0)
         }
 
-        let delta = (Int(serial) - Int(last) + 256) % 256
-        if delta == 0 { return .duplicate }
+        let rawDelta = (Int(serial) - Int(last) + 256) % 256
+        if rawDelta == 0 { return .duplicate }
 
-        // 交叉驗證：serial 推算出的時間間隔應與實際到達間隔相符。
         // 用已擬合的 b 當基準比用標稱值更穩健 —— 曾觀察到封包率與標稱值差 6.3 倍的情況，
         // 此時標稱值會誤判。
         let periodMs = fit()?.b ?? Self.nominalPeriodMs
-        let expectedGap = Double(delta * Self.samplesPerPacket) * periodMs
         let actualGap = arrivalMs - (lastArrivalMs ?? arrivalMs)
+
+        // ---- serial 繞回還原 ----
+        // `serial` 是 UInt8，只要中斷超過 256 包（256 × 20 ÷ 104Hz ≈ **49 秒**）就會繞回，
+        // `rawDelta` 從此失去意義。組間休息會關閉 ACC notify，而 `set_rest_time` 是**療程設定值**
+        // 不是程式常數 —— 短休息時 rawDelta 剛好正確、長休息時必定錯誤，
+        // 同一份程式在不同療程下表現不同，是最難察覺的那種問題。
+        //
+        // 解法：用實際經過的時間推估「真正走了幾包」，再取**與 rawDelta 同餘（mod 256）、
+        // 且最接近這個推估值**的那一個。正常情況（gap 遠小於 49 秒）推估值就在 rawDelta 附近，
+        // 圈數算出來是 0，行為與繞回還原前完全相同。
+        //
+        // 🔴 **這個還原不會放寬把關**：算出 `delta` 之後仍走下面同一套交叉驗證。
+        // 若裝置在中斷期間其實**停止取樣**（serial 沒前進），沒有任何圈數能讓
+        // expectedGap 對上 actualGap，一樣會落到重置分支。
+        // 也就是說它只可能把「本來會誤判成重置」的情況救回來，不可能製造新的誤放行。
+        let estimatedPackets = actualGap / (Double(Self.samplesPerPacket) * periodMs)
+        let wraps = ((estimatedPackets - Double(rawDelta)) / 256.0).rounded()
+        let unwrapped = rawDelta + Int(wraps) * 256
+        // 圈數為負且把 delta 推到 0 以下時不採用——封包編號不可能倒退
+        let delta = unwrapped > 0 ? unwrapped : rawDelta
+
+        // 交叉驗證：serial 推算出的時間間隔應與實際到達間隔相符。
+        let expectedGap = Double(delta * Self.samplesPerPacket) * periodMs
 
         if abs(expectedGap - actualGap) > Self.crossCheckToleranceMs {
             // packetIndex / lastSerial / 回歸累加量必須同進同出，
             // 否則新舊兩段不同編號基準的 (k, t) 會混在同一條回歸線裡。
+            let info = (delta: delta, expectedGapMs: expectedGap, actualGapMs: actualGap)
             reset()
+            lastResetInfo = info   // reset() 之後才設，否則會被清掉
             resetCount += 1
             lastSerial = serial
             lastArrivalMs = arrivalMs
