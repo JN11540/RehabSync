@@ -110,7 +110,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     /// UI state (main thread)。階段 6 才會由即時流程驅動，但 §4.5① 的按鈕停用條件現在就需要它——
     /// 校正與即時共用 tkeBuffers 但保留規則衝突，不能同時啟動。
     var isTKELiveEstimating = false
-    var tkeResult: TKECalibrationResult? = nil   // UI state (main thread)
+    var tkeResult: KneeCalibrationResult? = nil   // UI state (main thread)
     var currentTKEAngle: Double? = nil           // UI state (main thread)：即時 theta
     @ObservationIgnored private var tkeLiveTimer: Timer?
     @ObservationIgnored private var tkeLiveOThigh = 0.0
@@ -119,6 +119,9 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     /// 連續配不到的 tick 數。達到門檻就把角度清成 nil——
     /// 否則封包正常進來但配對持續失敗時，畫面會無限期停在過時的數字且毫無異常徵兆。
     @ObservationIgnored private var tkeLiveConsecutiveMisses = 0
+    /// 本次校正使用的動作規格。即時階段必須用同一份 ——
+    /// 兩個動作的真值與係數套用肢段都不同，混用會算出完全錯誤的角度。
+    @ObservationIgnored private var tkeSpec: any KneeCalibrationSpec.Type = TKESpec.self
     /// TKE 路徑的連線檢查／封包新鮮度 timer（1 秒一次）。
     ///
     /// **沒有它，裝置關機後就永遠回不來** —— `didDisconnectPeripheral` 只清狀態、不發起重連，
@@ -762,8 +765,8 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             tkeProbes[calfId]  = TKESerialProbe(label: "小腿")
             tkeClock[thighId] = BLEDeviceClock()
             tkeClock[calfId]  = BLEDeviceClock()
-            tkeSmoothers[thighId] = CausalSmoother(window: TKECalibration.smoothWindow)
-            tkeSmoothers[calfId]  = CausalSmoother(window: TKECalibration.smoothWindow)
+            tkeSmoothers[thighId] = CausalSmoother(window: KneeCalibration.smoothWindow)
+            tkeSmoothers[calfId]  = CausalSmoother(window: KneeCalibration.smoothWindow)
             tkeBuffers[thighId] = []
             tkeBuffers[calfId]  = []
             tkeCalibrating = false      // 階段 5 才會由校正流程設為 true
@@ -786,17 +789,21 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         }
     }
 
-    /// 執行一次 TKE 校正（tke-sitting-calibration-port-plan.md §9 階段 5）。
+    /// 執行一次膝角校正（tke-sitting-calibration-port-plan.md §9 階段 5）。
     ///
     /// 若 TKE 路徑尚未啟用會先啟用。**校正結束後路徑維持啟用、notify 不關**（§4.4）——
     /// 這是「`tkeClock` 跨階段保留、即時啟動時免暖機」能成立的前提。
     ///
-    /// - Parameter durationSec: 收集秒數，預設 8。8 秒理論上限 ≈832 筆，
-    ///   扣掉平滑暖機與姿勢淘汰後約 723 筆，對 250 門檻有充分餘裕（§5.2）。
-    func startTKECalibration(
+    /// - Parameters:
+    ///   - spec: 動作規格（`TKESpec` = 動作 2 坐姿、`SquatSpec` = 動作 9 部分蹲）。
+    ///     收集層完全與動作無關，只有結算與即時換算需要知道規格。
+    ///   - durationSec: 收集秒數，預設 8。8 秒理論上限 ≈832 筆，
+    ///     扣掉平滑暖機與姿勢淘汰後約 723 筆，對 250 門檻有充分餘裕（§5.2）。
+    func startKneeCalibration(
+        spec: any KneeCalibrationSpec.Type = TKESpec.self,
         thighPeripheral: CBPeripheral, calfPeripheral: CBPeripheral,
         durationSec: Double = 8,
-        completion: ((TKECalibrationResult) -> Void)? = nil
+        completion: ((KneeCalibrationResult) -> Void)? = nil
     ) {
         let alreadyActive = isTKEPathActive
         if !alreadyActive {
@@ -822,19 +829,22 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             // clock 刻意不重置——它從路徑啟用起就在累積，重置只會白白丟掉觀測點
             tkeCalibStartPackets[thighId] = tkeProbes[thighId]?.packetCount ?? 0
             tkeCalibStartPackets[calfId] = tkeProbes[calfId]?.packetCount ?? 0
-            print("[TKE-CAL] 開始收集 \(Int(durationSec)) 秒（side=\(side == 1 ? "右" : "左")，路徑\(alreadyActive ? "已啟用" : "本次啟用")）")
+            // 記住這次校正用的規格，即時階段必須用同一份（係數與真值都不同）
+            tkeSpec = spec
+            print("[KNEE-CAL] \(spec.name) 開始收集 \(Int(durationSec)) 秒（side=\(side == 1 ? "右" : "左")，路徑\(alreadyActive ? "已啟用" : "本次啟用")）")
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + durationSec) { [weak self] in
             self?.bleQueue.async {
-                self?.finishTKECalibration(thighId: thighId, calfId: calfId, side: side, completion: completion)
+                self?.finishKneeCalibration(spec: spec, thighId: thighId, calfId: calfId, side: side, completion: completion)
             }
         }
     }
 
-    private func finishTKECalibration(
+    private func finishKneeCalibration(
+        spec: any KneeCalibrationSpec.Type,
         thighId: UUID, calfId: UUID, side: Int,
-        completion: ((TKECalibrationResult) -> Void)?
+        completion: ((KneeCalibrationResult) -> Void)?
     ) {
         tkeCalibrating = false
 
@@ -852,7 +862,8 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         let thighPackets = (tkeProbes[thighId]?.packetCount ?? 0) - (tkeCalibStartPackets[thighId] ?? 0)
         let calfPackets = (tkeProbes[calfId]?.packetCount ?? 0) - (tkeCalibStartPackets[calfId] ?? 0)
 
-        let result = TKECalibration.computeOffsets(
+        let result = KneeCalibration.computeOffsets(
+            spec: spec,
             thighSamples: thighSamples, calfSamples: calfSamples, side: side,
             thighFit: fitOrFallback(thighId), calfFit: fitOrFallback(calfId),
             thighPacketCount: thighPackets, calfPacketCount: calfPackets)
@@ -951,7 +962,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             var paired: (thigh: BLESample, calf: BLESample)?
             for offset in 0 ..< min(Self.tkeLiveWalkBack, thighBuf.count) {
                 let t = thighBuf[thighBuf.count - 1 - offset]
-                if let c = TKECalibration.findPair(kThigh: t.k, thighFit: thighFit,
+                if let c = KneeCalibration.findPair(kThigh: t.k, thighFit: thighFit,
                                                    calfSamples: calfBuf, calfFit: calfFit) {
                     paired = (t, c)
                     break
@@ -969,7 +980,8 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             }
             tkeLiveConsecutiveMisses = 0
 
-            let theta = TKECalibration.liveAngle(
+            let theta = KneeCalibration.liveAngle(
+                spec: tkeSpec,
                 thigh: p.thigh, calf: p.calf, side: tkeLiveSide,
                 oThigh: tkeLiveOThigh, oCalf: tkeLiveOCalf)
             let rounded = (theta * 10).rounded() / 10
@@ -1107,7 +1119,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             firstK = k
         }
 
-        var smoother = tkeSmoothers[id] ?? CausalSmoother(window: TKECalibration.smoothWindow)
+        var smoother = tkeSmoothers[id] ?? CausalSmoother(window: KneeCalibration.smoothWindow)
         var buf = tkeBuffers[id] ?? []
 
         for i in 0 ..< 20 {
@@ -1291,7 +1303,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             print("""
             [\(label)]
               buffer 筆數   = \(buffered)（上限 \(cap)）\(buffered <= cap ? "✅ 未超過上限" : "❌ 超過上限")
-              暖機丟棄      = \(warmup) 筆 \(warmup == TKECalibration.smoothWindow - 1 ? "✅ 正好 N-1=\(TKECalibration.smoothWindow - 1)" : "（預期 \(TKECalibration.smoothWindow - 1)）")
+              暖機丟棄      = \(warmup) 筆 \(warmup == KneeCalibration.smoothWindow - 1 ? "✅ 正好 N-1=\(KneeCalibration.smoothWindow - 1)" : "（預期 \(KneeCalibration.smoothWindow - 1)）")
               k 範圍        = \(firstK) ~ \(lastK)
               收到樣本總數  = \(expectedTotal)（\(packets) 包 × 20）
               → 環形裁切後只留最近 \(buffered) 筆，符合「不隨時間成長」
@@ -2059,7 +2071,7 @@ extension BluetoothViewModel: CBPeripheralDelegate {
 
         // 三者必須同進同出：k 的編號基準變了，舊 buffer 與平滑視窗都無法與另一側對齊
         tkeClock[id] = BLEDeviceClock()
-        tkeSmoothers[id] = CausalSmoother(window: TKECalibration.smoothWindow)
+        tkeSmoothers[id] = CausalSmoother(window: KneeCalibration.smoothWindow)
         tkeBuffers[id] = []
         // session t0 刻意保留——兩顆的 a 必須落在同一時間框架，配對公式才成立
 

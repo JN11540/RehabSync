@@ -293,9 +293,10 @@ struct TestPage: View {
                     // TKE 校正（tke-sitting-calibration-port-plan.md §4.5①）：
                     // 按下即啟用 TKE 路徑並收集 8 秒。校正結束後路徑維持啟用、notify 不關（§4.4），
                     // 一路到離開頁面才由 .onDisappear 收尾。
-                    Button("TKE校正") {
+                    Button("動作2校正") {
                         guard let pair = thighAndCalfPeripherals else { return }
-                        btVM.startTKECalibration(thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+                        btVM.startKneeCalibration(spec: TKESpec.self,
+                                                  thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
                     }
                     .font(.system(size: 15, weight: .medium))
                     .padding(.horizontal, 20)
@@ -305,6 +306,21 @@ struct TestPage: View {
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     // 必須排除「即時進行中」——校正與即時的 buffer 保留規則衝突（§4.5①）
+                    .disabled(!bothConnected || btVM.isCollectingTKE || btVM.isTKELiveEstimating)
+
+                    // 動作 9（部分蹲．站立基準）。收集層完全共用，只有規格不同。
+                    Button("動作9校正") {
+                        guard let pair = thighAndCalfPeripherals else { return }
+                        btVM.startKneeCalibration(spec: SquatSpec.self,
+                                                  thighPeripheral: pair.thigh, calfPeripheral: pair.calf)
+                    }
+                    .font(.system(size: 15, weight: .medium))
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(bothConnected && !btVM.isCollectingTKE
+                        ? Color.orange.opacity(0.85) : Color.gray.opacity(0.3))
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
                     .disabled(!bothConnected || btVM.isCollectingTKE || btVM.isTKELiveEstimating)
 
                     // 結果：大腿 / 小腿 / 訊息。失敗時 offset 顯示 --，只有訊息有內容。
@@ -326,7 +342,7 @@ struct TestPage: View {
                     }
 
                     // TKE 即時角度（tke-sitting-calibration-port-plan.md §4.5②）
-                    Button(btVM.isTKELiveEstimating ? "停止 TKE 即時角度" : "開始 TKE 即時角度") {
+                    Button(btVM.isTKELiveEstimating ? "停止即時角度" : "開始即時角度") {
                         if btVM.isTKELiveEstimating {
                             btVM.stopTKELiveAngle()
                         } else {
