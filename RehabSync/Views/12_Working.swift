@@ -805,6 +805,19 @@ struct Working12: View {
             btVM.stopRecordingAll()
             btVM.currentTreatmentResultId = nil
             stopStepStatusIfNeeded()
+            // 🔴 TKE 路徑的**交棒終點**，必須是獨立的一行，不可放進 stopStepStatusIfNeeded()。
+            //
+            // 那個 helper 開頭是 `guard btVM.isEstimatingStepStatus`，而新流程走 startTKELiveAngle()
+            // 設的是 isTKELiveEstimating —— 放進去會被 guard 短路、一次都不會執行，
+            // 交棒等於沒有終點：離開後 notify 一直開、tkeCollecting 一直攔截封包，
+            // 接著進任何走舊路徑的頁面（PreWorking_22）即時角度都會失效。
+            //
+            // 這條出口 PreWorking_12 根 View 的 .onDisappear 救不到 ——
+            // 導頁走 .fullScreenCover，不會觸發被覆蓋那一層的 onDisappear。
+            //
+            // ⚠️ 觸發時機比「遊戲結束」晚：PostWorking_12 蓋在 Working12 之上，
+            // 要到從結果頁返回總覽、整個堆疊收起才觸發。
+            btVM.stopTKEPath()
         }
     }
 }

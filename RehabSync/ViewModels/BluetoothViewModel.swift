@@ -207,11 +207,12 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     @ObservationIgnored private var stepCalfId: UUID?
     @ObservationIgnored private var stepThighIncline: Double?
     @ObservationIgnored private var stepCalfIncline: Double?
+    /// `detectStepStatus` 的比較基準。動作 12 改用 offset 模型後由呼叫端傳 `0`——
+    /// theta 站立時 ≈ 0，「相對站立姿勢」已內建在 theta 裡。
+    /// ⚠️ 但 `detectStepStatus` 的 `+40` 門檻仍是舊尺度的值，見 working12-database-port-plan.md §20.3。
     @ObservationIgnored private var stepBaseline: Double = 0
-    /// 供 `advanced_statistics` 記錄用：跟「站立即時預估真實角度」同一套換算（`standingMappingTable`／`angleToReal`），
-    /// 跟 `detectStepStatus` 拿 `stepBaseline` 直接比較的登階狀態機邏輯完全獨立，不影響既有的登階判定。
-    @ObservationIgnored private var stepShift: Double = 0
-    @ObservationIgnored private var stepBaselineTable: [(measured: Double, realAngle: Double)] = []
+    // stepShift／stepBaselineTable 已於階段 12-C 移除：它們只服務 tickStepStatus() 內
+    // 那段 advanced_statistics 寫入，該寫入已交給 TKE 路徑（§20.2）。
     @ObservationIgnored private var stepTickTimer: Timer?
 
     // MARK: - Working2 連線檢查／封包新鮮度檢查／共用修復路徑（working2-database-port-plan.md 第 17 節）
@@ -1834,28 +1835,34 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             stepThighIncline = nil
             stepCalfIncline  = nil
             stepBaseline = baseline
-            // advanced_statistics 記錄用的換算表，比照「站立即時預估」的站姿版做法（見 startLiveEstimateRealAngle 的 .standing 分支）。
-            // side 依鏡射分支選公式（working12-database-port-plan.md 19 節）：右膝感測器安裝方向與左膝相反，
-            // 沒有這個分支的話右膝使用者永遠套用左膝公式，advanced_statistics.angle 會算錯。
-            if side == 1 {
-                stepShift = baseline > 0 ? -(baseline + 10) : 0
-                stepBaselineTable = Self.standingMappingTableRight(baseline: baseline + stepShift, maxStep: 55, maxRealAngleDeg: 90)
-            } else {
-                stepShift = baseline < 0 ? (abs(baseline) + 10) : 0
-                stepBaselineTable = Self.standingMappingTable(baseline: baseline + stepShift, maxStep: 55, maxRealAngleDeg: 90)
-            }
+            // 原本這裡會建立 advanced_statistics 記錄用的換算表（stepShift／stepBaselineTable，
+            // 含第 19 節修正的左右膝鏡射分支）。階段 12-C 把角度寫入交給 TKE 路徑之後，
+            // 那張表已無人讀取，連同計算一併移除（working12-database-port-plan.md §20.2）。
+            // stepBaseline 保留 —— detectStepStatus 的狀態機還在用。
             resetStepStatus()
             stepEstimating = [thighId, calfId]
 
+            // 🔴 TKE 路徑已啟用時**不可重送設定指令**（working12-database-port-plan.md §20.2.1①）。
+            //
+            // 這一段是自己寫的，不走 subscribeAllCharacteristics，所以動作 2 階段 C 加的
+            // `sendConfigCommands` 參數涵蓋不到這裡。實測已證實重送 cmd_a0/a1/a2 會讓取樣短暫中斷，
+            // tkeClock 的交叉驗證因此失敗 → 重置 → 清空 buffer 與平滑器 → 約 2 秒沒有角度
+            //（working2-database-port-plan.md §20.9）。
+            //
+            // 動作 12 是唯一在 TKE 路徑啟用後仍會呼叫本函式的動作（動作 2／9 已停用舊即時路徑），
+            // 所以也是唯一會踩到這件事的動作。裝置在校正階段就已收過設定指令且正在串流，
+            // 這裡再送一次是純粹的傷害。setNotifyValue 是冪等的，維持無條件呼叫。
+            let tkePathActive = DispatchQueue.main.sync { self.isTKEPathActive }
             for peripheral in [thighPeripheral, calfPeripheral] {
                 guard let map = charMap[peripheral.identifier] else { continue }
-                if !wasRecording, let writeChar = map[CBUUID(string: config.write_uuid)] {
+                if !wasRecording, !tkePathActive, let writeChar = map[CBUUID(string: config.write_uuid)] {
                     peripheral.writeValue(config.cmd_a0, for: writeChar, type: .withResponse)
                     peripheral.writeValue(config.cmd_a1, for: writeChar, type: .withResponse)
                     peripheral.writeValue(config.cmd_a2, for: writeChar, type: .withResponse)
                 }
                 if let c = map[CBUUID(string: config.sub_acc_uuid)] { peripheral.setNotifyValue(true, for: c) }
             }
+            print("[STEP] 登階狀態預估啟動（重送設定指令=\(!wasRecording && !tkePathActive)）")
         }
     }
 
@@ -1869,10 +1876,23 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         }
         bleQueue.async { [weak self] in
             guard let self else { return }
-            let wasRecording = DispatchQueue.main.sync { self.isRecording }
+            let (wasRecording, tkePathActive) = DispatchQueue.main.sync {
+                (self.isRecording, self.isTKEPathActive)
+            }
             stepEstimating = []
             resetStepStatus()
-            if !wasRecording, let config = bluetoothConfig {
+            // 🔴 TKE 路徑仍啟用時**不可關 ACC notify**（working12-database-port-plan.md §20.2.1②）。
+            //
+            // startTKEPath 只訂閱 ACC —— 這一關就把 TKE 路徑的唯一資料來源切斷了，
+            // 而本函式原本的判斷條件只有 !wasRecording，完全不知道 TKE 路徑的存在。
+            //
+            // 目前唯一會走到的路徑是「按返回離開 PreWorking_12」，後面緊接著根 View 的
+            // stopTKEPath()，所以影響有限 —— 但那是靠兩個 .onDisappear 的執行順序僥倖成立，
+            // 而執行順序是 SwiftUI 的實作細節，不是保證。日後若出現「退回校正面板」的路徑，
+            // 這一關會在 TKE 路徑仍需存活時切斷它，校正頁的角度直接死掉且沒有錯誤訊息。
+            //
+            // 交給 stopTKEPath 統一收尾，與「notify 與 tkeCollecting 同生共死」的原則一致。
+            if !wasRecording, !tkePathActive, let config = bluetoothConfig {
                 for peripheral in [thighPeripheral, calfPeripheral] {
                     if let map = charMap[peripheral.identifier],
                        let c = map[CBUUID(string: config.sub_acc_uuid)] {
@@ -1936,18 +1956,19 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             let status = detectStepStatus(kneeAngle: kneeAngle, baseline: stepBaseline)
             DispatchQueue.main.async { self.currentStepStatus = status }
 
-            // 寫進 advanced_statistics 的角度比照「站立即時預估真實角度」的換算方式（angleToReal + 站姿對應表），
-            // 不是直接寫 detectStepStatus 用的原始 kneeAngle，兩者計算目的不同、互不影響。
-            let realAngle = Self.angleToReal(kneeAngle + stepShift, table: stepBaselineTable)
-            let rounded = (realAngle * 10).rounded() / 10
-
-            // 組間休息（未在記錄中）時暫停寫入，跟 acc/gyro/exg 的起訖規則一致。
-            let (stillRecording, treatmentResultId) = DispatchQueue.main.sync {
-                (self.isRecording, self.currentTreatmentResultId)
-            }
-            guard stillRecording else { return }
-            let ts = Int64(Date().timeIntervalSince1970 * 1000)
-            self.deviceVM.insertAdvancedStatistics(timestamp: ts, angle: rounded, treatmentResultId: treatmentResultId)
+            // 🔴 `advanced_statistics` 的寫入已於階段 12-C 移除（working12-database-port-plan.md §20.2）。
+            //
+            // 原本這裡會自己算 realAngle（angleToReal + 站姿對應表）並自己 insert，
+            // 是寫入 advanced_statistics 的**第三條獨立 tick**，與 tickLiveEstimatedRealAngle 平行。
+            // 動作 12 改用 offset 模型後，角度統一由 tickTKELiveAngle → publishKneeAngle 發布與寫入，
+            // 本函式只保留登階狀態機那一半。
+            //
+            // ⚠️ 移除寫入與「開啟 TKE 即時路徑」必須是同一次改動：
+            //   只開路徑不移除這裡 → 同一時間點寫入兩筆 angle
+            //   只移除這裡不開路徑 → advanced_statistics 完全沒有資料
+            // 兩種都沒有任何畫面徵兆（動作 12 的角度不上畫面）。
+            //
+            // 連帶：stepShift／stepBaselineTable 只服務這段寫入，移除後不再被讀取。
         }
     }
 
