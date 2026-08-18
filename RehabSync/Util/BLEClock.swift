@@ -1,40 +1,30 @@
 import Foundation
 
-/// 校正結果（tke-sitting-calibration-port-plan.md §4.1）。
+/// BLE 封包時間軸重建與訊號平滑 —— **與動作無關的通用層**。
 ///
-/// `thigh`／`calf` 恆同時有值或同時為 nil，呼叫端用 `if let thigh, let calf` 判定成功；
-/// `message` 不論成功失敗都可直接顯示。
+/// 解決的是通訊層問題：兩顆各自獨立計時的 BLE 裝置，如何把各自的封包定位到共同時間軸上，
+/// 以便逐筆配對。任何需要「大腿＋小腿跨裝置對齊」的動作都可以直接使用，不限於動作 2。
 ///
-/// `side` 一律回填 —— 即時階段必須確認「現在綁定的側」與「校正當時的側」相同，
-/// 否則 `k` 值符號相反會產生完全錯誤的角度，而畫面上不會有任何異常徵兆。
-struct TKECalibrationResult {
-    let thigh: Double?    // 成功 = o_thigh；失敗 = nil
-    let calf: Double?     // 成功 = o_calf； 失敗 = nil
-    let message: String   // 成功 = "校正成功"；失敗 = 對應提示
-    let side: Int         // 校正當下的綁定側（0=左 1=右）
+/// 設計與實測依據見 tke-sitting-calibration-port-plan.md §4.2、§9 階段 0–2。
+/// 動作專屬的角度公式、姿勢門檻、校正流程請放在各自的 `N_Calibration.swift`。
 
-    var succeeded: Bool { thigh != nil && calf != nil }
-}
-
-/// 一筆已平滑、已定位的加速度樣本（tke-sitting-calibration-port-plan.md §4.1）。
+/// 一筆已平滑、已定位的加速度樣本。
 ///
-/// `k` 是 Serial 展開後的全域樣本索引，**不存時間戳** —— 時間一律透過 `TKEClockFit` 換算。
-/// 型別放在這裡而非 `TKECalibration.swift`（規劃書原本的位置）：`k` 本來就是 clock 的產物，
-/// 而且收集層（階段 2）比演算法層（階段 4）更早需要它。
-struct TKESample {
-    let k: Int      // 全域樣本索引 = packetIndex * 20 + i
-    let x: Double   // mg，已套用 N=30 因果移動平均
+/// `k` 是 Serial 展開後的全域樣本索引，**不存時間戳** —— 時間一律透過 `BLEClockFit` 換算。
+struct BLESample {
+    let k: Int      // 全域樣本索引 = packetIndex * samplesPerPacket + i
+    let x: Double   // mg，已套用因果移動平均
     let y: Double
     let z: Double
 }
 
-/// 因果移動平均（tke-sitting-calibration-port-plan.md §4.2 收集步驟 4-5）。
+/// 因果移動平均。在**原始 x/y/z 域**做平滑，不是角度域。
 ///
-/// 在**原始 x/y/z 域**做平滑，不是角度域。視窗未滿前一律丟棄（§5.1 暖機期處理）——
-/// Python 靠 3 秒穩定期讓視窗在收集開始前就填滿，App 不設穩定期，
-/// 所以改成「未滿就不輸出」，代價僅 29 筆 ≈ 0.28 秒。
-struct TKECausalSmoother {
-    static let window = 30
+/// 視窗未滿前一律丟棄（暖機期處理）—— Python 原版靠收集前的穩定期讓視窗先填滿，
+/// App 不設穩定期，所以改成「未滿就不輸出」，代價僅 `window - 1` 筆。
+struct CausalSmoother {
+    /// 視窗長度。動作 2 用 30（≈0.29 秒 @104Hz）；其他動作可依需要調整。
+    let window: Int
 
     private var buf: [(x: Double, y: Double, z: Double)] = []
     private var head = 0
@@ -43,12 +33,16 @@ struct TKECausalSmoother {
     /// 已因暖機未滿而丟棄的樣本數（診斷用）
     private(set) var warmupDiscarded = 0
 
+    init(window: Int = 30) {
+        self.window = window
+    }
+
     /// 推入一筆原始樣本；視窗未滿時回傳 nil。
     mutating func push(x: Double, y: Double, z: Double) -> (x: Double, y: Double, z: Double)? {
-        if buf.count < Self.window {
+        if buf.count < window {
             buf.append((x, y, z))
             sumX += x; sumY += y; sumZ += z
-            if buf.count < Self.window {
+            if buf.count < window {
                 warmupDiscarded += 1
                 return nil
             }
@@ -59,9 +53,9 @@ struct TKECausalSmoother {
             sumY += y - old.y
             sumZ += z - old.z
             buf[head] = (x, y, z)
-            head = (head + 1) % Self.window
+            head = (head + 1) % window
         }
-        let n = Double(Self.window)
+        let n = Double(window)
         return (sumX / n, sumY / n, sumZ / n)
     }
 
@@ -74,13 +68,13 @@ struct TKECausalSmoother {
     }
 }
 
-/// 單一裝置的回歸擬合結果（tke-sitting-calibration-port-plan.md §4.1）。
-/// `a`／`b` 供跨裝置配對換算 `k_c`，`pointCount` 供校正失敗時的步驟 5a 判斷。
-struct TKEClockFit {
+/// 單一裝置的回歸擬合結果。
+/// `a`／`b` 供跨裝置配對換算索引，`pointCount` 供呼叫端判斷回歸是否可信。
+struct BLEClockFit {
     let a: Double              // 截距（ms，相對於 session t0）
     let b: Double              // 實測取樣週期（ms/sample）
     let pointCount: Int        // 回歸觀測點數
-    let residualStdMs: Double  // 殘差標準差＝實際 BLE 到達抖動量（§7.1 自檢用）
+    let residualStdMs: Double  // 殘差標準差＝實際 BLE 到達抖動量
 
     /// 樣本索引 → 主機時刻（ms，相對於 session t0）
     func time(at k: Int) -> Double { a + b * Double(k) }
@@ -92,22 +86,25 @@ struct TKEClockFit {
     var measuredRateHz: Double { b > 0 ? 1000.0 / b : 0 }
 }
 
-/// 單一裝置的時間軸狀態（tke-sitting-calibration-port-plan.md §4.2 節①②）。
+/// 單一裝置的時間軸狀態。
 ///
 /// 兩件事分開處理：
 /// - **順序**：用封包的 Serial No 展開成單調遞增的全域樣本索引 `k`，完全不受到達時間影響。
 /// - **對應**：用到達時間對 `k` 做增量最小平方回歸，估出 `k → 主機時鐘` 的映射。
 ///
+/// 這樣拆的好處是「掉包」與「抖動」互不干擾：掉包只在 `k` 上留下正確的空隙、不位移倖存樣本；
+/// 到達時間的抖動則被回歸平均掉，而不是逐包污染每一筆樣本的時間定位。
+///
 /// 時間一律使用「相對於 session t0 的毫秒」而非 epoch 毫秒 —— 見 `ingest` 的說明。
-struct TKEDeviceClock {
+struct BLEDeviceClock {
 
     // MARK: - 常數
 
     /// 標稱取樣週期（104Hz）。只在回歸尚未可信時，充當交叉驗證的後備估計值。
     static let nominalPeriodMs = 1000.0 / 104.0
-    /// 每個封包帶幾筆樣本（§9 階段 0 實測 shift=20，零重疊）
+    /// 每個封包帶幾筆樣本（實測 shift=20，相鄰封包零重疊）
     static let samplesPerPacket = 20
-    /// 回歸至少要這麼多觀測點才可信（§4.2 節④）
+    /// 回歸至少要這麼多觀測點才可信
     static let minPointsForFit = 10
     /// serial 推算的間隔與實際到達間隔差距超過這個值，視為 serial 異常並重置
     static let crossCheckToleranceMs = 1000.0
@@ -136,7 +133,7 @@ struct TKEDeviceClock {
     // MARK: - 結果
 
     enum Outcome: Equatable {
-        /// 正常收下，回傳本包 20 筆樣本的起始索引（樣本 i 的索引為 firstK + i）
+        /// 正常收下，回傳本包樣本的起始索引（樣本 i 的索引為 firstK + i）
         case accepted(firstK: Int)
         /// serial 沒有前進，視為重複封包，丟棄
         case duplicate
@@ -163,9 +160,9 @@ struct TKEDeviceClock {
         let delta = (Int(serial) - Int(last) + 256) % 256
         if delta == 0 { return .duplicate }
 
-        // 交叉驗證（§4.2「Serial 計數器異常的偵測」）：
-        // serial 推算出的時間間隔應與實際到達間隔相符。用已擬合的 b 當基準比用標稱值更穩健——
-        // §9 階段 0 曾觀察到封包率與標稱值差 6.3 倍的情況，此時標稱值會誤判。
+        // 交叉驗證：serial 推算出的時間間隔應與實際到達間隔相符。
+        // 用已擬合的 b 當基準比用標稱值更穩健 —— 曾觀察到封包率與標稱值差 6.3 倍的情況，
+        // 此時標稱值會誤判。
         let periodMs = fit()?.b ?? Self.nominalPeriodMs
         let expectedGap = Double(delta * Self.samplesPerPacket) * periodMs
         let actualGap = arrivalMs - (lastArrivalMs ?? arrivalMs)
@@ -190,7 +187,7 @@ struct TKEDeviceClock {
     }
 
     /// 目前的擬合結果；觀測點不足時回傳 nil。
-    func fit() -> TKEClockFit? {
+    func fit() -> BLEClockFit? {
         guard pointCount >= Self.minPointsForFit else { return nil }
         let n = Double(pointCount)
         let denom = n * sumKK - sumK * sumK
@@ -203,7 +200,7 @@ struct TKEDeviceClock {
         let sse = sumTT - a * sumT - b * sumKT
         let residualStd = pointCount > 2 ? (max(0, sse) / Double(pointCount - 2)).squareRoot() : 0
 
-        return TKEClockFit(a: a, b: b, pointCount: pointCount, residualStdMs: residualStd)
+        return BLEClockFit(a: a, b: b, pointCount: pointCount, residualStdMs: residualStd)
     }
 
     /// 清空所有狀態（`resetCount` 除外，那是跨重置的累計診斷值）。

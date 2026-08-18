@@ -138,11 +138,11 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     /// 這段期間仍維持攔截（避免漏寫資料庫），但不再做任何處理。
     @ObservationIgnored private var tkeDraining = false
 
-    // 階段 1：Serial 展開 + 增量回歸（Util/TKEClock.swift）
-    @ObservationIgnored private var tkeClock: [UUID: TKEDeviceClock] = [:]
+    // 階段 1：Serial 展開 + 增量回歸（Util/BLEClock.swift）
+    @ObservationIgnored private var tkeClock: [UUID: BLEDeviceClock] = [:]
     // 階段 2：因果平滑 + 三態 buffer
-    @ObservationIgnored private var tkeSmoothers: [UUID: TKECausalSmoother] = [:]
-    @ObservationIgnored private var tkeBuffers: [UUID: [TKESample]] = [:]
+    @ObservationIgnored private var tkeSmoothers: [UUID: CausalSmoother] = [:]
+    @ObservationIgnored private var tkeBuffers: [UUID: [BLESample]] = [:]
     /// 校正收集中的 bleQueue 端旗標。三態（校正中／即時中／閒置串流中）由它與
     /// `tkeLiveEstimating` 決定；`tkeCollecting` 只代表「TKE 路徑已啟用」。
     /// 用 bleQueue 端旗標而非主執行緒的 `isCollectingTKE`，理由同 `recordingSessionActive`。
@@ -760,10 +760,10 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
 
             tkeProbes[thighId] = TKESerialProbe(label: "大腿")
             tkeProbes[calfId]  = TKESerialProbe(label: "小腿")
-            tkeClock[thighId] = TKEDeviceClock()
-            tkeClock[calfId]  = TKEDeviceClock()
-            tkeSmoothers[thighId] = TKECausalSmoother()
-            tkeSmoothers[calfId]  = TKECausalSmoother()
+            tkeClock[thighId] = BLEDeviceClock()
+            tkeClock[calfId]  = BLEDeviceClock()
+            tkeSmoothers[thighId] = CausalSmoother(window: TKECalibration.smoothWindow)
+            tkeSmoothers[calfId]  = CausalSmoother(window: TKECalibration.smoothWindow)
             tkeBuffers[thighId] = []
             tkeBuffers[calfId]  = []
             tkeCalibrating = false      // 階段 5 才會由校正流程設為 true
@@ -843,9 +843,9 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
 
         // 觀測點不足時 fit() 回傳 nil，這裡補一個帶真實 pointCount 的替身，
         // 讓 computeOffsets 的步驟 5a 能正確判定「回歸不可信」而不是崩在 nil 上。
-        func fitOrFallback(_ id: UUID) -> TKEClockFit {
+        func fitOrFallback(_ id: UUID) -> BLEClockFit {
             if let f = tkeClock[id]?.fit() { return f }
-            return TKEClockFit(a: 0, b: TKEDeviceClock.nominalPeriodMs,
+            return BLEClockFit(a: 0, b: BLEDeviceClock.nominalPeriodMs,
                                pointCount: tkeClock[id]?.pointCount ?? 0, residualStdMs: 0)
         }
 
@@ -948,7 +948,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             // 防護一：從最新一筆往回退，最多一個封包。
             // 回退必須發生在**大腿側**——在小腿側找鄰近樣本等同「取最近鄰替代」，
             // 那是 findPair 明令禁止的行為。往回取較舊的大腿樣本，配到的仍是時間上真正對應的小腿樣本。
-            var paired: (thigh: TKESample, calf: TKESample)?
+            var paired: (thigh: BLESample, calf: BLESample)?
             for offset in 0 ..< min(Self.tkeLiveWalkBack, thighBuf.count) {
                 let t = thighBuf[thighBuf.count - 1 - offset]
                 if let c = TKECalibration.findPair(kThigh: t.k, thighFit: thighFit,
@@ -1082,7 +1082,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     ///
     /// 回傳 clock 的處理結果供診斷用。
     @discardableResult
-    private func collectTKEAcc(_ data: Data, id: UUID, config: Bluetooth) -> TKEDeviceClock.Outcome? {
+    private func collectTKEAcc(_ data: Data, id: UUID, config: Bluetooth) -> BLEDeviceClock.Outcome? {
         guard data.count >= 123 else { return nil }
 
         let nowMs = Date().timeIntervalSince1970 * 1000
@@ -1107,7 +1107,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             firstK = k
         }
 
-        var smoother = tkeSmoothers[id] ?? TKECausalSmoother()
+        var smoother = tkeSmoothers[id] ?? CausalSmoother(window: TKECalibration.smoothWindow)
         var buf = tkeBuffers[id] ?? []
 
         for i in 0 ..< 20 {
@@ -1117,7 +1117,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             let rawZ = Double(data.int16BE(at: o + 4)) * config.acc_sensitivity
             // 視窗未滿的樣本直接丟棄，不進 buffer（§5.1）
             guard let s = smoother.push(x: rawX, y: rawY, z: rawZ) else { continue }
-            buf.append(TKESample(k: firstK + i, x: s.x, y: s.y, z: s.z))
+            buf.append(BLESample(k: firstK + i, x: s.x, y: s.y, z: s.z))
         }
 
         // 非校正狀態下裁成環形 buffer，避免無限成長
@@ -1249,11 +1249,11 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
 
         // ---- 階段 1：回歸自檢（§7.1）----
         print("\n---- 回歸自檢（§9 階段 1 / §7.1）----")
-        let nominal = TKEDeviceClock.nominalPeriodMs
+        let nominal = BLEDeviceClock.nominalPeriodMs
         for (id, label) in [(thighId, "大腿"), (calfId, "小腿")] {
             guard let clock = tkeClock[id] else { continue }
             guard let f = clock.fit() else {
-                print("[\(label)] 觀測點不足（\(clock.pointCount) < \(TKEDeviceClock.minPointsForFit)），無法擬合")
+                print("[\(label)] 觀測點不足（\(clock.pointCount) < \(BLEDeviceClock.minPointsForFit)），無法擬合")
                 continue
             }
             let deviationPct = (f.b - nominal) / nominal * 100
@@ -1291,7 +1291,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             print("""
             [\(label)]
               buffer 筆數   = \(buffered)（上限 \(cap)）\(buffered <= cap ? "✅ 未超過上限" : "❌ 超過上限")
-              暖機丟棄      = \(warmup) 筆 \(warmup == TKECausalSmoother.window - 1 ? "✅ 正好 N-1=29" : "（預期 29）")
+              暖機丟棄      = \(warmup) 筆 \(warmup == TKECalibration.smoothWindow - 1 ? "✅ 正好 N-1=\(TKECalibration.smoothWindow - 1)" : "（預期 \(TKECalibration.smoothWindow - 1)）")
               k 範圍        = \(firstK) ~ \(lastK)
               收到樣本總數  = \(expectedTotal)（\(packets) 包 × 20）
               → 環形裁切後只留最近 \(buffered) 筆，符合「不隨時間成長」
@@ -2058,8 +2058,8 @@ extension BluetoothViewModel: CBPeripheralDelegate {
         let wasRecording = DispatchQueue.main.sync { self.isRecording }
 
         // 三者必須同進同出：k 的編號基準變了，舊 buffer 與平滑視窗都無法與另一側對齊
-        tkeClock[id] = TKEDeviceClock()
-        tkeSmoothers[id] = TKECausalSmoother()
+        tkeClock[id] = BLEDeviceClock()
+        tkeSmoothers[id] = CausalSmoother(window: TKECalibration.smoothWindow)
         tkeBuffers[id] = []
         // session t0 刻意保留——兩顆的 a 必須落在同一時間框架，配對公式才成立
 

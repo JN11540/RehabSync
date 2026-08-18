@@ -1,5 +1,21 @@
 import Foundation
 
+/// 校正結果（tke-sitting-calibration-port-plan.md §4.1）。
+///
+/// `thigh`／`calf` 恆同時有值或同時為 nil，呼叫端用 `if let thigh, let calf` 判定成功；
+/// `message` 不論成功失敗都可直接顯示。
+///
+/// `side` 一律回填 —— 即時階段必須確認「現在綁定的側」與「校正當時的側」相同，
+/// 否則 `k` 值符號相反會產生完全錯誤的角度，而畫面上不會有任何異常徵兆。
+struct TKECalibrationResult {
+    let thigh: Double?    // 成功 = o_thigh；失敗 = nil
+    let calf: Double?     // 成功 = o_calf； 失敗 = nil
+    let message: String   // 成功 = "校正成功"；失敗 = 對應提示
+    let side: Int         // 校正當下的綁定側（0=左 1=右）
+
+    var succeeded: Bool { thigh != nil && calf != nil }
+}
+
 /// TKE（終端膝伸展）坐姿校正的演算法本體。
 /// 對照 tke-sitting-calibration-port-plan.md §4.1，移植自 calibrate_tke_left/right.py 與 tke_live_left/right.py。
 ///
@@ -14,13 +30,16 @@ enum TKECalibration {
 
     // MARK: - 常數
 
+    /// 因果移動平均的視窗長度（≈0.29 秒 @104Hz）。
+    /// `CausalSmoother` 本身是通用的，視窗長度屬於動作層的參數，所以在這裡宣告。
+    static let smoothWindow = 30
     /// 姿勢門檻（mg）：該歸零的軸必須小於這個值
     static let postureThresholdMG = 400.0
     /// 方向檢查的容許範圍（度）：算出的 alpha 必須落在真值 ±這個範圍內
     static let directionToleranceDeg = 30.0
     /// 最少合格樣本數。沿用 Python 現值。
     static let minQualifiedSamples = 250
-    /// 回歸觀測點少於這個數就視為不可信（與 TKEDeviceClock.minPointsForFit 一致）
+    /// 回歸觀測點少於這個數就視為不可信（與 BLEDeviceClock.minPointsForFit 一致）
     static let minRegressionPoints = 10
     /// 實收封包數低於這個值就視為封包遺失嚴重（只在失敗後用來解釋原因，訂寬訂窄都不會誤殺）
     static let minPacketCount = 20
@@ -39,12 +58,12 @@ enum TKECalibration {
     // MARK: - 角度公式
 
     /// alpha_thigh_raw = atan2(k·ax, −ay)
-    static func alphaThighRaw(_ s: TKESample, side: Int) -> Double {
+    static func alphaThighRaw(_ s: BLESample, side: Int) -> Double {
         atan2(kValue(side: side) * s.x, -s.y) * 180 / .pi
     }
 
     /// alpha_shank_raw = atan2(−k·ax, ay)
-    static func alphaShankRaw(_ s: TKESample, side: Int) -> Double {
+    static func alphaShankRaw(_ s: BLESample, side: Int) -> Double {
         atan2(-kValue(side: side) * s.x, s.y) * 180 / .pi
     }
 
@@ -53,13 +72,13 @@ enum TKECalibration {
     /// 大腿是否處於校正姿勢（水平）。
     /// 方向檢查**併入**這裡而非獨立一層 —— 步驟 5d 的訊息是依 `thighOnlyPass` 計數分類的，
     /// 方向檢查若在計數之外，會出現「計數說合格、實際卻被剔除」的不一致（§4.1 步驟 3）。
-    static func checkThigh(_ s: TKESample, side: Int) -> Bool {
+    static func checkThigh(_ s: BLESample, side: Int) -> Bool {
         guard abs(s.y) < postureThresholdMG, abs(s.z) < postureThresholdMG else { return false }
         return abs(alphaThighRaw(s, side: side) - alphaThighTrueDeg) < directionToleranceDeg
     }
 
     /// 小腿是否處於校正姿勢（鉛直）。方向檢查同樣併入。
-    static func checkCalf(_ s: TKESample, side: Int) -> Bool {
+    static func checkCalf(_ s: BLESample, side: Int) -> Bool {
         guard abs(s.x) < postureThresholdMG, abs(s.z) < postureThresholdMG else { return false }
         return abs(alphaShankRaw(s, side: side) - alphaShankTrueDeg) < directionToleranceDeg
     }
@@ -78,9 +97,9 @@ enum TKECalibration {
     /// - Note: 校正與即時都必須呼叫這一份，不可各寫一份。這段邏輯帶著多條「不得如何」的限制，
     ///   重複實作等於把限制也複製一遍，遲早有一邊漏掉。
     static func findPair(
-        kThigh: Int, thighFit: TKEClockFit,
-        calfSamples: [TKESample], calfFit: TKEClockFit
-    ) -> TKESample? {
+        kThigh: Int, thighFit: BLEClockFit,
+        calfSamples: [BLESample], calfFit: BLEClockFit
+    ) -> BLESample? {
         guard calfFit.b > 0 else { return nil }
         let hostTime = thighFit.time(at: kThigh)
         let kc = calfFit.sampleIndex(atTime: hostTime)
@@ -103,7 +122,7 @@ enum TKECalibration {
     /// **不做 0–90 夾限**，超出範圍照實輸出（規劃書第 0 節決策）。
     /// 完全伸直時 theta 會落到負值是增益補償的預期行為，不是錯誤。
     static func liveAngle(
-        thigh: TKESample, calf: TKESample,
+        thigh: BLESample, calf: BLESample,
         side: Int, oThigh: Double, oCalf: Double
     ) -> Double {
         let thighRaw = alphaThighRaw(thigh, side: side)
@@ -114,8 +133,8 @@ enum TKECalibration {
     // MARK: - 校正主流程
 
     static func computeOffsets(
-        thighSamples: [TKESample], calfSamples: [TKESample], side: Int,
-        thighFit: TKEClockFit, calfFit: TKEClockFit,
+        thighSamples: [BLESample], calfSamples: [BLESample], side: Int,
+        thighFit: BLEClockFit, calfFit: BLEClockFit,
         thighPacketCount: Int, calfPacketCount: Int
     ) -> TKECalibrationResult {
 
@@ -224,11 +243,11 @@ enum TKECalibration {
     // MARK: - 診斷輸出（§5.2）
 
     /// 整組診斷欄位統一由這裡輸出，不另外定義第二套。
-    /// 唯一的例外是回歸殘差標準差 —— 它在 `TKEClockFit` 裡，所以這裡也印得出來。
+    /// 唯一的例外是回歸殘差標準差 —— 它在 `BLEClockFit` 裡，所以這裡也印得出來。
     private static func printDiagnostics(
         side: Int,
-        thighSamples: [TKESample], calfSamples: [TKESample],
-        thighFit: TKEClockFit, calfFit: TKEClockFit,
+        thighSamples: [BLESample], calfSamples: [BLESample],
+        thighFit: BLEClockFit, calfFit: BLEClockFit,
         thighPacketCount: Int, calfPacketCount: Int,
         pairedCount: Int, thighOnlyPass: Int, calfOnlyPass: Int, qualified: Int,
         message: String, extra: String? = nil
