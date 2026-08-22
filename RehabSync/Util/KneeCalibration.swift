@@ -51,6 +51,22 @@ protocol KneeCalibrationSpec {
     /// 引擎完全不必知道哪個動作把係數放在哪邊。
     static func coefficients(side: Int) -> (thigh: Double, calf: Double)
 
+    // MARK: 分項的報告慣例（tke-sitting-calibration-port-plan.md §11）
+    //
+    // 🔴 與上面的 `alphaThighTrueDeg`／`alphaShankTrueDeg` **刻意分開**。
+    // 那兩個是「校正姿勢下**原始 alpha** 的期望值」，同時被**方向檢查**使用
+    //（`checkThigh`／`checkCalf` 比對的是未乘係數的原始 alpha）——
+    // 它們與感測器安裝方式綁定，不可以為了改顯示慣例而動。
+    //
+    // 下面四個只影響「分項要報告成什麼數字」，不參與任何校正判定。
+
+    /// 分項在校正姿勢應該報告的值。預設等於對應的 `alpha*TrueDeg`（維持既有行為）。
+    static var thighReportAtCalibrationDeg: Double { get }
+    /// 離開校正姿勢時分項的變化方向：`+1` 遞增、`-1` 遞減。
+    static var thighReportSign: Double { get }
+    static var calfReportAtCalibrationDeg: Double { get }
+    static var calfReportSign: Double { get }
+
     /// 姿勢門檻（mg）。站姿動作若實測通過率偏低可個別放寬。
     static var postureThresholdMG: Double { get }
     /// 方向檢查容許範圍（度）
@@ -60,6 +76,12 @@ protocol KneeCalibrationSpec {
 }
 
 extension KneeCalibrationSpec {
+    // 預設＝維持既有行為（報告值等於真值、方向為正），站姿三個動作都吃這組預設值。
+    static var thighReportAtCalibrationDeg: Double { alphaThighTrueDeg }
+    static var thighReportSign: Double { 1 }
+    static var calfReportAtCalibrationDeg: Double { alphaShankTrueDeg }
+    static var calfReportSign: Double { 1 }
+
     static var postureThresholdMG: Double { 400.0 }
     static var directionToleranceDeg: Double { 30.0 }
     static var minQualifiedSamples: Int { 250 }
@@ -167,10 +189,38 @@ enum KneeCalibration {
         thigh: BLESample, calf: BLESample,
         side: Int, oThigh: Double, oCalf: Double
     ) -> Double {
+        let c = liveAngleComponents(spec: spec, thigh: thigh, calf: calf,
+                                    side: side, oThigh: oThigh, oCalf: oCalf)
+        return c.thigh - c.calf
+    }
+
+    /// theta 的兩個分項：`(α_thigh × C_thigh − o_thigh)` 與 `(α_shank × C_calf − o_calf)`。
+    /// **相減即為 `liveAngle` 的回傳值** —— `liveAngle` 就是呼叫這個函式再相減。
+    ///
+    /// 抽出來是給 `Test.swift` 顯示用（tke-sitting-calibration-port-plan.md §10）：
+    /// 角度不對時可以直接看出是大腿側還是小腿側出問題。
+    ///
+    /// 🔴 **不可以在呼叫端另外重算一次分項** —— 那會變成兩份實作，
+    /// 改係數或改公式時只改一份就走鐘，而且畫面上的分項相減會對不上同一畫面的 theta，
+    /// 比沒有這個功能更糟。這裡是唯一的真實來源（§10.2）。
+    static func liveAngleComponents(
+        spec: any KneeCalibrationSpec.Type,
+        thigh: BLESample, calf: BLESample,
+        side: Int, oThigh: Double, oCalf: Double
+    ) -> (thigh: Double, calf: Double) {
         let c = spec.coefficients(side: side)
-        let thighRaw = alphaThighRaw(thigh, side: side) * c.thigh
-        let shankRaw = alphaShankRaw(calf, side: side) * c.calf
-        return (thighRaw - oThigh) - (shankRaw - oCalf)
+
+        // 展開說明（§11.4）：
+        //   o        = mean × C − true            ← computeOffsets 的定義，本次未改
+        //   raw × C − o − true = C × (alpha − mean)   ← 相對校正姿勢的變化量（已乘增益）
+        //   分項      = report + sign × 變化量
+        //
+        // 預設（report == true、sign == +1）代回去就是 `raw × C − o`，
+        // 與改動前**逐位元相同** —— 站姿三個動作完全不受影響。
+        let thighDelta = alphaThighRaw(thigh, side: side) * c.thigh - oThigh - spec.alphaThighTrueDeg
+        let calfDelta  = alphaShankRaw(calf, side: side) * c.calf - oCalf - spec.alphaShankTrueDeg
+        return (thigh: spec.thighReportAtCalibrationDeg + spec.thighReportSign * thighDelta,
+                calf:  spec.calfReportAtCalibrationDeg  + spec.calfReportSign  * calfDelta)
     }
 
     // MARK: - 校正主流程

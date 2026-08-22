@@ -164,7 +164,20 @@ struct Working2: View {
     @State private var isSessionPaused = false
     @State private var finalElapsedSeconds = 0
 
-    private static let holdThreshold: Double = 20
+    /// 膝角度判定門檻（度）。判定式為 `angle >= holdThreshold`。
+    ///
+    /// 🔴 **方向已於 §11 翻轉。** 小腿分項改成膝屈曲角之後，theta 的語意變成
+    /// 「校正姿勢（小腿垂下）≈ 0、完全伸直 ≈ 90」——**角度越大代表膝蓋越伸直**，
+    /// 所以現在**門檻調小 = 變簡單**（不必伸到那麼直就開始讀秒），與翻轉前相反。
+    ///
+    /// 翻轉後動作 2 與 9／12／22 的語意一致（角度大 = 動作到位）。
+    ///
+    /// 數值沿革：20 → 45（依復健需求調整）。翻轉時**數值不變**——
+    /// `theta_舊 <= 45` 與 `theta_新 >= 45` 在 `theta_新 ≈ 90 − theta_舊` 之下等價。
+    ///
+    /// 這三處都讀同一個常數，改這一行即可全部生效：
+    /// 魚圖切換（`NoGetFishIcon`）、圈圈數字紅字、`.onChange` 的讀秒判定。
+    private static let holdThreshold: Double = 45
     private static let holdDuration: Double = 5
     private static let catchQualifyDuration: Double = 1
     private static let catchAnimationDuration: Double = 1.5
@@ -626,7 +639,7 @@ struct Working2: View {
                 // 屬於「判定」而非「顯示」，依 §20.3 判定一律讀未夾限值。
                 // （結果其實相同：負值與 0 都滿足 `<= 20`。維持未夾限是為了讓
                 //  「判定讀原值、顯示讀夾限值」這條規則在檔案裡沒有例外。）
-                } else if let angle = btVM.currentEstimatedRealAngle, angle <= Self.holdThreshold {
+                } else if let angle = btVM.currentEstimatedRealAngle, angle >= Self.holdThreshold {
                     Image("NoGetFishIcon")
                         .resizable()
                         .scaledToFill()
@@ -762,7 +775,7 @@ struct Working2: View {
                     if let angle = btVM.displayKneeAngle {
                         Text(String(format: "%.0f°", angle))
                             .font(.system(size: 50, weight: .bold))
-                            .foregroundStyle(angle <= Self.holdThreshold ? .red : .black)
+                            .foregroundStyle(angle >= Self.holdThreshold ? .red : .black)
                             .minimumScaleFactor(0.3)
                             .lineLimit(1)
                             .padding(12)
@@ -843,7 +856,7 @@ struct Working2: View {
         }
         .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
             guard !isSessionPaused, btVM.isRecording else { return }
-            if let angle = newValue, angle <= Self.holdThreshold {
+            if let angle = newValue, angle >= Self.holdThreshold {
                 startHoldTimer()
             } else {
                 stopHoldTimer()

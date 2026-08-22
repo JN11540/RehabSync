@@ -5,8 +5,8 @@ import CoreBluetooth
 /// 背景底層圖依 totalCoins 里程碑切換：< 2400 是 earth，>= 2400 換成 moon，>= 7500 換成
 /// new_world；astronaut_landing.png 固定疊在底層圖上方，不隨里程碑改變；space_shuttle 是
 /// 獨立的一層，不受背景切換影響；
-/// 前景太空人角度 < 70° 顯示 get.png，>= 70° 換成 holding.png（微微抖動，同時直式膠囊水位隨秒數上漲），
-/// 曾經達到 70° 後又回落到 < 25° 且讀秒超過 1 秒時，短暫換成 release.png（1.5 秒後切回預設），
+/// 前景太空人角度 < 50° 顯示 get.png，>= 50° 換成 holding.png（微微抖動，同時直式膠囊水位隨秒數上漲），
+/// 曾經達到 50° 後又回落到 < 25° 且讀秒超過 1 秒時，短暫換成 release.png（1.5 秒後切回預設），
 /// 同時 astronaut_fuel.png 從雙手位置飛進火箭燃料艙口（同樣 1.5 秒），燃料箱抵達的瞬間
 /// astronaut_space_shuttle.png 會連續放大＋變亮再變回原狀 3 次；不論是否達到 1 秒，
 /// 只要回落到 < 25° 直式膠囊水位都會歸零；讀秒不足 1 秒時不計入 currentRep／評語次數／金錢，
@@ -279,7 +279,14 @@ struct Working22: View {
     @State private var trembleTimer: Timer?
     @State private var trembleOffset: CGSize = .zero
 
-    private static let holdAngleThreshold: Double = 70
+    /// 進入 holding 的門檻（度）。動作 22 是弓步蹲，判定式為 `angle >= holdAngleThreshold`——
+    /// 角度越大代表膝蓋越屈，所以**門檻調小 = 變簡單**（不必蹲那麼深就開始讀秒）。
+    ///
+    /// 70 → 50：改用 offset 模型之後依實際復健需求調整。
+    private static let holdAngleThreshold: Double = 50
+    /// 離開 holding、結算這一次的門檻（度）。與上面構成**遲滯帶**：
+    /// 角度落在 25~50 之間時維持現狀不切換，避免在門檻附近反覆抖動。
+    /// 本次只調 hold 門檻，release 維持 25，帶寬因此從 45 縮成 **25**。
     private static let releaseAngleThreshold: Double = 25
     private static let releaseAnimationDuration: Double = 1.5
     // 讀秒（holdElapsed）要超過這個秒數，回落到 releaseAngleThreshold 以下才算一次有效的 release。
@@ -580,8 +587,8 @@ struct Working22: View {
                 .padding(48)
                 .allowsHitTesting(false)
 
-            // 前景太空人：角度 < 70° 顯示 astronaut_get.png；角度 >= 70° 換成 astronaut_holding.png 並持續微微抖動；
-            // 曾經達到 70° 之後又回落到 < 25° 時，短暫換成 astronaut_release.png（1.5 秒後自動切回預設）。
+            // 前景太空人：角度 < 50° 顯示 astronaut_get.png；角度 >= 50° 換成 astronaut_holding.png 並持續微微抖動；
+            // 曾經達到 50° 之後又回落到 < 25° 時，短暫換成 astronaut_release.png（1.5 秒後自動切回預設）。
             Group {
                 switch astronautState {
                 case .idle:
@@ -1006,7 +1013,7 @@ struct Working22: View {
             }
         }
         // 這裡刻意**不**用 displayKneeAngle —— handleAngleChange 是遊戲判定
-        // （雙段門檻遲滯 holdAngleThreshold = 70／releaseAngleThreshold = 25），
+        // （雙段門檻遲滯 holdAngleThreshold = 50／releaseAngleThreshold = 25），
         // 判定一律讀未夾限值。結果其實相同（負值與 0 都遠低於 25），
         // 維持未夾限是為了讓「判定讀原值、顯示讀夾限值」這條規則在檔案裡沒有例外。
         .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
