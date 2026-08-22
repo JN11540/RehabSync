@@ -283,13 +283,13 @@ enum GameDataExporter {
     // MARK: - advanced_statistics
 
     private static func buildAdvancedStatisticsCSV(treatmentResultId: Int64, deviceVM: DeviceViewModel) -> String {
-        let header = "timestamp,angle,emg"
+        let header = "timestamp,angle,knee_flexion,hip_flexion,emg"
         let rows = deviceVM.fetchAdvancedStatistics(treatmentResultId: treatmentResultId)
 
         var lines = [header]
         for row in rows {
             let emgStr = row.emg.map { "\($0)" } ?? ""
-            lines.append("\(row.timestamp),\(row.angle),\(emgStr)")
+            lines.append("\(row.timestamp),\(row.angle),\(row.knee_flexion),\(row.hip_flexion),\(emgStr)")
         }
         return lines.joined(separator: "\n")
     }

@@ -90,9 +90,15 @@ class DeviceViewModel {
         } completion: { _, _ in }
     }
 
-    func insertAdvancedStatistics(timestamp: Int64, angle: Double, treatmentResultId: Int64? = nil) {
+    /// - Parameters:
+    ///   - kneeFlexion: 小腿分項（膝屈曲角）
+    ///   - hipFlexion: 大腿分項（髖屈曲角）。恆等式 `angle == hipFlexion - kneeFlexion`
+    func insertAdvancedStatistics(timestamp: Int64, angle: Double,
+                                  kneeFlexion: Double, hipFlexion: Double,
+                                  treatmentResultId: Int64? = nil) {
         db.asyncWrite { db in
-            var row = AdvancedStatistics(treatment_result_id: treatmentResultId, timestamp: timestamp, angle: angle)
+            var row = AdvancedStatistics(treatment_result_id: treatmentResultId, timestamp: timestamp,
+                                         angle: angle, knee_flexion: kneeFlexion, hip_flexion: hipFlexion)
             try row.insert(db)
         } completion: { _, _ in }
     }

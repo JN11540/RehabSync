@@ -166,6 +166,21 @@ func createAppDatabase() throws -> DatabaseQueue {
         }
     }
 
+    // advanced_statistics 加記 theta 的兩個分項（tke-sitting-calibration-port-plan.md §10／§11）：
+    //   hip_flexion  = 大腿分項（髖屈曲角）
+    //   knee_flexion = 小腿分項（膝屈曲角）
+    // angle（= hip_flexion − knee_flexion）維持不變，三者一起存才能事後回頭診斷
+    // 「角度不對是大腿側還是小腿側的問題」——只存 angle 的話兩者相減後就分不出來了。
+    //
+    // NOT NULL 必須帶 DEFAULT，否則既有列無法通過約束。既有列補 0 代表「當時沒有記錄分項」，
+    // 不是真的量到 0；分析時要用 v11 之後的資料才有意義。
+    migrator.registerMigration("v11") { db in
+        try db.alter(table: "advanced_statistics") { t in
+            t.add(column: "knee_flexion", .double).notNull().defaults(to: 0)
+            t.add(column: "hip_flexion",  .double).notNull().defaults(to: 0)
+        }
+    }
+
     try migrator.migrate(dbQueue)
     return dbQueue
 }

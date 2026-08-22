@@ -1070,7 +1070,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
                 oThigh: tkeLiveOThigh, oCalf: tkeLiveOCalf)
             let theta = comp.thigh - comp.calf
             let rounded = (theta * 10).rounded() / 10
-            self.publishKneeAngle(rounded)
+            self.publishKneeAngle(rounded, components: comp)
             self.publishTKEComponents(comp)
         }
     }
@@ -1685,7 +1685,14 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     ///   - **非 `nil`（發布 + 寫入）：只能從 `bleQueue` 呼叫。** 它要用 `main.sync` 讀
     ///     `isRecording`／`currentTreatmentResultId`，從主執行緒呼叫會直接死鎖。
     ///     目前兩個非 nil 呼叫點（`tickTKELiveAngle`／`tickLiveEstimatedRealAngle`）都在 bleQueue 內。
-    private func publishKneeAngle(_ angle: Double?) {
+    /// - Parameter components: theta 的兩個分項，寫進 `advanced_statistics` 的
+    ///   `hip_flexion`（大腿）／`knee_flexion`（小腿）。
+    ///
+    ///   只有 TKE 路徑（`tickTKELiveAngle`）提供得出來；舊路徑（`tickLiveEstimatedRealAngle`，
+    ///   走 mapping table）**沒有分項的概念**，傳 `nil` 時兩欄寫 0。
+    ///   四個動作都已遷移到 TKE 路徑，所以正式流程一定帶得到分項；
+    ///   舊路徑目前只剩 `Test.swift` 在用，而測試頁 `isRecording` 恆為 false、根本不會寫入。
+    private func publishKneeAngle(_ angle: Double?, components: (thigh: Double, calf: Double)? = nil) {
         DispatchQueue.main.async { self.currentEstimatedRealAngle = angle }
 
         guard let angle else { return }
@@ -1700,7 +1707,10 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         }
         guard stillRecording else { return }
         let ts = Int64(Date().timeIntervalSince1970 * 1000)
-        deviceVM.insertAdvancedStatistics(timestamp: ts, angle: angle, treatmentResultId: treatmentResultId)
+        deviceVM.insertAdvancedStatistics(timestamp: ts, angle: angle,
+                                          kneeFlexion: components?.calf ?? 0,
+                                          hipFlexion: components?.thigh ?? 0,
+                                          treatmentResultId: treatmentResultId)
     }
 
     /// 發布／清空 theta 的兩個分項（§10.4）。傳 `nil` 代表清空。
