@@ -318,6 +318,12 @@ struct Working22: View {
     ///     （一達標就立刻滿足結束條件）。
     ///
     /// **程式不會擋、也不會有任何警告。** 這段註解是唯一的防線。
+    ///
+    /// 🔴 **設定頁的 Slider 下限 30 依賴這個 25** ——
+    /// `DashboardTargetAngleEditModal.editableRanges` 給動作 22 的範圍是 30…75，
+    /// 那個 30 是「留 5 度餘裕」推算出來的，**與這裡是兩份沒有連結的數字**。
+    /// 把這個常數調大（例如 35）會讓那個下限立刻變成不安全（上下緣交叉），
+    /// 而且不會有編譯錯誤、不會有警告。**改這裡就要一起改那裡。**
     private static let releaseAngleThreshold: Double = 25
     private static let releaseAnimationDuration: Double = 1.5
     // 讀秒（holdElapsed）要超過這個秒數，回落到 releaseAngleThreshold 以下才算一次有效的 release。
