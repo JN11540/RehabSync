@@ -50,7 +50,16 @@ struct Working9: View {
             extension_length: Array(repeating: 0, count: content.sets * content.reps),
             set_start_time: Array(repeating: 0, count: content.sets),
             set_end_time: Array(repeating: 0, count: content.sets),
-            date: Int(Date().timeIntervalSince1970 * 1000)
+            date: Int(Date().timeIntervalSince1970 * 1000),
+            // 🔴 來源用 `content.exercise_id`，不要用 `exercise?.id` ——
+            // 後者是 Optional，nil 時會寫進 NULL；前者非 Optional、而且它就是
+            // `exercise` 當初查出來的依據，兩者同源但不會消失。
+            exercise_id: content.exercise_id,
+            // 🔴 複用 `targetAngle`，不要在這裡重寫
+            // `exercise?.target_angle ?? Exercise.fallbackTargetAngle` ——
+            // 快照的意義是「判定實際用的那個值」。兩邊各寫一次現在會相等，
+            // 但只要哪天 targetAngle 多一層處理，快照就會悄悄變成另一個數字。
+            target_angle: targetAngle
         )
         resultVM.insert(&result)
         treatmentResult = result
@@ -171,7 +180,23 @@ struct Working9: View {
     @State private var isSessionPaused = false
     @State private var showCompletionPopup = false
 
-    private static let holdThreshold: Double = 45
+    /// **髖屈曲角**判定門檻（度）。判定式為 `髖屈曲角 >= targetAngle`：
+    /// 站直 = 0、屈髖遞增，所以**門檻調小 = 變簡單**（不必蹲那麼深就開始讀秒）。
+    ///
+    /// 來源是 `exercise.target_angle`（migration v12），查不到才用保底值。
+    /// 🔴 **不要在任何地方寫死 45** —— 值的權威在資料庫，字面值只存在於
+    /// `Exercise.fallbackTargetAngle`（working2-database-port-plan.md §22.3）。
+    ///
+    /// 三處判定都讀這個屬性；`createTreatmentResultIfNeeded()` 也讀它，
+    /// 把當時的值存成 `treatment_result.target_angle` 快照。
+    private var targetAngle: Double {
+        #if DEBUG
+        if exercise == nil {
+            print("[TARGET-ANGLE] ⚠️ exercise 為 nil，改用保底值 \(Exercise.fallbackTargetAngle)")
+        }
+        #endif
+        return exercise?.target_angle ?? Exercise.fallbackTargetAngle
+    }
     private static let holdDuration: Double = 5
     /// 每組從起始點起算的時間上限：倒數 3 分鐘歸零視同該組提前結束。
     private static let setTimeLimit: TimeInterval = 180
@@ -625,7 +650,9 @@ struct Working9: View {
                     // 屬於「判定」而非「顯示」，判定一律讀未夾限值。
                     // （結果其實相同：負值與 0 都遠低於 45。維持未夾限是為了讓
                     //  「判定讀原值、顯示讀夾限值」這條規則在檔案裡沒有例外。）
-                    } else if let angle = btVM.currentEstimatedRealAngle, angle >= Self.holdThreshold {
+                    // 依門檻挑弓箭圖屬於「判定」而非「顯示」，讀**未夾限**的髖屈曲角
+                    // （currentTKEThighComponent），不是夾限過的 displayHipFlexion。
+                    } else if let angle = btVM.currentTKEThighComponent, angle >= targetAngle {
                         Image("ArcheryFocusIcon")
                             .resizable()
                     } else {
@@ -777,13 +804,16 @@ struct Working9: View {
                     // 唯一把角度**數字**顯示給使用者的地方 → 讀夾限過的 displayKneeAngle。
                     // 計算與寫入 advanced_statistics 保留負值（校正殘差），只有顯示層夾限。
                     //
-                    // 下面的紅字判斷 `angle >= holdThreshold` 用夾限值不影響結果 ——
+                    // 下面的紅字判斷 `angle >= targetAngle` 用夾限值不影響結果 ——
                     // 動作 9 的負值出現在站直（動作的起始端），與門檻 45 差得很遠，
                     // 夾成 0 之後仍在同一個分支。
-                    if let angle = btVM.displayKneeAngle {
+                    // 顯示**髖屈曲角**（大腿分項，夾限到 0）—— 與動作測試頁圓圈、遊戲判定
+                    // 都是同一個量（working9-database-port-plan.md §20），
+                    // 使用者在畫面上看到的數字就是被判定的那一個。
+                    if let angle = btVM.displayHipFlexion {
                         Text(String(format: "%.0f°", angle))
                             .font(.system(size: 50, weight: .bold))
-                            .foregroundStyle(angle >= Self.holdThreshold ? .red : .black)
+                            .foregroundStyle(angle >= targetAngle ? .red : .black)
                             .minimumScaleFactor(0.3)
                             .lineLimit(1)
                             .padding(12)
@@ -862,9 +892,19 @@ struct Working9: View {
                 )
             }
         }
-        .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
+        // 讀秒判定改用**髖屈曲角**（未夾限），不是 theta（§20）：
+        // 站直 = 0、屈髖遞增，方向與 theta 相同，所以門檻仍是 `>=`。
+        //
+        // 🔴 只讀大腿分項代表**判定不再考慮小腿**。站姿的小腿本來就會轉
+        // （蹲下時脛骨前傾），忽略它等於丟掉膝角度的一半資訊，
+        // 判定的物理意義也從「膝角度」變成「髖角度」。
+        // 門檻的 45 已於 2026-08-23 實機測試通過（working9-database-port-plan.md §20.10）：
+        // 站姿的小腿轉動幅度遠小於大腿，theta 與髖屈曲角在部分蹲的活動範圍內數值相近，
+        // 所以換了量之後門檻不用動。這個結論不適用於動作 2（坐姿大腿不動）。
+        // 該值現在由 `exercise.target_angle` 提供，見 `targetAngle`（§21）。
+        .onChange(of: btVM.currentTKEThighComponent) { _, newValue in
             guard !isSessionPaused, btVM.isRecording else { return }
-            if let angle = newValue, angle >= Self.holdThreshold {
+            if let angle = newValue, angle >= targetAngle {
                 startHoldTimer()
             } else {
                 stopHoldTimer()

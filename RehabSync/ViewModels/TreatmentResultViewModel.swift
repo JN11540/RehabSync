@@ -283,13 +283,13 @@ enum GameDataExporter {
     // MARK: - advanced_statistics
 
     private static func buildAdvancedStatisticsCSV(treatmentResultId: Int64, deviceVM: DeviceViewModel) -> String {
-        let header = "timestamp,angle,emg"
+        let header = "timestamp,angle,knee_flexion,hip_flexion,emg"
         let rows = deviceVM.fetchAdvancedStatistics(treatmentResultId: treatmentResultId)
 
         var lines = [header]
         for row in rows {
             let emgStr = row.emg.map { "\($0)" } ?? ""
-            lines.append("\(row.timestamp),\(row.angle),\(emgStr)")
+            lines.append("\(row.timestamp),\(row.angle),\(row.knee_flexion),\(row.hip_flexion),\(emgStr)")
         }
         return lines.joined(separator: "\n")
     }
@@ -306,6 +306,25 @@ enum GameDataExporter {
         let set_end_time: [Int]
         /// 0 = 左腳、1 = 右腳；只存在於匯出的 JSON，不落地到 `treatment_result` 表（schema 不變）。
         let side: Int
+        /// 這一場是哪個動作（v13）。
+        ///
+        /// 🔴 **加欄位到資料表不會自動出現在這裡** —— 這個 struct 是手寫的欄位清單，
+        /// 不是直接編碼 `TreatmentResult`。沒加就不會出現在檔案裡。
+        ///
+        /// ⚠️ 可為 `nil`（孤兒列，見 `TreatmentResult.exercise_id`），JSON 會印
+        /// `"exercise_id": null` —— 如實反映「不知道是哪個動作」比填一個假的 id 誠實。
+        ///
+        /// 加這兩欄的原因：在此之前匯出的 8 個檔案裡**沒有任何一處寫著這是哪個動作**，
+        /// 只有不透明的 `treatment_content_id`，而 `treatment_content` 表不在匯出範圍內。
+        let exercise_id: Int?
+        /// 這一場**當時**的目標角度（度，v13）。
+        ///
+        /// ⚠️ 型別是 `Double`（欄位是 INTEGER，刻意不一致），所以 JSON 會印成
+        /// `"target_angle": 45.0`。已確認可接受，不為了好看在這裡轉成 `Int`。
+        ///
+        /// ⚠️ `0` = 這一場沒有記錄（v13 之前的舊場次）。實務上匯出只能從遊戲結束的
+        /// `CompletionPopup` 觸發，舊場次不會再被匯出，所以不會出現 0。
+        let target_angle: Double
     }
 
     private static func buildTreatmentResultJSON(_ result: TreatmentResult, side: Int) -> String {
@@ -317,7 +336,11 @@ enum GameDataExporter {
             extension_length: result.extension_length,
             set_start_time: result.set_start_time,
             set_end_time: result.set_end_time,
-            side: side
+            side: side,
+            // 兩欄都直接取自 `result` —— 不用查 `exercise` 表、也不用保底值，
+            // 因為 target_angle 已經是遊戲當時寫下的快照（working2 §22.5.7）。
+            exercise_id: result.exercise_id,
+            target_angle: result.target_angle
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted]

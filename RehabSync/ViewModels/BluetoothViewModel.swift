@@ -111,6 +111,21 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     /// 校正與即時共用 tkeBuffers 但保留規則衝突，不能同時啟動。
     var isTKELiveEstimating = false
     var tkeResult: KneeCalibrationResult? = nil   // UI state (main thread)
+
+    /// 目前生效的校正規格名稱（`spec.name`）。`Test.swift` 用它判斷「分項該顯示在哪一列」——
+    /// 分項只有一組（取決於 `tkeSpec`），四列校正按鈕只有生效的那一列該顯示
+    /// （tke-sitting-calibration-port-plan.md §10.5 方案 B）。
+    /// `tkeSpec` 本身是 bleQueue 專用的 private 狀態，View 讀不到，所以另外開這個主執行緒鏡像。
+    var tkeSpecName: String? = nil                // UI state (main thread)
+
+    /// theta 的兩個分項：`α_thigh × C_thigh − o_thigh` 與 `α_shank × C_calf − o_calf`，
+    /// **相減即為 `currentEstimatedRealAngle`**。只服務 `Test.swift` 的除錯顯示（§10）。
+    ///
+    /// 🔴 刻意**不**塞進共用的 `publishKneeAngle` —— 那是動作 2／9／12／22 共用的發布管道，
+    /// 而舊路徑（`tickLiveEstimatedRealAngle`，走 mapping table）根本沒有分項的概念，
+    /// 加進去等於逼它提供不存在的東西（§10.3）。
+    var currentTKEThighComponent: Double? = nil   // UI state (main thread)
+    var currentTKECalfComponent: Double? = nil    // UI state (main thread)
     @ObservationIgnored private var tkeLiveTimer: Timer?
     @ObservationIgnored private var tkeLiveOThigh = 0.0
     @ObservationIgnored private var tkeLiveOCalf = 0.0
@@ -182,6 +197,34 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     /// 它的用途就是與 Python 逐值比對，夾限會掩蓋差異。
     var displayKneeAngle: Double? {
         currentEstimatedRealAngle.map { max(0, $0) }
+    }
+
+    /// 供畫面顯示的**膝屈曲角**（小腿分項，夾限到 0 以上）。
+    ///
+    /// 動作 2 專用（working2-database-port-plan.md §21）：坐姿小腿自然垂下 = 90、完全伸直 ≈ 0。
+    /// 動作 9／12／22 的圓圈仍讀 `displayKneeAngle`（theta）。
+    ///
+    /// 🔴 **夾限咬在「完全伸直」那一端** —— 該處含校正殘差時是負值（實測 −12.7／−15.6），
+    /// 夾限後顯示 `0°`。若殘差偏大會出現「伸到底之後數字卡在 0 不動」，
+    /// 那是**校正品質問題不是顯示問題**。
+    ///
+    /// 只有 TKE 路徑會餵 `currentTKECalfComponent`，四個動作都已遷移，正式流程一定拿得到。
+    var displayKneeFlexion: Double? {
+        currentTKECalfComponent.map { max(0, $0) }
+    }
+
+    /// 供畫面顯示的**髖屈曲角**（大腿分項，夾限到 0 以上）。
+    ///
+    /// 站姿三動作（9／12／22）專用（working9-database-port-plan.md §20）：
+    /// 站直 = 0、屈髖遞增。動作 2 用 `displayKneeFlexion`（膝屈曲角）。
+    ///
+    /// 選「有增益的那一段」當顯示與判定的量：站姿的 `C` 放在大腿、大腿掃過的範圍大，
+    /// 資訊量最大；動作 2 相反（`C` 在小腿）。
+    ///
+    /// 🔴 夾限咬在「站直」那一端 —— 與目前顯示 theta 的情況相同（theta 站姿也是 0），
+    /// **不是新問題**，但驗收仍要確認站直靜止時數字有小幅跳動。
+    var displayHipFlexion: Double? {
+        currentTKEThighComponent.map { max(0, $0) }
     }
 
     // internal (bleQueue)：只記住「最新一筆」傾角，實際計算交給 liveTickTimer 每 0.2 秒統一處理
@@ -865,6 +908,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
 
         DispatchQueue.main.async {
             self.tkeResult = nil
+            self.tkeSpecName = spec.name
             self.isCollectingTKE = true
         }
 
@@ -966,7 +1010,10 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             tkeLiveEstimating = true
         }
 
+        // 啟動歸零：theta 與分項必須成對，否則會有一個 tick（0.2 秒）的窗口
+        // 出現「theta 已清空、分項還停在上一次的值」—— 正是 §10.4 要避免的不對稱。
         publishKneeAngle(nil)
+        publishTKEComponents(nil)
         DispatchQueue.main.async {
             self.isTKELiveEstimating = true
             self.tkeLiveTimer?.invalidate()
@@ -981,6 +1028,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     /// 路徑一路維持到離開頁面才由 stopTKEPath 收尾。
     func stopTKELiveAngle() {
         publishKneeAngle(nil)
+        publishTKEComponents(nil)
         DispatchQueue.main.async {
             self.tkeLiveTimer?.invalidate()
             self.tkeLiveTimer = nil
@@ -1007,6 +1055,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             for id in [thighId, calfId] {
                 if let last = lastPacketAt[id]?[Self.signalACC], now - last > 1000 {
                     self.publishKneeAngle(nil)
+                    self.publishTKEComponents(nil)
                     return
                 }
             }
@@ -1035,17 +1084,22 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
                 tkeLiveConsecutiveMisses += 1
                 if tkeLiveConsecutiveMisses >= Self.tkeLiveMissLimit {
                     self.publishKneeAngle(nil)
+                    self.publishTKEComponents(nil)
                 }
                 return
             }
             tkeLiveConsecutiveMisses = 0
 
-            let theta = KneeCalibration.liveAngle(
+            // 分項與 theta 走同一份計算：liveAngle 內部就是呼叫 liveAngleComponents 再相減，
+            // 所以這裡直接取分項自己相減，畫面上的「大腿 − 小腿 = theta」必定成立（§10.2）。
+            let comp = KneeCalibration.liveAngleComponents(
                 spec: tkeSpec,
                 thigh: p.thigh, calf: p.calf, side: tkeLiveSide,
                 oThigh: tkeLiveOThigh, oCalf: tkeLiveOCalf)
+            let theta = comp.thigh - comp.calf
             let rounded = (theta * 10).rounded() / 10
-            self.publishKneeAngle(rounded)
+            self.publishKneeAngle(rounded, components: comp)
+            self.publishTKEComponents(comp)
         }
     }
 
@@ -1118,11 +1172,13 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
             tkeCalibStartPackets.removeAll()
             tkeLiveConsecutiveMisses = 0
             self.publishKneeAngle(nil)
+            self.publishTKEComponents(nil)
             DispatchQueue.main.async {
                 self.tkeLiveTimer?.invalidate()
                 self.tkeLiveTimer = nil
                 self.isTKELiveEstimating = false
                 self.tkeResult = nil
+                self.tkeSpecName = nil
                 self.isCollectingTKE = false
             }
             print("[TKE] 路徑停用（wasRecording=\(wasRecording)，notify \(wasRecording ? "保留" : "已關閉")）。")
@@ -1657,7 +1713,14 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
     ///   - **非 `nil`（發布 + 寫入）：只能從 `bleQueue` 呼叫。** 它要用 `main.sync` 讀
     ///     `isRecording`／`currentTreatmentResultId`，從主執行緒呼叫會直接死鎖。
     ///     目前兩個非 nil 呼叫點（`tickTKELiveAngle`／`tickLiveEstimatedRealAngle`）都在 bleQueue 內。
-    private func publishKneeAngle(_ angle: Double?) {
+    /// - Parameter components: theta 的兩個分項，寫進 `advanced_statistics` 的
+    ///   `hip_flexion`（大腿）／`knee_flexion`（小腿）。
+    ///
+    ///   只有 TKE 路徑（`tickTKELiveAngle`）提供得出來；舊路徑（`tickLiveEstimatedRealAngle`，
+    ///   走 mapping table）**沒有分項的概念**，傳 `nil` 時兩欄寫 0。
+    ///   四個動作都已遷移到 TKE 路徑，所以正式流程一定帶得到分項；
+    ///   舊路徑目前只剩 `Test.swift` 在用，而測試頁 `isRecording` 恆為 false、根本不會寫入。
+    private func publishKneeAngle(_ angle: Double?, components: (thigh: Double, calf: Double)? = nil) {
         DispatchQueue.main.async { self.currentEstimatedRealAngle = angle }
 
         guard let angle else { return }
@@ -1672,7 +1735,25 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         }
         guard stillRecording else { return }
         let ts = Int64(Date().timeIntervalSince1970 * 1000)
-        deviceVM.insertAdvancedStatistics(timestamp: ts, angle: angle, treatmentResultId: treatmentResultId)
+        deviceVM.insertAdvancedStatistics(timestamp: ts, angle: angle,
+                                          kneeFlexion: components?.calf ?? 0,
+                                          hipFlexion: components?.thigh ?? 0,
+                                          treatmentResultId: treatmentResultId)
+    }
+
+    /// 發布／清空 theta 的兩個分項（§10.4）。傳 `nil` 代表清空。
+    ///
+    /// 🔴 **發布與清空必須集中在這裡。** `tickTKELiveAngle` 有三個把 theta 清成 `nil` 的分支
+    /// （封包新鮮度、連續配對失敗、停止／停用路徑），分項每一個都要跟上 ——
+    /// 漏掉任何一個，症狀就是「theta 顯示『等待資料…』、但兩個分項還停在最後一次的值」，
+    /// 而那正是使用者最想看分項的時刻（角度不對的時候），顯示殘留值會直接誤導判斷。
+    ///
+    /// 這與 `publishKneeAngle` 把「發布」與「清空」收在同一個函式是同樣的理由。
+    private func publishTKEComponents(_ components: (thigh: Double, calf: Double)?) {
+        DispatchQueue.main.async {
+            self.currentTKEThighComponent = components?.thigh
+            self.currentTKECalfComponent = components?.calf
+        }
     }
 
     /// Timer callback（main thread 觸發），跳回 bleQueue 讀最新值計算，算完再寫回主執行緒的 UI 屬性。

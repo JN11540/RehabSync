@@ -134,6 +134,7 @@ struct Dashboard: View {
     @State private var selectedWeekdayIndex: Int = todayWeekdayIndex()
     @State private var showIncompleteActionsModal = false
     @State private var showBluetoothBindingModal = false
+    @State private var showTargetAngleEditModal = false
     @State private var deviceStatusTick = 0
     @Environment(BluetoothViewModel.self) private var btVM
     private let deviceVM = DeviceViewModel()
@@ -207,7 +208,10 @@ struct Dashboard: View {
                         .frame(width: 420)
                         .background(DashboardPalette.panelBackground)
                 } else if selectedNav == .settings {
-                    DashboardSettingsPanel(onBluetoothBindingTap: { showBluetoothBindingModal = true })
+                    DashboardSettingsPanel(
+                        onBluetoothBindingTap: { showBluetoothBindingModal = true },
+                        onTargetAngleEditTap: { showTargetAngleEditModal = true }
+                    )
                         .id(deviceStatusTick)
                         .padding(28)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -235,6 +239,15 @@ struct Dashboard: View {
                     .ignoresSafeArea()
 
                 DashboardBluetoothBindingModal(onClose: { showBluetoothBindingModal = false })
+                    .frame(width: 640, height: 520)
+            }
+
+            if showTargetAngleEditModal {
+                Color.black.opacity(0.25)
+                    .ignoresSafeArea()
+
+                // 尺寸與藍牙綁定視窗相同（settings-target-angle-edit-plan.md §5.2）。
+                DashboardTargetAngleEditModal(onClose: { showTargetAngleEditModal = false })
                     .frame(width: 640, height: 520)
             }
         }
@@ -294,6 +307,9 @@ private struct DashboardSidebar: View {
 
             DashboardSidebarSectionLabel(text: "一般")
             DashboardSidebarItem(item: .overview, selectedNav: $selectedNav)
+            // 藍牙除錯／動作測試頁入口。`onNavigateToTest` 一路從 Home 傳下來
+            //（Home 把 selectedTab 切成 .test 顯示 TestPage），這裡只負責渲染那一列。
+            DashboardSidebarItem(item: .test, selectedNav: $selectedNav, action: onNavigateToTest)
 
             Spacer()
 
@@ -385,6 +401,7 @@ private struct DashboardSettingsSectionTitle: View {
 /// 原本各自獨立在側邊欄「工具」分頁下的匯入／匯出功能，整合進設定頁後不再需要獨立的側邊欄項目。
 private struct DashboardSettingsPanel: View {
     let onBluetoothBindingTap: () -> Void
+    let onTargetAngleEditTap: () -> Void
 
     @State private var deviceVM = DeviceViewModel()
     @State private var settingVM = SettingViewModel()
@@ -429,6 +446,22 @@ private struct DashboardSettingsPanel: View {
                     Text(settingVM.softwareVersion)
                         .font(.system(size: 16))
                         .foregroundStyle(DashboardPalette.mutedText)
+                }
+
+                VStack(alignment: .leading, spacing: 16) {
+                    DashboardSettingsSectionTitle(text: "目標角度編輯")
+
+                    // 樣式逐字比照上面的「藍芽裝置綁定」按鈕，只有標籤文字不同、沒有 disabled 條件。
+                    Button(action: onTargetAngleEditTap) {
+                        Text("編輯")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                            .background(DashboardPalette.indigo)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(20)
@@ -1115,6 +1148,258 @@ private struct DashboardBluetoothBindingModal: View {
         )
         .onAppear { btVM.startScan() }
         .onDisappear { btVM.stopScan() }
+    }
+}
+
+// MARK: - Target Angle Edit Modal（settings-target-angle-edit-plan.md）
+
+/// 「設定」頁「目標角度編輯」按鈕跳出的視窗：左欄所有 exercise、右欄目標角度編輯。
+/// 尺寸／外框／標題列／叉叉／確認鈕全部逐字比照 `DashboardBluetoothBindingModal`。
+///
+/// 🔴 **編輯的是遊戲判定用的門檻**（`exercise.target_angle`，migration v12）——
+/// `Working2／9／22` 的 `targetAngle` 直接讀它，改完下一場訓練的判定標準就變了。
+/// 已經打完的場次**不受影響**，因為目標角度在遊戲開始時已存進
+/// `treatment_result.target_angle` 快照（migration v13）。
+/// 這個「歷史不會被改動」的性質正是敢開這個 UI 的前提。
+private struct DashboardTargetAngleEditModal: View {
+    let onClose: () -> Void
+
+    @State private var exerciseVM = ExerciseViewModel()
+    /// 🔴 存 `id`，不要存索引或整個 `Exercise` 值 ——
+    /// `ExerciseViewModel.update(_:)` 內部會呼叫 `fetchAll()` 把陣列整個換掉，
+    /// 存索引或值的話按下確認之後參照就失效了。
+    @State private var selectedId: Int64?
+    /// Slider 的暫存值。拖動只改這裡，按下確認才寫資料庫。
+    @State private var draftAngle: Double = 0
+
+    /// 目標角度可編輯的動作 → Slider 範圍。
+    ///
+    /// 🔴 **這張表就是「可編輯清單」** —— 查不到 = 這個動作不使用目標角度 = 右欄只讀。
+    /// **不要另外維護一份 `[2, 9, 22]` 陣列**，那是同一件事的第二份，
+    /// 只加一邊就會出現「有範圍卻不能編輯」或「可編輯卻沒範圍」。
+    ///
+    /// 🔴 動作 22 的下限 30 **依賴 `Working22.releaseAngleThreshold = 25`**：
+    /// 留 5 度餘裕，使用者無論怎麼拖都不會讓遲滯帶上下緣交叉。
+    /// 那個常數若被調大，這裡的 30 會立刻變成不安全，而且不會有任何提示
+    /// （`22_Working.swift` 的常數註解有對應的反向提醒）。
+    private static let editableRanges: [Int64: ClosedRange<Double>] = [
+        2:  0...45,
+        9:  45...90,
+        22: 30...75,
+    ]
+
+    /// 每個可編輯動作的判定方向。
+    ///
+    /// 🔴 `target_angle` 欄位**不帶方向** —— 動作 2 是上限（`<=`，調大變簡單）、
+    /// 動作 9／22 是下限（`>=`，調大變難）。同一個數字在不同動作意義相反，
+    /// 所以右欄一定要把方向顯示出來，否則治療師會調反。
+    /// ⚠️ 這張表與各 `Working*` 裡的判定式是兩份，改判定方向要兩邊一起改。
+    private static let directions: [Int64: (quantity: String, symbol: String, biggerMeans: String)] = [
+        2:  ("膝屈曲角", "≤", "數字調大 = 變簡單（不必伸那麼直）"),
+        9:  ("髖屈曲角", "≥", "數字調大 = 變難（要蹲更深）"),
+        22: ("髖屈曲角", "≥", "數字調大 = 變難（要蹲更深）"),
+    ]
+
+    /// 左欄順序：可編輯的排前面，其餘接在後面，兩組各自維持 `id` 遞增。
+    ///
+    /// 🔴 這個排序同時解掉一個問題：`exercise.json` 的 `id = 1`（股四頭肌等長收縮）
+    /// 是只讀的，若照 `id` 順序、預設選第一列，打開視窗的第一眼會是灰掉、
+    /// 不能編輯的畫面，看起來像功能壞了。重排之後第一列是 `id = 2`，可編輯。
+    ///
+    /// ⚠️ 排序刻意做在這裡，**不動 `ExerciseViewModel.fetchAll()`** ——
+    /// 那是側邊欄動作清單共用的，順序改了會連帶影響那裡。
+    private var sortedExercises: [Exercise] {
+        let all = exerciseVM.exercises
+        let editable = all.filter { isEditable($0) }.sorted { ($0.id ?? 0) < ($1.id ?? 0) }
+        let readOnly = all.filter { !isEditable($0) }.sorted { ($0.id ?? 0) < ($1.id ?? 0) }
+        return editable + readOnly
+    }
+
+    private func isEditable(_ exercise: Exercise) -> Bool {
+        guard let id = exercise.id else { return false }
+        return Self.editableRanges[id] != nil
+    }
+
+    private var selected: Exercise? {
+        guard let selectedId else { return nil }
+        return exerciseVM.exercises.first { $0.id == selectedId }
+    }
+
+    private var selectedRange: ClosedRange<Double>? {
+        guard let selectedId else { return nil }
+        return Self.editableRanges[selectedId]
+    }
+
+    /// 確認鈕停用條件：選中的動作不可編輯，或值與資料庫現值相同（沒有變更）。
+    private var isConfirmDisabled: Bool {
+        guard let selected, selectedRange != nil else { return true }
+        return draftAngle == selected.target_angle
+    }
+
+    /// 切到別的動作時，未確認的變更**直接丟掉**（不跳確認框）——
+    /// 這個視窗一次只編輯一個動作、確認即關閉，「改了 A 又去改 B」不是預期流程。
+    /// ⚠️ 代價：拖了半天再點別的動作，改動會無聲消失。
+    private func select(_ exercise: Exercise) {
+        selectedId = exercise.id
+        draftAngle = exercise.target_angle
+    }
+
+    private func handleConfirm() {
+        guard var target = selected, selectedRange != nil else { return }
+        target.target_angle = draftAngle
+        exerciseVM.update(target)
+        onClose()
+    }
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white)
+                .shadow(color: .black.opacity(0.2), radius: 20, y: 8)
+
+            VStack(spacing: 0) {
+                HStack {
+                    Text("目標角度編輯")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(Color.black)
+                        .padding(.leading, 24)
+
+                    Spacer()
+
+                    Button(action: onClose) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.white)
+                            Circle()
+                                .stroke(DashboardPalette.indigo, lineWidth: 1.5)
+                            Image(systemName: "xmark")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundStyle(DashboardPalette.indigo)
+                        }
+                        .frame(width: 50, height: 50)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.trailing, 16)
+                }
+                .padding(.top, 16)
+                .padding(.bottom, 16)
+
+                HStack(spacing: 0) {
+                    // 🔴 左欄一定要包 ScrollView —— 藍牙視窗左欄是固定 4 列，
+                    // 這裡有 22 列，200pt × 520pt 塞不下，不捲的話後面十幾個動作點不到。
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 12) {
+                            ForEach(sortedExercises, id: \.id) { exercise in
+                                let isSelected = exercise.id == selectedId
+
+                                Text(exercise.name)
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(isSelected ? .white : Color.black)
+                                    .lineLimit(2)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(12)
+                                    .background(isSelected ? DashboardPalette.indigoDark : DashboardPalette.indigoFaint)
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    .contentShape(Rectangle())
+                                    .onTapGesture { select(exercise) }
+                            }
+                        }
+                        .padding(16)
+                    }
+                    .frame(width: 200)
+
+                    Rectangle()
+                        .fill(Color.black.opacity(0.08))
+                        .frame(width: 1)
+
+                    rightPane
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                }
+            }
+
+            Button(action: handleConfirm) {
+                ZStack {
+                    Circle()
+                        .fill(DashboardPalette.indigo)
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+                .frame(width: 50, height: 50)
+                .padding(16)
+            }
+            .buttonStyle(.plain)
+            .disabled(isConfirmDisabled)
+            .opacity(isConfirmDisabled ? 0.4 : 1)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.black.opacity(0.06), lineWidth: 1)
+        )
+        .onAppear {
+            exerciseVM.fetchAll()
+            // 預設選中重排後的第一列（＝可編輯的 id = 2）。
+            if let first = sortedExercises.first { select(first) }
+        }
+    }
+
+    @ViewBuilder
+    private var rightPane: some View {
+        if let selected {
+            VStack(alignment: .leading, spacing: 20) {
+                Text(selected.name)
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(Color.black)
+
+                if let range = selectedRange, let id = selected.id, let dir = Self.directions[id] {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("\(dir.quantity) \(dir.symbol) 目標角度")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(Color.black)
+                        Text(dir.biggerMeans)
+                            .font(.system(size: 14))
+                            .foregroundStyle(DashboardPalette.mutedText)
+                    }
+
+                    Text(String(format: "%.0f 度", draftAngle))
+                        .font(.system(size: 40, weight: .bold))
+                        .foregroundStyle(DashboardPalette.indigo)
+
+                    // step: 1 保證只產生整數 —— target_angle 的 Swift 型別是 Double
+                    // 但資料庫欄位是 INTEGER，寫入 45.5 會被 SQLite 存成 REAL。
+                    Slider(value: $draftAngle, in: range, step: 1)
+                        .tint(DashboardPalette.indigo)
+
+                    HStack {
+                        Text(String(format: "%.0f", range.lowerBound))
+                        Spacer()
+                        Text(String(format: "%.0f", range.upperBound))
+                    }
+                    .font(.system(size: 13))
+                    .foregroundStyle(DashboardPalette.mutedText)
+
+                    // ⚠️ 這句話成立的**唯一原因**是 treatment_result.target_angle 快照
+                    // （migration v13）。日後若有人把結果頁改回讀 exercise.target_angle，
+                    // 這句提示就會變成謊話，而且沒有任何機制會發現。
+                    Text("調整後只影響往後的訓練，已完成的紀錄與報告不受影響。")
+                        .font(.system(size: 14))
+                        .foregroundStyle(DashboardPalette.mutedText)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    // 只讀：這個動作不使用目標角度（動作 12 用狀態機判定，
+                    // 其餘 18 個尚未實作）。刻意**不加任何說明文字** ——
+                    // 使用者從「沒有 Slider、確認鈕是灰的」自行判斷。
+                    Text(String(format: "%.0f 度", selected.target_angle))
+                        .font(.system(size: 40, weight: .bold))
+                        .foregroundStyle(DashboardPalette.mutedText)
+                }
+
+                Spacer()
+            }
+            .padding(24)
+        }
     }
 }
 

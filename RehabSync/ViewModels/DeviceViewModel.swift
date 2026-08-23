@@ -90,9 +90,23 @@ class DeviceViewModel {
         } completion: { _, _ in }
     }
 
-    func insertAdvancedStatistics(timestamp: Int64, angle: Double, treatmentResultId: Int64? = nil) {
+    /// - Parameters:
+    ///   - kneeFlexion: 小腿分項。四個動作的 `calfReportSign` 都是 −1，所以這個值是
+    ///     「小腿相對校正姿勢反向遞增」的量；只有動作 2 的校正姿勢（小腿垂直地面）讓它
+    ///     真的等於膝屈曲角（完全伸直 = 0、垂直 = 90）。9／12／22 只是同一條公式的產物，
+    ///     不要當成膝屈曲角解讀。
+    ///   - hipFlexion: 大腿分項（髖屈曲角）。9／12／22 的畫面顯示、遊戲判定、結果頁折線圖
+    ///     都讀這一欄；動作 2 讀 `kneeFlexion`。
+    ///
+    /// ⚠️ `angle`（theta）不是這兩欄的差 —— `calfReportSign = −1` 已經把小腿那一項翻過號，
+    /// 兩欄各自帶自己的 report 基準，彼此之間沒有恆等式。三欄要分開看。
+    /// 舊路徑（Test 頁的 `startLiveEstimateRealAngle`）沒有分項，兩欄都寫 0。
+    func insertAdvancedStatistics(timestamp: Int64, angle: Double,
+                                  kneeFlexion: Double, hipFlexion: Double,
+                                  treatmentResultId: Int64? = nil) {
         db.asyncWrite { db in
-            var row = AdvancedStatistics(treatment_result_id: treatmentResultId, timestamp: timestamp, angle: angle)
+            var row = AdvancedStatistics(treatment_result_id: treatmentResultId, timestamp: timestamp,
+                                         angle: angle, knee_flexion: kneeFlexion, hip_flexion: hipFlexion)
             try row.insert(db)
         } completion: { _, _ in }
     }

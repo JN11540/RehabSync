@@ -20,10 +20,9 @@ struct PostWorking_2: View {
         return String(format: "%d 分 %02d 秒", totalSeconds / 60, totalSeconds % 60)
     }
 
-    /// 毫秒轉成「X.X 秒」。
-    fileprivate static func formatSeconds(ms: Double) -> String {
-        String(format: "%.1f 秒", ms / 1000.0)
-    }
+    // `formatSeconds(ms:)`（毫秒 → 「X.X 秒」）已隨 §11.1／§11.2 移除 ——
+    // 它的兩個使用者「整局平均伸展時長」與「本組平均伸直時長」都不在了。
+    // `PostWorking_9／22` 的同名函式後來也一併移除（動作 12 本來就沒有）。
 
     fileprivate static let darkPurple = Color(red: 0.30, green: 0.16, blue: 0.65)
     fileprivate static let midPurple = Color(red: 0.45, green: 0.35, blue: 0.85)
@@ -48,8 +47,10 @@ struct PostWorking_2: View {
                             PostWorking2Header()
                             PostWorking2StatRow(treatmentResult: treatmentResult, onRequestReturn: { showReturnConfirm = true })
 
+                            // 🔴 不可以加 `.frame(maxHeight: .infinity)`（§11.5）——
+                            // 那會把卡片撐滿畫面高度、內容再多也不長高，外層 ScrollView
+                            // 就永遠沒有東西可捲。卡片高度必須由內容決定。
                             PostWorking2DonationOverviewCard(content: content, treatmentResult: treatmentResult)
-                                .frame(maxHeight: .infinity)
                         }
                         .padding(28)
                         .frame(minHeight: geo.size.height)
@@ -119,18 +120,30 @@ private struct PostWorking2StatRow: View {
         treatmentResult.reps.reduce(0, +)
     }
 
-    /// sum(extension_length) / sum(reps)：未完成的次數固定補 0，不會影響平均值。
-    private var averageExtensionText: String {
-        guard totalReps > 0 else { return "－" }
-        let totalMs = treatmentResult.extension_length.reduce(0, +)
-        return PostWorking_2.formatSeconds(ms: Double(totalMs) / Double(totalReps))
+    /// 這一場**當時**的目標角度，讀 `treatment_result.target_angle`（migration v13）。
+    ///
+    /// 🔴 **不是讀 `exercise.target_angle`。** 那是「現在設定的值」，可編輯 ——
+    /// 一次 `UPDATE` 就會讓所有歷史場次的卡片跟著變。這一欄是遊戲開始時寫下的快照，
+    /// 之後不會再變（working2-database-port-plan.md §22.5）。
+    ///
+    /// ⚠️ `0` = **這一場沒有記錄目標角度**（v13 之前的舊場次，migration 刻意不回填 ——
+    /// 當時的門檻寫死在當時那一版程式裡，已經無從得知）。顯示「－」，不是「0 度」。
+    ///
+    /// 🔴 這裡**不需要** `Exercise.fallbackTargetAngle`：遊戲當時若走了保底值，
+    /// 那個值已經被寫進快照，讀出來就是它。顯示端再算一次只會多一個算錯的地方。
+    ///
+    /// ⚠️ `target_angle` 是 `Double`（欄位是 INTEGER，型別刻意不一致，§22.3.1），
+    /// 所以要用 `String(format:)`，字串插值會印成「45.0 度」。
+    private var targetAngleText: String {
+        guard treatmentResult.target_angle > 0 else { return "－" }
+        return String(format: "%.0f 度", treatmentResult.target_angle)
     }
 
     private var stats: [PostWorking2Stat] {
         [
             PostWorking2Stat(icon: "clock.fill", color: PostWorking_2.midPurple, label: "總時間", value: totalTimeText, change: "", isPositive: true, note: ""),
             PostWorking2Stat(icon: "repeat.circle.fill", color: PostWorking_2.blue, label: "總次數", value: "\(totalReps) 次", change: "", isPositive: true, note: ""),
-            PostWorking2Stat(icon: "figure.flexibility", color: PostWorking_2.green, label: "整局平均伸展時長", value: averageExtensionText, change: "", isPositive: true, note: "")
+            PostWorking2Stat(icon: "figure.flexibility", color: PostWorking_2.green, label: "目標角度（膝屈曲角）", value: targetAngleText, change: "", isPositive: true, note: "")
         ]
     }
 
@@ -254,21 +267,21 @@ private struct PostWorking2StatCard: View {
     }
 }
 
-// MARK: - Donation Overview (Bar Chart)
+// MARK: - Group Overview (Angle Trend Charts)
 
-private struct PostWorking2AttemptDuration: Identifiable {
-    let attempt: Int
-    let seconds: Double
-    var id: Int { attempt }
-}
-
-/// 一組的統計資料，從 `treatmentResult` 依索引現算，取代原本寫死在 enum 裡的假資料。
+/// 一組的統計資料，從 `treatmentResult` 依索引現算。
+///
+/// §11.2 之後**不再攜帶任何 `extension_length` 衍生資料** —— 原本的
+/// `barData`（每次伸直秒數）與 `averageDurationText`（本組平均伸直時長）
+/// 隨著柱狀圖與第三欄統計一起移除。
+///
+/// ⚠️ `extension_length` 仍然照常寫入資料庫、也仍然出現在匯出的 CSV／JSON，
+/// 只是結果頁不再顯示它。不要因為這裡沒用就把 `Working2.recordExtensionLength` 拿掉。
 private struct PostWorking2GroupStats {
     let index: Int
     let reps: Int
     let setStartTimeMs: Int
     let setEndTimeMs: Int
-    let barData: [PostWorking2AttemptDuration]
 
     /// 「這組從未開始」跟「這組有開始／結束但 0 次動作完成」視為同一種狀況，統一用這個判斷。
     var hasData: Bool { reps > 0 }
@@ -280,27 +293,16 @@ private struct PostWorking2GroupStats {
         return PostWorking_2.formatMinutesSeconds(ms: setEndTimeMs - setStartTimeMs)
     }
 
-    var averageDurationText: String {
-        guard hasData else { return "－" }
-        let totalMs = barData.reduce(0.0) { $0 + $1.seconds * 1000 }
-        return PostWorking_2.formatSeconds(ms: totalMs / Double(reps))
+    /// 兩張趨勢圖共用的 X 軸長度。下限 0.001 避免 `domain: 0...0` 讓 Charts 除以 0。
+    var durationSeconds: Double {
+        max(0.001, Double(setEndTimeMs - setStartTimeMs) / 1000.0)
     }
 
-    static func compute(index: Int, treatmentResult: TreatmentResult, repsPerSet: Int) -> PostWorking2GroupStats {
+    static func compute(index: Int, treatmentResult: TreatmentResult) -> PostWorking2GroupStats {
         let reps = treatmentResult.reps.indices.contains(index) ? treatmentResult.reps[index] : 0
         let startMs = treatmentResult.set_start_time.indices.contains(index) ? treatmentResult.set_start_time[index] : 0
         let endMs = treatmentResult.set_end_time.indices.contains(index) ? treatmentResult.set_end_time[index] : 0
-
-        let sliceStart = index * repsPerSet
-        let sliceEnd = min(sliceStart + repsPerSet, treatmentResult.extension_length.count)
-        let slice = sliceStart < sliceEnd ? Array(treatmentResult.extension_length[sliceStart..<sliceEnd]) : []
-        // 只取前 reps 個（實際完成的次數），其餘是 0 補值，不應該畫出來。
-        let realValues = Array(slice.prefix(reps))
-        let barData = realValues.enumerated().map { i, ms in
-            PostWorking2AttemptDuration(attempt: i + 1, seconds: Double(ms) / 1000.0)
-        }
-
-        return PostWorking2GroupStats(index: index, reps: reps, setStartTimeMs: startMs, setEndTimeMs: endMs, barData: barData)
+        return PostWorking2GroupStats(index: index, reps: reps, setStartTimeMs: startMs, setEndTimeMs: endMs)
     }
 }
 
@@ -309,48 +311,45 @@ private struct PostWorking2DonationOverviewCard: View {
     let treatmentResult: TreatmentResult
 
     @State private var selectedIndex: Int = 0
-    @State private var showRetentionDetail = false
+
+    /// 兩張趨勢圖的資料來自 `advanced_statistics` 的**同一批 row**，在這裡查一次、
+    /// 拆成兩個陣列往下傳（§11.4）。
+    ///
+    /// 🔴 不要讓兩個子元件各自查一次 —— 那是同一組時間範圍查兩次一模一樣的東西。
+    /// 子元件也不可以把這兩個陣列複製進自己的 `@State` 再用生命週期事件寫入
+    /// （第 7.1 節結尾那條警告）：它們必須是單純的傳入參數，父層一變 `Chart` 就重畫。
+    @State private var kneePoints: [PostWorking2AnglePoint] = []
+    @State private var hipPoints: [PostWorking2AnglePoint] = []
 
     private var groups: [PostWorking2GroupStats] {
-        (0..<content.sets).map { PostWorking2GroupStats.compute(index: $0, treatmentResult: treatmentResult, repsPerSet: content.reps) }
+        (0..<content.sets).map { PostWorking2GroupStats.compute(index: $0, treatmentResult: treatmentResult) }
     }
 
     private var selected: PostWorking2GroupStats {
-        groups.first(where: { $0.index == selectedIndex }) ?? PostWorking2GroupStats.compute(index: 0, treatmentResult: treatmentResult, repsPerSet: content.reps)
+        groups.first(where: { $0.index == selectedIndex }) ?? PostWorking2GroupStats.compute(index: 0, treatmentResult: treatmentResult)
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 30) {
-            HStack {
-                HStack(spacing: 16) {
-                    ForEach(groups, id: \.index) { group in
-                        Button {
-                            selectedIndex = group.index
-                        } label: {
-                            Text(group.label)
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundStyle(group.index == selectedIndex ? Color.white : PostWorking_2.mutedText)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
-                                .background(group.index == selectedIndex ? PostWorking_2.darkPurple : Color.clear)
-                                .clipShape(Capsule())
-                        }
-                        .buttonStyle(.plain)
+            HStack(spacing: 16) {
+                ForEach(groups, id: \.index) { group in
+                    Button {
+                        selectedIndex = group.index
+                    } label: {
+                        Text(group.label)
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(group.index == selectedIndex ? Color.white : PostWorking_2.mutedText)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(group.index == selectedIndex ? PostWorking_2.darkPurple : Color.clear)
+                            .clipShape(Capsule())
                     }
+                    .buttonStyle(.plain)
                 }
                 Spacer()
-                Button {
-                    showRetentionDetail = true
-                } label: {
-                    Text("檢視")
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundStyle(PostWorking_2.mutedText)
-                }
-                .buttonStyle(.plain)
-                .disabled(!selected.hasData)
-                .opacity(selected.hasData ? 1 : 0.4)
             }
 
+            // §11.2：原本這裡有第三欄「本組平均伸直時長」，已隨柱狀圖一起移除。
             HStack(alignment: .top, spacing: 56) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("總時間")
@@ -368,168 +367,97 @@ private struct PostWorking2DonationOverviewCard: View {
                         .font(.system(size: 30, weight: .bold))
                         .foregroundStyle(Color.black)
                 }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("本組平均伸直時長")
-                        .font(.system(size: 20))
-                        .foregroundStyle(PostWorking_2.mutedText)
-                    Text(selected.averageDurationText)
-                        .font(.system(size: 30, weight: .bold))
-                        .foregroundStyle(Color.black)
-                }
             }
 
-            HStack(alignment: .top, spacing: 20) {
-                Chart(selected.barData) { point in
-                    BarMark(
-                        x: .value("次數", point.attempt),
-                        y: .value("單次伸直時間（秒）", point.seconds),
-                        width: .fixed(22)
-                    )
-                    .foregroundStyle(PostWorking_2.darkPurple)
-                    .cornerRadius(2)
-                }
-                .chartXScale(domain: 0.5...(Double(content.reps) + 0.5))
-                .chartYScale(domain: 0...7)
-                .chartXAxis {
-                    AxisMarks(values: Array(1...content.reps)) { value in
-                        AxisGridLine()
-                        AxisTick()
-                        AxisValueLabel {
-                            if let count = value.as(Int.self) {
-                                Text("\(count)")
-                                    .font(.system(size: 16))
-                            }
-                        }
-                    }
-                }
-                .chartYAxis {
-                    AxisMarks(position: .leading, values: Array(0...7)) { value in
-                        AxisGridLine()
-                        AxisTick()
-                        AxisValueLabel()
-                            .font(.system(size: 16))
-                    }
-                }
-                .chartXAxisLabel(alignment: .center) {
-                    Text("次數")
-                        .font(.system(size: 18))
-                }
-                .chartYAxisLabel(position: .leading, alignment: .center) {
-                    Text("單次伸直時間（秒）")
-                        .font(.system(size: 18))
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 220, alignment: .leading)
-                .offset(y: 15)
+            // §11.3／§11.4：原本是「每次伸直秒數」的柱狀圖，改成兩張時間軸趨勢圖。
+            // 兩張圖共用同一組 setStart／setEndTimeMs 與 durationSeconds，上下可直接對照。
+            VStack(alignment: .leading, spacing: 24) {
+                PostWorking2AngleTrendCard(
+                    title: "即時膝屈曲度",
+                    yAxisLabel: "膝屈曲度（度）",
+                    points: kneePoints,
+                    durationSeconds: selected.durationSeconds,
+                    // 膝屈曲角：**自動**。伸直到底含校正殘差會落到負值
+                    //（實測 −12.7／−15.6），固定 0...90 會把負的部分裁掉，
+                    // 看起來像貼在軸底的平線 —— 而那正是使用者最在意的「有沒有伸直」那一段。
+                    yDomain: nil
+                )
+                PostWorking2AngleTrendCard(
+                    title: "即時髖屈曲角",
+                    yAxisLabel: "髖屈曲角（度）",
+                    points: hipPoints,
+                    durationSeconds: selected.durationSeconds,
+                    // 髖屈曲角：固定 **0...180**。坐姿 TKE 全程大腿水平（≈ 90°）幾乎不動，
+                    // 自動範圍會把 89.6～90.4 這種窄值域拉滿整個軸高、看起來像劇烈震盪。
+                    // 固定成 0...180 之後，這條線就會如實地呈現成「一條穩定的水平線」，
+                    // 真正發生漂移時才看得出來 —— 這張圖的用途本來就是診斷大腿裝置。
+                    yDomain: 0...180
+                )
             }
-            .padding(.trailing, 20)
-            .frame(height: 300)
         }
         .padding(20)
         .padding(.top, 20)
-        .frame(maxHeight: .infinity, alignment: .top)
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black.opacity(0.05)))
-        .fullScreenCover(isPresented: $showRetentionDetail) {
-            PostWorking2RetentionDetailSheet(
+        // 🔴 一定要 `.task(id:)`，不能用 `.onAppear`（§11.3）——
+        // 切換組別分頁時 SwiftUI 視為「同一個畫面身份、只是參數更新」，`.onAppear`
+        // 不會再觸發，圖表會卡在第一組的資料，但上方統計已經換成第二組。
+        // 這就是第 6.2 節 `deviceId` 那個 bug 的同一種情境。
+        //
+        // ⚠️ 這推翻了第 4 節「不預先讀取進記憶體」的決定：趨勢圖搬到主畫面之後，
+        // 一進結果頁就會查一次、每切一次分頁再查一次。這是需求的必然結果。
+        .task(id: selectedIndex) {
+            kneePoints = []
+            hipPoints = []
+            guard selected.hasData else { return }
+            let rows = DeviceViewModel().fetchAdvancedStatistics(
                 treatmentResultId: treatmentResult.id ?? 0,
-                setStartTimeMs: selected.setStartTimeMs,
-                setEndTimeMs: selected.setEndTimeMs
+                from: Int64(selected.setStartTimeMs),
+                to: Int64(selected.setEndTimeMs)
             )
+            // 🔴 v11 之前的既有場次 knee_flexion／hip_flexion 恆為 0
+            //（ALTER TABLE 的 DEFAULT），折線圖會是一條貼底的直線。
+            // 那不是量到 0，是當時沒有記錄這兩個欄位。
+            let base = Int64(selected.setStartTimeMs)
+            kneePoints = rows.map { PostWorking2AnglePoint(time: Double($0.timestamp - base) / 1000.0, angle: $0.knee_flexion) }
+            hipPoints  = rows.map { PostWorking2AnglePoint(time: Double($0.timestamp - base) / 1000.0, angle: $0.hip_flexion) }
         }
     }
 }
 
-// MARK: - Donor Retention Rate
+// MARK: - Angle Trend Charts
 
-private struct PostWorking2KneeAnglePoint: Identifiable {
+private struct PostWorking2AnglePoint: Identifiable {
     let time: Double
     let angle: Double
     var id: Double { time }
 }
 
-private struct PostWorking2RetentionCard: View {
-    let treatmentResultId: Int64
-    let setStartTimeMs: Int
-    let setEndTimeMs: Int
-
-    /// 不預先讀取進記憶體：只有這個畫面真的顯示出來（也就是使用者點了「檢視」）才查詢，
-    /// 用帶時間範圍的查詢函式只查當下這一組，不會撈其他組別的資料。
-    @State private var dataPoints: [PostWorking2KneeAnglePoint] = []
-
-    private var durationSeconds: Double {
-        max(0.001, Double(setEndTimeMs - setStartTimeMs) / 1000.0)
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("即時膝角度")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.black)
-                Spacer()
-            }
-
-            Chart(dataPoints) { point in
-                LineMark(
-                    x: .value("時間（秒）", point.time),
-                    y: .value("膝角度", point.angle)
-                )
-                .foregroundStyle(PostWorking_2.darkPurple)
-                .interpolationMethod(.catmullRom)
-            }
-            .chartXScale(domain: 0...durationSeconds)
-            .chartYScale(domain: 0...90)
-            .chartXAxisLabel("時間（秒）", alignment: .center)
-            .chartYAxisLabel("膝角度（度）", position: .leading, alignment: .center)
-            .frame(height: 220)
-        }
-        .padding(20)
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black.opacity(0.05)))
-        .onAppear {
-            let rows = DeviceViewModel().fetchAdvancedStatistics(
-                treatmentResultId: treatmentResultId,
-                from: Int64(setStartTimeMs),
-                to: Int64(setEndTimeMs)
-            )
-            dataPoints = rows.map { row in
-                PostWorking2KneeAnglePoint(time: Double(row.timestamp - Int64(setStartTimeMs)) / 1000.0, angle: row.angle)
-            }
-        }
-    }
-}
-
-// MARK: - EXG Trend Charts
-
-private struct PostWorking2ExgPoint: Identifiable {
-    let time: Double
-    let uv: Double
-    var id: Double { time }
-}
-
-/// 大腿／小腿、channel 0／1 共用的 EXG 趨勢圖卡片：不預先讀取進記憶體，只有使用者在「檢視」視窗點選
-/// 對應分頁、這張卡片才會被建立出來（見 `PostWorking2RetentionDetailSheet`），建立後才用時間範圍查這一組
-/// 的區間，換算 μV 的係數跟匯出 CSV（`GameDataExporter`）用同一個常數。
-private struct PostWorking2ExgCard: View {
+/// 膝屈曲角／髖屈曲角共用的趨勢圖。
+///
+/// **純顯示元件，自己不查資料庫** —— 資料由 `PostWorking2DonationOverviewCard`
+/// 查一次後當一般參數傳進來（§11.4）。這樣兩張圖只查一次資料庫，
+/// 也避開了「子元件把參數複製進 @State、父層更新後不重畫」那個反覆踩到的 bug。
+///
+/// 取代了原本的 `PostWorking2RetentionCard`（第 4 節）：那個元件自己在 `.onAppear`
+/// 查資料，搬到主畫面後切換組別分頁不會重查，所以沒有沿用而是改寫成這個版本。
+private struct PostWorking2AngleTrendCard: View {
     let title: String
-    let treatmentResultId: Int64
-    let deviceId: Int64?
-    let channel: Int
-    let setStartTimeMs: Int
-    let setEndTimeMs: Int
-
-    @State private var dataPoints: [PostWorking2ExgPoint] = []
-
-    private var durationSeconds: Double {
-        max(0.001, Double(setEndTimeMs - setStartTimeMs) / 1000.0)
-    }
-
-    /// 分頁切換時（例如大腿 Ch0 → 大腿 Ch1）`deviceId` 可能不變，只有 `channel` 變了；
-    /// `.task(id:)` 一定要同時綁 `deviceId` 跟 `channel`，只綁 `deviceId` 會漏掉「同裝置換 channel」這個情境。
-    private var queryKey: String { "\(deviceId?.description ?? "nil")-\(channel)" }
+    let yAxisLabel: String
+    let points: [PostWorking2AnglePoint]
+    let durationSeconds: Double
+    /// `nil` = 不寫 `.chartYScale(domain:)`，讓 Charts 依實際資料自動決定範圍。
+    ///
+    /// 動作 2 的兩張圖用相反的設定（§11.4，2026-08-23 調整）：
+    /// - **膝屈曲角 → `nil`（自動）**：主圖，伸直到底會落到負值（實測 −12.7／−15.6），
+    ///   固定範圍會裁掉負的那一段，而那正是使用者最在意的部分。
+    /// - **髖屈曲角 → `0...180`（固定）**：副圖，坐姿下幾乎不動（≈ 90°），
+    ///   自動範圍會把零點幾度的雜訊放大成假震盪；固定範圍才看得出「穩定」與「漂移」的差別。
+    ///
+    /// ⚠️ 兩張圖的 Y 軸刻度因此不同，**不能用線的高低互相比較**，判讀只能看實際數字。
+    /// 自動那張還會**每組刻度都不一樣**，切換組別分頁時線的形狀相似不代表幅度相同。
+    let yDomain: ClosedRange<Double>?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -540,162 +468,29 @@ private struct PostWorking2ExgCard: View {
                 Spacer()
             }
 
-            Chart(dataPoints) { point in
-                LineMark(
-                    x: .value("時間（秒）", point.time),
-                    y: .value("μV", point.uv)
-                )
-                .foregroundStyle(PostWorking_2.darkPurple)
-                .interpolationMethod(.catmullRom)
-            }
-            .chartXScale(domain: 0...durationSeconds)
-            .chartXAxisLabel("時間（秒）", alignment: .center)
-            .chartYAxisLabel("μV", position: .leading, alignment: .center)
-            .frame(height: 220)
+            chart
+                .chartXScale(domain: 0...durationSeconds)
+                .chartXAxisLabel("時間（秒）", alignment: .center)
+                .chartYAxisLabel(yAxisLabel, position: .leading, alignment: .center)
+                .frame(height: 220)
         }
-        .padding(20)
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black.opacity(0.05)))
-        .task(id: queryKey) {
-            dataPoints = []
-            guard let deviceId else { return }
-            let rows = DeviceViewModel().fetchEXG(
-                treatmentResultId: treatmentResultId, deviceId: deviceId, channel: channel,
-                from: Int64(setStartTimeMs), to: Int64(setEndTimeMs)
+    }
+
+    /// `.chartYScale` 沒有「傳 nil 就當作沒寫」的用法，只能靠分支決定要不要套。
+    @ViewBuilder
+    private var chart: some View {
+        let base = Chart(points) { point in
+            LineMark(
+                x: .value("時間（秒）", point.time),
+                y: .value(yAxisLabel, point.angle)
             )
-
-            let sampleRate = 32.0
-
-            // 第 0 步：偵測掉包、補 0。exg 表沒存 Serial No，但同一個 BLE 封包的 64 筆樣本
-            // 共用同一個 row.timestamp（insertEXGBatch，DeviceViewModel.swift:65-72），
-            // 一個完整封包固定 64 筆＝2 秒。先把 rows 依連續相同 timestamp 分組成封包，
-            // 再比較相鄰封包的時間差：明顯是 2000ms 的整數倍時，代表中間掉了對應顆數的封包，
-            // 插入等量的 0 值樣本，讓後面的時間軸不會悄悄壓縮（postworking2-realdata-plan.md 第 10.3 節）。
-            let samplesPerPacket = 64
-            let packetDurationMs = Double(samplesPerPacket) / sampleRate * 1000.0   // 2000ms
-
-            struct Packet { let timestamp: Int64; var values: [Int] }
-            var packets: [Packet] = []
-            for row in rows {
-                if let lastIndex = packets.indices.last, packets[lastIndex].timestamp == row.timestamp {
-                    packets[lastIndex].values.append(row.value)
-                } else {
-                    packets.append(Packet(timestamp: row.timestamp, values: [row.value]))
-                }
-            }
-
-            var expandedValues: [Int] = []
-            for (i, packet) in packets.enumerated() {
-                if i > 0 {
-                    let gapMs = Double(packet.timestamp - packets[i - 1].timestamp)
-                    let missingPackets = Int((gapMs / packetDurationMs).rounded()) - 1
-                    if missingPackets > 0 {
-                        expandedValues.append(contentsOf: Array(repeating: 0, count: missingPackets * samplesPerPacket))
-                    }
-                }
-                expandedValues.append(contentsOf: packet.values)
-            }
-
-            // 第一步：原始樣本（含補過 0 的）一準備好就先配好時間戳（32Hz，1 秒切成 32 等分，依序），
-            // 比照 Test.swift 的做法：先建立一份權威的逐筆時間戳，後面平滑完是查表借用，不重新算。
-            let times: [Double] = expandedValues.indices.map { Double($0) / sampleRate }
-
-            // 第二步：換算 μV（0 值樣本換算後還是 0，不需要特殊處理）
-            let uvValues = expandedValues.map { Double($0) * GameDataExporter.exgMicrovoltScale }
-
-            // 第三步：平滑
-            guard let (avgValues, centerIndices) = try? EMGAlgo.movingAverage(uv: uvValues) else {
-                dataPoints = []
-                return
-            }
-
-            // 第四步：平滑後每個點的時間戳，用四捨五入的 centerIndex「查表」借用第一步配好的時間戳，
-            // 不是用 centerIndex / sampleRate 重新算一次。
-            dataPoints = zip(avgValues, centerIndices).compactMap { avg, centerIndex in
-                let idx = Int(centerIndex.rounded())
-                guard times.indices.contains(idx) else { return nil }
-                return PostWorking2ExgPoint(time: times[idx], uv: avg)
-            }
+            .foregroundStyle(PostWorking_2.darkPurple)
+            .interpolationMethod(.catmullRom)
         }
-    }
-}
-
-private struct PostWorking2RetentionDetailSheet: View {
-    let treatmentResultId: Int64
-    let setStartTimeMs: Int
-    let setEndTimeMs: Int
-
-    @Environment(\.dismiss) private var dismiss
-    @State private var thighDeviceId: Int64?
-    @State private var calfDeviceId: Int64?
-    /// `nil` = 沒有任何分頁被選中（預設狀態，底下完全空白，不查詢任何 EXG 資料）。
-    @State private var selectedExgChannel: Int? = nil
-
-    private var exgTabs: [(title: String, deviceId: Int64?, channel: Int)] {
-        [
-            ("大腿通道 0", thighDeviceId, 0),
-            ("大腿通道 1", thighDeviceId, 1),
-            ("小腿通道 0", calfDeviceId, 0),
-            ("小腿通道 1", calfDeviceId, 1)
-        ]
-    }
-
-    var body: some View {
-        ZStack(alignment: .topLeading) {
-            PostWorking_2.panelBackground.ignoresSafeArea()
-
-            ScrollView {
-                VStack(spacing: 20) {
-                    PostWorking2RetentionCard(treatmentResultId: treatmentResultId, setStartTimeMs: setStartTimeMs, setEndTimeMs: setEndTimeMs)
-
-                    HStack(spacing: 12) {
-                        ForEach(exgTabs.indices, id: \.self) { index in
-                            Button {
-                                selectedExgChannel = index
-                            } label: {
-                                Text(exgTabs[index].title)
-                                    .font(.system(size: 20, weight: .semibold))
-                                    .foregroundStyle(selectedExgChannel == index ? Color.white : PostWorking_2.mutedText)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 8)
-                                    .background(selectedExgChannel == index ? PostWorking_2.darkPurple : Color.clear)
-                                    .clipShape(Capsule())
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        Spacer()
-                    }
-
-                    if let selectedExgChannel, exgTabs.indices.contains(selectedExgChannel) {
-                        let tab = exgTabs[selectedExgChannel]
-                        PostWorking2ExgCard(title: tab.title, treatmentResultId: treatmentResultId, deviceId: tab.deviceId, channel: tab.channel, setStartTimeMs: setStartTimeMs, setEndTimeMs: setEndTimeMs)
-                    }
-                }
-                .padding(28)
-                .padding(.top, 60)
-                .frame(maxWidth: .infinity, alignment: .top)
-            }
-
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(PostWorking_2.darkPurple)
-                    .frame(width: 44, height: 44)
-                    .background(Color.white)
-                    .clipShape(Circle())
-                    .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
-            }
-            .buttonStyle(.plain)
-            .padding(20)
-        }
-        .onAppear {
-            let deviceVM = DeviceViewModel()
-            let side = deviceVM.fetchAnySide() ?? 0
-            thighDeviceId = deviceVM.fetch(side: side, limb: 0)?.id
-            calfDeviceId = deviceVM.fetch(side: side, limb: 1)?.id
+        if let yDomain {
+            base.chartYScale(domain: yDomain)
+        } else {
+            base
         }
     }
 }
@@ -718,7 +513,9 @@ private struct PostWorking2RetentionDetailSheet: View {
             extension_length: Array(repeating: 5000, count: 30),
             set_start_time: [now, now + 200_000, now + 400_000],
             set_end_time: [now + 180_000, now + 380_000, now + 580_000],
-            date: now
+            date: now,
+            exercise_id: 2,
+            target_angle: 45
         ),
         onReturnToDashboard: {}
     )

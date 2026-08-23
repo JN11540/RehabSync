@@ -5,8 +5,8 @@ import CoreBluetooth
 /// 背景底層圖依 totalCoins 里程碑切換：< 2400 是 earth，>= 2400 換成 moon，>= 7500 換成
 /// new_world；astronaut_landing.png 固定疊在底層圖上方，不隨里程碑改變；space_shuttle 是
 /// 獨立的一層，不受背景切換影響；
-/// 前景太空人角度 < 70° 顯示 get.png，>= 70° 換成 holding.png（微微抖動，同時直式膠囊水位隨秒數上漲），
-/// 曾經達到 70° 後又回落到 < 25° 且讀秒超過 1 秒時，短暫換成 release.png（1.5 秒後切回預設），
+/// 前景太空人角度 < 50° 顯示 get.png，>= 50° 換成 holding.png（微微抖動，同時直式膠囊水位隨秒數上漲），
+/// 曾經達到 50° 後又回落到 < 25° 且讀秒超過 1 秒時，短暫換成 release.png（1.5 秒後切回預設），
 /// 同時 astronaut_fuel.png 從雙手位置飛進火箭燃料艙口（同樣 1.5 秒），燃料箱抵達的瞬間
 /// astronaut_space_shuttle.png 會連續放大＋變亮再變回原狀 3 次；不論是否達到 1 秒，
 /// 只要回落到 < 25° 直式膠囊水位都會歸零；讀秒不足 1 秒時不計入 currentRep／評語次數／金錢，
@@ -93,7 +93,16 @@ struct Working22: View {
             extension_length: Array(repeating: 0, count: content.sets * content.reps),
             set_start_time: Array(repeating: 0, count: content.sets),
             set_end_time: Array(repeating: 0, count: content.sets),
-            date: Int(Date().timeIntervalSince1970 * 1000)
+            date: Int(Date().timeIntervalSince1970 * 1000),
+            // 🔴 來源用 `content.exercise_id`，不要用 `exercise?.id` ——
+            // 後者是 Optional，nil 時會寫進 NULL；前者非 Optional、而且它就是
+            // `exercise` 當初查出來的依據，兩者同源但不會消失。
+            exercise_id: content.exercise_id,
+            // 🔴 複用 `targetAngle`，不要在這裡重寫
+            // `exercise?.target_angle ?? Exercise.fallbackTargetAngle` ——
+            // 快照的意義是「判定實際用的那個值」。兩邊各寫一次現在會相等，
+            // 但只要哪天 targetAngle 多一層處理，快照就會悄悄變成另一個數字。
+            target_angle: targetAngle
         )
         resultVM.insert(&result)
         treatmentResult = result
@@ -279,7 +288,42 @@ struct Working22: View {
     @State private var trembleTimer: Timer?
     @State private var trembleOffset: CGSize = .zero
 
-    private static let holdAngleThreshold: Double = 70
+    /// **髖屈曲角**的**上緣**判定門檻（度）：`髖屈曲角 >= targetAngle` 開始讀秒。
+    ///
+    /// 來源是 `exercise.target_angle`（migration v12，`exercise_id = 22` 是 50），
+    /// 查不到才用保底值。
+    /// 🔴 **不要在任何地方寫死 50** —— 值的權威在資料庫，字面值只存在於
+    /// `Exercise.fallbackTargetAngle`（working2-database-port-plan.md §22.3）。
+    ///
+    /// ⚠️ `Exercise.fallbackTargetAngle` 是 **45**，對動作 22 是錯的（正確值 50）。
+    /// 走到 fallback 時整場遊戲會比應有標準寬鬆 5 度，而且畫面上看不出異常
+    /// （快照也存 45、卡片跟著顯示 45）。唯一的痕跡是下面那行 log。
+    private var targetAngle: Double {
+        #if DEBUG
+        if exercise == nil {
+            print("[TARGET-ANGLE] ⚠️ exercise 為 nil，改用保底值 \(Exercise.fallbackTargetAngle)")
+        }
+        #endif
+        return exercise?.target_angle ?? Exercise.fallbackTargetAngle
+    }
+
+    /// 遲滯帶下緣（度）：髖屈曲角掉到這個值以下才算這一次結束。
+    /// 與 `targetAngle` 構成遲滯帶，角度落在中間地帶時維持現狀不切換，避免抖動。
+    ///
+    /// 🔴 **上緣來自資料庫、這個下緣寫死** —— 兩端來源不同，是刻意的取捨
+    /// （working22-database-port-plan.md §18.2）。
+    /// 改 `exercise.target_angle`（`exercise_id = 22`）時**必須人工檢查**：
+    ///   - 新值必須明顯大於 25，否則遲滯帶太窄，門檻附近會反覆進出讀秒狀態；
+    ///   - 新值若 <= 25，上下緣交叉，狀態機行為變成未定義
+    ///     （一達標就立刻滿足結束條件）。
+    ///
+    /// **程式不會擋、也不會有任何警告。** 這段註解是唯一的防線。
+    ///
+    /// 🔴 **設定頁的 Slider 下限 30 依賴這個 25** ——
+    /// `DashboardTargetAngleEditModal.editableRanges` 給動作 22 的範圍是 30…75，
+    /// 那個 30 是「留 5 度餘裕」推算出來的，**與這裡是兩份沒有連結的數字**。
+    /// 把這個常數調大（例如 35）會讓那個下限立刻變成不安全（上下緣交叉），
+    /// 而且不會有編譯錯誤、不會有警告。**改這裡就要一起改那裡。**
     private static let releaseAngleThreshold: Double = 25
     private static let releaseAnimationDuration: Double = 1.5
     // 讀秒（holdElapsed）要超過這個秒數，回落到 releaseAngleThreshold 以下才算一次有效的 release。
@@ -515,7 +559,7 @@ struct Working22: View {
 
     private func handleAngleChange(_ angle: Double?) {
         guard let angle else { return }
-        if angle >= Self.holdAngleThreshold {
+        if angle >= targetAngle {
             hasReachedHoldThreshold = true
             releaseWorkItem?.cancel()
             astronautState = .holding
@@ -580,8 +624,8 @@ struct Working22: View {
                 .padding(48)
                 .allowsHitTesting(false)
 
-            // 前景太空人：角度 < 70° 顯示 astronaut_get.png；角度 >= 70° 換成 astronaut_holding.png 並持續微微抖動；
-            // 曾經達到 70° 之後又回落到 < 25° 時，短暫換成 astronaut_release.png（1.5 秒後自動切回預設）。
+            // 前景太空人：角度 < 50° 顯示 astronaut_get.png；角度 >= 50° 換成 astronaut_holding.png 並持續微微抖動；
+            // 曾經達到 50° 之後又回落到 < 25° 時，短暫換成 astronaut_release.png（1.5 秒後自動切回預設）。
             Group {
                 switch astronautState {
                 case .idle:
@@ -880,7 +924,9 @@ struct Working22: View {
                     // 唯一把角度**數字**顯示給使用者的地方 → 讀夾限過的 displayKneeAngle。
                     // 計算與寫入 advanced_statistics 保留負值（校正殘差），只有顯示層夾限。
                     // 負值出現在站直（動作的起始端），與門檻 70／25 都差得很遠，夾限不影響任何分支。
-                    if let angle = btVM.displayKneeAngle {
+                    // 顯示**髖屈曲角**（大腿分項，夾限到 0）—— 與動作測試頁圓圈、遊戲判定
+                    // 都是同一個量（working22-database-port-plan.md §17）。
+                    if let angle = btVM.displayHipFlexion {
                         Text(String(format: "%.0f°", angle))
                             .font(.system(size: 50, weight: .bold))
                             .foregroundStyle(.black)
@@ -1005,11 +1051,16 @@ struct Working22: View {
                 )
             }
         }
-        // 這裡刻意**不**用 displayKneeAngle —— handleAngleChange 是遊戲判定
-        // （雙段門檻遲滯 holdAngleThreshold = 70／releaseAngleThreshold = 25），
-        // 判定一律讀未夾限值。結果其實相同（負值與 0 都遠低於 25），
-        // 維持未夾限是為了讓「判定讀原值、顯示讀夾限值」這條規則在檔案裡沒有例外。
-        .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
+        // 這裡刻意**不**用 displayHipFlexion —— handleAngleChange 是遊戲判定
+        // （雙段門檻遲滯 targetAngle／releaseAngleThreshold），判定一律讀未夾限值。
+        // 結果其實相同（負值與 0 都遠低於 25），維持未夾限是為了讓
+        // 「判定讀原值、顯示讀夾限值」這條規則在檔案裡沒有例外。
+        //
+        // 判定用**髖屈曲角**（未夾限），不是 theta（§17）：站直 = 0、屈髖遞增，
+        // 方向與 theta 相同，所以雙段門檻仍是 `>= hold` / `< release`。
+        // 上緣的 50 已於 2026-08-23 實機測試通過（working9 §20.10、working22 §17.1），
+        // 現在改由 `exercise.target_angle` 提供（§18）。
+        .onChange(of: btVM.currentTKEThighComponent) { _, newValue in
             guard !isSessionPaused, btVM.isRecording else { return }
             handleAngleChange(newValue)
         }
