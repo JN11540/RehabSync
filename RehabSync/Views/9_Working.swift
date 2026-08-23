@@ -171,7 +171,15 @@ struct Working9: View {
     @State private var isSessionPaused = false
     @State private var showCompletionPopup = false
 
-    private static let holdThreshold: Double = 45
+    /// **髖屈曲角**判定門檻（度）。判定式為 `髖屈曲角 >= holdThreshold`：
+    /// 站直 = 0、屈髖遞增，所以**門檻調小 = 變簡單**（不必蹲那麼深就開始讀秒）。
+    ///
+    /// 🔴 **不是 `private`**：`PostWorking_9` 的「目標角度」卡片也讀這一個常數
+    /// （postworking9-realdata-plan.md §11.2）。結果頁**不可以另外寫一個 45**。
+    ///
+    /// ⚠️ 結果頁顯示的永遠是「當下這一版的門檻」，不是「那一場當時的門檻」。
+    /// 資料庫沒有欄位可存當時的值；使用者已確認接受這個取捨。
+    static let holdThreshold: Double = 45
     private static let holdDuration: Double = 5
     /// 每組從起始點起算的時間上限：倒數 3 分鐘歸零視同該組提前結束。
     private static let setTimeLimit: TimeInterval = 180
@@ -625,7 +633,9 @@ struct Working9: View {
                     // 屬於「判定」而非「顯示」，判定一律讀未夾限值。
                     // （結果其實相同：負值與 0 都遠低於 45。維持未夾限是為了讓
                     //  「判定讀原值、顯示讀夾限值」這條規則在檔案裡沒有例外。）
-                    } else if let angle = btVM.currentEstimatedRealAngle, angle >= Self.holdThreshold {
+                    // 依門檻挑弓箭圖屬於「判定」而非「顯示」，讀**未夾限**的髖屈曲角
+                    // （currentTKEThighComponent），不是夾限過的 displayHipFlexion。
+                    } else if let angle = btVM.currentTKEThighComponent, angle >= Self.holdThreshold {
                         Image("ArcheryFocusIcon")
                             .resizable()
                     } else {
@@ -780,7 +790,10 @@ struct Working9: View {
                     // 下面的紅字判斷 `angle >= holdThreshold` 用夾限值不影響結果 ——
                     // 動作 9 的負值出現在站直（動作的起始端），與門檻 45 差得很遠，
                     // 夾成 0 之後仍在同一個分支。
-                    if let angle = btVM.displayKneeAngle {
+                    // 顯示**髖屈曲角**（大腿分項，夾限到 0）—— 與動作測試頁圓圈、遊戲判定
+                    // 都是同一個量（working9-database-port-plan.md §20），
+                    // 使用者在畫面上看到的數字就是被判定的那一個。
+                    if let angle = btVM.displayHipFlexion {
                         Text(String(format: "%.0f°", angle))
                             .font(.system(size: 50, weight: .bold))
                             .foregroundStyle(angle >= Self.holdThreshold ? .red : .black)
@@ -862,7 +875,17 @@ struct Working9: View {
                 )
             }
         }
-        .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
+        // 讀秒判定改用**髖屈曲角**（未夾限），不是 theta（§20）：
+        // 站直 = 0、屈髖遞增，方向與 theta 相同，所以門檻仍是 `>=`。
+        //
+        // 🔴 只讀大腿分項代表**判定不再考慮小腿**。站姿的小腿本來就會轉
+        // （蹲下時脛骨前傾），忽略它等於丟掉膝角度的一半資訊，
+        // 判定的物理意義也從「膝角度」變成「髖角度」。
+        // `holdThreshold` 的 45 是切換前對著 theta 訂的值，**沿用未改**。
+        // 2026-08-23 實機測試通過（working9-database-port-plan.md §20.10）：
+        // 站姿的小腿轉動幅度遠小於大腿，theta 與髖屈曲角在部分蹲的活動範圍內數值相近，
+        // 所以換了量之後門檻不用動。這個結論不適用於動作 2（坐姿大腿不動）。
+        .onChange(of: btVM.currentTKEThighComponent) { _, newValue in
             guard !isSessionPaused, btVM.isRecording else { return }
             if let angle = newValue, angle >= Self.holdThreshold {
                 startHoldTimer()

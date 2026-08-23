@@ -825,6 +825,17 @@ private struct PreWorking9MotionTestAboutPanel: View {
                     .font(.system(size: 40, weight: .heavy))
                     .foregroundStyle(PreWorking_9.darkPurple)
 
+                // 標示下方圓圈顯示的是哪一個量。站姿三動作是**髖屈曲角**（大腿分項），
+                // 動作 2 是膝屈曲角 —— 四頁的圓圈長得一樣但量不同，
+                // 沒有標籤的話治療師分不出來（preworking9-knee-plan.md §9）。
+                // 樣式刻意與 sideLabelText 完全一致：同一列的兩個標籤視覺上要同級。
+                Text("髖屈曲角")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(PreWorking_9.midPurple)
+
                 Text(sideLabelText)
                     .font(.system(size: 20))
                     .foregroundStyle(.white)
@@ -850,18 +861,20 @@ private struct PreWorking9MotionTestAboutPanel: View {
                     .fill(Color(red: 0.90, green: 0.87, blue: 0.98))
                 Circle()
                     .strokeBorder(PreWorking_9.midPurple, lineWidth: 4)
-                // 讀 displayKneeAngle（夾限到 0），不是 currentEstimatedRealAngle。
-                // 計算與寫入 advanced_statistics 保留負值（校正殘差的真實訊號），只有顯示層夾限。
+                // 顯示**髖屈曲角**（大腿分項），不是 theta —— 站直 = 0°、屈髖遞增。
+                // 站姿的經驗係數放在大腿，大腿掃過的範圍大、資訊量最大（preworking9-knee-plan.md §9）。
                 //
-                // 🔴 動作 9 的休息／起始姿勢就是站直（theta ≈ 0），使用者在這一頁站著不動、
-                // 盯著這個數字看的時間最長。若校正殘差偏大，站直時的正常小幅波動會整段落在 0 以下、
-                // 被夾平，畫面長時間停在 0.0° 看起來像當掉 —— 那是**校正品質問題，不是顯示問題**，
-                // 要回頭看 [KNEE-CAL] 的 o_thigh／o_calf，不要靠改顯示邏輯掩蓋。
-                // （動作 2 的休息姿勢是坐姿彎曲、theta ≈ 90，不會有這個現象。）
-                if let angle = btVM.displayKneeAngle {
+                // 夾限到 0 以上：站直時含校正殘差可能微負。夾限位置與顯示 theta 時相同
+                // （theta 站姿也是 0），不是新問題。
+                if let angle = btVM.displayHipFlexion {
+                    // 60pt 與同頁校正倒數數字一致；動作 2 的動作測試頁圓圈也是 60pt。
+                    // 加 minimumScaleFactor／lineLimit：60pt 下「100.0°」共 6 個字元，
+                    // 在 200×200 的圓圈裡會頂到邊。
                     Text(String(format: "%.1f°", angle))
-                        .font(.system(size: 36, weight: .bold))
+                        .font(.system(size: 60, weight: .bold))
                         .foregroundStyle(PreWorking_9.darkPurple)
+                        .minimumScaleFactor(0.5)
+                        .lineLimit(1)
                 } else {
                     Text("等待資料…")
                         .font(.system(size: 16, weight: .medium))

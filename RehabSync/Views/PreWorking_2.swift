@@ -824,6 +824,17 @@ private struct PreWorking2MotionTestAboutPanel: View {
                     .font(.system(size: 40, weight: .heavy))
                     .foregroundStyle(PreWorking_2.darkPurple)
 
+                // 標示下方圓圈顯示的是哪一個量。動作 2 是**膝屈曲角**（小腿分項），
+                // 站姿三動作（9／12／22）是髖屈曲角 —— 四頁的圓圈長得一樣但量不同，
+                // 沒有標籤的話治療師分不出來（preworking2-knee-plan.md §9）。
+                // 樣式刻意與 sideLabelText 完全一致：同一列的兩個標籤視覺上要同級。
+                Text("膝屈曲角")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(PreWorking_2.midPurple)
+
                 Text(sideLabelText)
                     .font(.system(size: 20))
                     .foregroundStyle(.white)
@@ -849,14 +860,22 @@ private struct PreWorking2MotionTestAboutPanel: View {
                     .fill(Color(red: 0.90, green: 0.87, blue: 0.98))
                 Circle()
                     .strokeBorder(PreWorking_2.midPurple, lineWidth: 4)
-                // 讀 displayKneeAngle（夾限到 0），不是 currentEstimatedRealAngle。
-                // offset 模型完全伸直時 theta 是負值（實測 −12.7°／−15.6°），那是 C 增益補償的
-                // 預期行為、對演算法有意義，所以計算與寫入 advanced_statistics 都不夾限；
-                // 但顯示「−12.7°」對治療師是異常數字，只有顯示層夾限（§20.3）。
-                if let angle = btVM.displayKneeAngle {
+                // 顯示**膝屈曲角**（小腿分項），不是 theta——臨床上直接可讀：
+                // 坐姿小腿自然垂下 = 90°、完全伸直 ≈ 0°（preworking2-knee-plan.md §9）。
+                //
+                // 夾限到 0 以上：完全伸直時含校正殘差會是負值（實測 −12.7／−15.6），
+                // 顯示負角度對治療師是異常數字。夾限因此咬在「動作端」，
+                // 驗收要確認伸直到底時數字仍有小幅跳動（§9.3）。
+                if let angle = btVM.displayKneeFlexion {
+                    // ⚠️ 這頁顯示到小數點後一位，2_Working 的圈圈是整數（`%.0f`）。
+                    // 兩頁顯示的是**同一個量**，精度刻意不同：這頁是治療師擺位／確認訊號
+                    // 用的，需要看得出小幅跳動；遊戲畫面是給使用者看的，整數比較好讀。
+                    // 副作用：同一個角度在兩頁會顯示成 44.6° 與 45°，看起來像跳掉。
                     Text(String(format: "%.1f°", angle))
-                        .font(.system(size: 36, weight: .bold))
+                        .font(.system(size: 60, weight: .bold))
                         .foregroundStyle(PreWorking_2.darkPurple)
+                        .minimumScaleFactor(0.5)
+                        .lineLimit(1)
                 } else {
                     Text("等待資料…")
                         .font(.system(size: 16, weight: .medium))

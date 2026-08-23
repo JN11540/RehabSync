@@ -164,20 +164,31 @@ struct Working2: View {
     @State private var isSessionPaused = false
     @State private var finalElapsedSeconds = 0
 
-    /// 膝角度判定門檻（度）。判定式為 `angle >= holdThreshold`。
+    /// **膝屈曲角**判定門檻（度）。判定式為 `膝屈曲角 <= holdThreshold`。
     ///
-    /// 🔴 **方向已於 §11 翻轉。** 小腿分項改成膝屈曲角之後，theta 的語意變成
-    /// 「校正姿勢（小腿垂下）≈ 0、完全伸直 ≈ 90」——**角度越大代表膝蓋越伸直**，
-    /// 所以現在**門檻調小 = 變簡單**（不必伸到那麼直就開始讀秒），與翻轉前相反。
+    /// 判定的量是小腿分項（`currentTKECalfComponent`），不是 theta ——
+    /// 坐姿小腿自然垂下 = 90°、完全伸直 ≈ 0°，**角度越小代表膝蓋越伸直**，
+    /// 所以**門檻調大 = 變簡單**（不必伸到那麼直就開始讀秒）。
     ///
-    /// 翻轉後動作 2 與 9／12／22 的語意一致（角度大 = 動作到位）。
+    /// 數值沿革：20 → 45（依復健需求調整）。
     ///
-    /// 數值沿革：20 → 45（依復健需求調整）。翻轉時**數值不變**——
-    /// `theta_舊 <= 45` 與 `theta_新 >= 45` 在 `theta_新 ≈ 90 − theta_舊` 之下等價。
+    /// 📌 判定量換過兩次但行為繞回原點：
+    /// §11 之前判 theta（`<= 45`）、§11 之後判翻轉的 theta（`>= 45`）、
+    /// 現在判膝屈曲角（`<= 45`）。而 §11 之前的 theta 在大腿水平時本來就等於膝屈曲角 ——
+    /// 淨效果是同一個判定行為改由一個有明確臨床名稱、獨立存進 `knee_flexion` 欄位的量驅動。
     ///
     /// 這三處都讀同一個常數，改這一行即可全部生效：
     /// 魚圖切換（`NoGetFishIcon`）、圈圈數字紅字、`.onChange` 的讀秒判定。
-    private static let holdThreshold: Double = 45
+    ///
+    /// 🔴 **不是 `private`**：`PostWorking_2` 的「目標角度」卡片也讀這一個常數
+    /// （postworking2-realdata-plan.md §11.1）。結果頁**不可以另外寫一個 45**，
+    /// 那就是這個專案反覆踩到的「有兩份、改了一份」。
+    ///
+    /// ⚠️ 已知且已接受的取捨：結果頁顯示的永遠是「當下這一版程式的門檻」，
+    /// 不是「那一場訓練當時的門檻」。這個值改過（20 → 45），所以翻舊場次時
+    /// 卡片上的數字會與當時實際的判定標準不符。要根治得在 `treatment_result`
+    /// 存一欄當時的目標角度；使用者已確認不處理（§11.1）。
+    static let holdThreshold: Double = 45
     private static let holdDuration: Double = 5
     private static let catchQualifyDuration: Double = 1
     private static let catchAnimationDuration: Double = 1.5
@@ -635,11 +646,11 @@ struct Working2: View {
                                 endSize: 50
                             ))
                     }
-                // 這裡刻意**不**用 displayKneeAngle —— 它不顯示角度數字，只是依門檻挑圖，
-                // 屬於「判定」而非「顯示」，依 §20.3 判定一律讀未夾限值。
-                // （結果其實相同：負值與 0 都滿足 `<= 20`。維持未夾限是為了讓
-                //  「判定讀原值、顯示讀夾限值」這條規則在檔案裡沒有例外。）
-                } else if let angle = btVM.currentEstimatedRealAngle, angle >= Self.holdThreshold {
+                // 依門檻挑圖屬於「判定」而非「顯示」，所以讀**未夾限**的膝屈曲角
+                // （`currentTKECalfComponent`），不是夾限過的 `displayKneeFlexion`——
+                // 維持「判定讀原值、顯示讀夾限值」這條規則在檔案裡沒有例外。
+                // （結果其實相同：負值與 0 都滿足 `<= 45`，落在同一分支。）
+                } else if let angle = btVM.currentTKECalfComponent, angle <= Self.holdThreshold {
                     Image("NoGetFishIcon")
                         .resizable()
                         .scaledToFill()
@@ -765,17 +776,16 @@ struct Working2: View {
                         .strokeBorder(Color.black, lineWidth: 1.5)
                         .padding(4)
 
-                    // 唯一把角度**數字**顯示給使用者的地方 → 讀夾限過的 displayKneeAngle。
-                    // offset 模型完全伸直時 theta 是負值（實測 −12.7°／−15.6°），
-                    // 那是 C 增益補償的預期行為，計算與寫入 advanced_statistics 都保留；
-                    // 但「−13°」對治療師是異常數字，只有顯示層夾限（§20.3）。
+                    // 唯一把角度**數字**顯示給使用者的地方 → 顯示**膝屈曲角**（夾限到 0）。
+                    // 與動作測試頁圓圈、遊戲判定都是同一個量（§21.3）——
+                    // 使用者在畫面上看到的數字就是被判定的那一個。
                     //
-                    // 下面的紅字判斷 `angle <= holdThreshold` 用夾限值不影響結果 ——
-                    // 負值與 0 都滿足 `<= 20`，是同一個分支。
-                    if let angle = btVM.displayKneeAngle {
+                    // 完全伸直時含校正殘差會是負值（實測 −12.7／−15.6），夾限後顯示 0°。
+                    // 紅字判斷用夾限值不影響結果 —— 負值與 0 都滿足 `<= 45`，落在同一分支。
+                    if let angle = btVM.displayKneeFlexion {
                         Text(String(format: "%.0f°", angle))
                             .font(.system(size: 50, weight: .bold))
-                            .foregroundStyle(angle >= Self.holdThreshold ? .red : .black)
+                            .foregroundStyle(angle <= Self.holdThreshold ? .red : .black)
                             .minimumScaleFactor(0.3)
                             .lineLimit(1)
                             .padding(12)
@@ -854,9 +864,16 @@ struct Working2: View {
                 )
             }
         }
-        .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
+        // 讀秒判定改用**膝屈曲角**（未夾限），不是 theta（§21.3）：
+        // 屈曲角越小 = 越伸直，所以門檻方向是 `<=`。
+        // 判定與畫面顯示是同一個量，只差在這裡讀未夾限值。
+        //
+        // 🔴 只讀小腿分項代表**判定不受大腿移動影響**。對坐姿 TKE 反而穩健 ——
+        // 大腿理應貼在椅面不動，若使用者抬大腿代償，theta 會因 hip 變大而誤觸發，
+        // 膝屈曲角則不會。但這綁定「大腿不動」的前提，站姿動作不可套用。
+        .onChange(of: btVM.currentTKECalfComponent) { _, newValue in
             guard !isSessionPaused, btVM.isRecording else { return }
-            if let angle = newValue, angle >= Self.holdThreshold {
+            if let angle = newValue, angle <= Self.holdThreshold {
                 startHoldTimer()
             } else {
                 stopHoldTimer()

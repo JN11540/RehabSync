@@ -199,6 +199,34 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
         currentEstimatedRealAngle.map { max(0, $0) }
     }
 
+    /// 供畫面顯示的**膝屈曲角**（小腿分項，夾限到 0 以上）。
+    ///
+    /// 動作 2 專用（working2-database-port-plan.md §21）：坐姿小腿自然垂下 = 90、完全伸直 ≈ 0。
+    /// 動作 9／12／22 的圓圈仍讀 `displayKneeAngle`（theta）。
+    ///
+    /// 🔴 **夾限咬在「完全伸直」那一端** —— 該處含校正殘差時是負值（實測 −12.7／−15.6），
+    /// 夾限後顯示 `0°`。若殘差偏大會出現「伸到底之後數字卡在 0 不動」，
+    /// 那是**校正品質問題不是顯示問題**。
+    ///
+    /// 只有 TKE 路徑會餵 `currentTKECalfComponent`，四個動作都已遷移，正式流程一定拿得到。
+    var displayKneeFlexion: Double? {
+        currentTKECalfComponent.map { max(0, $0) }
+    }
+
+    /// 供畫面顯示的**髖屈曲角**（大腿分項，夾限到 0 以上）。
+    ///
+    /// 站姿三動作（9／12／22）專用（working9-database-port-plan.md §20）：
+    /// 站直 = 0、屈髖遞增。動作 2 用 `displayKneeFlexion`（膝屈曲角）。
+    ///
+    /// 選「有增益的那一段」當顯示與判定的量：站姿的 `C` 放在大腿、大腿掃過的範圍大，
+    /// 資訊量最大；動作 2 相反（`C` 在小腿）。
+    ///
+    /// 🔴 夾限咬在「站直」那一端 —— 與目前顯示 theta 的情況相同（theta 站姿也是 0），
+    /// **不是新問題**，但驗收仍要確認站直靜止時數字有小幅跳動。
+    var displayHipFlexion: Double? {
+        currentTKEThighComponent.map { max(0, $0) }
+    }
+
     // internal (bleQueue)：只記住「最新一筆」傾角，實際計算交給 liveTickTimer 每 0.2 秒統一處理
     @ObservationIgnored private var liveEstimating: Set<UUID> = []
     @ObservationIgnored private var liveThighId: UUID?

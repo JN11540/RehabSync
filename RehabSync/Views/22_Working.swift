@@ -283,7 +283,12 @@ struct Working22: View {
     /// 角度越大代表膝蓋越屈，所以**門檻調小 = 變簡單**（不必蹲那麼深就開始讀秒）。
     ///
     /// 70 → 50：改用 offset 模型之後依實際復健需求調整。
-    private static let holdAngleThreshold: Double = 50
+    /// 🔴 **不是 `private`**：`PostWorking_22` 的「目標角度」卡片也讀這一個常數
+    /// （postworking22-realdata-plan.md §4.3）。結果頁**不可以另外寫一個 50**。
+    ///
+    /// ⚠️ 結果頁只顯示這個上緣門檻，**不顯示 `releaseAngleThreshold`** ——
+    /// 治療師因此不會知道「掉到 25 度以下才算結束這一次」。已知並接受（§4.1）。
+    static let holdAngleThreshold: Double = 50
     /// 離開 holding、結算這一次的門檻（度）。與上面構成**遲滯帶**：
     /// 角度落在 25~50 之間時維持現狀不切換，避免在門檻附近反覆抖動。
     /// 本次只調 hold 門檻，release 維持 25，帶寬因此從 45 縮成 **25**。
@@ -887,7 +892,9 @@ struct Working22: View {
                     // 唯一把角度**數字**顯示給使用者的地方 → 讀夾限過的 displayKneeAngle。
                     // 計算與寫入 advanced_statistics 保留負值（校正殘差），只有顯示層夾限。
                     // 負值出現在站直（動作的起始端），與門檻 70／25 都差得很遠，夾限不影響任何分支。
-                    if let angle = btVM.displayKneeAngle {
+                    // 顯示**髖屈曲角**（大腿分項，夾限到 0）—— 與動作測試頁圓圈、遊戲判定
+                    // 都是同一個量（working22-database-port-plan.md §17）。
+                    if let angle = btVM.displayHipFlexion {
                         Text(String(format: "%.0f°", angle))
                             .font(.system(size: 50, weight: .bold))
                             .foregroundStyle(.black)
@@ -1016,7 +1023,17 @@ struct Working22: View {
         // （雙段門檻遲滯 holdAngleThreshold = 50／releaseAngleThreshold = 25），
         // 判定一律讀未夾限值。結果其實相同（負值與 0 都遠低於 25），
         // 維持未夾限是為了讓「判定讀原值、顯示讀夾限值」這條規則在檔案裡沒有例外。
-        .onChange(of: btVM.currentEstimatedRealAngle) { _, newValue in
+        // 判定改用**髖屈曲角**（未夾限），不是 theta（§17）：站直 = 0、屈髖遞增，
+        // 方向與 theta 相同，所以雙段門檻仍是 `>= hold` / `< release`。
+        //
+        // `holdAngleThreshold = 50`／`releaseAngleThreshold = 25` 是切換前對著 theta 訂的值，
+        // **兩個都沿用未改**。2026-08-23 實機測試通過
+        //（working9-database-port-plan.md §20.10、working22 §17.1）：
+        // 站姿的小腿轉動幅度遠小於大腿，theta 與髖屈曲角在弓步蹲的活動範圍內數值相近。
+        //
+        // 🔴 日後若要調整，兩個必須**一起量** —— 遲滯帶的寬度才是防抖動的關鍵，
+        // 只調一個會讓帶變窄（門檻附近反覆切換）或變寬（撐完站起來遲遲不結算）。
+        .onChange(of: btVM.currentTKEThighComponent) { _, newValue in
             guard !isSessionPaused, btVM.isRecording else { return }
             handleAngleChange(newValue)
         }
