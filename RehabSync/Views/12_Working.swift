@@ -43,6 +43,30 @@ struct Working12: View {
     /// 讓之後 acc/gyro/exg/advanced_statistics 每一筆寫入都能帶上這個 treatment_result_id。
     /// 建立完成後緊接著視同第一組的起始點，開始記錄。
     /// `extension_length` 這個動作不計算（登階沒有天然對應的「伸展時長」），陣列維持全 0，不再另外更新。
+    /// 這一場的目標角度（度），來源是 `exercise.target_angle`（migration v12），
+    /// 查不到才用保底值。
+    ///
+    /// 🔴 **動作 12 不用它做任何判定** —— 登階走的是狀態機（`stepStatus`，
+    /// 判定有沒有踏上／踏下），完全不看角度。這個屬性只有一個用途：
+    /// 把值寫進 `treatment_result.target_angle` 快照，讓四個動作的資料格式一致
+    /// （不寫的話 `WHERE exercise_id = 12` 之類的查詢會看到 0）。
+    ///
+    /// ⚠️ 因此 `exercise_id = 12` 的 45 是**惰性資料**，沒有臨床意義。
+    /// 源頭是 `exercise` 表把 1–21 統一填 45（v12），不是這裡造成的。
+    /// 它**會出現在匯出的 JSON 裡**，讀資料的人可能誤以為登階有 45 度的目標。
+    ///
+    /// 🔴 即使只用一次，也**不要**在 `createTreatmentResultIfNeeded()` 裡直接寫
+    /// `exercise?.target_angle ?? Exercise.fallbackTargetAngle` —— 那就變成
+    /// 同一個運算式散在四個檔案（working2-database-port-plan.md §22.5.5）。
+    private var targetAngle: Double {
+        #if DEBUG
+        if exercise == nil {
+            print("[TARGET-ANGLE] ⚠️ exercise 為 nil，改用保底值 \(Exercise.fallbackTargetAngle)")
+        }
+        #endif
+        return exercise?.target_angle ?? Exercise.fallbackTargetAngle
+    }
+
     private func createTreatmentResultIfNeeded() {
         guard treatmentResult == nil else { return }
         var result = TreatmentResult(
@@ -52,7 +76,16 @@ struct Working12: View {
             extension_length: Array(repeating: 0, count: content.sets * content.reps),
             set_start_time: Array(repeating: 0, count: content.sets),
             set_end_time: Array(repeating: 0, count: content.sets),
-            date: Int(Date().timeIntervalSince1970 * 1000)
+            date: Int(Date().timeIntervalSince1970 * 1000),
+            // 🔴 來源用 `content.exercise_id`，不要用 `exercise?.id` ——
+            // 後者是 Optional，nil 時會寫進 NULL；前者非 Optional、而且它就是
+            // `exercise` 當初查出來的依據，兩者同源但不會消失。
+            exercise_id: content.exercise_id,
+            // 🔴 複用 `targetAngle`，不要在這裡重寫
+            // `exercise?.target_angle ?? Exercise.fallbackTargetAngle` ——
+            // 快照的意義是「判定實際用的那個值」。兩邊各寫一次現在會相等，
+            // 但只要哪天 targetAngle 多一層處理，快照就會悄悄變成另一個數字。
+            target_angle: targetAngle
         )
         resultVM.insert(&result)
         treatmentResult = result

@@ -93,7 +93,16 @@ struct Working22: View {
             extension_length: Array(repeating: 0, count: content.sets * content.reps),
             set_start_time: Array(repeating: 0, count: content.sets),
             set_end_time: Array(repeating: 0, count: content.sets),
-            date: Int(Date().timeIntervalSince1970 * 1000)
+            date: Int(Date().timeIntervalSince1970 * 1000),
+            // 🔴 來源用 `content.exercise_id`，不要用 `exercise?.id` ——
+            // 後者是 Optional，nil 時會寫進 NULL；前者非 Optional、而且它就是
+            // `exercise` 當初查出來的依據，兩者同源但不會消失。
+            exercise_id: content.exercise_id,
+            // 🔴 複用 `targetAngle`，不要在這裡重寫
+            // `exercise?.target_angle ?? Exercise.fallbackTargetAngle` ——
+            // 快照的意義是「判定實際用的那個值」。兩邊各寫一次現在會相等，
+            // 但只要哪天 targetAngle 多一層處理，快照就會悄悄變成另一個數字。
+            target_angle: targetAngle
         )
         resultVM.insert(&result)
         treatmentResult = result
@@ -279,19 +288,36 @@ struct Working22: View {
     @State private var trembleTimer: Timer?
     @State private var trembleOffset: CGSize = .zero
 
-    /// 進入 holding 的門檻（度）。動作 22 是弓步蹲，判定式為 `angle >= holdAngleThreshold`——
-    /// 角度越大代表膝蓋越屈，所以**門檻調小 = 變簡單**（不必蹲那麼深就開始讀秒）。
+    /// **髖屈曲角**的**上緣**判定門檻（度）：`髖屈曲角 >= targetAngle` 開始讀秒。
     ///
-    /// 70 → 50：改用 offset 模型之後依實際復健需求調整。
-    /// 🔴 **不是 `private`**：`PostWorking_22` 的「目標角度」卡片也讀這一個常數
-    /// （postworking22-realdata-plan.md §4.3）。結果頁**不可以另外寫一個 50**。
+    /// 來源是 `exercise.target_angle`（migration v12，`exercise_id = 22` 是 50），
+    /// 查不到才用保底值。
+    /// 🔴 **不要在任何地方寫死 50** —— 值的權威在資料庫，字面值只存在於
+    /// `Exercise.fallbackTargetAngle`（working2-database-port-plan.md §22.3）。
     ///
-    /// ⚠️ 結果頁只顯示這個上緣門檻，**不顯示 `releaseAngleThreshold`** ——
-    /// 治療師因此不會知道「掉到 25 度以下才算結束這一次」。已知並接受（§4.1）。
-    static let holdAngleThreshold: Double = 50
-    /// 離開 holding、結算這一次的門檻（度）。與上面構成**遲滯帶**：
-    /// 角度落在 25~50 之間時維持現狀不切換，避免在門檻附近反覆抖動。
-    /// 本次只調 hold 門檻，release 維持 25，帶寬因此從 45 縮成 **25**。
+    /// ⚠️ `Exercise.fallbackTargetAngle` 是 **45**，對動作 22 是錯的（正確值 50）。
+    /// 走到 fallback 時整場遊戲會比應有標準寬鬆 5 度，而且畫面上看不出異常
+    /// （快照也存 45、卡片跟著顯示 45）。唯一的痕跡是下面那行 log。
+    private var targetAngle: Double {
+        #if DEBUG
+        if exercise == nil {
+            print("[TARGET-ANGLE] ⚠️ exercise 為 nil，改用保底值 \(Exercise.fallbackTargetAngle)")
+        }
+        #endif
+        return exercise?.target_angle ?? Exercise.fallbackTargetAngle
+    }
+
+    /// 遲滯帶下緣（度）：髖屈曲角掉到這個值以下才算這一次結束。
+    /// 與 `targetAngle` 構成遲滯帶，角度落在中間地帶時維持現狀不切換，避免抖動。
+    ///
+    /// 🔴 **上緣來自資料庫、這個下緣寫死** —— 兩端來源不同，是刻意的取捨
+    /// （working22-database-port-plan.md §18.2）。
+    /// 改 `exercise.target_angle`（`exercise_id = 22`）時**必須人工檢查**：
+    ///   - 新值必須明顯大於 25，否則遲滯帶太窄，門檻附近會反覆進出讀秒狀態；
+    ///   - 新值若 <= 25，上下緣交叉，狀態機行為變成未定義
+    ///     （一達標就立刻滿足結束條件）。
+    ///
+    /// **程式不會擋、也不會有任何警告。** 這段註解是唯一的防線。
     private static let releaseAngleThreshold: Double = 25
     private static let releaseAnimationDuration: Double = 1.5
     // 讀秒（holdElapsed）要超過這個秒數，回落到 releaseAngleThreshold 以下才算一次有效的 release。
@@ -527,7 +553,7 @@ struct Working22: View {
 
     private func handleAngleChange(_ angle: Double?) {
         guard let angle else { return }
-        if angle >= Self.holdAngleThreshold {
+        if angle >= targetAngle {
             hasReachedHoldThreshold = true
             releaseWorkItem?.cancel()
             astronautState = .holding
@@ -1019,20 +1045,15 @@ struct Working22: View {
                 )
             }
         }
-        // 這裡刻意**不**用 displayKneeAngle —— handleAngleChange 是遊戲判定
-        // （雙段門檻遲滯 holdAngleThreshold = 50／releaseAngleThreshold = 25），
-        // 判定一律讀未夾限值。結果其實相同（負值與 0 都遠低於 25），
-        // 維持未夾限是為了讓「判定讀原值、顯示讀夾限值」這條規則在檔案裡沒有例外。
-        // 判定改用**髖屈曲角**（未夾限），不是 theta（§17）：站直 = 0、屈髖遞增，
+        // 這裡刻意**不**用 displayHipFlexion —— handleAngleChange 是遊戲判定
+        // （雙段門檻遲滯 targetAngle／releaseAngleThreshold），判定一律讀未夾限值。
+        // 結果其實相同（負值與 0 都遠低於 25），維持未夾限是為了讓
+        // 「判定讀原值、顯示讀夾限值」這條規則在檔案裡沒有例外。
+        //
+        // 判定用**髖屈曲角**（未夾限），不是 theta（§17）：站直 = 0、屈髖遞增，
         // 方向與 theta 相同，所以雙段門檻仍是 `>= hold` / `< release`。
-        //
-        // `holdAngleThreshold = 50`／`releaseAngleThreshold = 25` 是切換前對著 theta 訂的值，
-        // **兩個都沿用未改**。2026-08-23 實機測試通過
-        //（working9-database-port-plan.md §20.10、working22 §17.1）：
-        // 站姿的小腿轉動幅度遠小於大腿，theta 與髖屈曲角在弓步蹲的活動範圍內數值相近。
-        //
-        // 🔴 日後若要調整，兩個必須**一起量** —— 遲滯帶的寬度才是防抖動的關鍵，
-        // 只調一個會讓帶變窄（門檻附近反覆切換）或變寬（撐完站起來遲遲不結算）。
+        // 上緣的 50 已於 2026-08-23 實機測試通過（working9 §20.10、working22 §17.1），
+        // 現在改由 `exercise.target_angle` 提供（§18）。
         .onChange(of: btVM.currentTKEThighComponent) { _, newValue in
             guard !isSessionPaused, btVM.isRecording else { return }
             handleAngleChange(newValue)

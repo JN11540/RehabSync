@@ -503,7 +503,9 @@ private struct PostWorking12AngleTrendCard: View {
             extension_length: [0, 0, 0, 0, 0, 0, 0, 0],
             set_start_time: [now, now + 200_000],
             set_end_time: [now + 180_000, now + 380_000],
-            date: now
+            date: now,
+            exercise_id: 12,
+            target_angle: 45
         ),
         onReturnToDashboard: {}
     )

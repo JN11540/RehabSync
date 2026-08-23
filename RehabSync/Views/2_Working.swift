@@ -50,7 +50,16 @@ struct Working2: View {
             extension_length: Array(repeating: 0, count: content.sets * content.reps),
             set_start_time: Array(repeating: 0, count: content.sets),
             set_end_time: Array(repeating: 0, count: content.sets),
-            date: Int(Date().timeIntervalSince1970 * 1000)
+            date: Int(Date().timeIntervalSince1970 * 1000),
+            // 🔴 來源用 `content.exercise_id`，不要用 `exercise?.id` ——
+            // 後者是 Optional，nil 時會寫進 NULL；前者非 Optional、而且它就是
+            // `exercise` 當初查出來的依據，兩者同源但不會消失。
+            exercise_id: content.exercise_id,
+            // 🔴 複用 `targetAngle`，不要在這裡重寫
+            // `exercise?.target_angle ?? Exercise.fallbackTargetAngle` ——
+            // 快照的意義是「判定實際用的那個值」。兩邊各寫一次現在會相等，
+            // 但只要哪天 targetAngle 多一層處理，快照就會悄悄變成另一個數字。
+            target_angle: targetAngle
         )
         resultVM.insert(&result)
         treatmentResult = result
@@ -164,31 +173,27 @@ struct Working2: View {
     @State private var isSessionPaused = false
     @State private var finalElapsedSeconds = 0
 
-    /// **膝屈曲角**判定門檻（度）。判定式為 `膝屈曲角 <= holdThreshold`。
+    /// **膝屈曲角**判定門檻（度）。判定式為 `膝屈曲角 <= targetAngle`。
+    ///
+    /// 來源是 `exercise.target_angle`（migration v12），查不到才用保底值。
+    /// 🔴 **不要在任何地方寫死 45** —— 值的權威在資料庫，字面值只存在於
+    /// `Exercise.fallbackTargetAngle`（working2-database-port-plan.md §22.3）。
     ///
     /// 判定的量是小腿分項（`currentTKECalfComponent`），不是 theta ——
     /// 坐姿小腿自然垂下 = 90°、完全伸直 ≈ 0°，**角度越小代表膝蓋越伸直**，
     /// 所以**門檻調大 = 變簡單**（不必伸到那麼直就開始讀秒）。
     ///
-    /// 數值沿革：20 → 45（依復健需求調整）。
-    ///
-    /// 📌 判定量換過兩次但行為繞回原點：
-    /// §11 之前判 theta（`<= 45`）、§11 之後判翻轉的 theta（`>= 45`）、
-    /// 現在判膝屈曲角（`<= 45`）。而 §11 之前的 theta 在大腿水平時本來就等於膝屈曲角 ——
-    /// 淨效果是同一個判定行為改由一個有明確臨床名稱、獨立存進 `knee_flexion` 欄位的量驅動。
-    ///
-    /// 這三處都讀同一個常數，改這一行即可全部生效：
+    /// 這三處都讀這個屬性，改資料庫即可全部生效：
     /// 魚圖切換（`NoGetFishIcon`）、圈圈數字紅字、`.onChange` 的讀秒判定。
-    ///
-    /// 🔴 **不是 `private`**：`PostWorking_2` 的「目標角度」卡片也讀這一個常數
-    /// （postworking2-realdata-plan.md §11.1）。結果頁**不可以另外寫一個 45**，
-    /// 那就是這個專案反覆踩到的「有兩份、改了一份」。
-    ///
-    /// ⚠️ 已知且已接受的取捨：結果頁顯示的永遠是「當下這一版程式的門檻」，
-    /// 不是「那一場訓練當時的門檻」。這個值改過（20 → 45），所以翻舊場次時
-    /// 卡片上的數字會與當時實際的判定標準不符。要根治得在 `treatment_result`
-    /// 存一欄當時的目標角度；使用者已確認不處理（§11.1）。
-    static let holdThreshold: Double = 45
+    /// 另外 `createTreatmentResultIfNeeded()` 也讀它，把當時的值存成快照。
+    private var targetAngle: Double {
+        #if DEBUG
+        if exercise == nil {
+            print("[TARGET-ANGLE] ⚠️ exercise 為 nil，改用保底值 \(Exercise.fallbackTargetAngle)")
+        }
+        #endif
+        return exercise?.target_angle ?? Exercise.fallbackTargetAngle
+    }
     private static let holdDuration: Double = 5
     private static let catchQualifyDuration: Double = 1
     private static let catchAnimationDuration: Double = 1.5
@@ -650,7 +655,7 @@ struct Working2: View {
                 // （`currentTKECalfComponent`），不是夾限過的 `displayKneeFlexion`——
                 // 維持「判定讀原值、顯示讀夾限值」這條規則在檔案裡沒有例外。
                 // （結果其實相同：負值與 0 都滿足 `<= 45`，落在同一分支。）
-                } else if let angle = btVM.currentTKECalfComponent, angle <= Self.holdThreshold {
+                } else if let angle = btVM.currentTKECalfComponent, angle <= targetAngle {
                     Image("NoGetFishIcon")
                         .resizable()
                         .scaledToFill()
@@ -785,7 +790,7 @@ struct Working2: View {
                     if let angle = btVM.displayKneeFlexion {
                         Text(String(format: "%.0f°", angle))
                             .font(.system(size: 50, weight: .bold))
-                            .foregroundStyle(angle <= Self.holdThreshold ? .red : .black)
+                            .foregroundStyle(angle <= targetAngle ? .red : .black)
                             .minimumScaleFactor(0.3)
                             .lineLimit(1)
                             .padding(12)
@@ -873,7 +878,7 @@ struct Working2: View {
         // 膝屈曲角則不會。但這綁定「大腿不動」的前提，站姿動作不可套用。
         .onChange(of: btVM.currentTKECalfComponent) { _, newValue in
             guard !isSessionPaused, btVM.isRecording else { return }
-            if let angle = newValue, angle <= Self.holdThreshold {
+            if let angle = newValue, angle <= targetAngle {
                 startHoldTimer()
             } else {
                 stopHoldTimer()

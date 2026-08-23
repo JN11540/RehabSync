@@ -120,18 +120,23 @@ private struct PostWorking2StatRow: View {
         treatmentResult.reps.reduce(0, +)
     }
 
-    /// 遊戲判定用的門檻，直接讀 `Working2.holdThreshold`（§11.1）。
+    /// 這一場**當時**的目標角度，讀 `treatment_result.target_angle`（migration v13）。
     ///
-    /// 🔴 **不要在這裡寫死 45** —— 門檻改在 `2_Working.swift` 一處，這裡自動跟上。
+    /// 🔴 **不是讀 `exercise.target_angle`。** 那是「現在設定的值」，可編輯 ——
+    /// 一次 `UPDATE` 就會讓所有歷史場次的卡片跟著變。這一欄是遊戲開始時寫下的快照，
+    /// 之後不會再變（working2-database-port-plan.md §22.5）。
     ///
-    /// ⚠️ 顯示成「45 度」而不是「≤ 45 度」是使用者確認過的決定。
-    /// 實際判定是 `膝屈曲角 <= 45`，45 是**上限**（要伸得比它更直），
-    /// 字面上容易被讀成「要彎到 45 度」，方向相反。這個歧義已知並接受。
+    /// ⚠️ `0` = **這一場沒有記錄目標角度**（v13 之前的舊場次，migration 刻意不回填 ——
+    /// 當時的門檻寫死在當時那一版程式裡，已經無從得知）。顯示「－」，不是「0 度」。
     ///
-    /// ⚠️ 顯示的永遠是「當下這一版的門檻」，不是「這一場當時的門檻」——
-    /// 舊場次會對不上，使用者已確認不處理（§11.1）。
+    /// 🔴 這裡**不需要** `Exercise.fallbackTargetAngle`：遊戲當時若走了保底值，
+    /// 那個值已經被寫進快照，讀出來就是它。顯示端再算一次只會多一個算錯的地方。
+    ///
+    /// ⚠️ `target_angle` 是 `Double`（欄位是 INTEGER，型別刻意不一致，§22.3.1），
+    /// 所以要用 `String(format:)`，字串插值會印成「45.0 度」。
     private var targetAngleText: String {
-        "\(Int(Working2.holdThreshold)) 度"
+        guard treatmentResult.target_angle > 0 else { return "－" }
+        return String(format: "%.0f 度", treatmentResult.target_angle)
     }
 
     private var stats: [PostWorking2Stat] {
@@ -508,7 +513,9 @@ private struct PostWorking2AngleTrendCard: View {
             extension_length: Array(repeating: 5000, count: 30),
             set_start_time: [now, now + 200_000, now + 400_000],
             set_end_time: [now + 180_000, now + 380_000, now + 580_000],
-            date: now
+            date: now,
+            exercise_id: 2,
+            target_angle: 45
         ),
         onReturnToDashboard: {}
     )
