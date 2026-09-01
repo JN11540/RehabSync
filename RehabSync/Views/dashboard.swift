@@ -307,9 +307,13 @@ private struct DashboardSidebar: View {
 
             DashboardSidebarSectionLabel(text: "一般")
             DashboardSidebarItem(item: .overview, selectedNav: $selectedNav)
-            // 藍牙除錯／動作測試頁入口。`onNavigateToTest` 一路從 Home 傳下來
-            //（Home 把 selectedTab 切成 .test 顯示 TestPage），這裡只負責渲染那一列。
-            DashboardSidebarItem(item: .test, selectedNav: $selectedNav, action: onNavigateToTest)
+            // 藍牙除錯／動作測試頁入口，**目前隱藏不顯示**。
+            //
+            // 只註解掉這一列的渲染，底層完全保留：`DashboardNavItem.test`、
+            // `onNavigateToTest` 的整條傳遞鏈（Home → Dashboard → Sidebar）、
+            // `Home` 裡切換 `selectedTab = .test` 顯示 `TestPage` 的邏輯都還在，
+            // 把下面這行取消註解就會恢復。
+            // DashboardSidebarItem(item: .test, selectedNav: $selectedNav, action: onNavigateToTest)
 
             Spacer()
 
@@ -1184,7 +1188,7 @@ private struct DashboardTargetAngleEditModal: View {
     /// （`22_Working.swift` 的常數註解有對應的反向提醒）。
     private static let editableRanges: [Int64: ClosedRange<Double>] = [
         2:  0...45,
-        9:  45...90,
+        9:  20...90,
         22: 30...75,
     ]
 
