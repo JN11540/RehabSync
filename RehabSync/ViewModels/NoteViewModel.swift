@@ -7,9 +7,13 @@ class NoteViewModel {
     private let db = DatabaseManager.shared.dbQueue
     var notes: [Note] = []
 
+    /// 🔴 **一定要 `order(Column("id"))`，不要用裸的 `Note.fetchAll(db)`。**
+    /// 症狀清單的順序有臨床意義（從「沒有不適」排到「其他身體不適」），
+    /// 而 SQLite 不保證無 ORDER BY 的回傳順序 —— 目前看起來對，只是因為
+    /// `INTEGER PRIMARY KEY` 的全表掃描剛好依 rowid 走，那是實作細節不是合約。
     func fetchAll() {
         notes = (try? db.read { db in
-            try Note.fetchAll(db)
+            try Note.order(Column("id")).fetchAll(db)
         }) ?? []
     }
 

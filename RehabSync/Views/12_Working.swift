@@ -85,7 +85,11 @@ struct Working12: View {
             // `exercise?.target_angle ?? Exercise.fallbackTargetAngle` ——
             // 快照的意義是「判定實際用的那個值」。兩邊各寫一次現在會相等，
             // 但只要哪天 targetAngle 多一層處理，快照就會悄悄變成另一個數字。
-            target_angle: targetAngle
+            target_angle: targetAngle,
+            // v14：還沒有讓治療師輸入的介面，明確傳 nil。
+            // ⚠️ notes 的 nil 是「沒問過」，不是「沒有備註」（那是 []）。
+            vas: nil,
+            notes: nil
         )
         resultVM.insert(&result)
         treatmentResult = result
@@ -132,6 +136,45 @@ struct Working12: View {
         resultVM.update(result)
     }
 
+    /// 遊戲結束的統一收尾點：三條結束路徑（正常打完最後一組／3 分鐘倒數歸零／
+    /// 按「結束遊戲」確定）都要呼叫它，不要各自寫 `showCompletionPopup = true`。
+    ///
+    /// 🔴 **總時長在這裡定住，不能留到「完成」按鈕。**
+    /// `finalElapsedSeconds` 原本在 `onComplete` 才計算，而「完成」的位置是
+    /// 遊戲結束 → 填 VAS／症狀 → 確定 → 儲存訓練結果 → 10 秒倒數 → 完成——
+    /// 治療師填問卷花多久就有多久被算進「訓練總時長」，而且不可預測
+    /// （被叫走三分鐘就多三分鐘）。遊戲結束的這一刻才是總時長該停的地方。
+    ///
+    /// ⚠️ 這也順帶修掉既有的 10 秒倒數灌水，所以同一場遊戲的總時長會比改版前
+    /// 少 10 秒上下——是修正不是退化，但跨版本比對這個數字時要知道。
+    ///
+    /// ⚠️ **它仍然只是「這個畫面開了多久」，不是運動時長**：`sessionStartDate`
+    /// 設定之後從不調整，`pauseSession()`／`resumeSession()` 也不碰它，所以組間休息、
+    /// app 進背景、結束確認視窗開著的時間全都算在內。要準確的運動時長請用
+    /// `set_end_time − set_start_time`（§4.3），不要用這個數字。
+    private func endSession() {
+        finalElapsedSeconds = Int(Date().timeIntervalSince(sessionStartDate))
+        showCompletionPopup = true
+    }
+
+    /// 階段 A 的「確定」回呼：把 VAS／症狀寫進**同一筆** treatment_result。
+    ///
+    /// 走的是跟 `finishSet`／`recordExtensionLength` 一模一樣的既有模式：
+    /// 改複本 → 指派回 `@State` → `resultVM.update`。
+    /// 🔴 指派回 `@State` 這一步不能省 —— `CompletionPopup` 手上是值複本，
+    /// 而匯出時序列化的就是那份複本（不回資料庫重讀）。少了這一步，
+    /// 資料庫會是對的、匯出的 JSON 卻是空的，而且完全沒有症狀（§23.7）。
+    private func recordVasAndNotes(vas: Int, notes: [Int]?) {
+        guard var result = treatmentResult else { return }
+        result.vas = vas
+        // 🔴 一定要排序：多選 UI 的順序跟著點選順序跑，同樣勾了 2 和 6，
+        // 先點 6 的人會存成 [6, 2]。排序是唯一能讓同一組症狀有唯一表示法的地方，
+        // 不能留給日後的查詢端去正規化（notes 沒有外鍵，DB 不管這件事）。
+        result.notes = notes?.sorted()
+        treatmentResult = result
+        resultVM.update(result)
+    }
+
     /// 從起始點起算倒數 3 分鐘歸零，視同該組提前結束。
     private func handleSetTimeLimitReached() {
         cancelInProgressStepCycleWithoutCounting()
@@ -139,7 +182,7 @@ struct Working12: View {
         if currentSet < content.sets {
             startSetRestCountdown()
         } else {
-            showCompletionPopup = true
+            endSession()
         }
     }
 
@@ -397,7 +440,7 @@ struct Working12: View {
             if currentSet < content.sets {
                 startSetRestCountdown()
             } else {
-                showCompletionPopup = true
+                endSession()
             }
         }
     }
@@ -757,7 +800,7 @@ struct Working12: View {
                         showExitConfirmPopup = false
                         cancelInProgressStepCycleWithoutCounting()
                         finishSet(index: currentSet - 1, reps: currentRep)
-                        showCompletionPopup = true
+                        endSession()
                     }
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
@@ -767,11 +810,16 @@ struct Working12: View {
                 Color.black.opacity(0.3)
                     .ignoresSafeArea()
 
-                CompletionPopup(treatmentResult: treatmentResult, onComplete: {
-                    showCompletionPopup = false
-                    finalElapsedSeconds = Int(Date().timeIntervalSince(sessionStartDate))
-                    navigateToPostWorking12 = true
-                })
+                CompletionPopup(
+                    treatmentResult: treatmentResult,
+                    onComplete: {
+                        showCompletionPopup = false
+                        navigateToPostWorking12 = true
+                    },
+                    onSubmit: { vas, notes in
+                        recordVasAndNotes(vas: vas, notes: notes)
+                    }
+                )
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             }
         }
@@ -1021,6 +1069,19 @@ private struct CompletionPopup: View {
     let treatmentResult: TreatmentResult?
     let onComplete: () -> Void
 
+    /// 「確定」填完 VAS／症狀時回呼給 `Working2`。
+    ///
+    /// 🔴 **不在這裡自己寫資料庫。** 這個 struct 拿到的 `treatmentResult` 是**值複本**，
+    /// 而 `runExport()` 匯出時序列化的就是這份複本（不會回資料庫重讀）。
+    /// 若在這裡直接 `resultVM.update(...)`，資料庫會是對的、複本卻還是 nil，
+    /// **匯出的 JSON 會少掉這兩欄而且完全沒有症狀**（working2 §23.7）。
+    /// 交給 `Working2` 走既有的「改複本 → 指派回 @State → update」模式，
+    /// 新的複本才會流回這個 popup。
+    ///
+    /// `notes` 是 Optional：清單為空（seed 失敗）的保底路徑傳 `nil`，
+    /// 代表「沒能問」，不是 `[]`（問了、答案是沒有）。
+    let onSubmit: (Int, [Int]?) -> Void
+
     private enum ExportPhase: Equatable {
         case ready
         case counting(secondsRemaining: Int)
@@ -1028,8 +1089,28 @@ private struct CompletionPopup: View {
         case done
     }
 
+    /// 階段 A（填 VAS／症狀）→ 階段 B（儲存／完成）。單向，沒有「返回修改」。
+    private enum Stage {
+        case form
+        case export
+    }
+
     @State private var phase: ExportPhase = .ready
     @State private var countdownTimer: Timer?
+
+    @State private var stage: Stage = .form
+    @State private var noteVM = NoteViewModel()
+    @State private var selectedVas: Int?
+    @State private var selectedNoteIds: Set<Int> = []
+
+    /// 兩個都必填才能按「確定」。
+    ///
+    /// ⚠️ 例外：`notes` 表是空的（seed 失敗）時，「至少選一則」永遠無法滿足，
+    /// 使用者會卡死在階段 A、連匯出都做不了 —— 這時只驗 VAS（working2 §23.6）。
+    private var canSubmitForm: Bool {
+        guard selectedVas != nil else { return false }
+        return noteVM.notes.isEmpty || !selectedNoteIds.isEmpty
+    }
 
     private var exportButtonTitle: String {
         switch phase {
@@ -1048,6 +1129,16 @@ private struct CompletionPopup: View {
 
     private var isCompleteButtonEnabled: Bool {
         phase == .done
+    }
+
+    /// 送出階段 A：回呼給 `Working2` 寫回，然後切到階段 B。單向，切過去就回不來。
+    private func submitForm() {
+        guard let selectedVas, canSubmitForm else { return }
+        // 🔴 清單為空的保底路徑傳 nil（沒能問），不是 []（問了、答案是沒有）——
+        // 匯出檔案也會照這個區分印 null（working2 §23.6／§23.8）。
+        let notes: [Int]? = noteVM.notes.isEmpty ? nil : Array(selectedNoteIds)
+        onSubmit(selectedVas, notes)
+        stage = .export
     }
 
     /// 點擊「儲存訓練結果」：畫面倒數 10 秒（儲存訓練結果(10) → … → 儲存訓練結果(0)）。前 5 秒（10→…→5）純粹是寫入緩衝，
@@ -1099,6 +1190,140 @@ private struct CompletionPopup: View {
     }
 
     var body: some View {
+        Group {
+            switch stage {
+            case .form:  formStage
+            case .export: exportStage
+            }
+        }
+        .frame(width: 520, height: 400)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.black, lineWidth: 1.5)
+        )
+        .onAppear {
+            noteVM.fetchAll()
+            // 🔴 沒有那一筆可以更新，問了也無處可寫 —— 直接跳過階段 A，
+            // 不要讓使用者填完才發現白填（working2 §23.7）。
+            // ⚠️ 這種情況下「完成」按鈕仍會卡住不解鎖，那是四個動作共通的
+            // 既有死結，屬於 working2 §24 的範圍，本次未修。
+            if treatmentResult == nil {
+                stage = .export
+            }
+        }
+        .onDisappear {
+            countdownTimer?.invalidate()
+            countdownTimer = nil
+        }
+    }
+
+    // MARK: - 階段 A：VAS ＋ 症狀備註
+
+    private var formStage: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("疼痛評分（VAS）")
+                .font(.system(size: 24, weight: .semibold))
+
+            // 🔴 11 顆按鈕、初始全部未選 —— 不用 slider。
+            // slider 一定會停在某個位置，「還沒動過」與「選了那個值」在畫面上分不出來，
+            // 而 0 在這一欄是有意義的真實評分（完全不痛）。
+            HStack(spacing: 5) {
+                ForEach(0...10, id: \.self) { score in
+                    Button {
+                        selectedVas = score
+                    } label: {
+                        Text("\(score)")
+                            .font(.system(size: 24, weight: .semibold))
+                            .foregroundStyle(selectedVas == score ? .white : .black)
+                            .frame(width: 38, height: 34)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(selectedVas == score ? Color.black : Color.white)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .stroke(Color.black, lineWidth: 1.5)
+                                    )
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            Text("症狀（可複選）")
+                .font(.system(size: 24, weight: .semibold))
+
+            if noteVM.notes.isEmpty {
+                // 保底：清單空掉（seed 失敗）時不擋，否則「至少選一則」永遠無法滿足，
+                // 整場訓練會因為 seed 失敗而收不了尾。這條路徑寫 nil、不是 []。
+                Text("目前沒有可選的症狀項目，這一場將不記錄症狀。")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                // 🔴 一定要包 ScrollView：520×400 是固定尺寸，而清單是把 notes 表
+                // 全部列出來、不寫死，note.json 加到第 8、9 則時一定會溢出。
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(noteVM.notes, id: \.id) { note in
+                            Button {
+                                if selectedNoteIds.contains(note.id) {
+                                    selectedNoteIds.remove(note.id)
+                                } else {
+                                    // ✅ 六則一律平等，不做互斥處理 —— 可以同時勾
+                                    // 「沒有不適」與「膝蓋明顯疼痛」。已確認接受。
+                                    selectedNoteIds.insert(note.id)
+                                }
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: selectedNoteIds.contains(note.id)
+                                          ? "checkmark.square.fill" : "square")
+                                        .font(.system(size: 20))
+                                        .foregroundStyle(.black)
+                                    Text(note.name)
+                                        .font(.system(size: 20))
+                                        .foregroundStyle(.black)
+                                        .multilineTextAlignment(.leading)
+                                    Spacer(minLength: 0)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.trailing, 4)
+                }
+            }
+
+            HStack {
+                Spacer()
+                Button(action: submitForm) {
+                    Text("確定")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.white)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(Color.black, lineWidth: 1.5)
+                                )
+                        )
+                }
+                .buttonStyle(.plain)
+                .disabled(!canSubmitForm)
+                .opacity(canSubmitForm ? 1 : 0.5)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color.white)
+    }
+
+    // MARK: - 階段 B：儲存訓練結果（匯出）／完成
+
+    private var exportStage: some View {
         ZStack(alignment: .bottomTrailing) {
             VStack(spacing: 0) {
                 ZStack {
@@ -1156,16 +1381,6 @@ private struct CompletionPopup: View {
                 .opacity(isCompleteButtonEnabled ? 1 : 0.5)
             }
             .padding(12)
-        }
-        .frame(width: 520, height: 400)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.black, lineWidth: 1.5)
-        )
-        .onDisappear {
-            countdownTimer?.invalidate()
-            countdownTimer = nil
         }
     }
 }
