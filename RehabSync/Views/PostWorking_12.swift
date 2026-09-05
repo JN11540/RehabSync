@@ -21,6 +21,24 @@ struct PostWorking_12: View {
     fileprivate static let green = Color(red: 0.20, green: 0.70, blue: 0.45)
     fileprivate static let blue = Color(red: 0.25, green: 0.55, blue: 0.95)
     fileprivate static let pink = Color(red: 0.90, green: 0.30, blue: 0.45)
+    /// ⚠️ 這個檔案原本沒有 `orange`，是為了症狀卡片的 icon 補上的
+    /// （postworking12-realdata-plan.md §13.2）。值與 `PostWorking_2`／`PostWorking_9` 相同。
+    fileprivate static let orange = Color(red: 0.95, green: 0.65, blue: 0.20)
+
+    /// 兩排 stat 卡片共用的固定高度（postworking2-realdata-plan.md §15.2）。
+    ///
+    /// 🔴 症狀卡片的內容長度隨選了幾則而變，不固定高度的話 `HStack` 會把整個第二排
+    /// 拉得比第一排高，兩排看起來就不是同一套卡片。
+    /// 數值取標準卡片的自然高度（padding 16 ＋ icon 列 32 ＋ 間距 10 ＋ 30pt 數值 ＋ padding 16），
+    /// 所以第一排外觀不變，只是高度從「由內容決定」變成「固定」。
+    fileprivate static let statCardHeight: CGFloat = 112
+
+    /// 主要內容區塊之間的垂直間距。
+    ///
+    /// 🔴 **`PostWorking12StatsBlock` 的兩排間距必須用同一個常數。**
+    /// 跨排按鈕的高度是 `statCardHeight × 2 + sectionSpacing` —— 若兩處各寫一個 24，
+    /// 改了外層間距、按鈕高度不會跟著變，版面會歪掉而且不會有任何錯誤。
+    fileprivate static let sectionSpacing: CGFloat = 24
 
     /// 毫秒轉成「X 分 YY 秒」，`ms <= 0` 一律視為沒有資料。
     fileprivate static func formatMinutesSeconds(ms: Int) -> String {
@@ -36,12 +54,15 @@ struct PostWorking_12: View {
             HStack(spacing: 0) {
                 GeometryReader { geo in
                     ScrollView(showsIndicators: false) {
-                        VStack(alignment: .leading, spacing: 24) {
+                        VStack(alignment: .leading, spacing: Self.sectionSpacing) {
                             PostWorking12Header()
-                            PostWorking12StatRow(treatmentResult: treatmentResult, onRequestReturn: { showReturnConfirm = true })
+                            PostWorking12StatsBlock(treatmentResult: treatmentResult,
+                                                    onRequestReturn: { showReturnConfirm = true })
 
+                            // 🔴 不可以加 `.frame(maxHeight: .infinity)`（postworking2 §11.5）——
+                            // 那會把卡片撐滿畫面高度、內容再多也不長高，外層 ScrollView
+                            // 就永遠沒有東西可捲。卡片高度必須由內容決定。
                             PostWorking12DonationOverviewCard(content: content, treatmentResult: treatmentResult)
-                                .frame(maxHeight: .infinity)
                         }
                         .padding(28)
                         .frame(minHeight: geo.size.height)
@@ -97,11 +118,15 @@ private struct PostWorking12Stat {
 }
 
 /// 頂部統計卡：只有「總時間」「總次數」兩項——`Working12`（登階）的 `extension_length` 永遠是 0（不計算），
-/// 沒有真實數字可以顯示「單次時長」，比照 `postworking12-realdata-plan.md` 第 2 節的決定直接省略第三張卡，
-/// 不用其他數字頂替，也不強行保留空白佔位。
+/// 沒有真實數字可以顯示「單次時長」，比照 `postworking12-realdata-plan.md` 第 2 節的決定不做第三張統計卡。
+///
+/// ⚠️ **但第 3 欄仍然有一張看得見外框的空白卡片**（見 `body`）——第 2 節的最終定案是
+/// 「版面上仍要看得到 4 張卡片並排」，不是讓那個位置完全沒有視覺存在感。
+/// 這一段原本寫著「也不強行保留空白佔位」，與 `body` 的實際做法相反，已更正。
 private struct PostWorking12StatRow: View {
     let treatmentResult: TreatmentResult
-    let onRequestReturn: () -> Void
+    /// 欄寬由 `PostWorking12StatsBlock` 統一計算後傳進來（§13.1）。
+    let slot: CGFloat
 
     /// 「第一組開始」到「最後一組結束」的絕對時間差（毫秒），天然包含組間休息時間。
     private var totalTimeText: String {
@@ -122,33 +147,120 @@ private struct PostWorking12StatRow: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 16) {
+        HStack(spacing: 16) {
             ForEach(stats, id: \.label) { stat in
                 PostWorking12StatCard(stat: stat)
+                    .frame(width: slot)
             }
 
-            // `Working12` 沒有「單次時長」可顯示的第三張統計卡，但版面上仍要湊滿 4 張卡（跟 `PostWorking_9`
-            // 一樣的卡片大小／排版），所以放一張外觀跟其他卡片一致（白底、圓角、邊框）但內容空白的卡片。
+            // `Working12` 沒有「單次時長」可顯示的第三張統計卡，但版面上仍要湊滿 4 欄
+            // （§2 的最終定案）：外觀跟其他卡片一致、內容空白。
+            // 🔴 `maxHeight: .infinity` 已拿掉 —— 套上固定高度後它會把自己撐到最大，
+            // 變成唯一一張高度不受控的卡片（§13.1）。
             Color.white
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(width: slot)
+                .frame(height: PostWorking_12.statCardHeight)
                 .clipShape(RoundedRectangle(cornerRadius: 16))
                 .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black.opacity(0.05)))
-
-            Button {
-                onRequestReturn()
-            } label: {
-                Text("回到總覽")
-                    .font(.system(size: 30, weight: .semibold))
-                    .foregroundStyle(Color.black)
-                    .multilineTextAlignment(.center)
-                    .padding(16)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                    .background(Color.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black.opacity(0.05)))
-            }
-            .buttonStyle(.plain)
         }
+    }
+}
+
+/// 第二排卡片：疼痛評分（VAS）＋症狀＋兩張空白（postworking2-realdata-plan.md §14）。
+///
+/// ⚠️ 這推翻了 working2-database-port-plan.md §23 原本「結果頁不顯示這兩欄」的決定，
+/// 那份文件的範圍宣告已一併更新。資料端不用動，本結構純粹是顯示。
+private struct PostWorking12VasNoteRow: View {
+    let treatmentResult: TreatmentResult
+    /// 同 `PostWorking12StatRow.slot`，由 `PostWorking12StatsBlock` 統一給。
+    let slot: CGFloat
+
+    /// 症狀文字的來源。⚠️ 不要在畫面檔裡寫死選項文字（§14.5）。
+    @State private var noteVM = NoteViewModel()
+
+    /// 🔴 `0` 顯示「0 分」不是「－」——`0` 是「完全不痛」，是有效評分。
+    /// `nil` 才是「這一場沒問到」。兩者不可以混為一談（working2 §23.5）。
+    private var vasText: String {
+        guard let vas = treatmentResult.vas else { return "－" }
+        return "\(vas) 分"
+    }
+
+    /// 三種狀態要顯示成三種字（§14.3）：
+    /// `nil` = 沒問到、`[]` = 問了但沒有症狀、有值 = 逐則列出。
+    private var noteText: String {
+        guard let ids = treatmentResult.notes else { return "－" }
+        if ids.isEmpty { return "無" }
+        let byId = Dictionary(uniqueKeysWithValues: noteVM.notes.map { ($0.id, $0.name) })
+        // ⚠️ 查不到的編號給佔位，不要 compactMap 掉 —— 靜默丟掉會讓病歷少一項而畫面正常。
+        return ids.map { byId[$0] ?? "#\($0)（已刪除）" }.joined(separator: "、")
+    }
+
+    private var vasStat: PostWorking12Stat {
+        PostWorking12Stat(icon: "bandage.fill", color: PostWorking_12.pink,
+                         label: "疼痛評分", value: vasText,
+                         change: "", isPositive: true, note: "")
+    }
+
+    private var noteStat: PostWorking12Stat {
+        PostWorking12Stat(icon: "list.bullet.clipboard.fill", color: PostWorking_12.orange,
+                         label: "症狀", value: noteText,
+                         change: "", isPositive: true, note: "")
+    }
+
+    var body: some View {
+        HStack(spacing: 16) {
+            PostWorking12StatCard(stat: vasStat)
+                .frame(width: slot)
+            // 橫跨第 2、3 欄：兩個 slot 再加上中間那道被吃掉的間距（§16.1）。
+            PostWorking12StatCard(stat: noteStat)
+                .frame(width: slot * 2 + 16)
+        }
+        .onAppear { noteVM.fetchAll() }
+    }
+}
+
+/// 兩排卡片 ＋ 跨排的「回到總覽」按鈕（postworking2-realdata-plan.md §17）。
+///
+/// 🔴 **第 4 欄要跨兩排，所以結構必須是「左邊一個 VStack ＋ 右邊一個按鈕」**，
+/// 不能是「兩個各自獨立的橫排」——那樣第 4 欄不可能跨排。
+/// 欄寬在這裡算一次、兩排共用，才不會有捨入誤差造成的錯位（§17.1）。
+private struct PostWorking12StatsBlock: View {
+    let treatmentResult: TreatmentResult
+    let onRequestReturn: () -> Void
+
+    /// 兩排之間的距離。🔴 直接用 `PostWorking_12.sectionSpacing`，**不要另外宣告一個 24** ——
+    /// 那樣它與外層 `VStack` 只是數字剛好一樣，改了外層這裡不會跟著變（§17.1）。
+    private var totalHeight: CGFloat {
+        PostWorking_12.statCardHeight * 2 + PostWorking_12.sectionSpacing
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            let slot = (geo.size.width - 16 * 3) / 4
+            HStack(spacing: 16) {
+                VStack(spacing: PostWorking_12.sectionSpacing) {
+                    PostWorking12StatRow(treatmentResult: treatmentResult, slot: slot)
+                    PostWorking12VasNoteRow(treatmentResult: treatmentResult, slot: slot)
+                }
+                Button(action: onRequestReturn) {
+                    Text("回到總覽")
+                        .font(.system(size: 30, weight: .semibold))
+                        // 紫底白字（§17.2）。darkPurple ＝「第 N 組」膠囊被選中時的底色，
+                        // 整頁只有一種「這是可點的紫色」。⚠️ 改膠囊的選中色時這裡要一起改。
+                        .foregroundStyle(Color.white)
+                        .multilineTextAlignment(.center)
+                        .padding(16)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                        .background(PostWorking_12.darkPurple)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black.opacity(0.05)))
+                }
+                .buttonStyle(.plain)
+                .frame(width: slot, height: totalHeight)
+            }
+        }
+        // ⚠️ GeometryReader 會吃掉高度，外層要補回整塊的高度。
+        .frame(height: totalHeight)
     }
 }
 
@@ -208,7 +320,8 @@ private struct PostWorking12StatCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
+            // icon 與標題同一排（postworking2-realdata-plan.md §13）。
+            HStack(spacing: 10) {
                 ZStack {
                     Circle().fill(stat.color.opacity(0.15))
                     Image(systemName: stat.icon)
@@ -216,14 +329,20 @@ private struct PostWorking12StatCard: View {
                         .foregroundStyle(stat.color)
                 }
                 .frame(width: 32, height: 32)
-                Spacer()
+                Text(stat.label)
+                    .font(.system(size: 20))
+                    .foregroundStyle(PostWorking_12.mutedText)
+                Spacer(minLength: 0)
             }
-            Text(stat.label)
-                .font(.system(size: 20))
-                .foregroundStyle(PostWorking_12.mutedText)
             Text(stat.value)
                 .font(.system(size: 30, weight: .bold))
                 .foregroundStyle(Color.black)
+                // ⚠️ 固定高度 ＋ 30pt 只放得下一行，過長的症狀會被尾端省略（§16.3）。
+                // 刻意不用 minimumScaleFactor —— 那會讓症狀那張字特別小，
+                // 四張卡片字級不一致，比截斷更難看。
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             if !stat.change.isEmpty {
                 HStack(spacing: 4) {
@@ -241,7 +360,10 @@ private struct PostWorking12StatCard: View {
             }
         }
         .padding(16)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        // 🔴 原本是 `maxHeight: .infinity, alignment: .topLeading`（動作 2／9 是 `.leading`）——
+        // 套上固定高度後 `maxHeight: .infinity` 會讓卡片自己撐到最大，必須拿掉（§13.1）。
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(height: PostWorking_12.statCardHeight)
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black.opacity(0.05)))
@@ -478,35 +600,4 @@ private struct PostWorking12AngleTrendCard: View {
             base
         }
     }
-}
-
-#Preview {
-    let now = Int(Date().timeIntervalSince1970 * 1000)
-    PostWorking_12(
-        content: TreatmentContent(
-            treatment_id: 1, exercise_id: 12,
-            sets: 2, set_rest_time: 10,
-            reps: 5,
-            date: Int(Date().timeIntervalSince1970)
-        ),
-        exercise: nil,
-        totalCoins: 0,
-        totalSets: 2,
-        totalElapsedSeconds: 120,
-        comingMoodCount: 0,
-        badMoodCount: 0,
-        angryMoodCount: 0,
-        treatmentResult: TreatmentResult(
-            treatment_id: 1,
-            treatment_content_id: 12,
-            reps: [5, 3],
-            extension_length: [0, 0, 0, 0, 0, 0, 0, 0],
-            set_start_time: [now, now + 200_000],
-            set_end_time: [now + 180_000, now + 380_000],
-            date: now,
-            exercise_id: 12,
-            target_angle: 45
-        ),
-        onReturnToDashboard: {}
-    )
 }
