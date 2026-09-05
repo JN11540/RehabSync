@@ -55,6 +55,29 @@ struct TreatmentResult: Codable, FetchableRecord, MutablePersistableRecord {
     ///
     /// 🔴 型別是 `Double` 但資料庫欄位是 INTEGER，理由同 `Exercise.target_angle`。
     var target_angle: Double
+    /// 這一場的 VAS 疼痛評分（v14 新增）。
+    ///
+    /// ⚠️ **可為 NULL，而且 `nil` 與 `0` 是兩件事** —— VAS 的 0 是「完全不痛」，
+    /// `nil` 是「這一場沒有記錄」。當初若用 `NOT NULL DEFAULT 0`，既有列全部補 0，
+    /// 「沒記錄」與「真的評 0 分」就永遠分不出來了。
+    var vas: Int?
+    /// 這一場的備註編號（v14 新增）。元素對應 `notes` 表的 `id`，文字是 `notes.name`。
+    ///
+    /// ⚠️ **三種狀態，不是兩種**：
+    /// - `nil` —— 這一場沒有記錄（v14 之前的既有列、以及還沒有輸入介面的期間）
+    /// - `[]` —— 有記錄，但治療師明確表示沒有任何備註
+    /// - `[2, 6]` —— 這一場有兩則備註
+    ///
+    /// 🔴 `nil` 與 `[]` 不可以互相取代。兩者在程式裡都很容易寫成「沒有備註」，
+    /// 但前者是「沒問過」、後者是「問了、答案是沒有」。UI 圖方便把沒勾任何項目
+    /// 存成 `nil`，那條區分就永久消失了。
+    ///
+    /// 🔴 **沒有外鍵** —— 外鍵只能建在單一純量欄位上。SQLite 不檢查陣列裡的編號
+    /// 存不存在、不擋刪除被引用的備註、不管重複與排序。寫入前要去重＋排序，
+    /// 顯示時查不到的編號要有佔位，不要 `compactMap` 掉（病歷會少一項而畫面正常）。
+    ///
+    /// ⚠️ 是 `[Int]?` 不是 `[Int]`，跟 `reps` 那幾個陣列欄位多一層 Optional。
+    var notes: [Int]?
 
     /// 🔴 **自訂 init，`exercise_id` 刻意不給預設值。**
     ///
@@ -70,6 +93,10 @@ struct TreatmentResult: Codable, FetchableRecord, MutablePersistableRecord {
     ///
     /// ⚠️ 副作用：日後新增欄位時這個 init 要手動加參數，memberwise init 沒有這個問題。
     /// 這是換取編譯期保護的代價。
+    ///
+    /// `vas`／`notes`（v14）同樣不給預設值，理由相同：漏傳就是編譯錯誤，
+    /// 不是靜默寫入 NULL。目前四個 `Working*` 都傳 `nil`（還沒有輸入介面），
+    /// 但那是**明確寫出來的 nil**，不是自動補的。
     init(id: Int64? = nil,
          treatment_id: Int,
          treatment_content_id: Int,
@@ -79,7 +106,9 @@ struct TreatmentResult: Codable, FetchableRecord, MutablePersistableRecord {
          set_end_time: [Int],
          date: Int,
          exercise_id: Int?,
-         target_angle: Double) {
+         target_angle: Double,
+         vas: Int?,
+         notes: [Int]?) {
         self.id = id
         self.treatment_id = treatment_id
         self.treatment_content_id = treatment_content_id
@@ -90,6 +119,8 @@ struct TreatmentResult: Codable, FetchableRecord, MutablePersistableRecord {
         self.date = date
         self.exercise_id = exercise_id
         self.target_angle = target_angle
+        self.vas = vas
+        self.notes = notes
     }
 
     mutating func didInsert(_ inserted: InsertionSuccess) {
