@@ -23,6 +23,8 @@ struct TestPage: View {
 
     @Environment(\.goHome) private var goHome
     @State private var exgDisplayMode: EXGDisplayMode = .raw
+    /// 只給下方「Treatment 紀錄」列表用，驗證重複匯入有沒有真的追加。
+    @State private var treatmentVM = TreatmentViewModel()
 
     /// 四個動作的校正規格。收集層完全共用，差異只在真值、姿勢檢查軸、經驗係數。
     /// 動作 9／12／22 的校正姿勢都是站立，僅係數不同（9 是左1.7/右1.55，12 與 22 兩側都 1.7）。
@@ -98,6 +100,67 @@ struct TestPage: View {
     private func exgStatus(deviceId: Int64?, channel: Int) -> EXGChannelStatus? {
         guard let deviceId else { return nil }
         return btVM.exgChannelStatus["\(deviceId)-\(channel)"]
+    }
+
+    // MARK: - Treatment 紀錄（重複匯入測試用）
+
+    /// 目前資料庫裡所有的 `treatment` 列。
+    ///
+    /// ⚠️ 這是**除錯用**的列表，用來驗證「可重複匯入訓練菜單」有沒有真的追加成功——
+    /// dashboard 只會顯示 `treatments.first`（settings-plan.md A.9），
+    /// 所以匯入第二份菜單之後，**只有這裡看得到它**。
+    @ViewBuilder
+    private var treatmentListPanel: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Treatment 紀錄")
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Text("共 \(treatmentVM.treatments.count) 筆")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+
+            if treatmentVM.treatments.isEmpty {
+                Text("尚無資料")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(treatmentVM.treatments, id: \.id) { t in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(t.name)
+                            .font(.system(size: 13, weight: .medium))
+                        Text("start_time：\(Self.formatEpochSeconds(t.start_time))")
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                        Text("end_time：\(Self.formatEpochSeconds(t.end_time))")
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(8)
+                    .background(Color.white.opacity(0.6))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+            }
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .onAppear { treatmentVM.fetchAll() }
+    }
+
+    /// 🔴 `start_time`／`end_time` 以**秒**為單位的 Unix epoch。
+    ///
+    /// 這兩個欄位在此之前**全專案沒有任何程式讀過**（settings-plan.md A.5.4），
+    /// 單位一直沒有被驗證。判定依據是實際的匯入檔 `PLAN-AUTO_治療計畫.json`：
+    /// `1785888000` 當秒解讀是 2026-08-05、當毫秒解讀是 1970-01-21，
+    /// 只有前者說得通。⚠️ 若日後出現毫秒的來源，這裡會顯示成 1970 年的日期。
+    private static func formatEpochSeconds(_ seconds: Int) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter.string(from: Date(timeIntervalSince1970: TimeInterval(seconds)))
     }
 
     @ViewBuilder
@@ -457,6 +520,9 @@ struct TestPage: View {
                         exgChannelPanel(title: "小腿 CH1", status: exgStatus(deviceId: calfDeviceId, channel: 1))
                     }
                     .padding(.horizontal, 24)
+
+                    treatmentListPanel
+                        .padding(.horizontal, 24)
                 }
                 .padding(.top, 72)
                 .padding(.bottom, 40)

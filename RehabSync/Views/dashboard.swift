@@ -208,11 +208,17 @@ struct Dashboard: View {
                         .frame(width: 420)
                         .background(DashboardPalette.panelBackground)
                 } else if selectedNav == .settings {
+                    // 🔴 **這裡不可以掛 `.id(deviceStatusTick)`。**
+                    // `deviceStatusTick` 每 5 秒 +1（見下面的 `.task`），
+                    // 掛在整個設定頁上會讓 SwiftUI 每 5 秒把整頁**銷毀重建**，
+                    // 裡面所有 `@State` 一起被清掉——匯入的倒數、「匯入成功」提示、
+                    // 甚至還在跑的 `Task` 所寫入的狀態全部消失（資料其實有進資料庫，
+                    // 只是畫面看不到）。tick 改成傳進去，只讓真正需要的那一小塊重建。
                     DashboardSettingsPanel(
                         onBluetoothBindingTap: { showBluetoothBindingModal = true },
-                        onTargetAngleEditTap: { showTargetAngleEditModal = true }
+                        onTargetAngleEditTap: { showTargetAngleEditModal = true },
+                        statusTick: deviceStatusTick
                     )
-                        .id(deviceStatusTick)
                         .padding(28)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .background(Color.white)
@@ -317,13 +323,10 @@ private struct DashboardSidebar: View {
             DashboardSidebarSectionLabel(text: "一般")
             DashboardSidebarItem(item: .overview, selectedNav: $selectedNav)
             DashboardSidebarItem(item: .statistics, selectedNav: $selectedNav)
-            // 藍牙除錯／動作測試頁入口，**目前隱藏不顯示**。
-            //
-            // 只註解掉這一列的渲染，底層完全保留：`DashboardNavItem.test`、
-            // `onNavigateToTest` 的整條傳遞鏈（Home → Dashboard → Sidebar）、
-            // `Home` 裡切換 `selectedTab = .test` 顯示 `TestPage` 的邏輯都還在，
-            // 把下面這行取消註解就會恢復。
-            // DashboardSidebarItem(item: .test, selectedNav: $selectedNav, action: onNavigateToTest)
+            // 藍牙除錯／動作測試頁（`TestPage`）入口。
+            // ⚠️ 這一列曾被註解掉隱藏起來，現已恢復顯示；底層（`DashboardNavItem.test`、
+            // `onNavigateToTest` 的傳遞鏈、`Home` 的 `selectedTab = .test`）從頭到尾都還在。
+            DashboardSidebarItem(item: .test, selectedNav: $selectedNav, action: onNavigateToTest)
 
             Spacer()
 
@@ -423,6 +426,10 @@ private struct DashboardSettingsPanel: View {
 
     /// `device` 表已經有 2 筆紀錄（不論目前是否有實際連線）就不能再綁新裝置，
     /// 跟人形圖／藍芽裝置綁定視窗左欄「最多同時綁 2 顆」是同一條規則，共用 `DeviceBindingRules`。
+    /// 每 5 秒 +1 的裝置狀態脈搏。⚠️ **只用來重建「藍芽裝置綁定」那一塊**，
+    /// 不要拿去 `.id()` 整個設定頁（理由見呼叫端的註解）。
+    let statusTick: Int
+
     private var isMaxDevicesReached: Bool {
         DeviceBindingRules.snapshot(deviceVM: deviceVM, btVM: btVM).isMaxDevicesReached
     }
@@ -453,6 +460,9 @@ private struct DashboardSettingsPanel: View {
                     .disabled(isMaxDevicesReached)
                     .opacity(isMaxDevicesReached ? 0.4 : 1)
                 }
+                // 只有這一塊需要跟著裝置狀態重建（`isMaxDevicesReached` 是從
+                // `deviceVM`／`btVM` 現算的，不是 @Observable 屬性，不會自己更新）。
+                .id(statusTick)
 
                 VStack(alignment: .leading, spacing: 16) {
                     DashboardSettingsSectionTitle(text: "軟體版本")
@@ -589,10 +599,10 @@ private struct DashboardImportJSONPanel: View {
     @State private var pickerDelegate: ImportJSONPickerDelegate?
     @State private var importSuccess = false
     @State private var importError: String?
-
-    /// 用資料庫裡現有的 `Treatment` 判斷「之前是否已經上傳過 JSON」——`Treatment` 只有透過這裡的匯入，
-    /// 或 Setting 頁「移除所有資料」才會清空，所以能直接拿來當作是否允許再次匯入的依據。
-    private var hasExistingTreatment: Bool { !vm.treatments.isEmpty }
+    /// 匯入倒數（秒）。`nil` = 沒有在匯入。
+    /// ⚠️ 歸零後**停在 0**、不繼續往下跑，也不自動消失——要等匯入真的結束才清掉。
+    @State private var importCountdown: Int?
+    @State private var importCountdownTimer: Timer?
 
     private func topMostViewController(from base: UIViewController?) -> UIViewController? {
         if let presented = base?.presentedViewController {
@@ -601,23 +611,59 @@ private struct DashboardImportJSONPanel: View {
         return base
     }
 
+    /// 開始 10 秒倒數。
+    ///
+    /// 🔴 **歸零之後停在 0，不繼續遞減、也不自動隱藏。**
+    /// 倒數只是「還在跑」的可視回饋，真正的結束訊號是匯入完成——
+    /// 10 秒到了還沒好，代表這次匯入比預期久，讓它停在 0 比讓它消失誠實。
+    private func startImportCountdown() {
+        importCountdownTimer?.invalidate()
+        importCountdown = 10
+        importCountdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
+            guard let current = importCountdown else {
+                timer.invalidate()
+                return
+            }
+            if current > 0 {
+                importCountdown = current - 1
+            } else {
+                // 已經到 0：停掉計時器，數字留在畫面上不動。
+                timer.invalidate()
+                importCountdownTimer = nil
+            }
+        }
+    }
+
+    /// 匯入結束（成功或失敗都算）時停止倒數並清掉數字。
+    private func stopImportCountdown() {
+        importCountdownTimer?.invalidate()
+        importCountdownTimer = nil
+        importCountdown = nil
+    }
+
     private func presentFilePicker() {
-        guard !hasExistingTreatment else { return }
+        // 🔴 原本這裡有 `guard !hasExistingTreatment else { return }`，已移除。
+        // 留著的話按鈕看起來可以按、按下去卻什麼都不會發生——比 disabled 更糟。
         importSuccess = false
         importError = nil
 
         let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.json])
         let delegate = ImportJSONPickerDelegate { url in
-            do {
-                try vm.importTreatment(from: url)
-                importSuccess = true
-                Task {
+            // 選定檔案的當下就開始倒數；匯入結束（成功或失敗）立刻停掉。
+            startImportCountdown()
+            // ⚠️ `@MainActor`：`onPick` 是一般的非 isolated closure，
+            // 直接寫 `Task { }` 不會繼承主執行緒，之後對 `@State` 的寫入
+            // 會發生在背景執行緒上，UI 不一定會更新。
+            Task { @MainActor in
+                do {
+                    try await vm.importTreatment(from: url)
+                    stopImportCountdown()
+                    importSuccess = true
                     try? await Task.sleep(for: .seconds(3))
                     importSuccess = false
-                }
-            } catch {
-                importError = error.localizedDescription
-                Task {
+                } catch {
+                    stopImportCountdown()
+                    importError = error.localizedDescription
                     try? await Task.sleep(for: .seconds(3))
                     importError = nil
                 }
@@ -636,17 +682,21 @@ private struct DashboardImportJSONPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            DashboardSettingsSectionTitle(text: "匯入")
+            DashboardSettingsSectionTitle(text: "匯入訓練菜單")
 
-            if hasExistingTreatment {
-                Label("已經匯入過治療計畫，無法再次上傳 JSON。", systemImage: "exclamationmark.triangle.fill")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.orange)
-            } else {
-                Text("選擇一個 JSON 檔案匯入治療計畫。")
-                    .font(.system(size: 16))
-                    .foregroundStyle(DashboardPalette.mutedText)
-            }
+            // 「已經匯入過…無法再次上傳」的警告已移除，按鈕也不再 disabled ——
+            // 現在任何時候都可以再匯入一次。
+            //
+            // 🔴 **重複匯入是「整包取代」，不是追加。** `TreatmentViewModel.importTreatment`
+            // 在寫入前會呼叫 `clearAll()`，而它會把
+            // `treatment_result` → `treatment_content` → `treatment` 三張表**全部清空**
+            //（`TreatmentViewModel.swift:102`）。
+            // 也就是說**再匯入一次會刪掉所有已經打完的訓練紀錄**，
+            // 連帶那些場次的 VAS／症狀也一起消失，而且沒有任何確認視窗。
+            // 這是既有行為（先前靠這個按鈕鎖住才碰不到），本次只解除封鎖、沒有改動它。
+            Text("選擇一個 json 檔案匯入")
+                .font(.system(size: 16))
+                .foregroundStyle(DashboardPalette.mutedText)
 
             Button(action: presentFilePicker) {
                 Text("選擇檔案")
@@ -654,12 +704,16 @@ private struct DashboardImportJSONPanel: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 12)
-                    .background(hasExistingTreatment ? DashboardPalette.mutedText : DashboardPalette.indigo)
+                    .background(DashboardPalette.indigo)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
             }
             .buttonStyle(.plain)
-            .disabled(hasExistingTreatment)
 
+            if let importCountdown {
+                Label("匯入中… \(importCountdown)", systemImage: "arrow.down.circle")
+                    .font(.system(size: 16))
+                    .foregroundStyle(DashboardPalette.indigo)
+            }
             if importSuccess {
                 Label("匯入成功", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
@@ -1437,22 +1491,23 @@ private struct DashboardIncompleteActionsModal: View {
     @State private var showBluetoothNotBoundAlert = false
     private let deviceVM = DeviceViewModel()
 
+    /// 🔴 載入**所有**菜單的內容，不再只取第一份（settings-plan.md A.9.1）。
+    /// 下面的過濾只看日期、不看 `treatment_id`，所以資料池變大就自然涵蓋所有菜單。
     private func loadData() {
         treatmentVM.fetchAll()
-        if let treatmentId = treatmentVM.treatments.first?.id {
-            contentVM.fetchAll(for: Int(treatmentId))
-        }
+        contentVM.fetchAll()
         exerciseVM.fetchAll()
     }
 
     private var incompleteTodayContents: [TreatmentContent] {
-        guard let treatmentId = treatmentVM.treatments.first?.id else { return [] }
         let calendar = taipeiCalendar()
         let today = calendar.startOfDay(for: Date())
         let todayContents = contentVM.contents.filter {
             calendar.startOfDay(for: Date(timeIntervalSince1970: TimeInterval($0.date))) == today
         }
-        let completedIds = resultVM.fetchCompletedContentIds(for: Int(treatmentId))
+        // 🔴 依「今天這些 content 的 id」查，不是依 treatment_id（A.9.1.3）。
+        let todayIds = todayContents.compactMap { $0.id.map(Int.init) }
+        let completedIds = resultVM.fetchCompletedContentIds(in: todayIds)
         return todayContents.filter { !completedIds.contains(Int($0.id ?? -1)) }
     }
 
@@ -1572,12 +1627,14 @@ private struct DashboardSchedulePanel: View {
     @State private var bellShakeAngle: Double = 0
     private let deviceVM = DeviceViewModel()
 
-    /// 資料庫沒有治療計畫選擇 UI，比照 Test1 的作法，以第一個治療計畫代表「目前的訓練菜單」。
+    /// 🔴 **合併顯示**：載入所有菜單的內容，不分 `treatment_id`（settings-plan.md A.9.1）。
+    ///
+    /// ⚠️ 這裡原本是「以第一個治療計畫代表目前的訓練菜單」——
+    /// 追加匯入之後那會讓第二份以後的菜單永遠看不到。
+    /// 週曆／今日動作／鈴鐺全部只依日期過濾，所以合併之後不需要選擇菜單的 UI。
     private func loadTrainingMenu() {
         treatmentVM.fetchAll()
-        if let treatmentId = treatmentVM.treatments.first?.id {
-            contentVM.fetchAll(for: Int(treatmentId))
-        }
+        contentVM.fetchAll()
         exerciseVM.fetchAll()
     }
 
@@ -1616,8 +1673,10 @@ private struct DashboardSchedulePanel: View {
     /// 今天安排的動作是否全部至少做過一次（`treatment_result` 裡有對應的 `treatment_content_id`）；
     /// 今天沒有安排任何動作時視為「已完成」，鈴鐺不需要震動提醒。
     private var allTodayContentsDone: Bool {
-        guard let treatmentId = treatmentVM.treatments.first?.id else { return true }
-        let completedIds = resultVM.fetchCompletedContentIds(for: Int(treatmentId))
+        // 🔴 依「今天這些 content 的 id」查，不是依 treatment_id（A.9.1.3）——
+        // 合併顯示之後今天的動作可能來自任何一份菜單。
+        let todayIds = todayContents.compactMap { $0.id.map(Int.init) }
+        let completedIds = resultVM.fetchCompletedContentIds(in: todayIds)
         return todayContents.allSatisfy { completedIds.contains(Int($0.id ?? -1)) }
     }
 

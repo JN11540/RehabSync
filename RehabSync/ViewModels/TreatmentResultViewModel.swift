@@ -51,10 +51,18 @@ class TreatmentResultViewModel {
         }) ?? 0
     }
 
-    func fetchCompletedContentIds(for treatmentId: Int) -> Set<Int> {
+    /// 這批 `treatment_content` 裡，哪些已經有訓練紀錄（＝做過至少一次）。
+    ///
+    /// 🔴 **篩選維度是 `treatment_content_id`，不是 `treatment_id`**（settings-plan.md A.9.1.3）。
+    /// 合併顯示之後不能再用「第一份菜單的 treatment_id」來查，但也**不可以**改成
+    /// 拿掉篩選全撈——`treatment_result` 每打完一場就多一列、隨使用時間無上限成長，
+    /// 跟「菜單內容有限」不是同一個量級。呼叫端本來就算得出今天有哪些 content，
+    /// 直接傳進來，查詢量只跟今天安排幾個動作有關。
+    func fetchCompletedContentIds(in contentIds: [Int]) -> Set<Int> {
+        guard !contentIds.isEmpty else { return [] }
         let fetched = (try? db.read { db in
             try TreatmentResult
-                .filter(Column("treatment_id") == treatmentId)
+                .filter(contentIds.contains(Column("treatment_content_id")))
                 .fetchAll(db)
         }) ?? []
         return Set(fetched.map { $0.treatment_content_id })
