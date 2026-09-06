@@ -135,6 +135,9 @@ struct Dashboard: View {
     @State private var showIncompleteActionsModal = false
     @State private var showBluetoothBindingModal = false
     @State private var showTargetAngleEditModal = false
+    /// ⚠️ 放在 `Dashboard`（不是設定面板）裡，比照 `showTargetAngleEditModal` ——
+    /// 設定面板的「藍芽裝置綁定」那一塊掛著 `.id(statusTick)` 會被週期性重建。
+    @State private var showDateRangeEditModal = false
     @State private var deviceStatusTick = 0
     @Environment(BluetoothViewModel.self) private var btVM
     private let deviceVM = DeviceViewModel()
@@ -217,6 +220,7 @@ struct Dashboard: View {
                     DashboardSettingsPanel(
                         onBluetoothBindingTap: { showBluetoothBindingModal = true },
                         onTargetAngleEditTap: { showTargetAngleEditModal = true },
+                        onDateRangeEditTap: { showDateRangeEditModal = true },
                         statusTick: deviceStatusTick
                     )
                         .padding(28)
@@ -261,6 +265,15 @@ struct Dashboard: View {
 
                 // 尺寸與藍牙綁定視窗相同（settings-target-angle-edit-plan.md §5.2）。
                 DashboardTargetAngleEditModal(onClose: { showTargetAngleEditModal = false })
+                    .frame(width: 640, height: 520)
+            }
+
+            if showDateRangeEditModal {
+                Color.black.opacity(0.25)
+                    .ignoresSafeArea()
+
+                // 同樣 640×520（settings-plan.md 附錄 B.5）。
+                DashboardDateRangeEditModal(onClose: { showDateRangeEditModal = false })
                     .frame(width: 640, height: 520)
             }
         }
@@ -426,6 +439,8 @@ private struct DashboardSettingsPanel: View {
 
     /// `device` 表已經有 2 筆紀錄（不論目前是否有實際連線）就不能再綁新裝置，
     /// 跟人形圖／藍芽裝置綁定視窗左欄「最多同時綁 2 顆」是同一條規則，共用 `DeviceBindingRules`。
+    var onDateRangeEditTap: () -> Void = {}
+
     /// 每 5 秒 +1 的裝置狀態脈搏。⚠️ **只用來重建「藍芽裝置綁定」那一塊**，
     /// 不要拿去 `.id()` 整個設定頁（理由見呼叫端的註解）。
     let statusTick: Int
@@ -477,6 +492,22 @@ private struct DashboardSettingsPanel: View {
 
                     // 樣式逐字比照上面的「藍芽裝置綁定」按鈕，只有標籤文字不同、沒有 disabled 條件。
                     Button(action: onTargetAngleEditTap) {
+                        Text("編輯")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                            .background(DashboardPalette.indigo)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                // settings-plan.md 附錄 B：統計頁的 baseline 起訖點。
+                VStack(alignment: .leading, spacing: 16) {
+                    DashboardSettingsSectionTitle(text: "起訖點設定")
+
+                    Button(action: onDateRangeEditTap) {
                         Text("編輯")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(.white)
@@ -1231,6 +1262,138 @@ private struct DashboardBluetoothBindingModal: View {
 /// 已經打完的場次**不受影響**，因為目標角度在遊戲開始時已存進
 /// `treatment_result.target_angle` 快照（migration v13）。
 /// 這個「歷史不會被改動」的性質正是敢開這個 UI 的前提。
+/// 「起訖點設定」編輯視窗（settings-plan.md 附錄 B）。
+///
+/// 左半唯讀顯示目前已存的值、右半兩個 `DatePicker`，按「確定」才寫入（比照 §6 的既有決議）。
+private struct DashboardDateRangeEditModal: View {
+    let onClose: () -> Void
+
+    @State private var settingVM = SettingViewModel()
+    @State private var startDate = Date()
+    /// 🔴 終點預設**隔天**，不是今天。
+    /// 兩個都給今天會讓 `start < end` 一開始就不成立、確定鈕直接是灰的——
+    /// 那正是 B.6 要避免的「一打開就面對按不下去的按鈕」。
+    @State private var endDate = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
+
+    /// 🔴 兩個都要有值、且 `start < end` 才能存（B.6 第 3 項）。
+    /// `DatePicker` 一定有值，所以這裡只需要驗大小；
+    /// 「只設一個」在 UI 上不可能發生——這正是預設兩個都給今天的理由，
+    /// 否則第一次打開會面對一個永遠按不下去的按鈕。
+    private var canSave: Bool {
+        taipeiMidnight(startDate) < taipeiMidnight(endDate)
+    }
+
+    /// 🔴 存**台北時區**的午夜秒數（B.4.1）。
+    /// ⚠️ 與匯入資料的慣例（UTC 午夜）差 8 小時，兩者目前不互相比較；
+    /// 日後若要比，必須先對齊時區。
+    private func taipeiMidnight(_ date: Date) -> Int {
+        Int(taipeiCalendar().startOfDay(for: date).timeIntervalSince1970)
+    }
+
+    /// 把已存的秒數顯示成台北時區的 yyyy-MM-dd。
+    private func formatted(_ seconds: Int?) -> String {
+        guard let seconds else { return "未設定" }
+        let formatter = DateFormatter()
+        formatter.timeZone = TimeZone(identifier: "Asia/Taipei")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: Date(timeIntervalSince1970: TimeInterval(seconds)))
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("起訖點設定")
+                .font(.system(size: 22, weight: .semibold))
+                .padding(20)
+
+            Divider()
+
+            HStack(spacing: 0) {
+                // 左：目前設定（唯讀）
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("目前設定")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(DashboardPalette.mutedText)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("起點").font(.system(size: 14)).foregroundStyle(DashboardPalette.mutedText)
+                        Text(formatted(settingVM.startTime)).font(.system(size: 18, weight: .medium))
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("終點").font(.system(size: 14)).foregroundStyle(DashboardPalette.mutedText)
+                        Text(formatted(settingVM.endTime)).font(.system(size: 18, weight: .medium))
+                    }
+                    Spacer()
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+                Divider()
+
+                // 右：編輯
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("編輯")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(DashboardPalette.mutedText)
+
+                    DatePicker("起點", selection: $startDate, displayedComponents: .date)
+                        .datePickerStyle(.compact)
+                    DatePicker("終點", selection: $endDate, displayedComponents: .date)
+                        .datePickerStyle(.compact)
+
+                    if !canSave {
+                        Text("起點必須早於終點。")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.red)
+                    }
+
+                    Spacer()
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }
+
+            Divider()
+
+            HStack(spacing: 12) {
+                Spacer()
+                Button("取消", action: onClose)
+                    .font(.system(size: 16))
+                    .foregroundStyle(DashboardPalette.mutedText)
+
+                Button {
+                    // 已有值時直接覆蓋，不另外確認（B.6 第 4 項）。
+                    settingVM.saveDateRange(start: taipeiMidnight(startDate),
+                                            end: taipeiMidnight(endDate))
+                    onClose()
+                } label: {
+                    Text("確定")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(canSave ? DashboardPalette.indigo : DashboardPalette.mutedText)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+                .buttonStyle(.plain)
+                .disabled(!canSave)
+            }
+            .padding(20)
+        }
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .onAppear {
+            settingVM.fetchDateRange()
+            // 已有值就帶入既有設定，沒有才用今天（B.6 的初始值決議）。
+            if let s = settingVM.startTime {
+                startDate = Date(timeIntervalSince1970: TimeInterval(s))
+            }
+            if let e = settingVM.endTime {
+                endDate = Date(timeIntervalSince1970: TimeInterval(e))
+            }
+        }
+    }
+}
+
 private struct DashboardTargetAngleEditModal: View {
     let onClose: () -> Void
 

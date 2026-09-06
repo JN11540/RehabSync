@@ -68,12 +68,19 @@ class TreatmentViewModel {
         // 它原本自帶 `db.write`，包在這個 `db.write` 裡會變成巢狀，
         // 而 GRDB 的 `DatabaseQueue.write` 不可重入，會死鎖。
         try db.write { db in
-            try assertNoOverlap(dto, in: db)
+            try assertImportable(dto, in: db)
             try writeTreatmentDTO(dto, in: db)
         }
     }
 
-    /// 匯入前的時間區間重疊檢查（settings-plan.md A.5）。
+    /// 匯入前的三道檢查，順序依 settings-plan.md **A.6.2**：
+    /// 1. 區間合法（`start < end`）
+    /// 2. `treatment.id` 未被使用
+    /// 3. 與既有菜單的時間區間分離
+    ///
+    /// ⚠️ **A.6.1 決定不檢查 `contents[].id`**（機率極低、明確接受的風險）。
+    /// 真的撞到時，既有 `treatment_result.treatment_content_id` 指向的內容會被
+    /// `upsert` 靜默覆蓋，歷史場次改指到新的動作／組數而沒有任何痕跡。
     ///
     /// 🔴 **判定的是「分離」，再取反得到重疊**（A.5.2.1）。
     /// 不要改成「既有的端點有沒有落在新區間內」那種端點包含測試 ——
@@ -83,14 +90,25 @@ class TreatmentViewModel {
     /// 🔴 **區間一律當半開區間 `[start_time, end_time)`**，含起點、不含終點，
     /// 所以「端點相接」算分離、可以通過（既有 3/31 結束、新的 3/31 開始）。
     /// ⚠️ 因此分離判定用 `<=` 而不是 `<` —— 寫成 `<` 會把合法的連續療程擋掉（A.5.3）。
-    private static func assertNoOverlap(_ dto: TreatmentImportDTO, in db: Database) throws {
+    private static func assertImportable(_ dto: TreatmentImportDTO, in db: Database) throws {
         // 前提 1：新進區間必須是正的。反向或零長度的區間會讓判定式得出
         // 「看起來通過」的錯誤結果，直接擋掉（A.5.3.1）。
         guard dto.start_time < dto.end_time else {
             throw TreatmentImportError.invalidRange(start: dto.start_time, end: dto.end_time)
         }
 
-        for existing in try Treatment.fetchAll(db) {
+        let existingTreatments = try Treatment.fetchAll(db)
+
+        // A.6.2 第 2 步：`treatment.id` 已存在就整份拒絕。
+        //
+        // 🔴 沒有這道檢查的話，`writeTreatmentDTO` 的 `upsert` 會**靜默覆蓋**既有那一列——
+        // 連同它的 `start_time`／`end_time`，也就是「重疊檢查剛通過、寫入時卻把被比較的
+        // 依據改掉」（A.6）。時間不重疊 ≠ id 不衝突，兩者要分開擋。
+        if let clash = existingTreatments.first(where: { $0.id == Int64(dto.id) }) {
+            throw TreatmentImportError.duplicateId(id: dto.id, name: clash.name)
+        }
+
+        for existing in existingTreatments {
             // 前提 1：既有列**不保證**是正的 —— `start_time`／`end_time` 從來沒有
             // 被任何程式讀過、也沒被驗證過（A.5.4），資料庫裡可能已經有反向的列。
             let lo = min(existing.start_time, existing.end_time)
@@ -174,12 +192,15 @@ class TreatmentViewModel {
     /// （A.5.4），猜錯的話格式化出來的日期會比原始數字更誤導。
     enum TreatmentImportError: LocalizedError {
         case invalidRange(start: Int, end: Int)
+        case duplicateId(id: Int, name: String)
         case overlapping(name: String, start: Int, end: Int)
 
         var errorDescription: String? {
             switch self {
             case .invalidRange(let start, let end):
                 return "JSON 的時間範圍不合法：start_time（\(start)）必須小於 end_time（\(end)）。"
+            case .duplicateId(let id, let name):
+                return "菜單編號 \(id) 已經存在（既有菜單「\(name)」），無法匯入。"
             case .overlapping(let name, let start, let end):
                 return "訓練期間與既有菜單「\(name)」（\(start) – \(end)）重疊，無法匯入。"
             }
