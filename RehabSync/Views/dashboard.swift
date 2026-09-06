@@ -216,6 +216,13 @@ struct Dashboard: View {
                         .padding(28)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .background(Color.white)
+                } else if selectedNav == .statistics {
+                    // ⚠️ `.padding(28)`／`.background` 與上面「總覽」那一支一致，標題位置才會對齊。
+                    // 內容本身在 `DashboardStatistics.swift`，自帶 ScrollView。
+                    DashboardStatisticsContent()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .padding(28)
+                        .background(Color.white)
                 } else {
                     DashboardPlaceholderCard(title: selectedNav.title)
                         .padding(28)
@@ -264,11 +271,12 @@ struct Dashboard: View {
 // MARK: - Sidebar Nav
 
 private enum DashboardNavItem: CaseIterable {
-    case overview, training, test, test1, settings
+    case overview, statistics, training, test, test1, settings
 
     var title: String {
         switch self {
         case .overview: "總覽"
+        case .statistics: "統計"
         case .training: "訓練"
         case .test: "測試"
         case .test1: "測試1"
@@ -279,6 +287,7 @@ private enum DashboardNavItem: CaseIterable {
     var systemImage: String {
         switch self {
         case .overview: "square.grid.2x2.fill"
+        case .statistics: "chart.bar.fill"
         case .training: "arrow.left.arrow.right"
         case .test: "wrench.and.screwdriver"
         case .test1: "wrench.and.screwdriver.fill"
@@ -307,6 +316,7 @@ private struct DashboardSidebar: View {
 
             DashboardSidebarSectionLabel(text: "一般")
             DashboardSidebarItem(item: .overview, selectedNav: $selectedNav)
+            DashboardSidebarItem(item: .statistics, selectedNav: $selectedNav)
             // 藍牙除錯／動作測試頁入口，**目前隱藏不顯示**。
             //
             // 只註解掉這一列的渲染，底層完全保留：`DashboardNavItem.test`、
@@ -663,6 +673,8 @@ private struct DashboardImportJSONPanel: View {
         .onAppear { vm.fetchAll() }
     }
 }
+
+// 「統計」頁的中欄內容在 `DashboardStatistics.swift`（`DashboardStatisticsContent`）。
 
 // MARK: - Overview Content (center column)
 
