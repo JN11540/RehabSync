@@ -474,8 +474,8 @@ private struct PostWorking12DonationOverviewCard: View {
             // 兩張圖共用同一組 setStart／setEndTimeMs 與 durationSeconds，上下可直接對照。
             VStack(alignment: .leading, spacing: 24) {
                 PostWorking12AngleTrendCard(
-                    title: "即時髖屈曲角",
-                    yAxisLabel: "髖屈曲角（度）",
+                    title: "即時軀幹–大腿相對夾角",
+                    yAxisLabel: "軀幹–大腿相對夾角（度）",
                     points: hipPoints,
                     durationSeconds: selected.durationSeconds,
                     // 髖屈曲角：**自動**。這是主圖、活動範圍因人／因動作而異
@@ -483,8 +483,8 @@ private struct PostWorking12DonationOverviewCard: View {
                     yDomain: nil
                 )
                 PostWorking12AngleTrendCard(
-                    title: "即時膝屈曲角",
-                    yAxisLabel: "膝屈曲角（度）",
+                    title: "即時大腿–小腿相對夾角",
+                    yAxisLabel: "大腿–小腿相對夾角（度）",
                     points: kneePoints,
                     durationSeconds: selected.durationSeconds,
                     // 膝屈曲角：固定 **−90...90**。站姿這一欄不是真的膝角度

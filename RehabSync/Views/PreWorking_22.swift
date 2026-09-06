@@ -790,7 +790,7 @@ private struct PreWorking22MotionTestAboutPanel: View {
                 // 動作 2 是膝屈曲角 —— 四頁的圓圈長得一樣但量不同，
                 // 沒有標籤的話治療師分不出來（preworking22-knee-plan.md §9）。
                 // 樣式刻意與 sideLabelText 完全一致：同一列的兩個標籤視覺上要同級。
-                Text("髖屈曲角")
+                Text("軀幹–大腿相對夾角")
                     .font(.system(size: 20))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 12)

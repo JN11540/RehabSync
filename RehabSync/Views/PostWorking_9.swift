@@ -160,7 +160,7 @@ private struct PostWorking9StatRow: View {
         [
             PostWorking9Stat(icon: "clock.fill", color: PostWorking_9.midPurple, label: "總時間", value: totalTimeText, change: "", isPositive: true, note: ""),
             PostWorking9Stat(icon: "repeat.circle.fill", color: PostWorking_9.blue, label: "總次數", value: "\(totalReps) 次", change: "", isPositive: true, note: ""),
-            PostWorking9Stat(icon: "figure.strengthtraining.functional", color: PostWorking_9.green, label: "目標角度（髖屈曲角）", value: targetAngleText, change: "", isPositive: true, note: "")
+            PostWorking9Stat(icon: "figure.strengthtraining.functional", color: PostWorking_9.green, label: "目標角度（軀幹–大腿相對夾角）", value: targetAngleText, change: "", isPositive: true, note: "")
         ]
     }
 
@@ -329,7 +329,7 @@ private struct PostWorking9StatCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             // icon 與標題同一排（postworking2-realdata-plan.md §13）。
-            // ⚠️ 第三張「目標角度（髖屈曲角）」標題最長，卡片窄時會換行 ——
+            // ⚠️ 第三張「目標角度（軀幹–大腿相對夾角）」標題最長，卡片窄時會換行 ——
             // 刻意不加 lineLimit(1)／minimumScaleFactor：截斷看不懂、縮字會讓三張不一致（§13.2）。
             HStack(spacing: 10) {
                 ZStack {
@@ -482,8 +482,8 @@ private struct PostWorking9DonationOverviewCard: View {
             // 兩張圖共用同一組 setStart／setEndTimeMs 與 durationSeconds，上下可直接對照。
             VStack(alignment: .leading, spacing: 24) {
                 PostWorking9AngleTrendCard(
-                    title: "即時髖屈曲角",
-                    yAxisLabel: "髖屈曲角（度）",
+                    title: "即時軀幹–大腿相對夾角",
+                    yAxisLabel: "軀幹–大腿相對夾角（度）",
                     points: hipPoints,
                     durationSeconds: selected.durationSeconds,
                     // 髖屈曲角：**自動**。這是主圖、活動範圍因人／因動作而異
@@ -491,8 +491,8 @@ private struct PostWorking9DonationOverviewCard: View {
                     yDomain: nil
                 )
                 PostWorking9AngleTrendCard(
-                    title: "即時膝屈曲角",
-                    yAxisLabel: "膝屈曲角（度）",
+                    title: "即時大腿–小腿相對夾角",
+                    yAxisLabel: "大腿–小腿相對夾角（度）",
                     points: kneePoints,
                     durationSeconds: selected.durationSeconds,
                     // 膝屈曲角：固定 **−90...90**。站姿這一欄不是真的膝角度

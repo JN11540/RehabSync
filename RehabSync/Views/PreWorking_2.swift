@@ -828,7 +828,7 @@ private struct PreWorking2MotionTestAboutPanel: View {
                 // 站姿三動作（9／12／22）是髖屈曲角 —— 四頁的圓圈長得一樣但量不同，
                 // 沒有標籤的話治療師分不出來（preworking2-knee-plan.md §9）。
                 // 樣式刻意與 sideLabelText 完全一致：同一列的兩個標籤視覺上要同級。
-                Text("膝屈曲角")
+                Text("大腿–小腿相對夾角")
                     .font(.system(size: 20))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 12)
