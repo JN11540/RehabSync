@@ -19,6 +19,8 @@ struct StatsSession: Identifiable {
     let reps: Int
     let vas: Int?
     let noteIds: [Int]?
+    /// 這一場是哪個動作。⚠️ 可為 `nil`（孤兒列，見 `TreatmentResult.exercise_id`）。
+    let exerciseId: Int?
 }
 
 /// 一根長條／一張週卡片所涵蓋的區間。
@@ -69,6 +71,8 @@ class StatisticsViewModel {
     /// 匯出端 `noteTexts(for:)`、結果頁 `PostWorking*VasNoteRow`、這裡）。
     /// 四處各自組 lookup、各自處理「查不到」的佔位字串，翻譯規則改動時四個地方都要改。
     private(set) var noteNames: [Int: String] = [:]
+    /// `exercise.id` → 動作名稱。執行紀錄表的「動作」欄用。
+    private(set) var exerciseNames: [Int: String] = [:]
 
     /// 週單位用的是哪一種模式，除錯與 UI 標示用。
     private(set) var usesBaseline = false
@@ -103,6 +107,12 @@ class StatisticsViewModel {
             uniqueKeysWithValues: ((try? db.read { db in try Note.fetchAll(db) }) ?? [])
                 .map { ($0.id, $0.name) }
         )
+        // ⚠️ 與 noteNames 同樣的理由：一次撈成字典，不要每一列各查一次資料庫。
+        // `Exercise.id` 是 `Int64?`，只有非 nil 的才進字典。
+        exerciseNames = Dictionary(
+            uniqueKeysWithValues: ((try? db.read { db in try Exercise.fetchAll(db) }) ?? [])
+                .compactMap { exercise in exercise.id.map { (Int($0), exercise.name) } }
+        )
 
         // ── 兩張卡片：本週／上週（永遠自然週）──────────────────
         let thisWeekStart = calendar.startOfWeek(for: now)
@@ -116,9 +126,15 @@ class StatisticsViewModel {
         lastWeekDurationMs = lastWeek.reduce(0) { $0 + $1.durationMs }
         lastWeekReps = lastWeek.reduce(0) { $0 + $1.reps }
 
-        // ── 天單位：本週七天 ───────────────────────────────
+        // ── 週單位：baseline 或 treatment 表 ────────────────
+        // 🔴 必須排在天單位**之前**：天單位有 baseline 時要跟著週單位切出來的
+        // 那一段走（見 `dayWindowStart`），需要 `weekBuckets` 已經算好。
+        weekBuckets = buildWeekBuckets(sessions: sessions, calendar: calendar)
+
+        // ── 天單位：baseline 的那一週，或自然週 ─────────────
+        let windowStart = dayWindowStart(now: now, naturalWeekStart: thisWeekStart)
         dayBuckets = (0..<7).compactMap { offset in
-            guard let dayStart = calendar.date(byAdding: .day, value: offset, to: thisWeekStart) else { return nil }
+            guard let dayStart = calendar.date(byAdding: .day, value: offset, to: windowStart) else { return nil }
             let start = dayStart.ms
             let end = start + Self.dayMs
             let formatter = DateFormatter()
@@ -126,15 +142,52 @@ class StatisticsViewModel {
             formatter.dateFormat = "M/d"
             return StatsBucket(
                 id: offset,
-                label: formatter.string(from: dayStart),
+                label: "\(formatter.string(from: dayStart))(\(Self.weekdaySymbol(of: dayStart, calendar: calendar)))",
                 start: start,
                 end: end,
                 sessions: sessions.filter { $0.date >= start && $0.date < end }
             )
         }
+    }
 
-        // ── 週單位：baseline 或 treatment 表 ────────────────
-        weekBuckets = buildWeekBuckets(sessions: sessions, calendar: calendar)
+    /// 星期的單字：`日`『一』…『六』。
+    ///
+    /// 🔴 **不要用 `DateFormatter` 的 `EEEEE`／`shortWeekdaySymbols`**——
+    /// 那會跟著**裝置語系**跑，英文機器上會變成 `Sun`，把標籤撐寬又不是中文。
+    /// 這裡要的是固定中文，所以直接查表。
+    ///
+    /// ⚠️ `Calendar.component(.weekday)` 是 **1 = 週日**，與 `firstWeekday = 2`
+    /// 無關（`firstWeekday` 只影響「一週從哪天開始」，不改 weekday 的編號）。
+    private static func weekdaySymbol(of date: Date, calendar: Calendar) -> String {
+        let symbols = ["日", "一", "二", "三", "四", "五", "六"]
+        return symbols[calendar.component(.weekday, from: date) - 1]
+    }
+
+    /// 天單位那 7 天從哪一天開始。
+    ///
+    /// | 起訖點設定 | 7 天是哪 7 天 |
+    /// |---|---|
+    /// | **有值** | 週單位裡**今天所在的那一段**（起點可能是任何一天，不一定是週一）|
+    /// | 沒有 | 自然週的**台北週一** |
+    ///
+    /// 🔴 有 baseline 時，天單位與週單位就是**同一段時間的兩種顆粒度**，
+    /// 不再像先前那樣是兩段不相干的區間（§4.4.1）。
+    ///
+    /// ⚠️ **今天可能不在 baseline 範圍內**（療程已結束或還沒開始）。
+    /// 這時夾到最近的一端——早於範圍取第 1 段、晚於範圍取最後一段——
+    /// 而不是退回自然週：退回自然週會讓兩個分頁又變成不同區間，
+    /// 而療程結束後「最後一週」比「空白的本週」有用。
+    /// 🔴 夾到端點時**今天不在那 7 根裡**，所以不會有任何一根被 highlight，
+    /// 也不會有 tooltip（§4.4.2）——這是預期行為，不要補一根假的。
+    private func dayWindowStart(now: Date, naturalWeekStart: Date) -> Date {
+        guard usesBaseline,
+              let first = weekBuckets.first,
+              let last = weekBuckets.last else { return naturalWeekStart }
+
+        let t = now.ms
+        let window = weekBuckets.first { t >= $0.start && t < $0.end }
+            ?? (t < first.start ? first : last)
+        return Date(timeIntervalSince1970: TimeInterval(window.start) / 1000)
     }
 
     /// 撈出所有 `treatment_result` 並換算成 `StatsSession`。
@@ -151,7 +204,8 @@ class StatisticsViewModel {
                 durationMs: Self.duration(of: row),
                 reps: row.reps.reduce(0, +),
                 vas: row.vas,
-                noteIds: row.notes
+                noteIds: row.notes,
+                exerciseId: row.exercise_id
             )
         }
     }
@@ -240,6 +294,10 @@ class StatisticsViewModel {
         return values.reduce(0, +) / Double(values.count)
     }
 
+    /// ⚠️ **統計頁的畫面上已經沒有中位數了**（那一列已移除），
+    /// 目前唯一的使用者是測試頁的除錯面板。
+    /// 保留是因為它與 `average` 共用同一個母體規則（§4.6），
+    /// 日後若要把中位數放回畫面，規則不用重新推導一次。
     func median(_ buckets: [StatsBucket], metric: StatsMetric) -> Double {
         let values = population(buckets).map { metric.value(of: $0) }.sorted()
         guard !values.isEmpty else { return 0 }
@@ -253,6 +311,15 @@ class StatisticsViewModel {
     /// `nil` = 這一場沒問到、`[]` = 問了但沒有症狀、有值 = 逐則列出。
     /// ⚠️ 查不到的編號給 `#N（已刪除）` 佔位，**不要 `compactMap` 掉**——
     /// 靜默丟掉會讓病歷少一項而畫面看起來正常。
+    /// `exercise_id` → 動作名稱。
+    ///
+    /// 🔴 `nil`（孤兒列）與「字典裡查不到」都回「－」，不要回空字串——
+    /// 空字串在表格裡看起來像是排版壞掉，「－」才看得出是「沒有這筆資料」。
+    func exerciseName(for id: Int?) -> String {
+        guard let id, let name = exerciseNames[id] else { return "－" }
+        return name
+    }
+
     func noteText(for ids: [Int]?) -> String {
         guard let ids else { return "－" }
         if ids.isEmpty { return "無" }

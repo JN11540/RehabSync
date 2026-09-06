@@ -101,9 +101,9 @@ struct DashboardStatisticsContent: View {
                     VStack(spacing: 8) {
                         HStack(spacing: 6) {
                             Image(systemName: tab.0)
-                                .font(.system(size: 13))
+                                .font(.system(size: 18))
                             Text(tab.1)
-                                .font(.system(size: 14, weight: selectedTab == index ? .semibold : .regular))
+                                .font(.system(size: 18, weight: selectedTab == index ? .semibold : .regular))
                         }
                         .foregroundStyle(selectedTab == index ? StatsPalette.indigo : StatsPalette.muted)
 
@@ -142,13 +142,13 @@ struct DashboardStatisticsContent: View {
         }
     }
 
-    /// 毫秒 → 「N 小時 M 分」。不足一小時只顯示分鐘。
-    /// ⚠️ 沒有訓練時顯示 `0 分`，不是「－」——0 是真的沒訓練，不是沒記錄（§4.1）。
+    /// 毫秒 → 「N 小時 M 分鐘」。不足一小時只顯示分鐘。
+    /// ⚠️ 沒有訓練時顯示 `0 分鐘`，不是「－」——0 是真的沒訓練，不是沒記錄（§4.1）。
     private static func durationText(_ ms: Int) -> String {
         let totalMinutes = ms / 60_000
         let hours = totalMinutes / 60
         let minutes = totalMinutes % 60
-        return hours > 0 ? "\(hours) 小時 \(minutes) 分" : "\(minutes) 分"
+        return hours > 0 ? "\(hours) 小時 \(minutes) 分鐘" : "\(minutes) 分鐘"
     }
 
     /// 「較上週」的變化率（§4.2.1）。
@@ -198,12 +198,12 @@ private struct StatsDeltaPill: View {
         HStack(spacing: 2) {
             if let ratio {
                 Text(String(format: "%.1f%%", abs(ratio) * 100))
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                 Image(systemName: ratio >= 0 ? "arrowtriangle.up.fill" : "arrowtriangle.down.fill")
-                    .font(.system(size: 7))
+                    .font(.system(size: 16))
             } else {
                 Text("－")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
             }
         }
         .foregroundStyle(color)
@@ -229,26 +229,26 @@ private struct StatsSummaryCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             // 右上角原本有一條迷你折線圖（參考圖的鋸齒線），已依指示移除。
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(title)
-                        .font(.system(size: 13))
-                        .foregroundStyle(StatsPalette.muted)
-                    Text(value)
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundStyle(Color.black)
-                }
-                Spacer()
-            }
+            Text(title)
+                .font(.system(size: 16))
+                .foregroundStyle(StatsPalette.muted)
 
-            // 靠卡片右下角：前置 Spacer 讓這一列吃滿寬度並把內容推到右邊。
-            // ⚠️ 沒有 Spacer 的話 HStack 只有內容寬度，會被外層 VStack 的
-            // `alignment: .leading` 貼在左邊。
+            // 數值與「較上週」膠囊同一列：數值靠左、漲跌幅靠右。
+            // ⚠️ 中間的 Spacer 同時負責「把膠囊推到右邊」與「讓這一列吃滿卡片寬度」。
             HStack(spacing: 8) {
-                Spacer()
+                Text(value)
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundStyle(Color.black)
+                    // 數值長度會變（「48 次」vs「3 小時 42 分鐘」），
+                    // 不加的話窄卡片上會被膠囊擠到換行或截斷。
+                    .fixedSize()
+
+                Spacer(minLength: 8)
+
                 Text("較上週")
-                    .font(.system(size: 11))
+                    .font(.system(size: 16))
                     .foregroundStyle(StatsPalette.muted)
+                    .fixedSize()
                 StatsDeltaPill(ratio: ratio)
             }
         }
@@ -285,12 +285,38 @@ private struct StatsTrainingChartCard: View {
 
     /// 超過 12 根就改成水平捲動（statistics-plan.md §6.1.1）。
     /// ⚠️ 天單位永遠 7 根，只有週單位會觸發。
-    private var needsScroll: Bool { buckets.count > 12 }
+    /// 畫面上一次最多顯示幾根長條。超過就固定欄寬、改成左右捲動。
+    ///
+    /// 🔴 這個數字同時決定**捲動門檻**與**捲動時的欄寬**（欄寬 ＝ 可用寬度 ÷ 9），
+    /// 所以「一次剛好看到 9 根」是靠這一個常數保證的，改它就兩邊一起變。
+    private static let visibleColumns = 9
 
-    /// 捲動模式下每一欄的固定寬度。
-    /// ⚠️ 56 是為了裝下最寬的標籤（`第12週` 被 highlight 時還有左右各 6 的 padding）——
-    /// 標籤用了 `fixedSize()`，欄位太窄的話文字會溢出、相鄰兩欄疊在一起。
-    private static let scrollColumnWidth: CGFloat = 56
+    /// 欄與欄的間距。週／天單位一致。
+    private static let columnSpacing: CGFloat = 16
+
+    private var needsScroll: Bool { buckets.count > Self.visibleColumns }
+
+    /// 捲動模式下的單欄寬度：可用寬度扣掉 8 個間距後除以 9。
+    ///
+    /// ⚠️ 不能寫死。先前是固定 80，導致「一次看到幾根」隨畫面寬度浮動。
+    private func columnWidth(available: CGFloat) -> CGFloat {
+        let gaps = Self.columnSpacing * CGFloat(Self.visibleColumns - 1)
+        return max((available - gaps) / CGFloat(Self.visibleColumns), 1)
+    }
+
+    /// 長條圖區域的總高度。
+    ///
+    /// 🔴 **這個數字是加出來的，不是隨便給的**：
+    /// tooltip 28（16pt 文字 ＋ 上下各 3 的 padding）
+    /// ＋ 間距 8 ＋ 長條最高 120 ＋ 間距 8 ＋ 標籤 28
+    /// ＋ 間距 8 ＋ 日期區間 16（12pt 文字）＝ **216**，留 4 的餘裕。
+    ///
+    /// ⚠️ 外層是 `alignment: .bottom`，所以**高度不夠時是從上面溢出**——
+    /// 被切掉的會是 tooltip，不是長條也不是標籤。
+    /// 先前這裡是 175（tooltip 與標籤還是 10pt 時算的），字級改成 16 之後
+    /// 內容變成 192，最高的那根長條就把 tooltip 頂出去、上半截被切掉。
+    /// 🔴 **日後再改 tooltip／標籤字級或長條最大高度，這個數字要跟著重算。**
+    private static let chartHeight: CGFloat = 220
 
     /// 原始值 → 畫面文字。時長的原始值是**毫秒**，要換算成分鐘。
     private func display(_ raw: Double) -> String {
@@ -310,7 +336,7 @@ private struct StatsTrainingChartCard: View {
                     ForEach(Array(ranges.enumerated()), id: \.offset) { i, r in
                         Button { selectedRange = i } label: {
                             Text(r)
-                                .font(.system(size: 12, weight: selectedRange == i ? .semibold : .regular))
+                                .font(.system(size: 16, weight: selectedRange == i ? .semibold : .regular))
                                 .foregroundStyle(selectedRange == i ? Color.black : StatsPalette.muted)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 6)
@@ -325,23 +351,16 @@ private struct StatsTrainingChartCard: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(averageTitle)
-                        .font(.system(size: 11))
+                        .font(.system(size: 16))
                         .foregroundStyle(StatsPalette.muted)
                     Text(display(vm.average(buckets, metric: metric)))
-                        .font(.system(size: 22, weight: .bold))
-                }
-
-                HStack(spacing: 6) {
-                    Circle().fill(StatsPalette.red).frame(width: 6, height: 6)
-                    Text("中位數 \(display(vm.median(buckets, metric: metric)))")
-                        .font(.system(size: 11))
-                        .foregroundStyle(StatsPalette.muted)
+                        .font(.system(size: 24, weight: .bold))
                 }
 
                 if buckets.isEmpty {
                     // 🔴 `treatment` 表是空的、又沒設定起訖點時會走到這裡（§2.3.1.3）。
                     Text("尚無資料")
-                        .font(.system(size: 12))
+                        .font(.system(size: 16))
                         .foregroundStyle(StatsPalette.muted)
                         .frame(maxWidth: .infinity, minHeight: 175)
                 } else {
@@ -355,40 +374,48 @@ private struct StatsTrainingChartCard: View {
     /// （§6.1.1）——否則捲到一半會看不到自己在看什麼。
     @ViewBuilder
     private var chart: some View {
-        if needsScroll {
-            ScrollViewReader { proxy in
-                ScrollView(.horizontal, showsIndicators: false) {
-                    barsRow
-                        .padding(.horizontal, 2)
-                }
-                .onAppear {
-                    // 打開時自動捲到「今天所在的那一根」（§6.1.1）。
-                    // ⚠️ 要等版面算完才捲得到，直接呼叫會沒有作用。
-                    // ⚠️ `highlighted` 為 nil（今天不在範圍內）時**不捲**，停在最舊那一端。
-                    guard let target = highlighted else { return }
-                    DispatchQueue.main.async {
-                        proxy.scrollTo(target, anchor: .trailing)
-                    }
+        // GeometryReader：欄寬要從「實際可用寬度」除出來，寫死就沒辦法保證一次 9 根。
+        GeometryReader { geo in
+            if needsScroll {
+                scrollingChart(columnWidth: columnWidth(available: geo.size.width))
+            } else {
+                // ≤ 9 根：不捲動，等分填滿整個寬度。
+                barsRow(columnWidth: nil)
+            }
+        }
+        .frame(height: Self.chartHeight)
+    }
+
+    private func scrollingChart(columnWidth: CGFloat) -> some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                barsRow(columnWidth: columnWidth)
+            }
+            .onAppear {
+                // 打開時自動捲到「今天所在的那一根」（§6.1.1）。
+                // ⚠️ 要等版面算完才捲得到，直接呼叫會沒有作用。
+                // ⚠️ `highlighted` 為 nil（今天不在範圍內）時**不捲**，停在最舊那一端。
+                guard let target = highlighted else { return }
+                DispatchQueue.main.async {
+                    proxy.scrollTo(target, anchor: .trailing)
                 }
             }
-        } else {
-            barsRow
         }
     }
 
-    private var barsRow: some View {
+    /// - Parameter columnWidth: `nil` 代表不捲動、等分填滿。
+    private func barsRow(columnWidth: CGFloat?) -> some View {
         // ⚠️ 全部長條都是 0 時（只匯入菜單、還沒打過）不能拿來當分母。
         let maxV = max(buckets.map { metric.value(of: $0) }.max() ?? 0, 1)
-        // ⚠️ 週單位用 6：`第12週` 較寬，12 欄排下來會擠不下。
-        // 天單位只有 7 欄、標籤又短（9/1），可以放寬到 14 才不會太擁擠。
-        return HStack(alignment: .bottom, spacing: isDayMode ? 14 : 6) {
+        // 週／天用同一個間距：一次最多只排 9 欄，週單位不再需要為了塞下 12 欄而縮到 6。
+        return HStack(alignment: .bottom, spacing: Self.columnSpacing) {
             ForEach(buckets) { bucket in
                 let isHighlighted = highlighted == bucket.id
                 VStack(spacing: 8) {
                     // tooltip 只掛在「今天所在的那一根」上，顯示該根的實際值。
                     // ⚠️ 一定要 fixedSize()：tooltip 比長條本身寬，不加會被欄寬擠成「35…」。
                     Text(display(metric.value(of: bucket)))
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.white)
                         .fixedSize()
                         .padding(.horizontal, 6)
@@ -403,20 +430,29 @@ private struct StatsTrainingChartCard: View {
 
                     // fixedSize()：理由同上面的 tooltip，不加會被欄寬截成「第12…」。
                     Text(bucket.label)
-                        .font(.system(size: 10, weight: isHighlighted ? .semibold : .regular))
+                        .font(.system(size: 16, weight: isHighlighted ? .semibold : .regular))
                         .fixedSize()
                         .foregroundStyle(isHighlighted ? Color.white : StatsPalette.muted)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 3)
                         .background(isHighlighted ? StatsPalette.indigo : Color.clear)
                         .clipShape(Capsule())
+
+                    // 「第 N 週」看不出是哪幾天，補上實際日期區間。
+                    // ⚠️ 只有週單位需要——天單位的標籤本身就是日期（9/1），再加一次是重複。
+                    if !isDayMode {
+                        Text(statsRangeText(bucket))
+                            .font(.system(size: 12))
+                            .fixedSize()
+                            .foregroundStyle(StatsPalette.muted)
+                    }
                 }
                 // 捲動模式下每欄固定寬度；不捲動時維持等分填滿。
-                .frame(width: needsScroll ? Self.scrollColumnWidth : nil)
+                .frame(width: columnWidth)
                 .id(bucket.id)
             }
         }
-        .frame(height: 175, alignment: .bottom)
+        .frame(height: Self.chartHeight, alignment: .bottom)
     }
 }
 
@@ -427,72 +463,187 @@ private struct StatsTrainingChartCard: View {
 ///
 /// 🔴 資料全部來自 `StatisticsViewModel` 的 `weekBuckets`，
 /// 與長條圖是**同一份 buckets**——切法一致，不會出現「圖上有、表上沒有」。
+/// 一段 bucket 涵蓋的日期區間，`MM/DD-MM/DD`。長條標籤與執行紀錄表卡片標題共用。
+///
+/// 🔴 結束日要用 `end - 1 天`。bucket 是**半開區間** `[start, end)`，
+/// `end` 已經是下一段的起點——直接印會變成「08/03-08/10」，
+/// 而 08/10 其實屬於下一根。
+private func statsRangeText(_ bucket: StatsBucket) -> String {
+    let formatter = DateFormatter()
+    formatter.timeZone = TimeZone(identifier: "Asia/Taipei")
+    formatter.dateFormat = "MM/dd"
+    let start = Date(timeIntervalSince1970: TimeInterval(bucket.start) / 1000)
+    let last = Date(timeIntervalSince1970: TimeInterval(bucket.end - 86_400_000) / 1000)
+    return "\(formatter.string(from: start))-\(formatter.string(from: last))"
+}
+
+/// 量出執行紀錄表可用寬度，供比例欄寬使用。
+private struct StatsTableWidthKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 private struct StatsRecordTableCard: View {
     let bucket: StatsBucket
     let vm: StatisticsViewModel
 
-    /// ⚠️ **同一天可能有多場**（一天打好幾次遊戲），所以一天可能對應多列。
-    /// 編號是**這張卡片內的流水號**，不是 `treatment_result.id`，所以要先排序再編號。
-    private var sortedSessions: [StatsSession] {
-        bucket.sessions.sorted { $0.date < $1.date }
+    /// 卡片內容區的實際寬度。
+    /// ⚠️ 用 GeometryReader ＋ PreferenceKey **量**，不是拿 GeometryReader 直接包內容——
+    /// 表格高度是變動的（列數不固定），包起來會撐不開。
+    @State private var tableWidth: CGFloat = 0
+
+    /// 同一天的多場場次。編號與日期在這個群組裡是**合併儲存格**。
+    private struct DayGroup: Identifiable {
+        /// 台北時區當天 00:00 的毫秒值，同時當分組鍵與 `ForEach` 的 id。
+        let id: Int
+        let sessions: [StatsSession]
+    }
+
+    /// 依「台北時區的日期」分組。
+    ///
+    /// ⚠️ **同一天可能有多場**（一天打好幾次遊戲）——這正是要合併儲存格的原因。
+    /// 🔴 分組鍵一定要用 `Calendar.startOfDay` 搭配 `Asia/Taipei`，
+    /// 不能拿 `date / 86_400_000` 去除——那切出來的是 **UTC** 的日界，
+    /// 台北時間 08:00 之前的場次會被算到前一天。
+    ///
+    /// ⚠️ 用 `order` 陣列保留首次出現的順序，不要對 Dictionary 的 key 排序後再組——
+    /// 場次已經先依時間排好，跟著它走就是正確的日期順序。
+    private var dayGroups: [DayGroup] {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Asia/Taipei") ?? .current
+
+        var order: [Int] = []
+        var grouped: [Int: [StatsSession]] = [:]
+        for session in bucket.sessions.sorted(by: { $0.date < $1.date }) {
+            let day = calendar.startOfDay(for: Date(timeIntervalSince1970: TimeInterval(session.date) / 1000))
+            let key = Int(day.timeIntervalSince1970) * 1000
+            if grouped[key] == nil { order.append(key) }
+            grouped[key, default: []].append(session)
+        }
+        return order.map { DayGroup(id: $0, sessions: grouped[$0] ?? []) }
     }
 
     var body: some View {
         StatsCard {
             VStack(alignment: .leading, spacing: 12) {
-                Text(bucket.label)
-                    .font(.system(size: 16, weight: .semibold))
+                // firstTextBaseline：兩段字級差很多（24 / 16），
+                // 用預設的置中對齊會讓小的那段看起來浮在半空。
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(bucket.label)
+                        .font(.system(size: 24, weight: .semibold))
+                    Text(statsRangeText(bucket))
+                        .font(.system(size: 16))
+                        .foregroundStyle(StatsPalette.muted)
+                }
 
                 // ⚠️ 標頭用 alignment: .top —— 「運動後疼痛」是兩行，
                 // 其餘單行標頭要跟它的第一行對齊，不能垂直置中。
                 HStack(alignment: .top, spacing: 0) {
-                    headerCell("編號", width: 60)
-                    headerCell("日期", width: 100)
-                    headerCell("訓練時長", width: 120)
-                    headerCell("運動後疼痛\n（0不痛-10最痛）", width: 170)
-                    headerCell("備註（身體狀況）", width: 260)
+                    headerCell("編號", width: w(Self.rNo))
+                    headerCell("日期", width: w(Self.rDate))
+                    headerCell("單日訓練時長", width: w(Self.rDayDur))
+                    headerCell("動作", width: w(Self.rAction))
+                    headerCell("單場訓練時長", width: w(Self.rDuration))
+                    headerCell("運動後疼痛\n（0不痛-10最痛）", width: w(Self.rPain))
+                    headerCell("備註（身體狀況）", width: w(Self.rNote))
                 }
                 Divider().overlay(StatsPalette.hairline)
 
-                if sortedSessions.isEmpty {
+                if dayGroups.isEmpty {
                     // 🔴 未來的週照樣顯示卡片，但沒有資料列（§4.7.1）。
                     // 留空白會讓人以為載入失敗，所以明講。
                     Text("本週尚無紀錄")
-                        .font(.system(size: 12))
+                        .font(.system(size: 16))
                         .foregroundStyle(StatsPalette.muted)
                         .padding(.vertical, 12)
                 } else {
-                    ForEach(Array(sortedSessions.enumerated()), id: \.element.id) { index, session in
-                        HStack(spacing: 0) {
+                    // 🔴 編號是**「這張卡片裡的第幾天」**，不是場次流水號，
+                    // 也不是 `treatment_result.id`——一天打三場也只會有一個編號。
+                    ForEach(Array(dayGroups.enumerated()), id: \.element.id) { index, group in
+                        // alignment: .center ＝ 合併儲存格的垂直置中。
+                        // 高度由右邊那疊場次決定，編號與日期自然落在正中間。
+                        HStack(alignment: .center, spacing: 0) {
                             Text("\(index + 1)")
-                                .font(.system(size: 12))
+                                .font(.system(size: 16))
                                 .foregroundStyle(StatsPalette.muted)
-                                .frame(width: 60, alignment: .leading)
-                            Text(Self.dayText(session.date))
-                                .font(.system(size: 12))
-                                .frame(width: 100, alignment: .leading)
-                            Text(Self.durationText(session.durationMs))
-                                .font(.system(size: 12))
-                                .frame(width: 120, alignment: .leading)
-                            // 🔴 `nil` → 「－」；`0` → 「0」。
-                            // 0 是「完全不痛」的有效評分，不能跟「沒記錄」混為一談。
-                            Text(session.vas.map(String.init) ?? "－")
-                                .font(.system(size: 12))
-                                .frame(width: 170, alignment: .leading)
-                            Text(vm.noteText(for: session.noteIds))
-                                .font(.system(size: 12))
-                                .frame(width: 260, alignment: .leading)
+                                .frame(width: w(Self.rNo), alignment: .leading)
+                            Text(Self.dayText(group.id))
+                                .font(.system(size: 16))
+                                .frame(width: w(Self.rDate), alignment: .leading)
+                            // 🔴 單日訓練時長也是**合併格**——它是當天所有場次的加總，
+                            // 一天一個值，跟編號／日期同一層，不能放進右邊逐場的那一疊。
+                            Text(Self.durationText(group.sessions.reduce(0) { $0 + $1.durationMs }))
+                                .font(.system(size: 16))
+                                .frame(width: w(Self.rDayDur), alignment: .leading)
+
+                            VStack(spacing: 0) {
+                                ForEach(group.sessions) { session in
+                                    HStack(spacing: 0) {
+                                        // ⚠️ 動作名稱最長 11 字（「大腿後側肌群伸展（一）」），
+                                        // 窄畫面塞不下時截斷成「…」，不要讓它折行把整列撐高。
+                                        Text(vm.exerciseName(for: session.exerciseId))
+                                            .font(.system(size: 16))
+                                            .lineLimit(1)
+                                            .truncationMode(.tail)
+                                            .frame(width: w(Self.rAction), alignment: .leading)
+                                        Text(Self.durationText(session.durationMs))
+                                            .font(.system(size: 16))
+                                            .frame(width: w(Self.rDuration), alignment: .leading)
+                                        // 🔴 `nil` → 「－」；`0` → 「0」。
+                                        // 0 是「完全不痛」的有效評分，不能跟「沒記錄」混為一談。
+                                        Text(session.vas.map(String.init) ?? "－")
+                                            .font(.system(size: 16))
+                                            .frame(width: w(Self.rPain), alignment: .leading)
+                                        Text(vm.noteText(for: session.noteIds))
+                                            .font(.system(size: 16))
+                                            .frame(width: w(Self.rNote), alignment: .leading)
+                                    }
+                                    .padding(.vertical, 6)
+                                }
+                            }
                         }
-                        .padding(.vertical, 6)
+
+                        // 🔴 橫線只畫在**日與日之間**，同一天的多場之間不畫——
+                        // 畫下去會從中間切穿合併的編號／日期格，合併就白做了。
+                        // 最後一組後面也不畫，否則卡片底部會多一條懸空的線。
+                        if index < dayGroups.count - 1 {
+                            Divider().overlay(StatsPalette.hairline)
+                        }
                     }
                 }
             }
+            .background(
+                GeometryReader { geo in
+                    Color.clear.preference(key: StatsTableWidthKey.self, value: geo.size.width)
+                }
+            )
+            .onPreferenceChange(StatsTableWidthKey.self) { tableWidth = $0 }
         }
     }
 
+    // 欄寬。🔴 **比例制，不是固定 pt。**
+    //
+    // 先前是寫死的 pt，每加一次欄位、每改一次字級就得重量（已經發生三次）。
+    // 七欄之後固定寬度加起來超過 1000pt，窄一點的 iPad 會直接切掉右邊兩欄，
+    // 所以改成「量到卡片實際寬度，再按比例分」。
+    // ⚠️ 比例加總必須 = 1.0，改任何一個都要同時調另一個。
+    private static let rNo: CGFloat = 0.06       // 「編號」／一位數
+    private static let rDate: CGFloat = 0.09     // 「日期」／`9/6`
+    private static let rDayDur: CGFloat = 0.14   // 「單日訓練時長」（合併格）
+    private static let rAction: CGFloat = 0.18   // 「動作」／最長「大腿後側肌群伸展（一）」
+    private static let rDuration: CGFloat = 0.14 // 「單場訓練時長」
+    private static let rPain: CGFloat = 0.18     // 「（0不痛-10最痛）」，標頭比內容寬
+    private static let rNote: CGFloat = 0.21     // 備註，多則以「、」相連
+
+    /// 比例 → 實際寬度。
+    /// ⚠️ 第一次 layout 時 `tableWidth` 還是 0，用 700 當底避免那一幀擠成一直條。
+    private func w(_ ratio: CGFloat) -> CGFloat { max(tableWidth, 700) * ratio }
+
     private func headerCell(_ text: String, width: CGFloat) -> some View {
         Text(text)
-            .font(.system(size: 12))
+            .font(.system(size: 16))
             .foregroundStyle(StatsPalette.muted)
             .fixedSize(horizontal: false, vertical: true)
             .frame(width: width, alignment: .topLeading)
