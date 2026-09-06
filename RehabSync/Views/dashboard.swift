@@ -336,10 +336,11 @@ private struct DashboardSidebar: View {
             DashboardSidebarSectionLabel(text: "一般")
             DashboardSidebarItem(item: .overview, selectedNav: $selectedNav)
             DashboardSidebarItem(item: .statistics, selectedNav: $selectedNav)
-            // 藍牙除錯／動作測試頁（`TestPage`）入口。
-            // ⚠️ 這一列曾被註解掉隱藏起來，現已恢復顯示；底層（`DashboardNavItem.test`、
-            // `onNavigateToTest` 的傳遞鏈、`Home` 的 `selectedTab = .test`）從頭到尾都還在。
-            DashboardSidebarItem(item: .test, selectedNav: $selectedNav, action: onNavigateToTest)
+            // 藍牙除錯／動作測試頁（`TestPage`）入口——**刻意隱藏**，只在需要除錯時打開。
+            // ⚠️ 只有這一列被註解掉，底層（`DashboardNavItem.test`、`onNavigateToTest`
+            // 的傳遞鏈、`Home` 的 `selectedTab = .test`、`TestPage` 本身）從頭到尾都還在，
+            // 所以要顯示時**把下面這一行取消註解就好**，不需要改其他地方。
+//            DashboardSidebarItem(item: .test, selectedNav: $selectedNav, action: onNavigateToTest)
 
             Spacer()
 
