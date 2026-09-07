@@ -15,8 +15,6 @@ struct StatsSession: Identifiable {
     let date: Int
     /// 這一場的訓練時長（毫秒）。⚠️ **各組加總**，不含組間休息（§2.1）。
     let durationMs: Int
-    /// 這一場的總次數（`Σ reps`，§2.2）。
-    let reps: Int
     let vas: Int?
     let noteIds: [Int]?
     /// 這一場是哪個動作。⚠️ 可為 `nil`（孤兒列，見 `TreatmentResult.exercise_id`）。
@@ -34,7 +32,15 @@ struct StatsBucket: Identifiable {
     let sessions: [StatsSession]
 
     var durationMs: Int { sessions.reduce(0) { $0 + $1.durationMs } }
-    var reps: Int { sessions.reduce(0) { $0 + $1.reps } }
+    /// 這一段有幾**場**（§2.2 A）。
+    ///
+    /// 🔴 **就是列數，不做任何過濾**——時長 0 的場次照算（§2.2.1）。
+    /// 所以「時長 0 分鐘、場次 3 場」是可能且已接受的組合：那三場每一組都是
+    /// `start > 0` 但 `end == 0`，依 §2.1.1 整組跳過，算不出時長但確實打過。
+    ///
+    /// > 📌 這一欄原本是 `Σ reps`（總次數）。使用者改成「用場次計算」，
+    /// > 名稱與公式一起換掉——只改名不改公式會名不副實。
+    var sessionCount: Int { sessions.count }
 }
 
 enum StatsMetric {
@@ -44,7 +50,7 @@ enum StatsMetric {
     func value(of bucket: StatsBucket) -> Double {
         switch self {
         case .duration: Double(bucket.durationMs)
-        case .count:    Double(bucket.reps)
+        case .count:    Double(bucket.sessionCount)
         }
     }
 }
@@ -58,12 +64,20 @@ class StatisticsViewModel {
     /// 天單位長條：永遠是**本週**的週一～週日（§4.4）。
     private(set) var dayBuckets: [StatsBucket] = []
 
-    /// 兩張數值卡片用（§4.1／§4.2）。⚠️ 永遠是**自然週**，不跟著 baseline 走。
+    /// 兩張數值卡片用（§4.1／§4.2）。
+    /// ⚠️ 有起訖點設定時是**療程第 N 週**，沒有才是自然週（見 `windowIndex`）。
     private(set) var thisWeekDurationMs = 0
-    private(set) var thisWeekReps = 0
+    private(set) var thisWeekSessions = 0
     /// 「較上週」膠囊用（§4.2.1）。
     private(set) var lastWeekDurationMs = 0
-    private(set) var lastWeekReps = 0
+    private(set) var lastWeekSessions = 0
+
+    /// 卡片標題要顯示的療程週次（1 起算）。`nil` = 沒有 baseline，標題用「本週」。
+    ///
+    /// 🔴 這一欄存在的唯一理由是**標題**：baseline 模式下卡片算的是「療程第 N 週」，
+    /// 標題卻寫「本週」會不準——尤其今天落在療程範圍外被夾到端點時（§4.4.1.1），
+    /// 那個「本週」其實是三個月前的第 1 週或早就結束的最後一週。
+    private(set) var currentWeekNumber: Int?
 
     /// 備註編號 → 文字。執行紀錄表用（§4.7）。
     ///
@@ -114,25 +128,53 @@ class StatisticsViewModel {
                 .compactMap { exercise in exercise.id.map { (Int($0), exercise.name) } }
         )
 
-        // ── 兩張卡片：本週／上週（永遠自然週）──────────────────
-        let thisWeekStart = calendar.startOfWeek(for: now)
-        let thisWeekEnd = thisWeekStart.addingTimeInterval(TimeInterval(Self.weekMs / 1000))
-        let lastWeekStart = thisWeekStart.addingTimeInterval(-TimeInterval(Self.weekMs / 1000))
-
-        let thisWeek = sessions.filter { $0.date >= thisWeekStart.ms && $0.date < thisWeekEnd.ms }
-        let lastWeek = sessions.filter { $0.date >= lastWeekStart.ms && $0.date < thisWeekStart.ms }
-        thisWeekDurationMs = thisWeek.reduce(0) { $0 + $1.durationMs }
-        thisWeekReps = thisWeek.reduce(0) { $0 + $1.reps }
-        lastWeekDurationMs = lastWeek.reduce(0) { $0 + $1.durationMs }
-        lastWeekReps = lastWeek.reduce(0) { $0 + $1.reps }
-
         // ── 週單位：baseline 或 treatment 表 ────────────────
-        // 🔴 必須排在天單位**之前**：天單位有 baseline 時要跟著週單位切出來的
-        // 那一段走（見 `dayWindowStart`），需要 `weekBuckets` 已經算好。
+        // 🔴 必須**排在最前面**：兩張卡片與天單位在有 baseline 時都要跟著
+        // 週單位切出來的那一段走（見 `windowIndex`），需要 `weekBuckets` 先算好。
+        // 這個呼叫同時決定了 `usesBaseline`。
         weekBuckets = buildWeekBuckets(sessions: sessions, calendar: calendar)
 
+        let thisWeekStart = calendar.startOfWeek(for: now)
+        let window = windowIndex(now: now)
+
+        // ── 兩張卡片：本週／上週 ────────────────────────────
+        //
+        // | 起訖點設定 | 「本週」是 | 「上週」是 |
+        // |---|---|---|
+        // | **有值** | 療程第 N 週（今天所在的那一段）| 療程第 N−1 週 |
+        // | 沒有 | 自然週的週一～週日 | 前一個自然週 |
+        //
+        // 🔴 有 baseline 時**不能用自然週**：卡片與長條圖會變成兩段不同的時間，
+        // 「本週 3 小時」對不上被 highlight 那根的高度（先前 §6.1.2 記錄的落差）。
+        // 現在兩者同源，數字必定一致。
+        // 🔴 標題用的週次與卡片數值來自**同一個 `window`**，
+        // 不要另外算一次——兩者一旦分開算就有機會不一致。
+        currentWeekNumber = window.map { $0 + 1 }
+
+        if let window {
+            let current = weekBuckets[window]
+            thisWeekDurationMs = current.durationMs
+            thisWeekSessions = current.sessionCount
+            // ⚠️ 第 1 週沒有「上一段」→ 當成 0，「較上週」會顯示「－」（§4.2.1）。
+            let previous = window > 0 ? weekBuckets[window - 1] : nil
+            lastWeekDurationMs = previous?.durationMs ?? 0
+            lastWeekSessions = previous?.sessionCount ?? 0
+        } else {
+            let thisWeekEnd = thisWeekStart.addingTimeInterval(TimeInterval(Self.weekMs / 1000))
+            let lastWeekStart = thisWeekStart.addingTimeInterval(-TimeInterval(Self.weekMs / 1000))
+
+            let thisWeek = sessions.filter { $0.date >= thisWeekStart.ms && $0.date < thisWeekEnd.ms }
+            let lastWeek = sessions.filter { $0.date >= lastWeekStart.ms && $0.date < thisWeekStart.ms }
+            thisWeekDurationMs = thisWeek.reduce(0) { $0 + $1.durationMs }
+            thisWeekSessions = thisWeek.count
+            lastWeekDurationMs = lastWeek.reduce(0) { $0 + $1.durationMs }
+            lastWeekSessions = lastWeek.count
+        }
+
         // ── 天單位：baseline 的那一週，或自然週 ─────────────
-        let windowStart = dayWindowStart(now: now, naturalWeekStart: thisWeekStart)
+        let windowStart = window.map {
+            Date(timeIntervalSince1970: TimeInterval(weekBuckets[$0].start) / 1000)
+        } ?? thisWeekStart
         dayBuckets = (0..<7).compactMap { offset in
             guard let dayStart = calendar.date(byAdding: .day, value: offset, to: windowStart) else { return nil }
             let start = dayStart.ms
@@ -163,31 +205,29 @@ class StatisticsViewModel {
         return symbols[calendar.component(.weekday, from: date) - 1]
     }
 
-    /// 天單位那 7 天從哪一天開始。
+    /// 「本週」對應到 `weekBuckets` 的哪一個索引。`nil` = 沒有 baseline，用自然週。
     ///
-    /// | 起訖點設定 | 7 天是哪 7 天 |
+    /// 🔴 **兩張數值卡片與天單位那 7 天共用這一個答案。**
+    /// 有 baseline 時三者就是同一段時間的不同呈現，數字必定互相對得上；
+    /// 各自算各自的才是先前 §6.1.2 那個落差的成因。
+    ///
+    /// | 起訖點設定 | 「本週」是哪一段 |
     /// |---|---|
-    /// | **有值** | 週單位裡**今天所在的那一段**（起點可能是任何一天，不一定是週一）|
-    /// | 沒有 | 自然週的**台北週一** |
-    ///
-    /// 🔴 有 baseline 時，天單位與週單位就是**同一段時間的兩種顆粒度**，
-    /// 不再像先前那樣是兩段不相干的區間（§4.4.1）。
+    /// | **有值** | 今天所在的療程週（起點可能是任何一天，不一定是週一）|
+    /// | 沒有（回傳 `nil`）| 自然週的**台北週一**起算 |
     ///
     /// ⚠️ **今天可能不在 baseline 範圍內**（療程已結束或還沒開始）。
     /// 這時夾到最近的一端——早於範圍取第 1 段、晚於範圍取最後一段——
-    /// 而不是退回自然週：退回自然週會讓兩個分頁又變成不同區間，
+    /// 而不是退回自然週：退回去會讓卡片與長條圖又變成不同區間，
     /// 而療程結束後「最後一週」比「空白的本週」有用。
-    /// 🔴 夾到端點時**今天不在那 7 根裡**，所以不會有任何一根被 highlight，
-    /// 也不會有 tooltip（§4.4.2）——這是預期行為，不要補一根假的。
-    private func dayWindowStart(now: Date, naturalWeekStart: Date) -> Date {
-        guard usesBaseline,
-              let first = weekBuckets.first,
-              let last = weekBuckets.last else { return naturalWeekStart }
+    /// 🔴 夾到端點時**今天不在那一段裡**，長條圖不會有任何一根被 highlight、
+    /// 也不會有 tooltip（§4.4.2），但卡片仍然顯示那一段的數字——這是預期行為。
+    private func windowIndex(now: Date) -> Int? {
+        guard usesBaseline, !weekBuckets.isEmpty else { return nil }
 
         let t = now.ms
-        let window = weekBuckets.first { t >= $0.start && t < $0.end }
-            ?? (t < first.start ? first : last)
-        return Date(timeIntervalSince1970: TimeInterval(window.start) / 1000)
+        if let hit = weekBuckets.firstIndex(where: { t >= $0.start && t < $0.end }) { return hit }
+        return t < weekBuckets[0].start ? 0 : weekBuckets.count - 1
     }
 
     /// 撈出所有 `treatment_result` 並換算成 `StatsSession`。
@@ -202,7 +242,6 @@ class StatisticsViewModel {
                 id: id,
                 date: row.date,
                 durationMs: Self.duration(of: row),
-                reps: row.reps.reduce(0, +),
                 vas: row.vas,
                 noteIds: row.notes,
                 exerciseId: row.exercise_id

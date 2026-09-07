@@ -6,7 +6,7 @@ import SwiftUI
 //
 // | 分頁 | 內容 |
 // |---|---|
-// | 數值比較 | 兩張數值卡（本週訓練時長／次數）＋ 訓練時長長條圖 ＋ 訓練次數長條圖 |
+// | 數值比較 | 兩張數值卡（本週訓練時長／場次）＋ 訓練時長長條圖 ＋ 訓練場次長條圖 |
 // | 執行紀錄表 | 每一週一張表格卡片 |
 //
 // ✅ **資料全部來自 `StatisticsViewModel`**（statistics-plan.md 階段 1～5），
@@ -57,7 +57,7 @@ struct DashboardStatisticsContent: View {
                     summaryRow
                     StatsTrainingChartCard(title: "訓練時長", unit: "分鐘",
                                            metric: .duration, vm: statsVM)
-                    StatsTrainingChartCard(title: "訓練次數", unit: "次",
+                    StatsTrainingChartCard(title: "訓練場次", unit: "場",
                                            metric: .count, vm: statsVM)
                 } else if statsVM.weekBuckets.isEmpty {
                     // 沒設定起訖點、又沒匯入任何菜單時連一張卡片都切不出來（§2.3.1.3）。
@@ -121,22 +121,32 @@ struct DashboardStatisticsContent: View {
 
     // MARK: 兩張數值卡
 
-    /// ⚠️ 兩張卡片永遠用**自然週**，不跟著起訖點設定走（§2.3）——
-    /// 「本週」講的是使用者當下這一週，跟療程第幾週無關。
-    /// 🔴 所以有設定 baseline 時，這兩張卡片與下面長條圖的「週」定義不同，
-    /// 數字對不上是**預期的**（§6.1.2）。
+    /// 兩張卡片跟著起訖點設定走（§2.3）：
+    ///
+    /// | 起訖點設定 | 算的區間 | 標題 |
+    /// |---|---|---|
+    /// | **有值** | 療程第 N 週（今天所在的那一段）| 「第 N 週訓練時長／場次」|
+    /// | 沒有 | 自然週（台北週一～週日）| 「本週訓練時長／場次」|
+    ///
+    /// 🔴 **標題一定要跟著模式換。** baseline 模式下寫「本週」會不準——
+    /// 那一段的起點可能是週三，今天落在療程範圍外時更會是被夾到的
+    /// 第 1 週或最後一週（§4.4.1.1），跟「本週」完全無關。
+    private var weekPrefix: String {
+        statsVM.currentWeekNumber.map { "第\($0)週" } ?? "本週"
+    }
+
     private var summaryRow: some View {
         HStack(spacing: 16) {
             StatsSummaryCard(
-                title: "本週訓練時長",
+                title: "\(weekPrefix)訓練時長",
                 value: Self.durationText(statsVM.thisWeekDurationMs),
                 ratio: Self.ratio(current: statsVM.thisWeekDurationMs, previous: statsVM.lastWeekDurationMs),
                 tint: StatsPalette.cardBlue
             )
             StatsSummaryCard(
-                title: "本週訓練次數",
-                value: "\(statsVM.thisWeekReps) 次",
-                ratio: Self.ratio(current: statsVM.thisWeekReps, previous: statsVM.lastWeekReps),
+                title: "\(weekPrefix)訓練場次",
+                value: "\(statsVM.thisWeekSessions) 場",
+                ratio: Self.ratio(current: statsVM.thisWeekSessions, previous: statsVM.lastWeekSessions),
                 tint: StatsPalette.cardPink
             )
         }
@@ -145,7 +155,16 @@ struct DashboardStatisticsContent: View {
     /// 毫秒 → 「N 小時 M 分鐘」。不足一小時只顯示分鐘。
     /// ⚠️ 沒有訓練時顯示 `0 分鐘`，不是「－」——0 是真的沒訓練，不是沒記錄（§4.1）。
     private static func durationText(_ ms: Int) -> String {
-        let totalMinutes = ms / 60_000
+        // 🔴 **一定要用四捨五入，不能用 `ms / 60_000` 的整數除法。**
+        //
+        // 這一頁有三個地方把毫秒轉成分鐘：這裡、長條圖的 tooltip／平均
+        // （`display`）、執行紀錄表的時長欄。後兩者都是 `.rounded()`，
+        // 只有這裡曾經是整數除法（無條件捨去）——同一個 bucket 的
+        // 5.6 分鐘會變成卡片「5 分鐘」、長條「6 分鐘」，
+        // 看起來像兩邊算出不同的資料，其實只是進位規則不同。
+        //
+        // ⚠️ 日後再加第四個顯示時長的地方，也要用 `.rounded()`。
+        let totalMinutes = Int((Double(ms) / 60_000).rounded())
         let hours = totalMinutes / 60
         let minutes = totalMinutes % 60
         return hours > 0 ? "\(hours) 小時 \(minutes) 分鐘" : "\(minutes) 分鐘"
@@ -259,7 +278,7 @@ private struct StatsSummaryCard: View {
     }
 }
 
-// MARK: - 長條圖卡片（訓練時長／訓練次數共用）
+// MARK: - 長條圖卡片（訓練時長／訓練場次共用）
 
 /// ⚠️ 兩張卡片各自持有自己的 `selectedRange`，所以**週單位／天單位是分開切換的**——
 /// 切上面那張不會連動下面那張。
@@ -268,7 +287,7 @@ private struct StatsSummaryCard: View {
 /// 這個 struct 只負責畫，不做任何區間切割或單位換算。
 private struct StatsTrainingChartCard: View {
     let title: String
-    /// 數值後綴：訓練時長是「分鐘」、訓練次數是「次」。
+    /// 數值後綴：訓練時長是「分鐘」、訓練場次是「場」。
     let unit: String
     let metric: StatsMetric
     let vm: StatisticsViewModel
@@ -276,11 +295,21 @@ private struct StatsTrainingChartCard: View {
     @State private var selectedRange = 0
     private let ranges = ["週單位", "天單位"]
 
+    /// 使用者點選的長條。`nil` = 沒點過，用預設的「今天那一根」。
+    ///
+    /// 🔴 **不要把預設值直接寫成今天的索引** —— 那樣 `reload()` 之後根數變了、
+    /// 或今天不在範圍內時，這個索引會指向錯的一根。`nil` 代表「跟著今天走」，
+    /// 語意才不會過期。
+    @State private var selectedBar: Int?
+
     private var isDayMode: Bool { selectedRange == 1 }
     /// 天單位永遠是本週 7 天；週單位依 baseline／`treatment` 表決定根數（§4.3／§4.4）。
     private var buckets: [StatsBucket] { isDayMode ? vm.dayBuckets : vm.weekBuckets }
-    /// ⚠️ `nil` = 今天不在範圍內（療程已結束或還沒開始）→ **不 highlight 任何一根**（§4.4.2）。
-    private var highlighted: Int? { vm.todayIndex(in: buckets) }
+    /// 目前深紫色（含 tooltip）的那一根：**使用者點選的優先，否則是今天那一根**。
+    ///
+    /// ⚠️ `nil` = 沒點過、而且今天不在範圍內（療程已結束或還沒開始）
+    /// → **不 highlight 任何一根**（§4.4.2）。這時點一下任何一根就會有了。
+    private var highlighted: Int? { selectedBar ?? vm.todayIndex(in: buckets) }
     private var averageTitle: String { isDayMode ? "每天平均" : "每週平均" }
 
     /// 超過 12 根就改成水平捲動（statistics-plan.md §6.1.1）。
@@ -326,6 +355,19 @@ private struct StatsTrainingChartCard: View {
         }
     }
 
+    /// 「每週平均／每天平均」專用的格式（§2.2.2）。
+    ///
+    /// 🔴 **場次的平均一定要有小數位。** 14 場 ÷ 10 週 ＝ 1.4，
+    /// 用 `display` 四捨五入成「1 場」是 **−29%** 的誤差。
+    /// ⚠️ **時長維持整數分鐘**，不要一起改——兩者可容忍的誤差量級不同
+    /// （分鐘的四捨五入只差幾十秒）。
+    private func displayAverage(_ raw: Double) -> String {
+        switch metric {
+        case .duration: display(raw)
+        case .count:    String(format: "%.1f", raw) + unit
+        }
+    }
+
     var body: some View {
         StatsCard {
             VStack(alignment: .leading, spacing: 14) {
@@ -334,7 +376,12 @@ private struct StatsTrainingChartCard: View {
                         .font(.system(size: 16, weight: .semibold))
 
                     ForEach(Array(ranges.enumerated()), id: \.offset) { i, r in
-                        Button { selectedRange = i } label: {
+                        Button {
+                            selectedRange = i
+                            // 🔴 換粒度就把選取清掉：週單位的「第 3 根」與天單位的
+                            // 「第 3 根」是完全不同的東西，沿用只會指到不相干的一天。
+                            selectedBar = nil
+                        } label: {
                             Text(r)
                                 .font(.system(size: 16, weight: selectedRange == i ? .semibold : .regular))
                                 .foregroundStyle(selectedRange == i ? Color.black : StatsPalette.muted)
@@ -353,7 +400,7 @@ private struct StatsTrainingChartCard: View {
                     Text(averageTitle)
                         .font(.system(size: 16))
                         .foregroundStyle(StatsPalette.muted)
-                    Text(display(vm.average(buckets, metric: metric)))
+                    Text(displayAverage(vm.average(buckets, metric: metric)))
                         .font(.system(size: 24, weight: .bold))
                 }
 
@@ -368,6 +415,10 @@ private struct StatsTrainingChartCard: View {
                 }
             }
         }
+        // 重新進入統計頁 = 一次新的瀏覽，回到「今天那一根」。
+        // ⚠️ 外層 `ScrollView` 用的是一般 `VStack`（非 Lazy），所以這裡只會觸發一次；
+        // 若日後改成 `LazyVStack`，捲動時卡片重新出現也會觸發，選取會被莫名清掉。
+        .onAppear { selectedBar = nil }
     }
 
     /// 🔴 **只有長條那一列會捲動**，標題／平均／中位數／週單位天單位膠囊都留在外面固定不動
@@ -412,17 +463,18 @@ private struct StatsTrainingChartCard: View {
             ForEach(buckets) { bucket in
                 let isHighlighted = highlighted == bucket.id
                 VStack(spacing: 8) {
-                    // tooltip 只掛在「今天所在的那一根」上，顯示該根的實際值。
-                    // ⚠️ 一定要 fixedSize()：tooltip 比長條本身寬，不加會被欄寬擠成「35…」。
+                    // **每一根都顯示自己的值**，不是只有被選取的那一根。
+                    // 差別在樣式：選取的是深紫底白字的膠囊，其餘是灰色純文字，
+                    // 這樣「哪一根被選取」仍然一眼看得出來（長條顏色 ＋ 標籤膠囊 ＋ 這裡）。
+                    // ⚠️ 一定要 fixedSize()：文字比長條本身寬，不加會被欄寬擠成「35…」。
                     Text(display(metric.value(of: bucket)))
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .font(.system(size: 16, weight: isHighlighted ? .semibold : .regular))
+                        .foregroundStyle(isHighlighted ? Color.white : StatsPalette.muted)
                         .fixedSize()
                         .padding(.horizontal, 6)
                         .padding(.vertical, 3)
-                        .background(StatsPalette.indigoDark)
+                        .background(isHighlighted ? StatsPalette.indigoDark : Color.clear)
                         .clipShape(RoundedRectangle(cornerRadius: 4))
-                        .opacity(isHighlighted ? 1 : 0)
 
                     RoundedRectangle(cornerRadius: 4)
                         .fill(isHighlighted ? StatsPalette.indigo : StatsPalette.barLight)
@@ -449,6 +501,11 @@ private struct StatsTrainingChartCard: View {
                 }
                 // 捲動模式下每欄固定寬度；不捲動時維持等分填滿。
                 .frame(width: columnWidth)
+                // 🔴 `contentShape` 不能省：值為 0 的長條 `frame(height: 0)`，
+                // 沒有這一行就**點不到**——而「這一週沒訓練」正是使用者會想點來確認的情況。
+                // 整欄（含 tooltip 位置與標籤）都算命中區，不是只有長條本身。
+                .contentShape(Rectangle())
+                .onTapGesture { selectedBar = bucket.id }
                 .id(bucket.id)
             }
         }

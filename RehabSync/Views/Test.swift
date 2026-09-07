@@ -185,9 +185,9 @@ struct TestPage: View {
 
             Text("兩張卡片")
                 .font(.system(size: 12, weight: .semibold))
-            Text("本週　時長 \(Self.minutes(statsVM.thisWeekDurationMs))　次數 \(statsVM.thisWeekReps)")
+            Text("本週　時長 \(Self.minutes(statsVM.thisWeekDurationMs))　場次 \(statsVM.thisWeekSessions)")
                 .font(.system(size: 12, design: .monospaced))
-            Text("上週　時長 \(Self.minutes(statsVM.lastWeekDurationMs))　次數 \(statsVM.lastWeekReps)")
+            Text("上週　時長 \(Self.minutes(statsVM.lastWeekDurationMs))　場次 \(statsVM.lastWeekSessions)")
                 .font(.system(size: 12, design: .monospaced))
 
             Divider()
@@ -217,7 +217,7 @@ struct TestPage: View {
                 .foregroundStyle(.secondary)
         } else {
             ForEach(buckets) { bucket in
-                Text("\(todayIndex == bucket.id ? "▶ " : "  ")\(bucket.label)　時長 \(Self.minutes(bucket.durationMs))　次數 \(bucket.reps)　場次 \(bucket.sessions.count)")
+                Text("\(todayIndex == bucket.id ? "▶ " : "  ")\(bucket.label)　時長 \(Self.minutes(bucket.durationMs))　場次 \(bucket.sessionCount)")
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(todayIndex == bucket.id ? Color.accentColor : .primary)
             }
