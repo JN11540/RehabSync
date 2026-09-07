@@ -135,6 +135,9 @@ struct Dashboard: View {
     @State private var showIncompleteActionsModal = false
     @State private var showBluetoothBindingModal = false
     @State private var showTargetAngleEditModal = false
+    /// ⚠️ 放在 `Dashboard`（不是設定面板）裡，比照 `showTargetAngleEditModal` ——
+    /// 設定面板的「藍芽裝置綁定」那一塊掛著 `.id(statusTick)` 會被週期性重建。
+    @State private var showDateRangeEditModal = false
     @State private var deviceStatusTick = 0
     @Environment(BluetoothViewModel.self) private var btVM
     private let deviceVM = DeviceViewModel()
@@ -208,13 +211,27 @@ struct Dashboard: View {
                         .frame(width: 420)
                         .background(DashboardPalette.panelBackground)
                 } else if selectedNav == .settings {
+                    // 🔴 **這裡不可以掛 `.id(deviceStatusTick)`。**
+                    // `deviceStatusTick` 每 5 秒 +1（見下面的 `.task`），
+                    // 掛在整個設定頁上會讓 SwiftUI 每 5 秒把整頁**銷毀重建**，
+                    // 裡面所有 `@State` 一起被清掉——匯入的倒數、「匯入成功」提示、
+                    // 甚至還在跑的 `Task` 所寫入的狀態全部消失（資料其實有進資料庫，
+                    // 只是畫面看不到）。tick 改成傳進去，只讓真正需要的那一小塊重建。
                     DashboardSettingsPanel(
                         onBluetoothBindingTap: { showBluetoothBindingModal = true },
-                        onTargetAngleEditTap: { showTargetAngleEditModal = true }
+                        onTargetAngleEditTap: { showTargetAngleEditModal = true },
+                        onDateRangeEditTap: { showDateRangeEditModal = true },
+                        statusTick: deviceStatusTick
                     )
-                        .id(deviceStatusTick)
                         .padding(28)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color.white)
+                } else if selectedNav == .statistics {
+                    // ⚠️ `.padding(28)`／`.background` 與上面「總覽」那一支一致，標題位置才會對齊。
+                    // 內容本身在 `DashboardStatistics.swift`，自帶 ScrollView。
+                    DashboardStatisticsContent()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .padding(28)
                         .background(Color.white)
                 } else {
                     DashboardPlaceholderCard(title: selectedNav.title)
@@ -250,6 +267,15 @@ struct Dashboard: View {
                 DashboardTargetAngleEditModal(onClose: { showTargetAngleEditModal = false })
                     .frame(width: 640, height: 520)
             }
+
+            if showDateRangeEditModal {
+                Color.black.opacity(0.25)
+                    .ignoresSafeArea()
+
+                // 同樣 640×520（settings-plan.md 附錄 B.5）。
+                DashboardDateRangeEditModal(onClose: { showDateRangeEditModal = false })
+                    .frame(width: 640, height: 520)
+            }
         }
         .task {
             try? await Task.sleep(nanoseconds: 1_000_000_000)
@@ -264,11 +290,12 @@ struct Dashboard: View {
 // MARK: - Sidebar Nav
 
 private enum DashboardNavItem: CaseIterable {
-    case overview, training, test, test1, settings
+    case overview, statistics, training, test, test1, settings
 
     var title: String {
         switch self {
         case .overview: "總覽"
+        case .statistics: "統計"
         case .training: "訓練"
         case .test: "測試"
         case .test1: "測試1"
@@ -279,6 +306,7 @@ private enum DashboardNavItem: CaseIterable {
     var systemImage: String {
         switch self {
         case .overview: "square.grid.2x2.fill"
+        case .statistics: "chart.bar.fill"
         case .training: "arrow.left.arrow.right"
         case .test: "wrench.and.screwdriver"
         case .test1: "wrench.and.screwdriver.fill"
@@ -307,13 +335,12 @@ private struct DashboardSidebar: View {
 
             DashboardSidebarSectionLabel(text: "一般")
             DashboardSidebarItem(item: .overview, selectedNav: $selectedNav)
-            // 藍牙除錯／動作測試頁入口，**目前隱藏不顯示**。
-            //
-            // 只註解掉這一列的渲染，底層完全保留：`DashboardNavItem.test`、
-            // `onNavigateToTest` 的整條傳遞鏈（Home → Dashboard → Sidebar）、
-            // `Home` 裡切換 `selectedTab = .test` 顯示 `TestPage` 的邏輯都還在，
-            // 把下面這行取消註解就會恢復。
-            // DashboardSidebarItem(item: .test, selectedNav: $selectedNav, action: onNavigateToTest)
+            DashboardSidebarItem(item: .statistics, selectedNav: $selectedNav)
+            // 藍牙除錯／動作測試頁（`TestPage`）入口——**刻意隱藏**，只在需要除錯時打開。
+            // ⚠️ 只有這一列被註解掉，底層（`DashboardNavItem.test`、`onNavigateToTest`
+            // 的傳遞鏈、`Home` 的 `selectedTab = .test`、`TestPage` 本身）從頭到尾都還在，
+            // 所以要顯示時**把下面這一行取消註解就好**，不需要改其他地方。
+//            DashboardSidebarItem(item: .test, selectedNav: $selectedNav, action: onNavigateToTest)
 
             Spacer()
 
@@ -413,6 +440,12 @@ private struct DashboardSettingsPanel: View {
 
     /// `device` 表已經有 2 筆紀錄（不論目前是否有實際連線）就不能再綁新裝置，
     /// 跟人形圖／藍芽裝置綁定視窗左欄「最多同時綁 2 顆」是同一條規則，共用 `DeviceBindingRules`。
+    var onDateRangeEditTap: () -> Void = {}
+
+    /// 每 5 秒 +1 的裝置狀態脈搏。⚠️ **只用來重建「藍芽裝置綁定」那一塊**，
+    /// 不要拿去 `.id()` 整個設定頁（理由見呼叫端的註解）。
+    let statusTick: Int
+
     private var isMaxDevicesReached: Bool {
         DeviceBindingRules.snapshot(deviceVM: deviceVM, btVM: btVM).isMaxDevicesReached
     }
@@ -443,6 +476,9 @@ private struct DashboardSettingsPanel: View {
                     .disabled(isMaxDevicesReached)
                     .opacity(isMaxDevicesReached ? 0.4 : 1)
                 }
+                // 只有這一塊需要跟著裝置狀態重建（`isMaxDevicesReached` 是從
+                // `deviceVM`／`btVM` 現算的，不是 @Observable 屬性，不會自己更新）。
+                .id(statusTick)
 
                 VStack(alignment: .leading, spacing: 16) {
                     DashboardSettingsSectionTitle(text: "軟體版本")
@@ -457,6 +493,22 @@ private struct DashboardSettingsPanel: View {
 
                     // 樣式逐字比照上面的「藍芽裝置綁定」按鈕，只有標籤文字不同、沒有 disabled 條件。
                     Button(action: onTargetAngleEditTap) {
+                        Text("編輯")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                            .background(DashboardPalette.indigo)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                // settings-plan.md 附錄 B：統計頁的 baseline 起訖點。
+                VStack(alignment: .leading, spacing: 16) {
+                    DashboardSettingsSectionTitle(text: "起訖點設定")
+
+                    Button(action: onDateRangeEditTap) {
                         Text("編輯")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(.white)
@@ -579,10 +631,10 @@ private struct DashboardImportJSONPanel: View {
     @State private var pickerDelegate: ImportJSONPickerDelegate?
     @State private var importSuccess = false
     @State private var importError: String?
-
-    /// 用資料庫裡現有的 `Treatment` 判斷「之前是否已經上傳過 JSON」——`Treatment` 只有透過這裡的匯入，
-    /// 或 Setting 頁「移除所有資料」才會清空，所以能直接拿來當作是否允許再次匯入的依據。
-    private var hasExistingTreatment: Bool { !vm.treatments.isEmpty }
+    /// 匯入倒數（秒）。`nil` = 沒有在匯入。
+    /// ⚠️ 歸零後**停在 0**、不繼續往下跑，也不自動消失——要等匯入真的結束才清掉。
+    @State private var importCountdown: Int?
+    @State private var importCountdownTimer: Timer?
 
     private func topMostViewController(from base: UIViewController?) -> UIViewController? {
         if let presented = base?.presentedViewController {
@@ -591,23 +643,59 @@ private struct DashboardImportJSONPanel: View {
         return base
     }
 
+    /// 開始 10 秒倒數。
+    ///
+    /// 🔴 **歸零之後停在 0，不繼續遞減、也不自動隱藏。**
+    /// 倒數只是「還在跑」的可視回饋，真正的結束訊號是匯入完成——
+    /// 10 秒到了還沒好，代表這次匯入比預期久，讓它停在 0 比讓它消失誠實。
+    private func startImportCountdown() {
+        importCountdownTimer?.invalidate()
+        importCountdown = 10
+        importCountdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
+            guard let current = importCountdown else {
+                timer.invalidate()
+                return
+            }
+            if current > 0 {
+                importCountdown = current - 1
+            } else {
+                // 已經到 0：停掉計時器，數字留在畫面上不動。
+                timer.invalidate()
+                importCountdownTimer = nil
+            }
+        }
+    }
+
+    /// 匯入結束（成功或失敗都算）時停止倒數並清掉數字。
+    private func stopImportCountdown() {
+        importCountdownTimer?.invalidate()
+        importCountdownTimer = nil
+        importCountdown = nil
+    }
+
     private func presentFilePicker() {
-        guard !hasExistingTreatment else { return }
+        // 🔴 原本這裡有 `guard !hasExistingTreatment else { return }`，已移除。
+        // 留著的話按鈕看起來可以按、按下去卻什麼都不會發生——比 disabled 更糟。
         importSuccess = false
         importError = nil
 
         let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.json])
         let delegate = ImportJSONPickerDelegate { url in
-            do {
-                try vm.importTreatment(from: url)
-                importSuccess = true
-                Task {
+            // 選定檔案的當下就開始倒數；匯入結束（成功或失敗）立刻停掉。
+            startImportCountdown()
+            // ⚠️ `@MainActor`：`onPick` 是一般的非 isolated closure，
+            // 直接寫 `Task { }` 不會繼承主執行緒，之後對 `@State` 的寫入
+            // 會發生在背景執行緒上，UI 不一定會更新。
+            Task { @MainActor in
+                do {
+                    try await vm.importTreatment(from: url)
+                    stopImportCountdown()
+                    importSuccess = true
                     try? await Task.sleep(for: .seconds(3))
                     importSuccess = false
-                }
-            } catch {
-                importError = error.localizedDescription
-                Task {
+                } catch {
+                    stopImportCountdown()
+                    importError = error.localizedDescription
                     try? await Task.sleep(for: .seconds(3))
                     importError = nil
                 }
@@ -626,17 +714,21 @@ private struct DashboardImportJSONPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            DashboardSettingsSectionTitle(text: "匯入")
+            DashboardSettingsSectionTitle(text: "匯入訓練菜單")
 
-            if hasExistingTreatment {
-                Label("已經匯入過治療計畫，無法再次上傳 JSON。", systemImage: "exclamationmark.triangle.fill")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.orange)
-            } else {
-                Text("選擇一個 JSON 檔案匯入治療計畫。")
-                    .font(.system(size: 16))
-                    .foregroundStyle(DashboardPalette.mutedText)
-            }
+            // 「已經匯入過…無法再次上傳」的警告已移除，按鈕也不再 disabled ——
+            // 現在任何時候都可以再匯入一次。
+            //
+            // 🔴 **重複匯入是「整包取代」，不是追加。** `TreatmentViewModel.importTreatment`
+            // 在寫入前會呼叫 `clearAll()`，而它會把
+            // `treatment_result` → `treatment_content` → `treatment` 三張表**全部清空**
+            //（`TreatmentViewModel.swift:102`）。
+            // 也就是說**再匯入一次會刪掉所有已經打完的訓練紀錄**，
+            // 連帶那些場次的 VAS／症狀也一起消失，而且沒有任何確認視窗。
+            // 這是既有行為（先前靠這個按鈕鎖住才碰不到），本次只解除封鎖、沒有改動它。
+            Text("選擇一個 json 檔案匯入")
+                .font(.system(size: 16))
+                .foregroundStyle(DashboardPalette.mutedText)
 
             Button(action: presentFilePicker) {
                 Text("選擇檔案")
@@ -644,12 +736,16 @@ private struct DashboardImportJSONPanel: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 12)
-                    .background(hasExistingTreatment ? DashboardPalette.mutedText : DashboardPalette.indigo)
+                    .background(DashboardPalette.indigo)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
             }
             .buttonStyle(.plain)
-            .disabled(hasExistingTreatment)
 
+            if let importCountdown {
+                Label("匯入中… \(importCountdown)", systemImage: "arrow.down.circle")
+                    .font(.system(size: 16))
+                    .foregroundStyle(DashboardPalette.indigo)
+            }
             if importSuccess {
                 Label("匯入成功", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
@@ -663,6 +759,8 @@ private struct DashboardImportJSONPanel: View {
         .onAppear { vm.fetchAll() }
     }
 }
+
+// 「統計」頁的中欄內容在 `DashboardStatistics.swift`（`DashboardStatisticsContent`）。
 
 // MARK: - Overview Content (center column)
 
@@ -1165,6 +1263,138 @@ private struct DashboardBluetoothBindingModal: View {
 /// 已經打完的場次**不受影響**，因為目標角度在遊戲開始時已存進
 /// `treatment_result.target_angle` 快照（migration v13）。
 /// 這個「歷史不會被改動」的性質正是敢開這個 UI 的前提。
+/// 「起訖點設定」編輯視窗（settings-plan.md 附錄 B）。
+///
+/// 左半唯讀顯示目前已存的值、右半兩個 `DatePicker`，按「確定」才寫入（比照 §6 的既有決議）。
+private struct DashboardDateRangeEditModal: View {
+    let onClose: () -> Void
+
+    @State private var settingVM = SettingViewModel()
+    @State private var startDate = Date()
+    /// 🔴 終點預設**隔天**，不是今天。
+    /// 兩個都給今天會讓 `start < end` 一開始就不成立、確定鈕直接是灰的——
+    /// 那正是 B.6 要避免的「一打開就面對按不下去的按鈕」。
+    @State private var endDate = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
+
+    /// 🔴 兩個都要有值、且 `start < end` 才能存（B.6 第 3 項）。
+    /// `DatePicker` 一定有值，所以這裡只需要驗大小；
+    /// 「只設一個」在 UI 上不可能發生——這正是預設兩個都給今天的理由，
+    /// 否則第一次打開會面對一個永遠按不下去的按鈕。
+    private var canSave: Bool {
+        taipeiMidnight(startDate) < taipeiMidnight(endDate)
+    }
+
+    /// 🔴 存**台北時區**的午夜秒數（B.4.1）。
+    /// ⚠️ 與匯入資料的慣例（UTC 午夜）差 8 小時，兩者目前不互相比較；
+    /// 日後若要比，必須先對齊時區。
+    private func taipeiMidnight(_ date: Date) -> Int {
+        Int(taipeiCalendar().startOfDay(for: date).timeIntervalSince1970)
+    }
+
+    /// 把已存的秒數顯示成台北時區的 yyyy-MM-dd。
+    private func formatted(_ seconds: Int?) -> String {
+        guard let seconds else { return "未設定" }
+        let formatter = DateFormatter()
+        formatter.timeZone = TimeZone(identifier: "Asia/Taipei")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: Date(timeIntervalSince1970: TimeInterval(seconds)))
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("起訖點設定")
+                .font(.system(size: 22, weight: .semibold))
+                .padding(20)
+
+            Divider()
+
+            HStack(spacing: 0) {
+                // 左：目前設定（唯讀）
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("目前設定")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(DashboardPalette.mutedText)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("起點").font(.system(size: 14)).foregroundStyle(DashboardPalette.mutedText)
+                        Text(formatted(settingVM.startTime)).font(.system(size: 18, weight: .medium))
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("終點").font(.system(size: 14)).foregroundStyle(DashboardPalette.mutedText)
+                        Text(formatted(settingVM.endTime)).font(.system(size: 18, weight: .medium))
+                    }
+                    Spacer()
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+                Divider()
+
+                // 右：編輯
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("編輯")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(DashboardPalette.mutedText)
+
+                    DatePicker("起點", selection: $startDate, displayedComponents: .date)
+                        .datePickerStyle(.compact)
+                    DatePicker("終點", selection: $endDate, displayedComponents: .date)
+                        .datePickerStyle(.compact)
+
+                    if !canSave {
+                        Text("起點必須早於終點。")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.red)
+                    }
+
+                    Spacer()
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }
+
+            Divider()
+
+            HStack(spacing: 12) {
+                Spacer()
+                Button("取消", action: onClose)
+                    .font(.system(size: 16))
+                    .foregroundStyle(DashboardPalette.mutedText)
+
+                Button {
+                    // 已有值時直接覆蓋，不另外確認（B.6 第 4 項）。
+                    settingVM.saveDateRange(start: taipeiMidnight(startDate),
+                                            end: taipeiMidnight(endDate))
+                    onClose()
+                } label: {
+                    Text("確定")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(canSave ? DashboardPalette.indigo : DashboardPalette.mutedText)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+                .buttonStyle(.plain)
+                .disabled(!canSave)
+            }
+            .padding(20)
+        }
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .onAppear {
+            settingVM.fetchDateRange()
+            // 已有值就帶入既有設定，沒有才用今天（B.6 的初始值決議）。
+            if let s = settingVM.startTime {
+                startDate = Date(timeIntervalSince1970: TimeInterval(s))
+            }
+            if let e = settingVM.endTime {
+                endDate = Date(timeIntervalSince1970: TimeInterval(e))
+            }
+        }
+    }
+}
+
 private struct DashboardTargetAngleEditModal: View {
     let onClose: () -> Void
 
@@ -1199,9 +1429,9 @@ private struct DashboardTargetAngleEditModal: View {
     /// 所以右欄一定要把方向顯示出來，否則治療師會調反。
     /// ⚠️ 這張表與各 `Working*` 裡的判定式是兩份，改判定方向要兩邊一起改。
     private static let directions: [Int64: (quantity: String, symbol: String, biggerMeans: String)] = [
-        2:  ("膝屈曲角", "≤", "數字調大 = 變簡單（不必伸那麼直）"),
-        9:  ("髖屈曲角", "≥", "數字調大 = 變難（要蹲更深）"),
-        22: ("髖屈曲角", "≥", "數字調大 = 變難（要蹲更深）"),
+        2:  ("大腿–小腿相對夾角", "≤", "數字調大 = 變簡單（不必伸那麼直）"),
+        9:  ("軀幹–大腿相對夾角", "≥", "數字調大 = 變難（要蹲更深）"),
+        22: ("軀幹–大腿相對夾角", "≥", "數字調大 = 變難（要蹲更深）"),
     ]
 
     /// 左欄順序：可編輯的排前面，其餘接在後面，兩組各自維持 `id` 遞增。
@@ -1425,22 +1655,23 @@ private struct DashboardIncompleteActionsModal: View {
     @State private var showBluetoothNotBoundAlert = false
     private let deviceVM = DeviceViewModel()
 
+    /// 🔴 載入**所有**菜單的內容，不再只取第一份（settings-plan.md A.9.1）。
+    /// 下面的過濾只看日期、不看 `treatment_id`，所以資料池變大就自然涵蓋所有菜單。
     private func loadData() {
         treatmentVM.fetchAll()
-        if let treatmentId = treatmentVM.treatments.first?.id {
-            contentVM.fetchAll(for: Int(treatmentId))
-        }
+        contentVM.fetchAll()
         exerciseVM.fetchAll()
     }
 
     private var incompleteTodayContents: [TreatmentContent] {
-        guard let treatmentId = treatmentVM.treatments.first?.id else { return [] }
         let calendar = taipeiCalendar()
         let today = calendar.startOfDay(for: Date())
         let todayContents = contentVM.contents.filter {
             calendar.startOfDay(for: Date(timeIntervalSince1970: TimeInterval($0.date))) == today
         }
-        let completedIds = resultVM.fetchCompletedContentIds(for: Int(treatmentId))
+        // 🔴 依「今天這些 content 的 id」查，不是依 treatment_id（A.9.1.3）。
+        let todayIds = todayContents.compactMap { $0.id.map(Int.init) }
+        let completedIds = resultVM.fetchCompletedContentIds(in: todayIds)
         return todayContents.filter { !completedIds.contains(Int($0.id ?? -1)) }
     }
 
@@ -1560,12 +1791,14 @@ private struct DashboardSchedulePanel: View {
     @State private var bellShakeAngle: Double = 0
     private let deviceVM = DeviceViewModel()
 
-    /// 資料庫沒有治療計畫選擇 UI，比照 Test1 的作法，以第一個治療計畫代表「目前的訓練菜單」。
+    /// 🔴 **合併顯示**：載入所有菜單的內容，不分 `treatment_id`（settings-plan.md A.9.1）。
+    ///
+    /// ⚠️ 這裡原本是「以第一個治療計畫代表目前的訓練菜單」——
+    /// 追加匯入之後那會讓第二份以後的菜單永遠看不到。
+    /// 週曆／今日動作／鈴鐺全部只依日期過濾，所以合併之後不需要選擇菜單的 UI。
     private func loadTrainingMenu() {
         treatmentVM.fetchAll()
-        if let treatmentId = treatmentVM.treatments.first?.id {
-            contentVM.fetchAll(for: Int(treatmentId))
-        }
+        contentVM.fetchAll()
         exerciseVM.fetchAll()
     }
 
@@ -1604,8 +1837,10 @@ private struct DashboardSchedulePanel: View {
     /// 今天安排的動作是否全部至少做過一次（`treatment_result` 裡有對應的 `treatment_content_id`）；
     /// 今天沒有安排任何動作時視為「已完成」，鈴鐺不需要震動提醒。
     private var allTodayContentsDone: Bool {
-        guard let treatmentId = treatmentVM.treatments.first?.id else { return true }
-        let completedIds = resultVM.fetchCompletedContentIds(for: Int(treatmentId))
+        // 🔴 依「今天這些 content 的 id」查，不是依 treatment_id（A.9.1.3）——
+        // 合併顯示之後今天的動作可能來自任何一份菜單。
+        let todayIds = todayContents.compactMap { $0.id.map(Int.init) }
+        let completedIds = resultVM.fetchCompletedContentIds(in: todayIds)
         return todayContents.allSatisfy { completedIds.contains(Int($0.id ?? -1)) }
     }
 

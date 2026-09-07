@@ -252,6 +252,33 @@ func createAppDatabase() throws -> DatabaseQueue {
         """)
     }
 
+    migrator.registerMigration("v14") { db in
+        // 備註選項表。只建結構，內容由 `NoteViewModel.seedIfNeeded()` 在 app 啟動時
+        // 從 `Util/note.json` 填入 —— seed 讀檔可能失敗，放在 migration 裡失敗就是
+        // `DatabaseManager` 的 `try!` 直接 crash、使用者 app 開不起來。
+        try db.create(table: "notes") { t in
+            // 編號自己指定（來自 note.json），不是 autoincrement。
+            t.column("id", .integer).primaryKey().notNull()
+            t.column("name", .text).notNull()
+        }
+
+        try db.alter(table: "treatment_result") { t in
+            // 兩欄都可為 NULL：NULL = 這一場沒有記錄，與「真的填了某個值」明確區分。
+            // ⚠️ VAS 的 0 是「完全不痛」，用 NOT NULL DEFAULT 0 回填既有列，
+            // 「當時沒記錄」與「真的評 0 分」就永遠分不出來了。
+            t.add(column: "vas", .integer)
+            // TEXT 存 `[Int]` JSON 陣列，比照同表的 reps／extension_length／set_start_time。
+            // 一場可以有多則備註 —— note.json 的 6 則裡有好幾組是能並存的
+            //（「大腿有點痠」＋「頭暈、喘」），單一 id 會逼治療師二選一。
+            //
+            // 🔴 **不能宣告外鍵** —— 外鍵只能建在單一純量欄位上，
+            // 陣列裡的編號 SQLite 一律不檢查：寫 [99] 會成功、刪掉被引用的備註不會被擋。
+            // 去重、排序、孤兒編號的顯示全部是 app 端的責任。
+            // 這是拿外鍵保護換多值能力的一次性決定（SQLite 不能事後加外鍵）。
+            t.add(column: "notes", .text)
+        }
+    }
+
     try migrator.migrate(dbQueue)
     return dbQueue
 }

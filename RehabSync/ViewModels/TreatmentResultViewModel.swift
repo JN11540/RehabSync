@@ -51,10 +51,18 @@ class TreatmentResultViewModel {
         }) ?? 0
     }
 
-    func fetchCompletedContentIds(for treatmentId: Int) -> Set<Int> {
+    /// 這批 `treatment_content` 裡，哪些已經有訓練紀錄（＝做過至少一次）。
+    ///
+    /// 🔴 **篩選維度是 `treatment_content_id`，不是 `treatment_id`**（settings-plan.md A.9.1.3）。
+    /// 合併顯示之後不能再用「第一份菜單的 treatment_id」來查，但也**不可以**改成
+    /// 拿掉篩選全撈——`treatment_result` 每打完一場就多一列、隨使用時間無上限成長，
+    /// 跟「菜單內容有限」不是同一個量級。呼叫端本來就算得出今天有哪些 content，
+    /// 直接傳進來，查詢量只跟今天安排幾個動作有關。
+    func fetchCompletedContentIds(in contentIds: [Int]) -> Set<Int> {
+        guard !contentIds.isEmpty else { return [] }
         let fetched = (try? db.read { db in
             try TreatmentResult
-                .filter(Column("treatment_id") == treatmentId)
+                .filter(contentIds.contains(Column("treatment_content_id")))
                 .fetchAll(db)
         }) ?? []
         return Set(fetched.map { $0.treatment_content_id })
@@ -325,6 +333,24 @@ enum GameDataExporter {
         /// ⚠️ `0` = 這一場沒有記錄（v13 之前的舊場次）。實務上匯出只能從遊戲結束的
         /// `CompletionPopup` 觸發，舊場次不會再被匯出，所以不會出現 0。
         let target_angle: Double
+        /// 這一場的 VAS 疼痛評分（v14／working2 §23）。
+        ///
+        /// ⚠️ `nil` 印 `null`，跟 `0`（完全不痛）是兩件事。
+        let vas: Int?
+        /// 這一場的症狀備註（v14／working2 §23）。
+        ///
+        /// 🔴 **輸出文字不是編號。** 資料庫存的是 `notes` 表的 `id` 陣列，
+        /// 但 `notes` 表不在匯出範圍內——收到檔案的人手上沒有對照表，
+        /// 裸數字 `[2, 6]` 對他等於沒有資訊（同 `exercise_id` 直接寫進檔案的理由）。
+        ///
+        /// 🔴 **`nil` 印 `null`，不可以印 `[]`。** 匯出檔案是唯一會離開這台裝置的東西，
+        /// `nil`（沒問到）與 `[]`（問了、沒有症狀）的區分在檔案裡也必須保留——
+        /// 印成 `[]` 等於把「這一場沒記錄」謊報成「治療師確認沒有症狀」。
+        /// ⚠️ 所以組裝時**不要寫 `?? []`**。
+        ///
+        /// ⚠️ 這是**文字快照**，資料庫存的是編號引用：日後有人改了 `notes.name` 的措辭，
+        /// 舊檔案保留當時的文字、資料庫跟著新文字走，兩者對帳時不會逐字相同。
+        let notes: [String]?
     }
 
     private static func buildTreatmentResultJSON(_ result: TreatmentResult, side: Int) -> String {
@@ -340,7 +366,10 @@ enum GameDataExporter {
             // 兩欄都直接取自 `result` —— 不用查 `exercise` 表、也不用保底值，
             // 因為 target_angle 已經是遊戲當時寫下的快照（working2 §22.5.7）。
             exercise_id: result.exercise_id,
-            target_angle: result.target_angle
+            target_angle: result.target_angle,
+            vas: result.vas,
+            // 🔴 `map` 而不是 `?? []` —— result.notes 是 nil 時整欄要印 null。
+            notes: result.notes.map(noteTexts(for:))
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted]
@@ -348,5 +377,22 @@ enum GameDataExporter {
             return "{}"
         }
         return json
+    }
+
+    /// 把 `treatment_result.notes` 的編號翻成 `notes.name` 的文字。
+    ///
+    /// ⚠️ 查不到的編號輸出 `#N（已刪除）` 佔位，**不要靜默丟掉** ——
+    /// `compactMap` 掉會讓那一場的病歷少一項而檔案看起來完全正常。
+    /// 編號沒有外鍵（`notes` 是 JSON 陣列，外鍵只能建在純量欄位上），
+    /// 所以「指到不存在的編號」在資料庫層面是允許的，這裡必須自己處理。
+    /// ⚠️ 直接讀資料庫、不走 `NoteViewModel`：這裡只需要一次性的查表，
+    /// 而 `runExport()` 是在背景佇列跑的，沒必要為此建一個 `@Observable` 物件
+    /// 並在背景執行緒改它的 `notes` 屬性。這裡也不需要排序（只是組 lookup）。
+    private static func noteTexts(for ids: [Int]) -> [String] {
+        let notes = (try? DatabaseManager.shared.dbQueue.read { db in
+            try Note.fetchAll(db)
+        }) ?? []
+        let byId = Dictionary(uniqueKeysWithValues: notes.map { ($0.id, $0.name) })
+        return ids.map { byId[$0] ?? "#\($0)（已刪除）" }
     }
 }

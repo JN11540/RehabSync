@@ -23,6 +23,11 @@ struct TestPage: View {
 
     @Environment(\.goHome) private var goHome
     @State private var exgDisplayMode: EXGDisplayMode = .raw
+    /// 只給下方「Treatment 紀錄」列表用，驗證重複匯入有沒有真的追加。
+    @State private var treatmentVM = TreatmentViewModel()
+    /// statistics-plan.md **階段 1** 的驗證用：把資料層算出來的數字印在這裡，
+    /// 統計頁本身還是假資料、一行都沒改。
+    @State private var statsVM = StatisticsViewModel()
 
     /// 四個動作的校正規格。收集層完全共用，差異只在真值、姿勢檢查軸、經驗係數。
     /// 動作 9／12／22 的校正姿勢都是站立，僅係數不同（9 是左1.7/右1.55，12 與 22 兩側都 1.7）。
@@ -98,6 +103,149 @@ struct TestPage: View {
     private func exgStatus(deviceId: Int64?, channel: Int) -> EXGChannelStatus? {
         guard let deviceId else { return nil }
         return btVM.exgChannelStatus["\(deviceId)-\(channel)"]
+    }
+
+    // MARK: - Treatment 紀錄（重複匯入測試用）
+
+    /// 目前資料庫裡所有的 `treatment` 列。
+    ///
+    /// ⚠️ 這是**除錯用**的列表，用來驗證「可重複匯入訓練菜單」有沒有真的追加成功——
+    /// dashboard 只會顯示 `treatments.first`（settings-plan.md A.9），
+    /// 所以匯入第二份菜單之後，**只有這裡看得到它**。
+    @ViewBuilder
+    private var treatmentListPanel: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Treatment 紀錄")
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Text("共 \(treatmentVM.treatments.count) 筆")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+
+            if treatmentVM.treatments.isEmpty {
+                Text("尚無資料")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(treatmentVM.treatments, id: \.id) { t in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(t.name)
+                            .font(.system(size: 13, weight: .medium))
+                        Text("start_time：\(Self.formatEpochSeconds(t.start_time))")
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                        Text("end_time：\(Self.formatEpochSeconds(t.end_time))")
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(8)
+                    .background(Color.white.opacity(0.6))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+            }
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .onAppear { treatmentVM.fetchAll() }
+    }
+
+    // MARK: - 統計資料層（除錯）
+
+    /// 把 `StatisticsViewModel` 算出來的每一個 bucket 原始值列出來。
+    ///
+    /// 🔴 **不要只看統計頁的平均／中位數就以為對了**——只打幾場的話，
+    /// 14 根裡只有 1～2 根非 0，算錯也看不出來（statistics-plan.md §0.3）。
+    /// 這個面板就是為了人工核對每一根的原始值。
+    ///
+    /// ⚠️ 這是**除錯用**的，刻意留在測試頁（統計頁本身不顯示這些）。
+    @ViewBuilder
+    private var statisticsDebugPanel: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("統計資料層（除錯）")
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Button("重新計算") { statsVM.reload() }
+                    .font(.system(size: 12))
+            }
+
+            Text("模式：\(statsVM.usesBaseline ? "起訖點設定" : "自然週（treatment 表 MIN/MAX）")")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+            Text("範圍：\(Self.msRange(statsVM.rangeStartMs, statsVM.rangeEndMs))")
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(.secondary)
+
+            Divider()
+
+            Text("兩張卡片")
+                .font(.system(size: 12, weight: .semibold))
+            Text("本週　時長 \(Self.minutes(statsVM.thisWeekDurationMs))　場次 \(statsVM.thisWeekSessions)")
+                .font(.system(size: 12, design: .monospaced))
+            Text("上週　時長 \(Self.minutes(statsVM.lastWeekDurationMs))　場次 \(statsVM.lastWeekSessions)")
+                .font(.system(size: 12, design: .monospaced))
+
+            Divider()
+
+            Text("週單位（\(statsVM.weekBuckets.count) 根，平均 \(Self.minutes(Int(statsVM.average(statsVM.weekBuckets, metric: .duration))))／中位數 \(Self.minutes(Int(statsVM.median(statsVM.weekBuckets, metric: .duration)))))")
+                .font(.system(size: 12, weight: .semibold))
+            bucketList(statsVM.weekBuckets, todayIndex: statsVM.todayIndex(in: statsVM.weekBuckets))
+
+            Divider()
+
+            Text("天單位（本週 7 天）")
+                .font(.system(size: 12, weight: .semibold))
+            bucketList(statsVM.dayBuckets, todayIndex: statsVM.todayIndex(in: statsVM.dayBuckets))
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .onAppear { statsVM.reload() }
+    }
+
+    @ViewBuilder
+    private func bucketList(_ buckets: [StatsBucket], todayIndex: Int?) -> some View {
+        if buckets.isEmpty {
+            Text("（沒有任何 bucket——treatment 表是空的？）")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+        } else {
+            ForEach(buckets) { bucket in
+                Text("\(todayIndex == bucket.id ? "▶ " : "  ")\(bucket.label)　時長 \(Self.minutes(bucket.durationMs))　場次 \(bucket.sessionCount)")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(todayIndex == bucket.id ? Color.accentColor : .primary)
+            }
+        }
+    }
+
+    private static func minutes(_ ms: Int) -> String {
+        String(format: "%.1f 分", Double(ms) / 60_000)
+    }
+
+    private static func msRange(_ start: Int?, _ end: Int?) -> String {
+        guard let start, let end else { return "（無）" }
+        let formatter = DateFormatter()
+        formatter.timeZone = TimeZone(identifier: "Asia/Taipei")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return "\(formatter.string(from: Date(timeIntervalSince1970: TimeInterval(start) / 1000))) ~ \(formatter.string(from: Date(timeIntervalSince1970: TimeInterval(end) / 1000)))"
+    }
+
+    /// 🔴 `start_time`／`end_time` 以**秒**為單位的 Unix epoch。
+    ///
+    /// 這兩個欄位在此之前**全專案沒有任何程式讀過**（settings-plan.md A.5.4），
+    /// 單位一直沒有被驗證。判定依據是實際的匯入檔 `PLAN-AUTO_治療計畫.json`：
+    /// `1785888000` 當秒解讀是 2026-08-05、當毫秒解讀是 1970-01-21，
+    /// 只有前者說得通。⚠️ 若日後出現毫秒的來源，這裡會顯示成 1970 年的日期。
+    private static func formatEpochSeconds(_ seconds: Int) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter.string(from: Date(timeIntervalSince1970: TimeInterval(seconds)))
     }
 
     @ViewBuilder
@@ -457,6 +605,12 @@ struct TestPage: View {
                         exgChannelPanel(title: "小腿 CH1", status: exgStatus(deviceId: calfDeviceId, channel: 1))
                     }
                     .padding(.horizontal, 24)
+
+                    treatmentListPanel
+                        .padding(.horizontal, 24)
+
+                    statisticsDebugPanel
+                        .padding(.horizontal, 24)
                 }
                 .padding(.top, 72)
                 .padding(.bottom, 40)
