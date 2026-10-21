@@ -258,9 +258,28 @@ enum KneeCalibration {
         var qualifiedThighAlpha: [Double] = []
         var qualifiedShankAlpha: [Double] = []
 
+        // 配對失敗分類（只供診斷，不影響判定）：
+        // k_c 落在小腿 buffer 之前／之後 = 兩側時間軸偏移；落在範圍內卻找不到 = 小腿編號有洞（掉包或 serial 跳號）
+        let calfFirstK = calfSamples.first!.k
+        let calfLastK = calfSamples.last!.k
+        var missEarly = 0, missLate = 0, missHole = 0
+        var maxOutOfRange = 0   // 越界時 k_c 距離 buffer 邊界最遠的樣本數
+
         for t in thighSamples {
             guard let c = findPair(kThigh: t.k, thighFit: thighFit,
-                                   calfSamples: calfSamples, calfFit: calfFit) else { continue }
+                                   calfSamples: calfSamples, calfFit: calfFit) else {
+                let kc = calfFit.b > 0 ? calfFit.sampleIndex(atTime: thighFit.time(at: t.k)) : Int.min
+                if kc < calfFirstK {
+                    missEarly += 1
+                    if kc != Int.min { maxOutOfRange = max(maxOutOfRange, calfFirstK - kc) }
+                } else if kc > calfLastK {
+                    missLate += 1
+                    maxOutOfRange = max(maxOutOfRange, kc - calfLastK)
+                } else {
+                    missHole += 1
+                }
+                continue
+            }
             pairedCount += 1
 
             let thighOK = checkThigh(spec, t, side: side)
@@ -274,6 +293,19 @@ enum KneeCalibration {
         }
 
         let qualified = qualifiedThighAlpha.count
+
+        let thighHoles = (thighSamples.last!.k - thighSamples.first!.k + 1) - thighSamples.count
+        let calfHoles = (calfLastK - calfFirstK + 1) - calfSamples.count
+        let firstKc = calfFit.b > 0 ? calfFit.sampleIndex(atTime: thighFit.time(at: thighSamples.first!.k)) : 0
+        let pairingDiag = String(format: """
+            配對失敗分類   落在小腿之前=%d 之後=%d（時間軸偏移，最遠 %d 筆 ≈ %.0fms）／範圍內有洞=%d
+              k 範圍         大腿=[%d, %d] 缺 %d 筆  小腿=[%d, %d] 缺 %d 筆
+              大腿首筆對應   k_c=%d（應落在小腿範圍內，與小腿首筆差 %d 筆 ≈ %.0fms）
+            """,
+            missEarly, missLate, maxOutOfRange, Double(maxOutOfRange) * calfFit.b, missHole,
+            thighSamples.first!.k, thighSamples.last!.k, thighHoles,
+            calfFirstK, calfLastK, calfHoles,
+            firstKc, firstKc - calfFirstK, Double(firstKc - calfFirstK) * calfFit.b)
 
         // ---- 步驟 4：合格數達標 ----
         if qualified >= spec.minQualifiedSamples {
@@ -290,6 +322,7 @@ enum KneeCalibration {
                              thighPacketCount: thighPacketCount, calfPacketCount: calfPacketCount,
                              pairedCount: pairedCount, thighOnlyPass: thighOnlyPass,
                              calfOnlyPass: calfOnlyPass, qualified: qualified, message: msg,
+                             pairing: pairingDiag,
                              extra: String(format: "meanThigh=%.2f° meanShank=%.2f° C=(%.3f, %.3f) → o_thigh=%.2f° o_calf=%.2f°",
                                            meanThigh, meanShank, coef.thigh, coef.calf, oThigh, oCalf))
             return KneeCalibrationResult(thigh: oThigh, calf: oCalf, message: msg, side: side)
@@ -329,7 +362,8 @@ enum KneeCalibration {
                          thighFit: thighFit, calfFit: calfFit,
                          thighPacketCount: thighPacketCount, calfPacketCount: calfPacketCount,
                          pairedCount: pairedCount, thighOnlyPass: thighOnlyPass,
-                         calfOnlyPass: calfOnlyPass, qualified: qualified, message: msg)
+                         calfOnlyPass: calfOnlyPass, qualified: qualified, message: msg,
+                         pairing: pairingDiag)
         return KneeCalibrationResult(thigh: nil, calf: nil, message: msg, side: side)
     }
 
@@ -374,7 +408,7 @@ enum KneeCalibration {
         thighFit: BLEClockFit, calfFit: BLEClockFit,
         thighPacketCount: Int, calfPacketCount: Int,
         pairedCount: Int, thighOnlyPass: Int, calfOnlyPass: Int, qualified: Int,
-        message: String, extra: String? = nil
+        message: String, pairing: String? = nil, extra: String? = nil
     ) {
         print("""
 
@@ -387,7 +421,7 @@ enum KneeCalibration {
           平滑暖機損耗   \(warmupVerdict(packetCount: thighPacketCount, sampleCount: thighSamples.count, label: "大腿"))
                          \(warmupVerdict(packetCount: calfPacketCount, sampleCount: calfSamples.count, label: "小腿"))
           成功配對       \(pairedCount)（佔大腿樣本 \(thighSamples.isEmpty ? 0 : pairedCount * 100 / thighSamples.count)%）
-          姿勢通過       大腿=\(thighOnlyPass)  小腿=\(calfOnlyPass)  同時=\(qualified)（門檻 \(spec.minQualifiedSamples)）
+        \(pairing.map { "  \($0)\n" } ?? "")  姿勢通過       大腿=\(thighOnlyPass)  小腿=\(calfOnlyPass)  同時=\(qualified)（門檻 \(spec.minQualifiedSamples)）
         \(extra.map { "  \($0)\n" } ?? "")  → \(message)
         ==========================================================
 

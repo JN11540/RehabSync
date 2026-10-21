@@ -872,10 +872,32 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
                 }
                 if let c = map[CBUUID(string: config.sub_acc_uuid)] { peripheral.setNotifyValue(true, for: c) }
             }
-            let c = deviceVM.accRowCounts()
             print("[TKE] 路徑啟用（wasRecording=\(wasRecording)）。notify 開啟，tkeCollecting 已填入兩顆。")
-            print("[TKE-DB] 啟用前 acc 表：總筆數=\(c.total)，treatment_result_id 為 nil=\(c.orphan)")
+            // 🔴 不可以在 bleQueue 上直接數 acc 表：bleQueue 也是 CBCentralManager 的 delegate queue，
+            // acc 表要到 1728 萬列才會被 cleanupIfNeeded 清理，COUNT 全表掃描會卡住 bleQueue 好幾秒。這段期間到達的封包
+            // 會在解除阻塞後一口氣處理、拿到幾乎相同的 nowMs，tkeClock 的回歸因此被扭曲，
+            // 校正時大腿與小腿就對不上（步驟 5c「無法對齊」）。資料越多越嚴重，所以是「越用越壞」。
+            Self.logAccRowCounts(deviceVM, label: "啟用前")
         }
+    }
+
+    /// 測試 A 用的 acc 表筆數診斷，**刻意丟到背景佇列**，不佔用 bleQueue（理由見 startTKEPath 內的說明）。
+    /// 同時印出耗時，用來確認資料量是否已大到會拖慢 BLE 處理。
+    ///
+    /// **只在 DEBUG 執行**：背景佇列仍會佔住 `DatabaseQueue`，查詢期間其他資料庫存取都要等
+    ///（例如主執行緒的 `fetchAnySide()`）。測試 A 是開發驗收用途，正式版不需要付這個成本
+    ///（tke-sitting-calibration-port-plan.md §12.3）。
+    private static func logAccRowCounts(_ dvm: DeviceViewModel, label: String, footer: String? = nil) {
+        #if DEBUG
+        DispatchQueue.global(qos: .utility).async {
+            let start = Date()
+            let c = dvm.accRowCounts()
+            let ms = Date().timeIntervalSince(start) * 1000
+            print(String(format: "[TKE-DB] %@ acc 表：總筆數=%d，treatment_result_id 為 nil=%d（查詢耗時 %.0fms）",
+                         label, c.total, c.orphan, ms))
+            if let footer { print(footer) }
+        }
+        #endif
     }
 
     /// 執行一次膝角校正（tke-sitting-calibration-port-plan.md §9 階段 5）。
@@ -1194,9 +1216,8 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
                     guard let self else { return }
                     tkeCollecting = []
                     tkeDraining = false
-                    let c = deviceVM.accRowCounts()
-                    print("[TKE-DB] 排空完成後 acc 表：總筆數=\(c.total)，treatment_result_id 為 nil=\(c.orphan)")
-                    print("[TKE-DB] → 測試 A 判定：這兩個數字都必須與「啟用前」完全相同")
+                    Self.logAccRowCounts(deviceVM, label: "排空完成後",
+                                         footer: "[TKE-DB] → 測試 A 判定：這兩個數字都必須與「啟用前」完全相同")
                 }
             }
         }
