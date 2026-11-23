@@ -996,9 +996,12 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
 
     // MARK: - TKE 即時角度（§9 階段 6）
 
-    /// 每次 tick 最多往回退幾筆大腿樣本（1 個封包）。
-    /// 小腿封包間隔 192ms ≈ tick 間隔 200ms，最新一筆大腿樣本對應的小腿樣本經常還沒到。
-    private static let tkeLiveWalkBack = 20
+    /// 每次 tick 最多往回退幾筆大腿樣本（3 個封包 ≈ 576ms）。
+    /// 小腿封包間隔 192ms ≈ tick 間隔 200ms，最新一筆大腿樣本對應的小腿樣本經常還沒到；
+    /// iOS 又會把通知累積起來一次送，小腿可能同時落後 2～3 包，只退 1 包會連續 miss、
+    /// 畫面跳成「等待資料...」（tke-sitting-calibration-port-plan.md §13）。
+    /// 576ms 仍小於封包新鮮度門檻 1000ms，不會拿到比那更舊的資料。
+    private static let tkeLiveWalkBack = 60
     /// 連續配不到幾次 tick 就清空角度。5 次 ≈ 1 秒，與封包新鮮度門檻對齊。
     private static let tkeLiveMissLimit = 5
 
@@ -1087,7 +1090,7 @@ final class BluetoothViewModel: NSObject, CBCentralManagerDelegate {
                   let thighFit = tkeClock[thighId]?.fit(),
                   let calfFit = tkeClock[calfId]?.fit() else { return }
 
-            // 防護一：從最新一筆往回退，最多一個封包。
+            // 防護一：從最新一筆往回退，最多 tkeLiveWalkBack 筆（3 個封包）。
             // 回退必須發生在**大腿側**——在小腿側找鄰近樣本等同「取最近鄰替代」，
             // 那是 findPair 明令禁止的行為。往回取較舊的大腿樣本，配到的仍是時間上真正對應的小腿樣本。
             var paired: (thigh: BLESample, calf: BLESample)?
